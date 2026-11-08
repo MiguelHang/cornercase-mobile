@@ -3,8 +3,7 @@ use std::future::{self, Future};
 
 use futures_util::future::{BoxFuture, FutureExt};
 use futures_util::stream::BoxStream;
-use futures_util::{SinkExt, sink, stream};
-use tokio::sync::mpsc;
+use futures_util::{SinkExt, stream};
 
 use super::{Closed, Exit, Out, OutSink, StderrTail, Stdin, Transport};
 use crate::error::Error;
@@ -62,15 +61,6 @@ impl Transport for FakeTransport {
             None => future::ready(Err(Error::Unscripted(argv))).boxed(),
         }
     }
-}
-
-pub(crate) fn listen() -> (OutSink, mpsc::UnboundedReceiver<Out>) {
-    let (sender, receiver) = mpsc::unbounded_channel();
-    let sink = sink::unfold(sender, async |sender, out| {
-        sender.send(out).map_err(|_| Closed)?;
-        Ok(sender)
-    });
-    (Box::pin(sink), receiver)
 }
 
 fn owned(words: &[&str]) -> Vec<String> {

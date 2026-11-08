@@ -3,6 +3,7 @@ use std::task::{Context, Poll, Waker};
 
 use futures_util::{SinkExt, StreamExt, sink, stream};
 use rstest::rstest;
+use serde::Deserialize;
 
 use super::*;
 
@@ -63,6 +64,106 @@ mod transport {
         let mut running = Counting.run(Vec::new(), stdin, out);
         let polled = running.as_mut().poll(&mut Context::from_waker(Waker::noop()));
         assert_eq!(polled, Poll::Ready(Err(Error::OutputClosed)));
+    }
+}
+
+fn words(words: &[&str]) -> Vec<String> {
+    words.iter().map(|&word| word.to_owned()).collect()
+}
+
+mod output {
+    use super::*;
+    use crate::transport::fake::FakeTransport;
+
+    #[rstest]
+    #[case::nothing(&[], "")]
+    #[case::one_line(&["main"], "main")]
+    #[case::several_lines(&["a", "b", "c"], "a\nb\nc")]
+    #[case::empty_lines(&["", "a", ""], "\na\n")]
+    #[tokio::test]
+    async fn joins_the_stdout_lines_with_a_newline(#[case] lines: &[&str], #[case] stdout: &str) {
+        let fake = FakeTransport::default().answer(&["list"], lines, &[], 0);
+        let output = output(&fake, words(&["list"])).await.expect("an answer");
+        assert_eq!(output.stdout, stdout);
+    }
+
+    #[tokio::test]
+    async fn keeps_the_stderr_and_the_code_apart() {
+        let fake = FakeTransport::default().answer(&["kill"], &["half"], &["warning: a", "error: b"], 3);
+        let output = output(&fake, words(&["kill"])).await;
+        let expected = Output { stdout: "half".to_owned(), stderr: "warning: a\nerror: b".to_owned(), code: 3 };
+        assert_eq!(output, Ok(expected));
+    }
+
+    #[tokio::test]
+    async fn sends_no_input_and_ends_it_at_once() {
+        let fake = FakeTransport::default().script(&["read"], async |stdin, mut out| {
+            let inputs = stdin.count().await;
+            out.send(Out::Stdout(format!("{inputs} inputs"))).await.map_err(|Closed| Error::OutputClosed)?;
+            Ok(Exit { code: 0, stderr: String::new() })
+        });
+        let output = output(&fake, words(&["read"])).await.expect("an answer");
+        assert_eq!(output.stdout, "0 inputs");
+    }
+
+    #[tokio::test]
+    async fn passes_the_transport_error_on() {
+        let fake = FakeTransport::default().fail(&["status"], Error::Dropped);
+        assert_eq!(output(&fake, words(&["status"])).await, Err(Error::Dropped));
+    }
+}
+
+mod json {
+    use super::*;
+    use crate::transport::fake::FakeTransport;
+
+    #[derive(Debug, PartialEq, Eq, Deserialize)]
+    struct Contract {
+        version: u32,
+        requests: Vec<String>,
+    }
+
+    async fn contract(fake: &FakeTransport) -> Result<Contract, Error> {
+        json(fake, words(&["contract", "--json"])).await
+    }
+
+    #[tokio::test]
+    async fn reads_a_json_spread_over_lines() {
+        let lines = ["{", "  \"version\": 2,", "  \"requests\": [\"status\", \"watch\"]", "}"];
+        let fake = FakeTransport::default().answer(&["contract", "--json"], &lines, &[], 0);
+        let expected = Contract { version: 2, requests: words(&["status", "watch"]) };
+        assert_eq!(contract(&fake).await, Ok(expected));
+    }
+
+    #[tokio::test]
+    async fn adds_nothing_to_the_argv() {
+        let fake = FakeTransport::default().answer(&["contract"], &["{}"], &[], 0);
+        let parsed: Result<serde_json::Value, Error> = json(&fake, words(&["contract"])).await;
+        assert_eq!(parsed, Ok(serde_json::json!({})));
+    }
+
+    #[tokio::test]
+    async fn fails_with_the_code_and_the_stderr() {
+        let fake = FakeTransport::default().answer(&["contract", "--json"], &["{}"], &["error: no server"], 2);
+        assert_eq!(contract(&fake).await, Err(Error::Failed { code: 2, stderr: "error: no server".to_owned() }));
+    }
+
+    #[tokio::test]
+    async fn passes_the_transport_error_on() {
+        let fake = FakeTransport::default().fail(&["contract", "--json"], Error::Unauthorized);
+        assert_eq!(contract(&fake).await, Err(Error::Unauthorized));
+    }
+
+    #[rstest]
+    #[case::syntax(&["secret-token"], "not JSON at line 1 column 1")]
+    #[case::wrong_type(&["{\"version\": \"secret-token\"}"], "not the expected shape at line 1 column 26")]
+    #[case::too_short(&["{\"version\": 2,", "\"requests\": [\"secret\""], "the JSON ends too early at line 2 column 21")]
+    #[tokio::test]
+    async fn names_the_place_but_not_the_text(#[case] lines: &[&str], #[case] reason: &str) {
+        let fake = FakeTransport::default().answer(&["contract", "--json"], lines, &[], 0);
+        let error = contract(&fake).await.expect_err("not a contract");
+        assert_eq!(error, Error::Json(reason.to_owned()));
+        assert!(!error.to_string().contains("secret"), "the message leaks the output: {error}");
     }
 }
 

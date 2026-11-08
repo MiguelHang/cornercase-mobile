@@ -1,8 +1,12 @@
+use std::iter;
 use std::pin::Pin;
 
-use futures_util::Sink;
 use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
+use futures_util::{Sink, StreamExt, sink, stream};
+use serde::de::DeserializeOwned;
+use serde_json::error::Category;
+use tokio::sync::mpsc;
 
 use crate::error::Error;
 
@@ -27,6 +31,13 @@ pub struct Exit {
     pub stderr: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Output {
+    pub stdout: String,
+    pub stderr: String,
+    pub code: i32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Closed;
 
@@ -39,6 +50,44 @@ pub trait Transport: Send + Sync {
         stdin: BoxStream<'static, Stdin>,
         out: OutSink,
     ) -> BoxFuture<'_, Result<Exit, Error>>;
+}
+
+pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Output, Error> {
+    let (out, mut receiver) = listen();
+    let exit = transport.run(argv, stream::empty().boxed(), out).await?;
+    let stdout: Vec<String> = iter::from_fn(|| receiver.try_recv().ok())
+        .filter_map(|out| match out {
+            Out::Stdout(line) => Some(line),
+            Out::Stderr(_) => None,
+        })
+        .collect();
+    Ok(Output { stdout: stdout.join("\n"), stderr: exit.stderr, code: exit.code })
+}
+
+pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
+    let output = output(transport, argv).await?;
+    if output.code != 0 {
+        return Err(Error::Failed { code: output.code, stderr: output.stderr });
+    }
+    serde_json::from_str(&output.stdout).map_err(|error| json_error(&error))
+}
+
+pub(crate) fn listen() -> (OutSink, mpsc::UnboundedReceiver<Out>) {
+    let (sender, receiver) = mpsc::unbounded_channel();
+    let sink = sink::unfold(sender, async |sender, out| {
+        sender.send(out).map_err(|_| Closed)?;
+        Ok(sender)
+    });
+    (Box::pin(sink), receiver)
+}
+
+fn json_error(error: &serde_json::Error) -> Error {
+    let reason = match error.classify() {
+        Category::Syntax | Category::Io => "not JSON",
+        Category::Eof => "the JSON ends too early",
+        Category::Data => "not the expected shape",
+    };
+    Error::Json(format!("{reason} at line {} column {}", error.line(), error.column()))
 }
 
 #[cfg_attr(not(test), expect(dead_code, reason = "the bridge transport collects its stderr with it"))]

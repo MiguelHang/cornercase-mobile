@@ -3,6 +3,7 @@ use rstest::rstest;
 use tokio::sync::mpsc;
 
 use super::*;
+use crate::transport::listen;
 
 fn words(words: &[&str]) -> Vec<String> {
     owned(words)
