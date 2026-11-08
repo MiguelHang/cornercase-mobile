@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: build + lint + tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: toolchain
+        run: rustup toolchain install
+
+      - name: system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libssl-dev \
+            libxdo-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: build frontend
+        run: pnpm build
+
+      - name: fmt
+        run: cargo fmt --check
+
+      - name: clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: tests
+        run: cargo test --workspace --locked
+
+      - name: svelte-check
+        run: pnpm check
+
+      - name: lint
+        run: pnpm lint
+
+      - name: frontend tests
+        run: pnpm test
