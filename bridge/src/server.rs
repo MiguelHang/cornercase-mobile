@@ -6,19 +6,18 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures_util::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::tungstenite::Error;
-use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
-use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{WebSocketStream, accept_hdr_async_with_config};
 
 use crate::process::LONGEST_LINE;
 
 mod auth;
+mod connection;
 
 use auth::Gate;
 
@@ -29,7 +28,6 @@ const HANDSHAKE: Duration = Duration::from_secs(10);
 const CONNECTIONS: usize = 64;
 const LARGEST_MESSAGE: usize = 1 << 20;
 const WRITE_BUFFER_LIMIT: usize = 7 * LONGEST_LINE;
-const CLOSING: Duration = Duration::from_secs(2);
 const ACCEPT_PAUSE: Duration = Duration::from_millis(100);
 
 pub struct Config {
@@ -106,12 +104,12 @@ async fn serve(stream: TcpStream, peer: SocketAddr, config: Arc<Config>, permit:
         handshake(stream, peer, Gate::Full { peer }, config.handshake).await;
         return;
     };
-    let Some(mut socket) = handshake(stream, peer, Gate::Open { token: &config.token, peer }, config.handshake).await
+    let Some(socket) = handshake(stream, peer, Gate::Open { token: &config.token, peer }, config.handshake).await
     else {
         return;
     };
     log(format_args!("accepted {peer}"));
-    close(&mut socket).await;
+    connection::serve(socket, peer, &config).await;
 }
 
 async fn handshake(
@@ -139,14 +137,6 @@ fn websocket() -> WebSocketConfig {
         .max_message_size(Some(LARGEST_MESSAGE))
         .max_frame_size(Some(LARGEST_MESSAGE))
         .max_write_buffer_size(WRITE_BUFFER_LIMIT)
-}
-
-async fn close(socket: &mut WebSocketStream<TcpStream>) {
-    let frame = CloseFrame { code: CloseCode::Normal, reason: "".into() };
-    if socket.close(Some(frame)).await.is_err() {
-        return;
-    }
-    let _ = timeout(CLOSING, async { while let Some(Ok(_)) = socket.next().await {} }).await;
 }
 
 fn log(message: fmt::Arguments<'_>) {
