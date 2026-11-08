@@ -15,7 +15,7 @@
 <section class="screen">
   <header class="brand">
     <Mark unit={5} />
-    <Wordmark size={22} />
+    <h1 class="name"><Wordmark size={22} /></h1>
   </header>
   <div class="card" in:riseIn out:fadeOut>
     <Glass>
@@ -43,6 +43,11 @@
     gap: var(--inset);
   }
 
+  .name {
+    margin: 0;
+    font-size: inherit;
+  }
+
   .card {
     width: 100%;
     max-width: 520px;
@@ -51,6 +56,6 @@
   .actions {
     display: flex;
     justify-content: center;
-    padding: 0 28px 28px;
+    padding: 0 var(--inset-card) var(--inset-card);
   }
 </style>

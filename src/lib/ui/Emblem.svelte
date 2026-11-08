@@ -21,7 +21,7 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 40px 28px 28px;
+    padding: 40px var(--inset-card) var(--inset-card);
     text-align: center;
   }
 

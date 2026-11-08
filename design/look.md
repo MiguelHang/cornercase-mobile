@@ -6,7 +6,7 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 
 - **`src/lib/theme/tokens.css` keeps `theme.rs`'s names in kebab-case** (`brand_light` is `--brand-light`, `radius::CARD` is `--radius-card`), so a colour is found by the same name in both repositories. The colours are `mod colours`; `--glass` is gpui's opaque ground, the one it uses on Linux.
 - **The whole palette is ported, not only what the first screen uses.** The states, `--veil`, `--field`, `--selection` and the rest are one piece of data copied as a whole, so the two repositories cannot drift apart; that is not dead code, which is about functions and components. A test checks that every `var(--x)` in `src/` is defined, in `tokens.css` or in the same file (a component's own property, like `Mark`'s `--unit`); it does not check that every token is used.
-- **Spacing, fonts and durations are not in `theme.rs`, so their names are ours.** `--gap` (8 px) and the panel margins `--inset` (12 px) and `--inset-wide` (16 px) come from the literals in gpui's `ui/mod.rs`; `--enter`, `--leave` and `--pop` from `ui/motion.rs`'s `ENTER`, `LEAVE` and `POP`. The durations also live in `src/lib/ui/motion.ts`, which the transitions read, and a test keeps the two equal.
+- **Spacing, fonts and durations are not in `theme.rs`, so their names are ours.** `--gap` (8 px) and the panel margins `--inset` (12 px) and `--inset-wide` (16 px) come from the literals in gpui's `ui/mod.rs`; `--inset-card` (28 px) is a card's own padding, shared by `Emblem`'s page and the actions under it so that the two keep the card symmetric; `--enter`, `--leave` and `--pop` from `ui/motion.rs`'s `ENTER`, `LEAVE` and `POP`. The durations also live in `src/lib/ui/motion.ts`, which the transitions read, and a test keeps the two equal.
 - **No Tokyo Night colour**: the terminal's palette comes with the terminal (task 020).
 - Colours with an alpha are written `rgb(r g b / a)` from the token's channels, not `color-mix()`, which iOS 15 lacks (the deployment target is 15.0).
 
@@ -34,8 +34,8 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 
 ## Components
 
-- **A component arrives with its first use**, so nothing sits unused. The first screen brought `Glass`, `Button` (primary and resting), `Emblem` (gpui's `emblem`, `emblem_page` and `emblem_line`), `Mark`, `Wordmark` and `Icon` (`server` only). The spinner, sheet, notice card, the dot and cursor that pulse while connecting and the normal and danger tones of `Button` come with task 014; `StatusDot` and the working orbit with 015; `Chip` with 014, 015 or 027. A gallery that only shows them was rejected for the same reason.
-- **`src/routes/` holds the screens**, starting with `NoMachines.svelte`, which `App.svelte` mounts until task 014 brings navigation. `src/lib/theme/` holds the tokens and the page's base styles, which `main.ts` imports so that the tests' server rendering does not need them.
+- **A component arrives with its first use**, so nothing sits unused. The first screen brought `Glass`, `Button` (primary and resting), `Emblem` (gpui's `emblem`, `emblem_page` and `emblem_line`), `Mark`, `Wordmark` and `Icon` (`server` only). The spinner, sheet, notice card, the dot and cursor that pulse while connecting and the normal and danger tones of `Button` come with task 014; `StatusDot` and the working orbit with 015; `Chip` with 014, 015 or 027. A gallery that only shows them was rejected for the same reason, and so was a radius prop on `Glass`, which keeps `--radius-card` until task 014's sheet needs `--radius-sheet`.
+- **`src/routes/` holds the screens**, starting with `NoMachines.svelte`, which `App.svelte` mounts until task 014 brings navigation. A screen's wordmark is its `h1`, so the headings of its cards start at `h2`. `src/lib/theme/` holds the tokens and the page's base styles, which `main.ts` imports so that the tests' server rendering does not need them.
 
 ## Launch
 
