@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::os::unix::fs::PermissionsExt;
 
 use rstest::rstest;
 
 use super::*;
+use crate::test_util::TempDir;
 
 const EXECUTABLES: &[&str] =
     &["/opt/cc/cornercase", "/usr/local/bin/cornercase", "/usr/bin/cornercase", "/usr/bin/cc-dev", "./dev/cornercase"];
@@ -132,5 +134,17 @@ mod is_executable {
     #[case::a_missing_path("/nonexistent/cornercase", false)]
     fn needs_a_file_with_an_execute_bit(#[case] path: &str, #[case] expected: bool) {
         assert_eq!(super::is_executable(Path::new(path)), expected);
+    }
+
+    #[rstest]
+    #[case::the_owner_s(0o700, true)]
+    #[case::only_the_group_s(0o070, false)]
+    #[case::only_the_others_(0o007, false)]
+    fn needs_the_execute_bit_that_applies_to_this_user(#[case] mode: u32, #[case] expected: bool) {
+        let dir = TempDir::new();
+        let path = dir.path().join("cornercase");
+        std::fs::write(&path, "#!/bin/sh\n").expect("write the file");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).expect("set its mode");
+        assert_eq!(super::is_executable(&path), expected);
     }
 }

@@ -1,13 +1,13 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+
+use rustix::fs::{Access, access};
 
 pub const VARIABLE: &str = "CORNERCASE_BIN";
 const OPTION: &str = "--cornercase";
 const DEFAULT_NAME: &str = "cornercase";
-const EXECUTE_BITS: u32 = 0o111;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
@@ -66,7 +66,7 @@ pub fn find(
 }
 
 pub fn is_executable(path: &Path) -> bool {
-    fs::metadata(path).is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & EXECUTE_BITS != 0)
+    fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) && access(path, Access::EXEC_OK).is_ok()
 }
 
 fn has_slash(name: &OsStr) -> bool {

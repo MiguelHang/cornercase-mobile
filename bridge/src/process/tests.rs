@@ -6,8 +6,10 @@ use std::time::Duration;
 
 use rstest::rstest;
 use rustix::io::Errno;
-use rustix::process::{Pid, Signal, kill_process, test_kill_process};
+use rustix::process::{Pid, test_kill_process};
 use tokio::time::timeout;
+
+use cornercase_core::protocol::Input;
 
 use super::*;
 use crate::test_util::{TempDir, collect, in_time, wait_until, write_executable};
@@ -30,6 +32,30 @@ async fn run(script: &str, argv: &[&str]) -> Vec<BridgeMessage> {
 
 fn stdout(line: &str) -> BridgeMessage {
     BridgeMessage::Stdout(line.to_owned())
+}
+
+async fn pids(running: &mut Running) -> (i32, i32) {
+    let line = match in_time(running.next()).await {
+        Some(BridgeMessage::Stdout(line)) => line,
+        other => panic!("the fake prints two pids, not {other:?}"),
+    };
+    let (first, second) = line.split_once(' ').expect("two pids");
+    (first.parse().expect("the first pid"), second.parse().expect("the second pid"))
+}
+
+fn reaped(pid: i32) -> bool {
+    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
+}
+
+fn gone(pid: i32) -> bool {
+    reaped(pid) || zombie(pid)
+}
+
+fn zombie(pid: i32) -> bool {
+    std::process::Command::new("ps")
+        .args(["-o", "stat=", "-p", &pid.to_string()])
+        .output()
+        .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim_start().starts_with('Z'))
 }
 
 mod spawn {
@@ -90,21 +116,32 @@ mod spawn {
 
     #[tokio::test]
     async fn waits_for_the_output_a_grandchild_still_writes_before_the_exit() {
-        let messages = run("(sleep 1; echo late) &", &[]).await;
+        let messages = run("(sleep 0.2; echo late) &", &[]).await;
         assert_eq!(messages, [stdout("late"), BridgeMessage::Exit(0)]);
     }
 
     #[tokio::test]
-    async fn exits_in_time_while_a_grandchild_holds_its_output() {
+    async fn keeps_the_output_nobody_read_before_the_patience_ran_out() {
         let dir = TempDir::new();
-        let mut running = start(&dir, "sleep 30 & echo $!", &[]);
-        let sleep = match in_time(running.next()).await {
-            Some(BridgeMessage::Stdout(line)) => Pid::from_raw(line.parse().expect("the sleep's pid")),
-            other => panic!("the fake prints the sleep's pid, not {other:?}"),
-        };
-        let rest = timeout(Duration::from_secs(4), collect(&mut running)).await;
-        let killed = sleep.map(|pid| kill_process(pid, Signal::KILL));
-        assert_eq!((rest.ok(), killed), (Some(vec![BridgeMessage::Exit(0)]), Some(Ok(()))));
+        let mut running = start(&dir, "echo $$ $$; seq 100", &[]);
+        let (leader, _) = pids(&mut running).await;
+        wait_until(async || reaped(leader)).await;
+        tokio::time::sleep(group::PATIENCE + Duration::from_millis(500)).await;
+        let lines = (1..=100).map(|n| stdout(&n.to_string()));
+        assert_eq!(collect(&mut running).await, lines.chain([BridgeMessage::Exit(0)]).collect::<Vec<_>>());
+    }
+
+    #[rstest]
+    #[case::holding_its_output("sleep 30 & echo $$ $!")]
+    #[case::without_its_output("sleep 30 >/dev/null 2>&1 & echo $$ $!")]
+    #[tokio::test]
+    async fn ends_a_grandchild_left_in_the_group_before_the_exit(#[case] script: &str) {
+        let dir = TempDir::new();
+        let mut running = start(&dir, script, &[]);
+        let (_, sleep) = pids(&mut running).await;
+        let rest = timeout(group::PATIENCE * 2, collect(&mut running)).await;
+        assert_eq!(rest.ok(), Some(vec![BridgeMessage::Exit(0)]));
+        wait_until(async || gone(sleep)).await;
     }
 }
 
@@ -113,6 +150,13 @@ mod write {
 
     fn text(line: &str) -> Input {
         Input::Text(line.to_owned())
+    }
+
+    async fn feed(stdin: &mut Stdin, lines: &[String]) {
+        for line in lines {
+            stdin.write(text(line)).await.expect("the input is accepted");
+        }
+        stdin.write(Input::Eof).await.expect("the end is accepted");
     }
 
     #[rstest]
@@ -125,8 +169,9 @@ mod write {
     ) {
         let dir = TempDir::new();
         let mut running = start(&dir, "cat", &[]);
+        let mut stdin = running.take_stdin().expect("its input");
         for input in inputs.into_iter().chain([Input::Eof]) {
-            running.write(input).await.expect("the input is accepted");
+            stdin.write(input).await.expect("the input is accepted");
         }
         assert_eq!(collect(&mut running).await, [lines, vec![BridgeMessage::Exit(0)]].concat());
     }
@@ -135,8 +180,9 @@ mod write {
     async fn fails_after_the_end_of_the_input() {
         let dir = TempDir::new();
         let mut running = start(&dir, "cat", &[]);
-        running.write(Input::Eof).await.expect("the end is accepted");
-        let refused = running.write(text("a")).await.err().map(|error| error.kind());
+        let mut stdin = running.take_stdin().expect("its input");
+        stdin.write(Input::Eof).await.expect("the end is accepted");
+        let refused = stdin.write(text("a")).await.err().map(|error| error.kind());
         assert_eq!((refused, collect(&mut running).await), (Some(ErrorKind::BrokenPipe), vec![BridgeMessage::Exit(0)]));
     }
 
@@ -144,9 +190,21 @@ mod write {
     async fn fails_once_the_child_stops_reading() {
         let dir = TempDir::new();
         let mut running = start(&dir, "exit 4", &[]);
+        let mut stdin = running.take_stdin().expect("its input");
         assert_eq!(collect(&mut running).await, [BridgeMessage::Exit(4)]);
-        wait_until(async || running.write(text("a")).await.is_err()).await;
+        wait_until(async || stdin.write(text("a")).await.is_err()).await;
         assert_eq!(running.next().await, None);
+    }
+
+    #[tokio::test]
+    async fn is_written_while_the_output_is_read() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "cat", &[]);
+        let mut stdin = running.take_stdin().expect("its input");
+        let lines: Vec<String> = (0..200).map(|n| n.to_string()).collect();
+        let ((), messages) = tokio::join!(feed(&mut stdin, &lines), collect(&mut running));
+        let expected = lines.iter().map(|line| stdout(line)).chain([BridgeMessage::Exit(0)]);
+        assert_eq!(messages, expected.collect::<Vec<_>>());
     }
 }
 
@@ -155,30 +213,7 @@ mod kill {
 
     const HUNG: &str = "sleep 30 & echo $$ $!; wait";
     const STUBBORN: &str = "trap '' TERM; sleep 30 & echo $$ $!; wait";
-
-    async fn pids(running: &mut Running) -> (i32, i32) {
-        let line = match in_time(running.next()).await {
-            Some(BridgeMessage::Stdout(line)) => line,
-            other => panic!("the fake prints its pids, not {other:?}"),
-        };
-        let (leader, sleep) = line.split_once(' ').expect("two pids");
-        (leader.parse().expect("the leader's pid"), sleep.parse().expect("the sleep's pid"))
-    }
-
-    fn reaped(pid: i32) -> bool {
-        Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
-    }
-
-    fn gone(pid: i32) -> bool {
-        reaped(pid) || zombie(pid)
-    }
-
-    fn zombie(pid: i32) -> bool {
-        std::process::Command::new("ps")
-            .args(["-o", "stat=", "-p", &pid.to_string()])
-            .output()
-            .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim_start().starts_with('Z'))
-    }
+    const LEFT_BEHIND: &str = r#"sh -c 'trap "" TERM; echo $PPID $$; exec sleep 30' & wait"#;
 
     #[tokio::test]
     async fn dropping_it_ends_the_whole_group() {
@@ -192,6 +227,7 @@ mod kill {
     #[rstest]
     #[case::by_terminating_it(HUNG, 143)]
     #[case::by_killing_what_ignores_termination(STUBBORN, 137)]
+    #[case::by_killing_a_member_that_outlives_its_leader(LEFT_BEHIND, 143)]
     #[tokio::test]
     async fn ends_the_whole_group_and_returns_once_reaped(#[case] script: &str, #[case] code: i32) {
         let dir = TempDir::new();

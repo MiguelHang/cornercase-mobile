@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 clap = { version = "4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "suggestions"] }
 cornercase-core = { path = "../crates/core" }
-rustix = { version = "1.1.5", features = ["process"] }
+rustix = { version = "1.1.5", features = ["fs", "process"] }
 tokio = { version = "1.54.1", features = ["process", "io-util", "rt", "sync", "time", "macros"] }
 
 [dev-dependencies]

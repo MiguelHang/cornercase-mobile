@@ -5,18 +5,20 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 
-use cornercase_core::protocol::{BridgeMessage, Input};
+use cornercase_core::protocol::BridgeMessage;
 
 mod group;
 mod input;
 mod lines;
+
+pub use input::Stdin;
 
 const REMOVED: [&str; 3] = ["CORNERCASE_PANE", "CORNERCASE_SERVER", "CORNERCASE_REMOTE"];
 const MESSAGES: usize = 16;
 
 pub struct Running {
     messages: mpsc::Receiver<BridgeMessage>,
-    input: input::Writer,
+    stdin: Option<Stdin>,
     order: Option<oneshot::Sender<()>>,
     code: Option<i32>,
 }
@@ -34,11 +36,11 @@ pub fn spawn(binary: &Path, argv: &[String]) -> io::Result<Running> {
         command.env_remove(variable);
     }
     let mut child = command.spawn()?;
-    let input = input::Writer::new(child.stdin.take());
+    let stdin = Stdin::new(child.stdin.take());
     let (sender, messages) = mpsc::channel(MESSAGES);
     let (order, stop) = oneshot::channel();
     group::supervise(child, sender, stop);
-    Ok(Running { messages, input, order: Some(order), code: None })
+    Ok(Running { messages, stdin: Some(stdin), order: Some(order), code: None })
 }
 
 impl Running {
@@ -50,8 +52,8 @@ impl Running {
         message
     }
 
-    pub async fn write(&mut self, input: Input) -> io::Result<()> {
-        self.input.write(input).await
+    pub fn take_stdin(&mut self) -> Option<Stdin> {
+        self.stdin.take()
     }
 
     pub async fn kill(mut self) -> i32 {

@@ -8,16 +8,16 @@ use cornercase_core::protocol::Input;
 
 const CHUNKS: usize = 16;
 
-pub(super) struct Writer {
+pub struct Stdin {
     chunks: Option<mpsc::Sender<Vec<u8>>>,
 }
 
-impl Writer {
+impl Stdin {
     pub(super) fn new(stdin: Option<ChildStdin>) -> Self {
         Self { chunks: stdin.map(feed) }
     }
 
-    pub(super) async fn write(&mut self, input: Input) -> io::Result<()> {
+    pub async fn write(&mut self, input: Input) -> io::Result<()> {
         let chunk = match input {
             Input::Text(text) => [text.into_bytes(), vec![b'\n']].concat(),
             Input::Bytes(bytes) => bytes,

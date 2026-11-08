@@ -1,14 +1,21 @@
 use std::time::Duration;
 
 use rstest::rstest;
-use tokio::io::AsyncRead;
-use tokio::time::timeout;
+use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::time::{Instant, timeout};
 
 use super::*;
 
 const PATIENCE: Duration = Duration::from_secs(5);
 
 async fn read<R>(stream: R, message: fn(String) -> BridgeMessage) -> Vec<BridgeMessage>
+where
+    R: AsyncRead + Unpin,
+{
+    read_by(stream, message, None).await
+}
+
+async fn read_by<R>(stream: R, message: fn(String) -> BridgeMessage, deadline: Option<Instant>) -> Vec<BridgeMessage>
 where
     R: AsyncRead + Unpin,
 {
@@ -20,7 +27,7 @@ where
         }
         messages
     };
-    let ((), messages) = tokio::join!(forward(stream, message, sender), collect);
+    let ((), messages) = tokio::join!(forward(stream, message, sender, watch::channel(deadline).1), collect);
     messages
 }
 
@@ -66,6 +73,25 @@ mod forward {
 
         let endless = tokio::io::repeat(b'\n');
 
-        timeout(PATIENCE, forward(endless, BridgeMessage::Stdout, sender)).await.expect("forward returns");
+        let unset = watch::channel(None).1;
+
+        timeout(PATIENCE, forward(endless, BridgeMessage::Stdout, sender, unset)).await.expect("forward returns");
+    }
+
+    #[tokio::test]
+    async fn reads_what_is_ready_past_the_deadline() {
+        let lines = ["a"; 100].join("\n");
+
+        assert_eq!(read_by(lines.as_bytes(), BridgeMessage::Stdout, Some(Instant::now())).await, stdout(&["a"; 100]));
+    }
+
+    #[tokio::test]
+    async fn stops_waiting_for_a_stream_still_open_past_the_deadline() {
+        let (mut writer, stream) = tokio::io::duplex(64);
+        writer.write_all(b"a\n").await.expect("write a line");
+
+        let lines = timeout(PATIENCE, read_by(stream, BridgeMessage::Stdout, Some(Instant::now()))).await;
+
+        assert_eq!(lines.ok(), Some(stdout(&["a"])));
     }
 }
