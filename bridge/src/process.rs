@@ -15,6 +15,8 @@ pub use input::Stdin;
 
 const REMOVED: [&str; 3] = ["CORNERCASE_PANE", "CORNERCASE_SERVER", "CORNERCASE_REMOTE"];
 const MESSAGES: usize = 16;
+const LONGEST_LINE: usize = 16 << 20;
+const TOO_LONG: &str = "a line of output passed 16 MiB";
 
 pub struct Running {
     messages: mpsc::Receiver<BridgeMessage>,
@@ -24,6 +26,10 @@ pub struct Running {
 }
 
 pub fn spawn(binary: &Path, argv: &[String]) -> io::Result<Running> {
+    launch(binary, argv, LONGEST_LINE)
+}
+
+fn launch(binary: &Path, argv: &[String], longest: usize) -> io::Result<Running> {
     let mut command = Command::new(binary);
     command
         .args(argv)
@@ -39,7 +45,7 @@ pub fn spawn(binary: &Path, argv: &[String]) -> io::Result<Running> {
     let stdin = Stdin::new(child.stdin.take());
     let (sender, messages) = mpsc::channel(MESSAGES);
     let (order, stop) = oneshot::channel();
-    group::supervise(child, sender, stop);
+    group::supervise(child, sender, stop, longest);
     Ok(Running { messages, stdin: Some(stdin), order: Some(order), code: None })
 }
 

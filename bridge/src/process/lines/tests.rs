@@ -5,6 +5,7 @@ use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::{Instant, timeout};
 
 use super::*;
+use crate::process::LONGEST_LINE;
 
 const PATIENCE: Duration = Duration::from_secs(5);
 
@@ -19,6 +20,25 @@ async fn read_by<R>(stream: R, message: fn(String) -> BridgeMessage, deadline: O
 where
     R: AsyncRead + Unpin,
 {
+    read_all(stream, message, deadline, LONGEST_LINE).await.0
+}
+
+async fn read_capped<R>(stream: R, longest: usize) -> (Vec<BridgeMessage>, End)
+where
+    R: AsyncRead + Unpin,
+{
+    read_all(stream, BridgeMessage::Stdout, None, longest).await
+}
+
+async fn read_all<R>(
+    stream: R,
+    message: fn(String) -> BridgeMessage,
+    deadline: Option<Instant>,
+    longest: usize,
+) -> (Vec<BridgeMessage>, End)
+where
+    R: AsyncRead + Unpin,
+{
     let (sender, mut receiver) = mpsc::channel(1);
     let collect = async {
         let mut messages = Vec::new();
@@ -27,8 +47,8 @@ where
         }
         messages
     };
-    let ((), messages) = tokio::join!(forward(stream, message, sender, watch::channel(deadline).1), collect);
-    messages
+    let (end, messages) = tokio::join!(forward(stream, message, sender, watch::channel(deadline).1, longest), collect);
+    (messages, end)
 }
 
 fn stdout(lines: &[&str]) -> Vec<BridgeMessage> {
@@ -75,7 +95,9 @@ mod forward {
 
         let unset = watch::channel(None).1;
 
-        timeout(PATIENCE, forward(endless, BridgeMessage::Stdout, sender, unset)).await.expect("forward returns");
+        let end = timeout(PATIENCE, forward(endless, BridgeMessage::Stdout, sender, unset, LONGEST_LINE)).await;
+
+        assert_eq!(end.ok(), Some(End::Closed));
     }
 
     #[tokio::test]
@@ -93,5 +115,35 @@ mod forward {
         let lines = timeout(PATIENCE, read_by(stream, BridgeMessage::Stdout, Some(Instant::now()))).await;
 
         assert_eq!(lines.ok(), Some(stdout(&["a"])));
+    }
+
+    #[rstest]
+    #[case::with_its_newline("\n")]
+    #[case::at_the_end_of_the_stream("")]
+    #[tokio::test]
+    async fn sends_a_line_as_long_as_the_limit_whole(#[case] tail: &str) {
+        let line = "x".repeat(BUFFER + 1);
+        let bytes = format!("a\n{line}{tail}");
+
+        assert_eq!(read_capped(bytes.as_bytes(), BUFFER + 1).await, (stdout(&["a", &line]), End::Closed));
+    }
+
+    #[rstest]
+    #[case::with_its_newline("\nb\n")]
+    #[case::at_the_end_of_the_stream("")]
+    #[tokio::test]
+    async fn stops_at_a_line_one_byte_past_the_limit(#[case] tail: &str) {
+        let bytes = format!("a\n{}{tail}", "x".repeat(BUFFER + 2));
+
+        assert_eq!(read_capped(bytes.as_bytes(), BUFFER + 1).await, (stdout(&["a"]), End::TooLong));
+    }
+
+    #[tokio::test]
+    async fn stops_at_a_line_that_never_ends() {
+        let endless = tokio::io::repeat(b'x');
+
+        let read = timeout(PATIENCE, read_capped(endless, BUFFER + 1)).await;
+
+        assert_eq!(read.ok(), Some((Vec::new(), End::TooLong)));
     }
 }
