@@ -1,6 +1,6 @@
 # 003 — Puente: protocolo y lista permitida
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 001 · decisión **D1** (bytes y EOF) tomada antes de empezar
 - Riesgo: medio (la lista permitida es la frontera de seguridad del puente)
 - Rama: `feat/003-bridge-protocol` · PR: `feat: define the bridge messages and the commands it allows`
