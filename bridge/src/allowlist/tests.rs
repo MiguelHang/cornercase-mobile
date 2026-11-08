@@ -150,6 +150,73 @@ mod commands {
         assert_eq!(CONTROL.len(), 60);
     }
 
+    #[test]
+    fn lists_exactly_the_control_commands_of_the_contract() {
+        let expected = [
+            "status",
+            "open",
+            "clone",
+            "new-workspace",
+            "new-tab",
+            "split",
+            "setup",
+            "start",
+            "send",
+            "keys",
+            "held",
+            "read",
+            "wait",
+            "close",
+            "rename",
+            "focus",
+            "go",
+            "notify",
+            "away",
+            "mark",
+            "search",
+            "todo",
+            "queue",
+            "events",
+            "flow",
+            "contract",
+            "surface",
+            "view",
+            "view-set",
+            "input",
+            "requests",
+            "scroll",
+            "selection",
+            "resize",
+            "redraw",
+            "ratio",
+            "link",
+            "paste-file",
+            "theme",
+            "config",
+            "move",
+            "move-pane",
+            "collapse",
+            "expand",
+            "group",
+            "issue",
+            "changes",
+            "files",
+            "usage",
+            "ports",
+            "pull-request",
+            "context",
+            "recap",
+            "processes",
+            "worktrees",
+            "machines",
+            "tour",
+            "agents",
+            "account",
+            "profile",
+        ];
+        assert_eq!(CONTROL, expected);
+    }
+
     #[rstest]
     #[case::start_server("start-server")]
     #[case::kill_server("kill-server")]
@@ -196,6 +263,13 @@ mod plugin {
     #[case::other_case("plugin Run")]
     fn refuses_the_other_actions(#[case] line: &str) {
         assert_eq!(refusal_of(&argv(line)), format!("`{line}` is not allowed through the bridge"));
+    }
+
+    #[test]
+    fn lists_exactly_the_actions_that_ask_the_server() {
+        assert_eq!(PLUGIN_ACTIONS, ["actions", "status", "run", "popup-close"]);
+        assert_eq!(OTHERS, ["stats"]);
+        assert_eq!(BARE_FLAGS, ["--help", "-h", "--version", "-V"]);
     }
 
     #[test]
