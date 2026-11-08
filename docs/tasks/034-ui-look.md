@@ -1,6 +1,6 @@
 # 034 — UI look: tema de gpui, cristal, logo y pantalla "sin máquinas"
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 002 (no necesita red, ni el puente, ni 013)
 - Riesgo: bajo
 - Rama: `feat/034-ui-look` · PR: `feat: give the app cornercase's look and an empty first screen`
@@ -14,7 +14,7 @@ comandos de Tauri: solo marcado, estilos y la lógica de movimiento. Lo que nece
 conexión, formulario de la primera máquina) es la 014.
 
 ## Criterios de aceptación
-- [ ] CA1 — Tokens: `src/lib/theme/tokens.css` con propiedades CSS portadas de `src/theme.rs` de gpui: colores
+- [x] CA1 — Tokens: `src/lib/theme/tokens.css` con propiedades CSS portadas de `src/theme.rs` de gpui: colores
   (`glass`/ground `#0b0c0e`, `raised`, `surface`, `panel`, `field`, `veil`, `border`, `edge`, `hover`, `selected`;
   textos `text` `soft` `muted` `faint`; `brand` `#005fff`, `brand-hover`, `brand-light`, `on-brand`, `accent`
   `#74a3ff`, `accent-soft`, `selection`; estados `working` `waiting` `done` `failed` `merged`), radios
@@ -22,10 +22,10 @@ conexión, formulario de la primera máquina) es la 014.
   (sistema y monoespaciada del sistema) y duraciones (`enter` 180 ms, `leave` 120 ms, `pop` 110 ms). Mismos nombres
   que en `theme.rs` (en kebab-case) para que se puedan buscar en los dos repos. Nada de la paleta Tokyo Night de la
   terminal: llega con 020.
-- [ ] CA2 — Base: `src/lib/theme/base.css` pinta el fondo (ground opaco + el lavado cobalto de `glass::wash` arriba),
+- [x] CA2 — Base: `src/lib/theme/base.css` pinta el fondo (ground opaco + el lavado cobalto de `glass::wash` arriba),
   `color-scheme: dark`, la tipografía, `-webkit-tap-highlight-color: transparent`, sin selección de texto en el cromo,
   y respeta las safe areas (`env(safe-area-inset-*)`); `index.html` lleva `viewport-fit=cover`.
-- [ ] CA3 — Componentes en `src/lib/ui/`, solo los que usa la pantalla de CA5 (sin código muerto):
+- [x] CA3 — Componentes en `src/lib/ui/`, solo los que usa la pantalla de CA5 (sin código muerto):
   - `Glass.svelte`: la tarjeta flotante de `glass::card` (brillo arriba, línea superior que se desvanece desde la
     izquierda, borde de 1 px, sombra `lift`), con `backdrop-filter` y `-webkit-backdrop-filter` (iOS 15–17 solo
     entiende el prefijo; el `deploymentTarget` es 15.0).
@@ -38,20 +38,20 @@ conexión, formulario de la primera máquina) es la 014.
     cobalto con brillo, cursor en `text`), escalable por `unit`. Sin parpadeo: el cursor solo late mientras se conecta,
     y eso es de la 014.
   - `Icon.svelte` con el SVG de Lucide `server` (el de la página vacía de Máquinas en gpui), trazo 1,75.
-- [ ] CA4 — Movimiento: `src/lib/ui/motion.ts` con las transiciones de Svelte de gpui (`slide`/`fade` de
+- [x] CA4 — Movimiento: `src/lib/ui/motion.ts` con las transiciones de Svelte de gpui (`slide`/`fade` de
   `ui/motion.rs`: subir 14 px y aparecer en 180 ms con ease-out cúbico al entrar, 120 ms ease-in al salir), que pasan
   a duración 0 con `prefers-reduced-motion: reduce`. Nada se anima para siempre en reposo.
-- [ ] CA5 — Pantalla "sin máquinas" (`src/routes/NoMachines.svelte` o equivalente; el router es de la 014),
+- [x] CA5 — Pantalla "sin máquinas" (`src/routes/NoMachines.svelte` o equivalente; el router es de la 014),
   montada por `App.svelte`: la marca y `cornercase` arriba, y en una tarjeta de cristal la página de emblema de gpui
   (`Icon::Server`, `No machines yet`, una frase de qué es una máquina, otra de qué necesita: el puente en el Mac y su
   URL) con `Add machine` primario en reposo, que la 014 activa. La tarjeta entra con la transición de CA4. Textos en
   inglés.
-- [ ] CA6 — Sin destello blanco ni barra de estado ilegible: fondo oscuro en el arranque (`backgroundColor` de la
+- [x] CA6 — Sin destello blanco ni barra de estado ilegible: fondo oscuro en el arranque (`backgroundColor` de la
   ventana en `tauri.conf.json` y/o `LaunchScreen.storyboard`) y `UIUserInterfaceStyle: Dark` en
   `src-tauri/gen/apple/project.yml` (y el `.xcodeproj` que genera, los dos en git).
-- [ ] CA7 — `scripts/check-rules.mjs` también mira `.css` (comentarios `/* */`, 1.000 líneas), con su test en vitest
+- [x] CA7 — `scripts/check-rules.mjs` también mira `.css` (comentarios `/* */`, 1.000 líneas), con su test en vitest
   que falla sin la regla; si el lexer de `.svelte` no mira los bloques `<style>`, también.
-- [ ] CA8 — vitest: (a) cada `var(--x)` usado en `src/` está definido en `tokens.css` (falla con un nombre mal
+- [x] CA8 — vitest: (a) cada `var(--x)` usado en `src/` está definido en `tokens.css` (falla con un nombre mal
   escrito); (b) `motion.ts`: duraciones y desplazamientos de entrada/salida, y duración 0 con movimiento reducido;
   (c) `App.test.ts` pasa a comprobar que se pinta la pantalla sin máquinas (`svelte/server`).
 
