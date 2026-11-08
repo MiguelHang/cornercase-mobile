@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 
 use crate::error::Error;
 
+pub mod bridge;
 #[cfg(test)]
 pub(crate) mod fake;
 
