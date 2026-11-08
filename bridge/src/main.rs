@@ -1,63 +1,70 @@
 use std::env;
-use std::io;
-use std::net::SocketAddr;
+use std::fmt;
+use std::io::{self, Write};
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use clap::builder::NonEmptyStringValueParser;
+use tokio::net::TcpListener;
 use tokio::signal::unix::{SignalKind, signal};
 
-use cornercase_bridge::binary;
-use cornercase_bridge::server::{self, Config};
+use cornercase_bridge::network::{self, Target};
+use cornercase_bridge::qr::{self, Place};
+use cornercase_bridge::server::{Config, Server};
+use cornercase_bridge::{binary, token};
 
-const NOT_FOUND: u8 = 2;
+const SETUP: u8 = 2;
 const FAILED: u8 = 1;
+const PORT: u16 = 8765;
+const LOOPBACK: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
 #[derive(Parser)]
 #[command(version, about = "Runs cornercase commands for the cornercase mobile app")]
 struct Args {
-    #[arg(
-        long,
-        value_name = "ADDRESS",
-        value_parser = loopback,
-        help = "The loopback address and port to listen on, such as 127.0.0.1:0 for any free port"
-    )]
-    listen: SocketAddr,
-    #[arg(
-        long,
-        value_name = "TOKEN",
-        value_parser = NonEmptyStringValueParser::new(),
-        help = "The token every client must send"
-    )]
-    token: String,
+    #[arg(long, value_name = "PORT", default_value_t = PORT, help = "The port to listen on, 0 for any free one")]
+    port: u16,
+    #[arg(long, help = "Make a new token, so the URLs and QR codes printed before stop working")]
+    new_token: bool,
+    #[arg(long, help = "Listen only on 127.0.0.1, instead of the LAN and Tailscale addresses")]
+    loopback: bool,
     #[arg(long, value_name = "PATH", help = "The cornercase binary to run, instead of CORNERCASE_BIN or the PATH")]
     cornercase: Option<PathBuf>,
 }
 
-fn loopback(text: &str) -> Result<SocketAddr, String> {
-    let address = text.parse::<SocketAddr>().map_err(|error| error.to_string())?;
-    if address.ip().is_loopback() {
-        Ok(address)
-    } else {
-        Err(format!(
-            "{} is not a loopback address (127.0.0.0/8 or ::1); listening beyond this machine comes with task 006",
-            address.ip()
-        ))
-    }
+struct Failure {
+    message: String,
+    code: u8,
+}
+
+fn failing<E: fmt::Display>(code: u8) -> impl FnOnce(E) -> Failure {
+    move |error| Failure { message: error.to_string(), code }
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> ExitCode {
-    let args = Args::parse();
-    let binary = match find(args.cornercase.as_deref()) {
-        Ok(binary) => binary,
-        Err(error) => return fail(&error, NOT_FOUND),
-    };
-    match serve(args.listen, Config::new(args.token, binary)).await {
+    match run(Args::parse()).await {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => fail(&error, FAILED),
+        Err(failure) => {
+            eprintln!("cornercase-bridge: {}", failure.message);
+            ExitCode::from(failure.code)
+        }
     }
+}
+
+async fn run(args: Args) -> Result<(), Failure> {
+    let binary = find(args.cornercase.as_deref()).map_err(failing(SETUP))?;
+    let token = load_token(args.new_token)?;
+    let targets = if args.loopback { None } else { Some(network_targets()?) };
+    let places = places(targets.as_deref());
+    let shutdown = shutdown().map_err(failing(FAILED))?;
+    let ips: Vec<IpAddr> = places.iter().map(|&(_, ip)| ip).collect();
+    let listeners = network::listen(&ips, args.port).await.map_err(failing(FAILED))?;
+    let count = listeners.len();
+    eprintln!("cornercase-bridge: listening on {count} address{}", if count == 1 { "" } else { "es" });
+    print(&places, &listeners, &token).map_err(failing(FAILED))?;
+    Server::from_listeners(listeners, Config::new(token, binary)).run(shutdown).await;
+    Ok(())
 }
 
 fn find(option: Option<&Path>) -> Result<PathBuf, binary::NotFound> {
@@ -66,13 +73,36 @@ fn find(option: Option<&Path>) -> Result<PathBuf, binary::NotFound> {
     binary::find(option, variable.as_deref(), path.as_deref(), binary::is_executable)
 }
 
-async fn serve(address: SocketAddr, config: Config) -> io::Result<()> {
-    let shutdown = shutdown()?;
-    let server = server::bind(address, config)
-        .await
-        .map_err(|error| io::Error::new(error.kind(), format!("could not listen on {address}: {error}")))?;
-    server.run(shutdown).await;
-    Ok(())
+fn load_token(new: bool) -> Result<String, Failure> {
+    let config_home = env::var_os(token::CONFIG_HOME);
+    let home = env::var_os(token::HOME);
+    let path = token::path(config_home.as_deref(), home.as_deref()).map_err(failing(SETUP))?;
+    let loaded = if new { token::rotate(&path) } else { token::load_or_create(&path) };
+    loaded.map_err(failing(FAILED))
+}
+
+fn network_targets() -> Result<Vec<Target>, Failure> {
+    let interfaces = network::interfaces().map_err(|error| Failure {
+        message: format!("could not list the network interfaces: {error}"),
+        code: FAILED,
+    })?;
+    network::targets(&interfaces).map_err(failing(FAILED))
+}
+
+fn places(targets: Option<&[Target]>) -> Vec<(Place<'_>, IpAddr)> {
+    match targets {
+        None => vec![(Place::Loopback, LOOPBACK)],
+        Some(targets) => targets.iter().map(|target| (Place::Network(target), target.ip)).collect(),
+    }
+}
+
+fn print(places: &[(Place<'_>, IpAddr)], listeners: &[TcpListener], token: &str) -> io::Result<()> {
+    let mut blocks = Vec::with_capacity(places.len());
+    for (&(place, _), listener) in places.iter().zip(listeners) {
+        let address = listener.local_addr()?;
+        blocks.push(qr::block(place, &qr::url(address.ip(), address.port(), token)).join("\n"));
+    }
+    writeln!(io::stdout().lock(), "{}", blocks.join("\n\n"))
 }
 
 fn shutdown() -> io::Result<impl Future<Output = ()>> {
@@ -84,9 +114,4 @@ fn shutdown() -> io::Result<impl Future<Output = ()>> {
             _ = terminate.recv() => {}
         }
     })
-}
-
-fn fail(error: &impl std::fmt::Display, code: u8) -> ExitCode {
-    eprintln!("cornercase-bridge: {error}");
-    ExitCode::from(code)
 }

@@ -1,0 +1,139 @@
+use rstest::rstest;
+
+use super::*;
+use crate::network::Kind;
+
+const URL: &str = "ws://192.168.1.20:8765/?token=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+const FOREGROUND: &str = "\x1b[38;5;";
+const BACKGROUND: &str = "m\x1b[48;5;";
+
+fn ip(text: &str) -> IpAddr {
+    text.parse().expect("a valid IP address")
+}
+
+fn module(colour: &str) -> bool {
+    match colour {
+        "16" => true,
+        "231" => false,
+        other => panic!("{other} is not one of the two colours"),
+    }
+}
+
+fn cells(line: &str) -> Vec<(bool, bool)> {
+    let body = line.strip_suffix(RESET).expect("the line ends with the reset");
+    let (cells, rest) = body.rsplit_once(HALF).expect("at least one half block");
+    assert_eq!(rest, "", "nothing after the last half block");
+    cells
+        .split(HALF)
+        .map(|cell| {
+            let colours = cell.strip_prefix(FOREGROUND).and_then(|colours| colours.strip_suffix('m'));
+            let (top, bottom) = colours.and_then(|colours| colours.split_once(BACKGROUND)).expect("two colours");
+            (module(top), module(bottom))
+        })
+        .collect()
+}
+
+fn drawn(url: &str) -> Vec<Vec<bool>> {
+    let mut rows = Vec::new();
+    for line in lines(url) {
+        let (top, bottom): (Vec<bool>, Vec<bool>) = cells(&line).into_iter().unzip();
+        rows.extend([top, bottom]);
+    }
+    rows
+}
+
+fn encoded(url: &str) -> Vec<Vec<bool>> {
+    let code = QrCode::with_error_correction_level(url.as_bytes(), EcLevel::L).expect("the URL fits");
+    let width = code.width();
+    let side = width + 2 * QUIET;
+    let dark: Vec<bool> = code.to_colors().into_iter().map(|module| module == Color::Dark).collect();
+    let mut rows = vec![vec![false; side]; side.next_multiple_of(2)];
+    for (index, module) in dark.into_iter().enumerate() {
+        rows[QUIET + index / width][QUIET + index % width] = module;
+    }
+    rows
+}
+
+fn width_of(url: &str) -> usize {
+    QrCode::with_error_correction_level(url.as_bytes(), EcLevel::L).expect("the URL fits").width()
+}
+
+mod url {
+    use super::*;
+
+    #[rstest]
+    #[case::lan("192.168.1.20", 8765, "ws://192.168.1.20:8765/?token=t0k-en_")]
+    #[case::tailscale_v4("100.101.102.103", 8765, "ws://100.101.102.103:8765/?token=t0k-en_")]
+    #[case::tailscale_v6("fd7a:115c:a1e0::1", 8765, "ws://[fd7a:115c:a1e0::1]:8765/?token=t0k-en_")]
+    #[case::loopback_v4("127.0.0.1", 40123, "ws://127.0.0.1:40123/?token=t0k-en_")]
+    #[case::loopback_v6("::1", 40123, "ws://[::1]:40123/?token=t0k-en_")]
+    fn puts_the_address_port_and_token_together(#[case] address: &str, #[case] port: u16, #[case] wanted: &str) {
+        assert_eq!(url(ip(address), port, "t0k-en_"), wanted);
+    }
+}
+
+mod lines {
+    use super::*;
+
+    #[rstest]
+    #[case::lan(URL)]
+    #[case::tailscale_v6(
+        "ws://[fd7a:115c:a1e0:ab12:4843:cd96:6258:b240]:65535/?token=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE"
+    )]
+    fn are_as_wide_as_the_code_and_its_quiet_zone(#[case] url: &str) {
+        let side = width_of(url) + 2 * QUIET;
+        let lines = lines(url);
+        assert_eq!(lines.len(), side.div_ceil(2));
+        assert!(lines.iter().all(|line| cells(line).len() == side), "{lines:?}");
+    }
+
+    #[test]
+    fn draw_the_modules_of_the_url_top_in_front_and_bottom_behind() {
+        assert_eq!(drawn(URL), encoded(URL));
+    }
+
+    #[test]
+    fn begin_and_end_with_the_quiet_zone() {
+        let lines = lines(URL);
+        for line in [lines.first(), lines.last()].map(|line| line.expect("a line")) {
+            assert!(cells(line).iter().all(|&(top, bottom)| !top && !bottom), "{line:?}");
+        }
+    }
+
+    #[test]
+    fn use_only_half_blocks_two_colours_and_the_reset() {
+        let line = &lines(URL)[QUIET];
+        let stripped = line
+            .replace(RESET, "")
+            .replace(&format!("{FOREGROUND}16m"), "")
+            .replace(&format!("{FOREGROUND}231m"), "")
+            .replace("\x1b[48;5;16m", "")
+            .replace("\x1b[48;5;231m", "");
+        assert!(stripped.chars().all(|character| character.to_string() == HALF), "{stripped:?}");
+        assert!(line.contains(&format!("{FOREGROUND}16m")), "the line has dark modules");
+    }
+
+    #[test]
+    fn are_empty_when_the_url_does_not_fit_in_a_code() {
+        assert_eq!(lines(&"a".repeat(3000)), Vec::<String>::new());
+    }
+}
+
+mod block {
+    use super::*;
+
+    fn target(kind: Kind, interface: &str) -> Target {
+        Target { kind, interface: interface.to_owned(), ip: ip("192.168.1.20") }
+    }
+
+    #[rstest]
+    #[case::lan(Some(target(Kind::Lan, "en0")), "LAN (en0)")]
+    #[case::tailscale(Some(target(Kind::Tailscale, "utun4")), "Tailscale (utun4)")]
+    #[case::loopback(None, "loopback")]
+    fn says_where_then_gives_the_url_and_its_code(#[case] target: Option<Target>, #[case] heading: &str) {
+        let place = target.as_ref().map_or(Place::Loopback, Place::Network);
+        let block = block(place, URL);
+        assert_eq!(block[..2], [heading, URL]);
+        assert_eq!(block[2..], lines(URL));
+    }
+}

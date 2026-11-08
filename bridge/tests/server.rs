@@ -5,7 +5,7 @@ use std::time::Duration;
 use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
@@ -14,7 +14,7 @@ use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
-use cornercase_bridge::server::{self, Config};
+use cornercase_bridge::server::{self, Config, Server};
 use cornercase_bridge::test_util::{HUNG, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until};
 
 const TOKEN: &str = "s3cret";
@@ -39,7 +39,10 @@ impl Served {
         let mut config = Config::new(TOKEN.to_owned(), PathBuf::from("/nonexistent/cornercase"));
         change(&mut config);
         let address = "127.0.0.1:0".parse().expect("an address");
-        let server = server::bind(address, config).await.expect("the server binds");
+        Self::serving(server::bind(address, config).await.expect("the server binds"))
+    }
+
+    fn serving(server: Server) -> Self {
         let address = server.local_addr().expect("the server's address");
         let (stop, stopped) = oneshot::channel::<()>();
         let running = tokio::spawn(server.run(async {
@@ -190,22 +193,96 @@ mod handshake {
 mod connections {
     use super::*;
 
+    async fn full(dir: &TempDir) -> (Served, Client) {
+        let served = Served::start(|config| {
+            faking(dir, HUNG)(config);
+            config.connections = 1;
+        })
+        .await;
+        let held = started(&served).await;
+        (served, held)
+    }
+
+    #[rstest]
+    #[case::no_token("/", StatusCode::UNAUTHORIZED)]
+    #[case::a_wrong_token("/?token=wrong", StatusCode::UNAUTHORIZED)]
+    #[case::another_path("/x?token=s3cret", StatusCode::NOT_FOUND)]
+    #[case::the_right_token(RIGHT, StatusCode::SERVICE_UNAVAILABLE)]
     #[tokio::test]
-    async fn answers_busy_past_the_limit() {
+    async fn answers_busy_past_the_limit_only_to_the_right_token(#[case] target: &str, #[case] status: StatusCode) {
+        let dir = TempDir::new();
+        let (served, _held) = full(&dir).await;
+        assert_eq!(served.upgrade(target).await, status);
+    }
+
+    #[tokio::test]
+    async fn takes_no_place_for_a_connection_that_has_not_upgraded() {
         let served = Served::start(|config| config.connections = 1).await;
-        let _held = served.silent().await;
-        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SERVICE_UNAVAILABLE);
+        let _silent = served.silent().await;
+        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SWITCHING_PROTOCOLS);
     }
 
     #[tokio::test]
     async fn frees_a_place_once_a_connection_ends() {
+        let dir = TempDir::new();
+        let (served, mut held) = full(&dir).await;
+        held.close(None).await.expect("the client closes");
+        wait_until(async || served.upgrade(RIGHT).await == StatusCode::SWITCHING_PROTOCOLS).await;
+    }
+}
+
+mod handshakes {
+    use super::*;
+
+    async fn crowded(within: Duration) -> (Served, [TcpStream; 2]) {
         let served = Served::start(|config| {
-            config.connections = 1;
-            config.handshake = Duration::from_millis(50);
+            config.handshakes = 2;
+            config.handshake = within;
         })
         .await;
+        let silent = [served.silent().await, served.silent().await];
+        (served, silent)
+    }
+
+    #[tokio::test]
+    async fn closes_a_connection_past_the_limit_without_answering() {
+        let (served, _silent) = crowded(Duration::from_secs(60)).await;
         closed(served.silent().await).await;
+    }
+
+    #[tokio::test]
+    async fn lets_a_client_in_once_the_silent_ones_run_out_of_time() {
+        let (served, [first, second]) = crowded(Duration::from_millis(50)).await;
+        closed(first).await;
+        closed(second).await;
         assert_eq!(served.upgrade(RIGHT).await, StatusCode::SWITCHING_PROTOCOLS);
+    }
+}
+
+mod listeners {
+    use super::*;
+
+    async fn listener() -> TcpListener {
+        TcpListener::bind("127.0.0.1:0").await.expect("a listener")
+    }
+
+    #[tokio::test]
+    async fn runs_a_command_through_each_and_closes_them_all_on_stopping() {
+        let dir = TempDir::new();
+        let mut config = Config::new(TOKEN.to_owned(), PathBuf::new());
+        faking(&dir, "echo hi")(&mut config);
+        let listening = Server::from_listeners(vec![listener().await, listener().await], config);
+        let addresses = listening.local_addrs().expect("the addresses");
+        let mut served = Served::serving(listening);
+        for &address in &addresses {
+            served.address = address;
+            let exchange = served.exchange(vec![Message::text(ARGV)]).await;
+            assert_eq!(exchange, Exchange::of(&[r#"{"stdout":"hi"}"#, EXITED]));
+        }
+        served.stop().await;
+        for address in addresses {
+            assert!(TcpStream::connect(address).await.is_err(), "{address} still accepts");
+        }
     }
 }
 

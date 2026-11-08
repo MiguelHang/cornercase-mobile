@@ -56,3 +56,46 @@ mod same {
         assert_eq!(same(a, b), expected);
     }
 }
+
+mod gate {
+    use super::*;
+
+    const RIGHT: &str = "/?token=s3cret";
+
+    struct Opened {
+        answer: Result<(), StatusCode>,
+        taken: bool,
+        left: usize,
+    }
+
+    fn open(places: usize, uri: &str) -> Opened {
+        let permits = Arc::new(Semaphore::new(places));
+        let mut permit = None;
+        let peer = "192.0.2.1:5000".parse().expect("a peer");
+        let gate = Gate { token: TOKEN, peer, permits: &permits, permit: &mut permit };
+        let request = Request::builder().uri(uri).body(()).expect("a request");
+        let answer = gate.on_request(&request, Response::new(())).map(|_| ()).map_err(|response| response.status());
+        Opened { answer, taken: permit.is_some(), left: permits.available_permits() }
+    }
+
+    #[rstest]
+    #[case::full_without_a_token(0, "/", StatusCode::UNAUTHORIZED)]
+    #[case::full_with_a_wrong_token(0, "/?token=wrong", StatusCode::UNAUTHORIZED)]
+    #[case::full_on_another_path(0, "/x?token=s3cret", StatusCode::NOT_FOUND)]
+    #[case::full_with_the_token(0, RIGHT, StatusCode::SERVICE_UNAVAILABLE)]
+    #[case::free_without_a_token(1, "/", StatusCode::UNAUTHORIZED)]
+    fn refuses_without_taking_a_place(#[case] places: usize, #[case] uri: &str, #[case] status: StatusCode) {
+        let opened = open(places, uri);
+        assert_eq!(opened.answer, Err(status));
+        assert!(!opened.taken, "no place is held");
+        assert_eq!(opened.left, places);
+    }
+
+    #[test]
+    fn takes_a_place_for_the_right_token() {
+        let opened = open(2, RIGHT);
+        assert_eq!(opened.answer, Ok(()));
+        assert!(opened.taken, "the place is held");
+        assert_eq!(opened.left, 1);
+    }
+}
