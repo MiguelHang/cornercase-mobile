@@ -457,10 +457,12 @@ dependencies = [
 name = "cornercase-bridge"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "clap",
  "cornercase-bridge",
  "cornercase-core",
  "futures-util",
+ "getrandom 0.4.3",
  "rstest",
  "rustix",
  "serde_json",
