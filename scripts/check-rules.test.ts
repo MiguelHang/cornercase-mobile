@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { check, lineCount, rustComments } from './check-rules.mjs'
+import { check, lineCount, rustComments, tsComments } from './check-rules.mjs'
 
 const roots: string[] = []
 
@@ -173,5 +173,87 @@ describe('Rust comments', () => {
   it('lets a listed commented Rust file pass', () => {
     const files = { 'crates/core/src/lib.rs': '// why\n' }
     expect(check(tree(files), { commented: ['crates/core/src/lib.rs'] })).toEqual([])
+  })
+})
+
+describe('TypeScript and JavaScript comments', () => {
+  it.each([
+    ['a line comment', 'const a = 1\n// why\n', 2, 'line comment'],
+    ['a doc comment', '/** what */\nexport const a = 1\n', 1, 'block comment'],
+    ['a block comment at the line it starts', 'const a = 1\n/* one\ntwo */\n', 2, 'block comment'],
+    ['an unclosed block comment', 'const a = 1\n/* one\n', 2, 'block comment'],
+    ['a comment after a division', 'const half = a / b // why\n', 1, 'line comment'],
+    ['a comment after a division of a call', 'const half = size() / 2 // why\n', 1, 'line comment'],
+    ['a comment after a division of an index', 'const half = sizes[0] / 2 // why\n', 1, 'line comment'],
+    ['a comment after a regex', 'const slash = /\\//g // why\n', 1, 'line comment'],
+    ['a comment after a string', "const url = 'https://x' // why\n", 1, 'line comment'],
+    ['a comment after a template', 'const url = `https://${host}` // why\n', 1, 'line comment'],
+    ['a comment after an object in a template', 'const a = `${ {a:1}.a }` // why\n', 1, 'line comment'],
+    ['a comment after a shebang', '#!/usr/bin/env node\n// why\n', 2, 'line comment'],
+    ['a comment after a private field', 'const half = this.#size / 2 // why\n', 1, 'line comment'],
+    ['a comment after a non-ASCII name', 'const half = café / 2 // why\n', 1, 'line comment'],
+    ['a comment after a regex after a block', "if (a) { b }\n/'/.test(s) // why\n", 2, 'line comment'],
+    ['a comment after a regex at the start of a block', "if (a) { /'/.test(s) } // why\n", 1, 'line comment'],
+    ['a comment after a regex after return', "function a() {\n  return /'/.test(s) // why\n}\n", 2, 'line comment'],
+    ['a comment after a regex after typeof', "const a = typeof /'/ // why\n", 1, 'line comment'],
+    ['a comment after a regex after a division', "const a = b / /'/.source.length // why\n", 1, 'line comment'],
+    ['a comment after a regex with a slash in a class', "const a = /[/]'/.test(s) // why\n", 1, 'line comment'],
+    ['a comment on the line after an unclosed regex', 'const a = /open\n// why\n', 2, 'line comment'],
+    ['a comment after a division of a string', "const half = '4' / 2 // why\n", 1, 'line comment'],
+    ['a comment after a division of a template', 'const half = `4` / 2 // why\n', 1, 'line comment'],
+    ['a comment after a string in a template', "const a = `${'`'}` // why\n", 1, 'line comment'],
+    ['a comment after a template regex', 'function a() { return `${a}${/`/.source}` } // why\n', 1, 'line comment'],
+    ['a comment after a hash bang past the start', 'const a = 1\n#! // why\n', 2, 'line comment'],
+  ])('finds %s', (_, text, line, reason) => {
+    expect(tsComments(text)).toEqual([{ line, reason }])
+  })
+
+  it('finds every comment, each at its line', () => {
+    expect(tsComments('// one\nconst a = 1\n/* two */\n')).toEqual([
+      { line: 1, reason: 'line comment' },
+      { line: 3, reason: 'block comment' },
+    ])
+  })
+
+  it.each([
+    ['a single-quoted string', "const url = 'https://x'\n"],
+    ['a double-quoted string', 'const url = "https://x"\n'],
+    ['a string with an escaped quote', "const text = 'say \\' // no'\n"],
+    ['a string with the other quote', 'const text = "it\'s // no"\n'],
+    ['a template', 'const url = `https://x`\n'],
+    ['a template with an escaped backtick', 'const text = `say \\` // no`\n'],
+    ['a template with a brace in its text', 'const text = `{ // no }`\n'],
+    ['a nested template', 'const text = `${ `${a}` } // no`\n'],
+    ['an object inside a template', 'const text = `${ {a: 1}.a } // no`\n'],
+    ['a regex with slashes', 'const doubled = /\\/\\//.test(s)\n'],
+    ['a regex with a block opener', 'const opener = /\\/*/\n'],
+    ['a regex with a slash in a class', 'const slash = /[/]/\n'],
+    ['a regex with an escaped bracket in a class', 'const slash = /[\\]/]/\n'],
+    ['a regex after return', 'function a() {\n  return /a/.test(s) || /b/.test(s)\n}\n'],
+    ['a regex after typeof', 'const a = typeof /a/\n'],
+    ['a regex at the start', '/a/.test(s)\n'],
+    ['a regex in a call', "text.replace(/'/g, '//')\n"],
+    ['a regex after an arrow', 'const test = () => /\\/\\//\n'],
+    ['a regex in a template', 'const text = `${/`/.source}`\n'],
+    ['a division', 'const half = a / b / c\n'],
+    ['a shebang', '#!/usr/bin/env node\nconst a = 1\n'],
+    ['a shebang with a double slash', '#!//usr/bin/node\nconst a = 1\n'],
+    ['an unclosed string to the end', "const text = 'open // no\n"],
+    ['an unclosed template to the end', 'const text = `open // no\n'],
+    ['an unclosed regex at the end', 'const text = /open'],
+  ])('skips %s', (_, text) => {
+    expect(tsComments(text)).toEqual([])
+  })
+
+  it.each([
+    ['src/main.ts', 'const a = 1\n/* why */\n'],
+    ['scripts/build.mjs', 'const a = 1\n/* why */\n'],
+    ['src/lib/a.js', 'const a = 1\n/* why */\n'],
+  ])('fails %s with a comment at its line', (path, text) => {
+    expect(check(tree({ [path]: text }))).toEqual([expect.stringMatching(new RegExp(`^${path}:2: block comment\\. `))])
+  })
+
+  it('lets a listed commented TypeScript file pass', () => {
+    expect(check(tree({ 'src/main.ts': '// why\n' }), { commented: ['src/main.ts'] })).toEqual([])
   })
 })
