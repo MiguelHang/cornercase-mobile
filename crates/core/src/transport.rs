@@ -6,6 +6,9 @@ use futures_util::stream::BoxStream;
 
 use crate::error::Error;
 
+#[cfg(test)]
+pub(crate) mod fake;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stdin {
     Text(String),
