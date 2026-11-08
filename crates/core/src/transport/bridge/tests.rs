@@ -325,15 +325,19 @@ mod run {
         assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
+    async fn ping(bridge: &mut Bridge, every: Duration, times: usize) {
+        for _ in 0..times {
+            tokio::time::sleep(every).await;
+            bridge.send(Message::Ping(Vec::new().into())).await.expect("pinged");
+        }
+    }
+
     #[tokio::test]
     async fn bears_a_long_command_while_the_bridge_pings() {
         let silence = Duration::from_millis(300);
         let (transport, script) = bridge(silent_after(silence), async move |mut bridge| {
             heard(&mut bridge).await;
-            for _ in 0..10 {
-                tokio::time::sleep(silence / 6).await;
-                bridge.send(Message::Ping(Vec::new().into())).await.expect("pinged");
-            }
+            ping(&mut bridge, silence / 6, 10).await;
             say(&mut bridge, &[BridgeMessage::Exit(0)]).await;
             closed_cleanly(&mut bridge).await
         })
