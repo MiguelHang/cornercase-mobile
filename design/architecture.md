@@ -32,3 +32,7 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 - `svelte-check`: type checks `.svelte` and `.ts` files (`pnpm check`).
 - `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-svelte`, `globals`: `pnpm lint`, in flat config through ESLint's own `defineConfig` (typescript-eslint deprecates its `config` helper in its favour); `globals` declares the browser's globals.
 - `vitest`: the UI's unit tests, configured in `vite.config.ts` so they share Vite's plugins. They render components with `svelte/server`, which needs no DOM; jsdom stays out until a test needs a browser. Vitest does not process CSS by default, so `tokens.css?raw` and `base.css?raw` would arrive empty; `test.css.include` lets only the `?raw` imports through.
+- `serde` (with `derive`), `serde_json`: the bridge's JSON messages in `crates/core` (`design/bridge.md`); refusing unknown keys and wrong types is serde's work rather than hand-written checks. Both were already in `Cargo.lock` through Tauri.
+- `base64`: decodes `stdin_base64` in `crates/core`, with the standard alphabet and padding, so a malformed message is refused instead of guessed at. 0.23, the version Tauri already brought into `Cargo.lock`.
+- `rstest` (dev, in `crates/core` and `bridge/`): the tables of named cases (`#[case::name]`) the Rust tests use, as in cornercase-terminal.
+- `cornercase-core` in `bridge/`: the bridge reads and writes the protocol types that live in the core, so the app and the bridge cannot drift apart (`design/bridge.md`).
