@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -6,14 +7,19 @@ use std::time::Duration;
 
 use rustix::io::Errno;
 use rustix::process::{Pid, test_kill_process};
+use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 use tokio::time::{Instant, sleep, timeout};
 
 use cornercase_core::protocol::BridgeMessage;
 
 use crate::process::Running;
+use crate::server::{self, Config, Server};
 
 const PATIENCE: Duration = Duration::from_secs(10);
 const POLL: Duration = Duration::from_millis(10);
+
+pub const TOKEN: &str = "s3cret";
 
 pub const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
 
@@ -42,6 +48,41 @@ impl Default for TempDir {
 impl Drop for TempDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+pub struct Served {
+    pub address: SocketAddr,
+    stop: oneshot::Sender<()>,
+    running: JoinHandle<()>,
+}
+
+impl Served {
+    pub async fn start(change: impl FnOnce(&mut Config)) -> Self {
+        let mut config = Config::new(TOKEN.to_owned(), PathBuf::from("/nonexistent/cornercase"));
+        change(&mut config);
+        let address = "127.0.0.1:0".parse().expect("an address");
+        Self::serving(server::bind(address, config).await.expect("the server binds"))
+    }
+
+    pub fn serving(server: Server) -> Self {
+        let address = server.local_addr().expect("the server's address");
+        let (stop, stopped) = oneshot::channel::<()>();
+        let running = tokio::spawn(server.run(async {
+            let _ = stopped.await;
+        }));
+        Self { address, stop, running }
+    }
+
+    pub async fn stop(self) -> String {
+        let url = self.url(&format!("/?token={TOKEN}"));
+        let _ = self.stop.send(());
+        in_time(self.running).await.expect("the server stops");
+        url
+    }
+
+    pub fn url(&self, target: &str) -> String {
+        format!("ws://{}{target}", self.address)
     }
 }
 
