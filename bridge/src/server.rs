@@ -103,10 +103,12 @@ impl Server {
                 biased;
                 () = &mut shutdown => break,
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
-                Some((stream, peer)) = accepting.next() => admit(stream, peer, &shared, &mut crowding, &mut connections),
+                Some((stream, peer)) = accepting.next() => {
+                    admit(stream, peer, &shared, &mut crowding, &mut connections);
+                }
             }
         }
-        wind_down(accepting, &stop, connections).await;
+        wind_down(accepting, crowding, &stop, connections).await;
     }
 }
 
@@ -128,7 +130,13 @@ async fn accepted(listener: &TcpListener) -> (TcpStream, SocketAddr) {
     }
 }
 
-async fn wind_down(accepting: impl Stream, stop: &watch::Sender<bool>, mut connections: JoinSet<()>) {
+async fn wind_down(
+    accepting: impl Stream,
+    mut crowding: Crowding,
+    stop: &watch::Sender<bool>,
+    mut connections: JoinSet<()>,
+) {
+    log_eased(&mut crowding);
     log(format_args!("stopping"));
     drop(accepting);
     stop.send_replace(true);
@@ -174,11 +182,15 @@ fn admit(stream: TcpStream, peer: SocketAddr, shared: &Shared, crowding: &mut Cr
         }
         return;
     };
+    log_eased(crowding);
+    connections.spawn(serve(stream, peer, shared.clone(), handshaking));
+}
+
+fn log_eased(crowding: &mut Crowding) {
     if let Some(unlogged) = crowding.ease() {
         let plural = if unlogged == 1 { "" } else { "s" };
         log(format_args!("refused {unlogged} more connection{plural}: too many handshakes"));
     }
-    connections.spawn(serve(stream, peer, shared.clone(), handshaking));
 }
 
 async fn serve(stream: TcpStream, peer: SocketAddr, shared: Shared, handshaking: OwnedSemaphorePermit) {
