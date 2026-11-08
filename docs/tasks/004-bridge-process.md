@@ -1,6 +1,6 @@
 # 004 — Puente: ejecutar `cornercase` línea a línea y matar su grupo
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 003
 - Riesgo: medio (procesos huérfanos si el grupo no se mata bien)
 - Rama: `feat/004-bridge-process` · PR: `feat: run an allowed cornercase command and stream its lines`
@@ -10,16 +10,16 @@ Dado un argv permitido, lanzar `cornercase <argv>` y exponer su stdin/stdout/std
 código de salida, matando el proceso y su grupo cuando el que lo pidió se va.
 
 ## Criterios de aceptación
-- [ ] CA1 — `bridge/src/process.rs`: `spawn(argv) -> Running` con tokio: stdout y stderr leídos línea a línea por
+- [x] CA1 — `bridge/src/process.rs`: `spawn(argv) -> Running` con tokio: stdout y stderr leídos línea a línea por
   separado (buffer grande: un frame de `surface` puede ser una línea de cientos de KiB), stdin escrito línea a línea,
   EOF según D1, y `exit` con el código (señal → código distinto de 0 documentado).
-- [ ] CA2 — El hijo arranca en su propio grupo de procesos (`process_group(0)`); al soltar `Running` (o al llamar a
+- [x] CA2 — El hijo arranca en su propio grupo de procesos (`process_group(0)`); al soltar `Running` (o al llamar a
   `kill`) se manda `SIGTERM` al grupo y `SIGKILL` tras un plazo corto; nunca queda un zombi (`wait`).
-- [ ] CA3 — Entorno del hijo sin `CORNERCASE_PANE`, `CORNERCASE_SERVER` ni `CORNERCASE_REMOTE` (si el puente corre
+- [x] CA3 — Entorno del hijo sin `CORNERCASE_PANE`, `CORNERCASE_SERVER` ni `CORNERCASE_REMOTE` (si el puente corre
   dentro de una pestaña de cornercase, los comandos no deben apuntar a esa pestaña ni a otra máquina).
-- [ ] CA4 — El binario se elige así: `--cornercase <ruta>` del puente, si no `CORNERCASE_BIN`, si no `cornercase` en
+- [x] CA4 — El binario se elige así: `--cornercase <ruta>` del puente, si no `CORNERCASE_BIN`, si no `cornercase` en
   el `PATH`; si no se encuentra, el puente no arranca y lo dice.
-- [ ] CA5 — Tests con un `cornercase` falso (script `/bin/sh` en un `TempDir`) que: hace eco de stdin, escribe en
+- [x] CA5 — Tests con un `cornercase` falso (script `/bin/sh` en un `TempDir`) que: hace eco de stdin, escribe en
   stderr, sale con 3, se queda colgado lanzando un `sleep` hijo (al soltar, el `sleep` también muere: se comprueba su
   pid), y muestra que las variables `CORNERCASE_*` no le llegan. Esperas con sondeo y plazo, nunca `sleep` fijo.
 
