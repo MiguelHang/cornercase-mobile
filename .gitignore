@@ -2,3 +2,10 @@ target/
 node_modules/
 dist/
 .DS_Store
+/src-tauri/gen/schemas/
+/src-tauri/gen/**/build/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+Externals/
+Pods/
