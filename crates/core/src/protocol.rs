@@ -36,6 +36,13 @@ pub enum ClientMessage {
     Eof,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Input {
+    Text(String),
+    Bytes(Vec<u8>),
+    Eof,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum WireMessage {
@@ -61,6 +68,24 @@ pub fn parse_client(text: &str) -> Result<ClientMessage, Refusal> {
     decode(wire)
 }
 
+pub fn first_message(text: &str) -> Result<Vec<String>, Refusal> {
+    match parse_client(text)? {
+        ClientMessage::Argv(argv) => Ok(argv),
+        ClientMessage::Stdin(_) | ClientMessage::StdinBase64(_) | ClientMessage::Eof => {
+            Err(refused("the first message must be `argv`"))
+        }
+    }
+}
+
+pub fn next_message(text: &str) -> Result<Input, Refusal> {
+    match parse_client(text)? {
+        ClientMessage::Argv(_) => Err(refused("`argv` was already sent")),
+        ClientMessage::Stdin(text) => Ok(Input::Text(text)),
+        ClientMessage::StdinBase64(bytes) => Ok(Input::Bytes(bytes)),
+        ClientMessage::Eof => Ok(Input::Eof),
+    }
+}
+
 fn decode(wire: WireMessage) -> Result<ClientMessage, Refusal> {
     match wire {
         WireMessage::Argv(argv) => Ok(ClientMessage::Argv(argv)),
@@ -75,7 +100,11 @@ fn decode(wire: WireMessage) -> Result<ClientMessage, Refusal> {
 }
 
 fn bad_message(reason: &str) -> Refusal {
-    Refusal { message: format!("bad message: {reason}").replace(char::is_control, " ") }
+    refused(&format!("bad message: {reason}").replace(char::is_control, " "))
+}
+
+fn refused(message: &str) -> Refusal {
+    Refusal { message: message.to_owned() }
 }
 
 #[cfg(test)]

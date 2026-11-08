@@ -102,3 +102,57 @@ mod client_message {
         assert_eq!(serde_json::to_string(&message).expect("serialize the message"), json);
     }
 }
+
+mod message_order {
+    use super::*;
+
+    #[test]
+    fn takes_the_argv_from_the_first_message() {
+        assert_eq!(
+            first_message(r#"{"argv":["status","--json"]}"#),
+            Ok(vec!["status".to_owned(), "--json".to_owned()])
+        );
+    }
+
+    #[test]
+    fn leaves_an_empty_argv_to_the_allowlist() {
+        assert_eq!(first_message(r#"{"argv":[]}"#), Ok(Vec::new()));
+    }
+
+    #[rstest]
+    #[case::stdin_first(r#"{"stdin":"a"}"#)]
+    #[case::stdin_base64_first(r#"{"stdin_base64":"//4A"}"#)]
+    #[case::eof_first(r#"{"eof":true}"#)]
+    fn refuses_a_first_message_that_is_not_argv(#[case] text: &str) {
+        let refusal = first_message(text).expect_err("refuse the first message");
+        assert_eq!(refusal.message, "the first message must be `argv`");
+    }
+
+    #[test]
+    fn refuses_invalid_json_first_as_a_bad_message() {
+        let refusal = first_message(r#"{"argv":"#).expect_err("refuse the first message");
+        assert!(refusal.message.starts_with("bad message: "), "{}", refusal.message);
+    }
+
+    #[rstest]
+    #[case::text(r#"{"stdin":"hello\n"}"#, Input::Text("hello\n".to_owned()))]
+    #[case::bytes(r#"{"stdin_base64":"//4A"}"#, Input::Bytes(vec![0xff, 0xfe, 0x00]))]
+    #[case::eof(r#"{"eof":true}"#, Input::Eof)]
+    fn reads_each_input_after_the_argv(#[case] text: &str, #[case] input: Input) {
+        assert_eq!(next_message(text), Ok(input));
+    }
+
+    #[rstest]
+    #[case::second_argv(r#"{"argv":["status"]}"#)]
+    #[case::second_empty_argv(r#"{"argv":[]}"#)]
+    fn refuses_a_second_argv(#[case] text: &str) {
+        let refusal = next_message(text).expect_err("refuse the second argv");
+        assert_eq!(refusal.message, "`argv` was already sent");
+    }
+
+    #[test]
+    fn refuses_invalid_json_after_the_argv_as_a_bad_message() {
+        let refusal = next_message("{}").expect_err("refuse the message");
+        assert!(refusal.message.starts_with("bad message: "), "{}", refusal.message);
+    }
+}
