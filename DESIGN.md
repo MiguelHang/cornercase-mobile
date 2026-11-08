@@ -22,5 +22,5 @@ Why cornercase-mobile works the way it does, area by area. The rules every chang
 - [Bridge](design/bridge.md) (`bridge/`): the development bridge, its protocol, the allowlist, listening, the proposal for `/cli`.
 - [Connection](design/connection.md) (`crates/core/`): the command line as the only contract, the transport, machines and routes, identity, `contract` and `boot`.
 - [Terminal](design/terminal.md) (`src/`, `crates/core/`): the live terminal, passive by default, claiming the tab by hand.
-- [Look](design/look.md) (`src/`): following cornercase-gpui's look on a phone.
+- [Look](design/look.md) (`src/lib/theme/`, `src/lib/ui/`, `src/routes/`, `src-tauri/gen/apple/` for the launch): following cornercase-gpui's look on a phone, the tokens, glass on an opaque ground, touch, motion, system fonts, Lucide icons, the dark launch.
 - [Upstream gaps](design/upstream-gaps.md): what the app cannot do because cornercase lacks it.
