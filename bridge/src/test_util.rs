@@ -4,13 +4,14 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use tokio::time::timeout;
+use tokio::time::{Instant, sleep, timeout};
 
 use cornercase_core::protocol::BridgeMessage;
 
 use crate::process::Running;
 
 const PATIENCE: Duration = Duration::from_secs(10);
+const POLL: Duration = Duration::from_millis(10);
 
 pub(crate) struct TempDir(PathBuf);
 
@@ -53,4 +54,12 @@ pub(crate) async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
         messages.push(message);
     }
     messages
+}
+
+pub(crate) async fn wait_until(mut condition: impl AsyncFnMut() -> bool) {
+    let deadline = Instant::now() + PATIENCE;
+    while !condition().await {
+        assert!(Instant::now() < deadline, "the condition holds in time");
+        sleep(POLL).await;
+    }
 }

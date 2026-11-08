@@ -6,7 +6,7 @@ use std::process::ExitStatus;
 use rstest::rstest;
 
 use super::*;
-use crate::test_util::{TempDir, collect, write_executable};
+use crate::test_util::{TempDir, collect, wait_until, write_executable};
 
 fn fake(dir: &TempDir, script: &str) -> PathBuf {
     let path = dir.path().join("cornercase");
@@ -14,11 +14,14 @@ fn fake(dir: &TempDir, script: &str) -> PathBuf {
     path
 }
 
+fn start(dir: &TempDir, script: &str, argv: &[&str]) -> Running {
+    let argv: Vec<String> = argv.iter().map(|argument| (*argument).to_owned()).collect();
+    spawn(&fake(dir, script), &argv).expect("the fake starts")
+}
+
 async fn run(script: &str, argv: &[&str]) -> Vec<BridgeMessage> {
     let dir = TempDir::new();
-    let argv: Vec<String> = argv.iter().map(|argument| (*argument).to_owned()).collect();
-    let mut running = spawn(&fake(&dir, script), &argv).expect("the fake starts");
-    collect(&mut running).await
+    collect(&mut start(&dir, script, argv)).await
 }
 
 fn stdout(line: &str) -> BridgeMessage {
@@ -73,6 +76,48 @@ mod spawn {
             std::fs::write(&path, "#!/bin/sh\n").expect("write the file");
         }
         assert_eq!(spawn(&path, &[]).err().map(|error| error.kind()), Some(kind));
+    }
+}
+
+mod write {
+    use super::*;
+
+    fn text(line: &str) -> Input {
+        Input::Text(line.to_owned())
+    }
+
+    #[rstest]
+    #[case::lines_of_text(vec![text("a"), text("b")], vec![stdout("a"), stdout("b")])]
+    #[case::bytes_as_they_are(vec![Input::Bytes(b"ab".to_vec()), text("c")], vec![stdout("abc")])]
+    #[tokio::test]
+    async fn reaches_the_child_until_the_end_of_its_input(
+        #[case] inputs: Vec<Input>,
+        #[case] lines: Vec<BridgeMessage>,
+    ) {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "cat", &[]);
+        for input in inputs.into_iter().chain([Input::Eof]) {
+            running.write(input).await.expect("the input is accepted");
+        }
+        assert_eq!(collect(&mut running).await, [lines, vec![BridgeMessage::Exit(0)]].concat());
+    }
+
+    #[tokio::test]
+    async fn fails_after_the_end_of_the_input() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "cat", &[]);
+        running.write(Input::Eof).await.expect("the end is accepted");
+        let refused = running.write(text("a")).await.err().map(|error| error.kind());
+        assert_eq!((refused, collect(&mut running).await), (Some(ErrorKind::BrokenPipe), vec![BridgeMessage::Exit(0)]));
+    }
+
+    #[tokio::test]
+    async fn fails_once_the_child_stops_reading() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "exit 4", &[]);
+        assert_eq!(collect(&mut running).await, [BridgeMessage::Exit(4)]);
+        wait_until(async || running.write(text("a")).await.is_err()).await;
+        assert_eq!(running.next().await, None);
     }
 }
 
