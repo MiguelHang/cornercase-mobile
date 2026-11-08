@@ -14,7 +14,7 @@ use cornercase_bridge::qr::{self, Place};
 use cornercase_bridge::server::{Config, Server};
 use cornercase_bridge::{binary, token};
 
-const NOT_FOUND: u8 = 2;
+const SETUP: u8 = 2;
 const FAILED: u8 = 1;
 const PORT: u16 = 8765;
 const LOOPBACK: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -37,7 +37,7 @@ struct Failure {
     code: u8,
 }
 
-fn exit<E: fmt::Display>(code: u8) -> impl FnOnce(E) -> Failure {
+fn failing<E: fmt::Display>(code: u8) -> impl FnOnce(E) -> Failure {
     move |error| Failure { message: error.to_string(), code }
 }
 
@@ -53,16 +53,16 @@ async fn main() -> ExitCode {
 }
 
 async fn run(args: Args) -> Result<(), Failure> {
-    let binary = find(args.cornercase.as_deref()).map_err(exit(NOT_FOUND))?;
+    let binary = find(args.cornercase.as_deref()).map_err(failing(SETUP))?;
     let token = load_token(args.new_token)?;
     let targets = if args.loopback { None } else { Some(network_targets()?) };
     let places = places(targets.as_deref());
-    let shutdown = shutdown().map_err(exit(FAILED))?;
+    let shutdown = shutdown().map_err(failing(FAILED))?;
     let ips: Vec<IpAddr> = places.iter().map(|&(_, ip)| ip).collect();
-    let listeners = network::listen(&ips, args.port).await.map_err(exit(FAILED))?;
+    let listeners = network::listen(&ips, args.port).await.map_err(failing(FAILED))?;
     let count = listeners.len();
     eprintln!("cornercase-bridge: listening on {count} address{}", if count == 1 { "" } else { "es" });
-    print(&places, &listeners, &token).map_err(exit(FAILED))?;
+    print(&places, &listeners, &token).map_err(failing(FAILED))?;
     Server::from_listeners(listeners, Config::new(token, binary)).run(shutdown).await;
     Ok(())
 }
@@ -76,15 +76,17 @@ fn find(option: Option<&Path>) -> Result<PathBuf, binary::NotFound> {
 fn load_token(new: bool) -> Result<String, Failure> {
     let config_home = env::var_os(token::CONFIG_HOME);
     let home = env::var_os(token::HOME);
-    let path = token::path(config_home.as_deref(), home.as_deref()).map_err(exit(NOT_FOUND))?;
+    let path = token::path(config_home.as_deref(), home.as_deref()).map_err(failing(SETUP))?;
     let loaded = if new { token::rotate(&path) } else { token::load_or_create(&path) };
-    loaded.map_err(exit(FAILED))
+    loaded.map_err(failing(FAILED))
 }
 
 fn network_targets() -> Result<Vec<Target>, Failure> {
-    let interfaces = network::interfaces()
-        .map_err(|error| exit(FAILED)(format!("could not list the network interfaces: {error}")))?;
-    network::targets(&interfaces).map_err(exit(FAILED))
+    let interfaces = network::interfaces().map_err(|error| Failure {
+        message: format!("could not list the network interfaces: {error}"),
+        code: FAILED,
+    })?;
+    network::targets(&interfaces).map_err(failing(FAILED))
 }
 
 fn places(targets: Option<&[Target]>) -> Vec<(Place<'_>, IpAddr)> {

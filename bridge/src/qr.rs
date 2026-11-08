@@ -37,7 +37,7 @@ pub fn block(place: Place<'_>, url: &str) -> Vec<String> {
     block
 }
 
-pub fn lines(url: &str) -> Vec<String> {
+fn lines(url: &str) -> Vec<String> {
     let Some((width, dark)) = modules(url) else { return Vec::new() };
     let side = width + 2 * QUIET;
     let at = |x: usize, y: usize| {

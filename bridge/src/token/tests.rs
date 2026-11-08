@@ -150,7 +150,7 @@ mod load_or_create {
         assert_eq!(
             error.to_string(),
             format!(
-                "{} can be read by other users (mode {mode:03o}); run with --new-token to make a new one",
+                "{} is open to other users (mode {mode:03o}); run with --new-token to make a new one",
                 path.display()
             )
         );

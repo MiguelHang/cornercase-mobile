@@ -95,6 +95,7 @@ impl Server {
         let mut accepting = accepting(listeners);
         let (stop, stopping) = watch::channel(false);
         let shared = Shared::new(config, stopping);
+        let mut crowding = Crowding::default();
         let mut connections = JoinSet::new();
         let mut shutdown = pin!(shutdown);
         loop {
@@ -102,7 +103,7 @@ impl Server {
                 biased;
                 () = &mut shutdown => break,
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
-                Some((stream, peer)) = accepting.next() => admit(stream, peer, &shared, &mut connections),
+                Some((stream, peer)) = accepting.next() => admit(stream, peer, &shared, &mut crowding, &mut connections),
             }
         }
         wind_down(accepting, &stop, connections).await;
@@ -150,11 +151,33 @@ impl Shared {
     }
 }
 
-fn admit(stream: TcpStream, peer: SocketAddr, shared: &Shared, connections: &mut JoinSet<()>) {
+#[derive(Default)]
+struct Crowding {
+    refused: usize,
+}
+
+impl Crowding {
+    fn refuse(&mut self) -> bool {
+        self.refused += 1;
+        self.refused == 1
+    }
+
+    fn ease(&mut self) -> Option<usize> {
+        Some(std::mem::take(&mut self.refused).saturating_sub(1)).filter(|&unlogged| unlogged > 0)
+    }
+}
+
+fn admit(stream: TcpStream, peer: SocketAddr, shared: &Shared, crowding: &mut Crowding, connections: &mut JoinSet<()>) {
     let Ok(handshaking) = Arc::clone(&shared.handshakes).try_acquire_owned() else {
-        log(format_args!("refused {peer}: too many handshakes"));
+        if crowding.refuse() {
+            log(format_args!("refused {peer}: too many handshakes; the next ones are counted until a place frees up"));
+        }
         return;
     };
+    if let Some(unlogged) = crowding.ease() {
+        let plural = if unlogged == 1 { "" } else { "s" };
+        log(format_args!("refused {unlogged} more connection{plural}: too many handshakes"));
+    }
     connections.spawn(serve(stream, peer, shared.clone(), handshaking));
 }
 

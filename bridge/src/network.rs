@@ -16,7 +16,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Lan => "LAN",
             Self::Tailscale => "Tailscale",
@@ -26,8 +26,8 @@ impl Kind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Target {
-    pub kind: Kind,
-    pub interface: String,
+    pub(crate) kind: Kind,
+    pub(crate) interface: String,
     pub ip: IpAddr,
 }
 
@@ -42,7 +42,7 @@ impl fmt::Display for NoAddress {
 
 impl std::error::Error for NoAddress {}
 
-pub fn eligible(ip: IpAddr) -> Option<Kind> {
+fn eligible(ip: IpAddr) -> Option<Kind> {
     match ip {
         IpAddr::V4(ip) => eligible_v4(ip),
         IpAddr::V6(ip) => eligible_v6(ip),

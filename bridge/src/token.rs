@@ -48,7 +48,7 @@ impl fmt::Display for Error {
             }
             Self::Shared { path, mode } => write!(
                 f,
-                "{} can be read by other users (mode {mode:03o}); run with {NEW_TOKEN} to make a new one",
+                "{} is open to other users (mode {mode:03o}); run with {NEW_TOKEN} to make a new one",
                 path.display()
             ),
         }
@@ -95,7 +95,7 @@ fn create(path: &Path) -> Result<String, Error> {
     let token = fresh()?;
     let temp = written(path, &token)?;
     let linked = fs::hard_link(&temp, path);
-    fs::remove_file(&temp).map_err(Error::io(&temp))?;
+    fs::remove_file(&temp).ok();
     match linked {
         Ok(()) => Ok(token),
         Err(error) if error.kind() == ErrorKind::AlreadyExists => {

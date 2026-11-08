@@ -64,3 +64,35 @@ mod websocket {
         assert!(config.max_write_buffer_size < usize::MAX);
     }
 }
+
+mod crowding {
+    use rstest::rstest;
+
+    use super::*;
+
+    fn refusing(times: usize) -> (Crowding, Vec<bool>) {
+        let mut crowding = Crowding::default();
+        let logged = (0..times).map(|_| crowding.refuse()).collect();
+        (crowding, logged)
+    }
+
+    #[test]
+    fn logs_only_the_first_refusal_of_a_crowd() {
+        assert_eq!(refusing(3).1, vec![true, false, false]);
+    }
+
+    #[rstest]
+    #[case::none(0, None)]
+    #[case::only_the_logged_one(1, None)]
+    #[case::two_more(3, Some(2))]
+    fn counts_the_unlogged_refusals_once_a_place_frees_up(#[case] times: usize, #[case] unlogged: Option<usize>) {
+        assert_eq!(refusing(times).0.ease(), unlogged);
+    }
+
+    #[test]
+    fn logs_the_first_refusal_again_after_a_place_freed_up() {
+        let (mut crowding, _) = refusing(2);
+        crowding.ease();
+        assert_eq!((crowding.refuse(), crowding.ease()), (true, None));
+    }
+}
