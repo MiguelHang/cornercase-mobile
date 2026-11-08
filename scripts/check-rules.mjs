@@ -19,6 +19,8 @@ const TS_WORD = /[\p{ID_Continue}$]+/uy
 const TS_REGEX_KEYWORDS = new Set(
   'await case delete do else in instanceof new of return throw typeof void yield'.split(' '),
 )
+const SVELTE_SECTION = /<(script|style)(?=[\s>])(?:"[^"]*"|'[^']*'|[^>"'])*>/y
+const CSS_QUOTES = new Set(["'", '"'])
 
 export function lineCount(text) {
   if (text === '') return 0
@@ -193,7 +195,53 @@ export function tsComments(text) {
   return comments(text, tsStep, { regex: true, braces: [] })
 }
 
-const LEXERS = { '.rs': rustComments, '.ts': tsComments, '.js': tsComments, '.mjs': tsComments }
+function cssStep(text, cursor) {
+  if (text.startsWith('/*', cursor)) return { end: blockCommentEnd(text, cursor), reason: 'block comment' }
+  return { end: CSS_QUOTES.has(text[cursor]) ? quotedEnd(text, cursor) : cursor + 1 }
+}
+
+function cssComments(text) {
+  return comments(text, cssStep)
+}
+
+const SVELTE_LEXERS = { script: tsComments, style: cssComments }
+
+function markupCommentEnd(text, cursor) {
+  const close = text.indexOf('-->', cursor + 4)
+  return close === -1 ? text.length : close + 3
+}
+
+function sectionEnd(text, body, name) {
+  const close = text.indexOf(`</${name}`, body)
+  return close === -1 ? text.length : close
+}
+
+function markupStep(text, cursor, sections) {
+  if (text.startsWith('<!--', cursor)) return { end: markupCommentEnd(text, cursor), reason: 'markup comment' }
+  const tag = matchAt(SVELTE_SECTION, text, cursor)
+  if (!tag) return { end: cursor + 1 }
+  const body = SVELTE_SECTION.lastIndex
+  const end = sectionEnd(text, body, tag[1])
+  sections.push({ lexer: SVELTE_LEXERS[tag[1]], offset: lineAt(text, body) - 1, code: text.slice(body, end) })
+  return { end }
+}
+
+export function svelteComments(text) {
+  const sections = []
+  const markup = comments(text, markupStep, sections)
+  const inner = sections.flatMap(({ lexer, offset, code }) =>
+    lexer(code).map((comment) => ({ ...comment, line: comment.line + offset })),
+  )
+  return [...markup, ...inner].sort((first, second) => first.line - second.line)
+}
+
+const LEXERS = {
+  '.rs': rustComments,
+  '.ts': tsComments,
+  '.js': tsComments,
+  '.mjs': tsComments,
+  '.svelte': svelteComments,
+}
 
 function walk(root, path) {
   const full = join(root, path)

@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { check, lineCount, rustComments, tsComments } from './check-rules.mjs'
+import { check, lineCount, rustComments, svelteComments, tsComments } from './check-rules.mjs'
 
 const roots: string[] = []
 
@@ -255,5 +255,57 @@ describe('TypeScript and JavaScript comments', () => {
 
   it('lets a listed commented TypeScript file pass', () => {
     expect(check(tree({ 'src/main.ts': '// why\n' }), { commented: ['src/main.ts'] })).toEqual([])
+  })
+})
+
+describe('Svelte comments', () => {
+  it.each([
+    ['a markup comment', '<main>\n  <!-- why -->\n</main>\n', 2, 'markup comment'],
+    ['a svelte-ignore directive', '<!-- svelte-ignore a11y_autofocus -->\n<input />\n', 1, 'markup comment'],
+    ['a markup comment at the line it starts', '<p>a</p>\n<!-- one\ntwo -->\n', 2, 'markup comment'],
+    ['an unclosed markup comment', '<p>a</p>\n<!-- open\n', 2, 'markup comment'],
+    ['a line comment in a script', '<script>\n  let a = 1\n  // why\n</script>\n', 3, 'line comment'],
+    ['a block comment in a script', '<script>\n  /** why */\n  let a = 1\n</script>\n', 2, 'block comment'],
+    ['a comment in a script below the markup', '<main></main>\n\n<script>\n  // why\n</script>\n', 4, 'line comment'],
+    ['a comment on the line of its script tag', '<script>// why\n</script>\n', 1, 'line comment'],
+    ['a comment in an unclosed script', '<script>\n  // why\n', 2, 'line comment'],
+    ['a comment in a generic script', '<script generics="T extends A<B>">\n  // why\n</script>\n', 2, 'line comment'],
+    ['a comment in a single-quoted generic script', "<script generics='T extends A<B>'>\n// why\n", 2, 'line comment'],
+    ['a block comment in a style', '<style>\n  p { color: red; }\n  /* why */\n</style>\n', 3, 'block comment'],
+    ['a markup comment after a script', "<script>\n  let a = '<!--'\n</script>\n<!-- why -->\n", 4, 'markup comment'],
+  ])('finds %s', (_, text, line, reason) => {
+    expect(svelteComments(text)).toEqual([{ line, reason }])
+  })
+
+  it('finds every comment, each at its line', () => {
+    const text =
+      '<script module>\n  // one\n</script>\n<script>\n  /* two */\n</script>\n' +
+      '<!-- three -->\n<style>\n  /* four */\n</style>\n'
+    expect(svelteComments(text)).toEqual([
+      { line: 2, reason: 'line comment' },
+      { line: 5, reason: 'block comment' },
+      { line: 7, reason: 'markup comment' },
+      { line: 9, reason: 'block comment' },
+    ])
+  })
+
+  it.each([
+    ['a URL in the markup text', '<p>See https://usecornercase.dev</p>\n'],
+    ['a URL in an attribute', '<a href="https://usecornercase.dev">site</a>\n'],
+    ['a URL in a style', '<style>\n  main { background: url(https://x.dev/a.png); }\n</style>\n'],
+    ['a single-quoted string in a style', "<style>\n  p::after { content: '/* no */'; }\n</style>\n"],
+    ['a double-quoted string in a style', '<style>\n  p::after { content: "/* no */"; }\n</style>\n'],
+    ['a markup comment opener in a script string', "<script>\n  const a = '<!-- no -->'\n</script>\n"],
+    ['an element named like a script', '<script-card>See https://usecornercase.dev</script-card>\n'],
+    ['the real src/App.svelte', readFileSync(new URL('../src/App.svelte', import.meta.url), 'utf8')],
+  ])('skips %s', (_, text) => {
+    expect(svelteComments(text)).toEqual([])
+  })
+
+  it.each([
+    ['src/App.svelte', '<main>\n  <!-- why -->\n</main>\n', 'markup comment'],
+    ['src/lib/Card.svelte', '<script>\n  // why\n</script>\n', 'line comment'],
+  ])('fails %s with a comment at its line', (path, text, reason) => {
+    expect(check(tree({ [path]: text }))).toEqual([expect.stringMatching(new RegExp(`^${path}:2: ${reason}\\. `))])
   })
 })
