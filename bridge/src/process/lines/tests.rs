@@ -4,8 +4,9 @@ use rstest::rstest;
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::time::{Instant, timeout};
 
+use cornercase_core::protocol::LONGEST_LINE;
+
 use super::*;
-use crate::process::LONGEST_LINE;
 
 const PATIENCE: Duration = Duration::from_secs(5);
 

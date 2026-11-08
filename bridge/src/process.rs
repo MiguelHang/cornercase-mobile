@@ -5,7 +5,7 @@ use std::process::Stdio;
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 
-use cornercase_core::protocol::BridgeMessage;
+use cornercase_core::protocol::{BridgeMessage, LONGEST_LINE};
 
 mod group;
 mod input;
@@ -15,7 +15,6 @@ pub use input::Stdin;
 
 const REMOVED: [&str; 3] = ["CORNERCASE_PANE", "CORNERCASE_SERVER", "CORNERCASE_REMOTE"];
 const MESSAGES: usize = 16;
-pub(crate) const LONGEST_LINE: usize = 16 << 20;
 const TOO_LONG: &str = "a line of output passed 16 MiB";
 
 pub struct Running {

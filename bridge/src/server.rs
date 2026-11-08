@@ -15,7 +15,7 @@ use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{WebSocketStream, accept_hdr_async_with_config};
 
-use crate::process::LONGEST_LINE;
+use cornercase_core::protocol::{LARGEST_MESSAGE, LONGEST_LINE};
 
 mod auth;
 mod connection;
@@ -28,7 +28,6 @@ const HELLO: Duration = Duration::from_secs(10);
 const HANDSHAKE: Duration = Duration::from_secs(10);
 const CONNECTIONS: usize = 64;
 const HANDSHAKES: usize = 64;
-const LARGEST_MESSAGE: usize = 1 << 20;
 const WRITE_BUFFER_LIMIT: usize = 7 * LONGEST_LINE;
 const ACCEPT_PAUSE: Duration = Duration::from_millis(100);
 
