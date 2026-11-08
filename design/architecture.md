@@ -35,4 +35,5 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 - `serde` (with `derive`), `serde_json`: the bridge's JSON messages in `crates/core` (`design/bridge.md`); refusing unknown keys and wrong types is serde's work rather than hand-written checks. Both were already in `Cargo.lock` through Tauri.
 - `base64`: decodes `stdin_base64` in `crates/core`, with the standard alphabet and padding, so a malformed message is refused instead of guessed at. 0.23, the version Tauri already brought into `Cargo.lock`.
 - `rstest` (dev, in `crates/core` and `bridge/`): the tables of named cases (`#[case::name]`) the Rust tests use, as in cornercase-terminal.
+- `clap` (with `derive`) in `bridge/`: the bridge's options (`--cornercase` for now; task 005 adds the listening ones), as in cornercase-terminal and with its features: no colours, help, usage, error context and suggestions for a mistyped option.
 - `cornercase-core` in `bridge/`: the bridge reads and writes the protocol types that live in the core, so the app and the bridge cannot drift apart (`design/bridge.md`).
