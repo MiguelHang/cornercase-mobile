@@ -31,4 +31,4 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 - No `@types/node`: `vite.config.ts` reads one environment variable (`TAURI_DEV_HOST`), so it declares the `process` it uses instead of pulling in Node's types for the whole config.
 - `svelte-check`: type checks `.svelte` and `.ts` files (`pnpm check`).
 - `eslint`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-svelte`, `globals`: `pnpm lint`, in flat config through ESLint's own `defineConfig` (typescript-eslint deprecates its `config` helper in its favour); `globals` declares the browser's globals.
-- `vitest`: the UI's unit tests, configured in `vite.config.ts` so they share Vite's plugins. They render components with `svelte/server`, which needs no DOM; jsdom stays out until a test needs a browser.
+- `vitest`: the UI's unit tests, configured in `vite.config.ts` so they share Vite's plugins. They render components with `svelte/server`, which needs no DOM; jsdom stays out until a test needs a browser. Vitest does not process CSS by default, so `tokens.css?raw` and `base.css?raw` would arrive empty; `test.css.include` lets only the `?raw` imports through.

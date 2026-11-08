@@ -62,6 +62,7 @@ describe('what is walked', () => {
     'src-tauri/build.rs',
     'src/App.svelte',
     'src/lib/store.svelte.ts',
+    'src/lib/theme/tokens.css',
     'scripts/tool.mjs',
     'scripts/tool.js',
     'vite.config.ts',
@@ -313,6 +314,27 @@ describe('Svelte comments', () => {
     ['src/lib/Card.svelte', '<script>\n  // why\n</script>\n', 'line comment'],
   ])('fails %s with a comment at its line', (path, text, reason) => {
     expect(check(tree({ [path]: text }))).toEqual([expect.stringMatching(new RegExp(`^${path}:2: ${reason}\\. `))])
+  })
+})
+
+describe('CSS comments', () => {
+  it('fails a CSS file with a block comment at its line', () => {
+    const text = ':root {\n  --a: 1px;\n  /* x */\n}\n'
+    expect(check(tree({ 'src/lib/theme/tokens.css': text }))).toEqual([
+      expect.stringMatching(/^src\/lib\/theme\/tokens\.css:3: block comment\. /),
+    ])
+  })
+
+  it.each([
+    ['a single-quoted string', "p::after { content: '/* no */'; }\n"],
+    ['a double-quoted string', 'p::after { content: "/* no */"; }\n'],
+    ['a URL', 'main { background: url(https://x.dev/a.png); }\n'],
+  ])('skips %s', (_, text) => {
+    expect(check(tree({ 'src/lib/theme/base.css': text }))).toEqual([])
+  })
+
+  it('lets a listed commented CSS file pass', () => {
+    expect(check(tree({ 'src/a.css': '/* why */\n' }), { commented: ['src/a.css'] })).toEqual([])
   })
 })
 

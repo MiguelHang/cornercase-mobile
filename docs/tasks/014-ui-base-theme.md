@@ -1,38 +1,40 @@
-# 014 — UI base: tema de gpui, cristal, navegación, avisos y primera máquina pegando la URL
+# 014 — UI base: navegación, avisos, estado de la conexión y primera máquina pegando la URL
 
 - Estado: pendiente
-- Depende de: 013 · decisión **D3**
+- Depende de: 013, 034 · decisión **D3**
 - Riesgo: bajo
-- Rama: `feat/014-ui-base` · PR: `feat: add the app's look, navigation and first machine form`
+- Rama: `feat/014-ui-base` · PR: `feat: add navigation, toasts and the first machine form`
 
 ## Objetivo
-El armazón de la UI sobre el que se montan las pantallas: aspecto de cornercase-gpui adaptado al móvil, navegación,
-avisos, estado de la conexión y una forma mínima de añadir la primera máquina pegando la URL del puente.
+El armazón de la UI sobre el que se montan las pantallas, sobre el aspecto que ya trae la 034: navegación, avisos,
+estado de la conexión y una forma mínima de añadir la primera máquina pegando la URL del puente en la pantalla "sin
+máquinas" de la 034.
 
 ## Criterios de aceptación
-- [ ] CA1 — `src/lib/theme/tokens.css`: colores, radios, espacios, tipografías y duraciones portados de `src/theme.rs`
-  de gpui (tema oscuro de usecornercase.dev, cobalto para lo elegido, verde/ámbar/rojo de estados) como propiedades CSS.
-- [ ] CA2 — Componentes base en `src/lib/ui/`: `Glass` (tarjeta de cristal: `backdrop-filter` sobre el fondo),
-  `Button` (normal, primario, peligro), `Chip`, `StatusDot` (trabajando con órbita animada, esperando, terminado,
-  fallido), `Spinner`, `Sheet` (sube desde abajo), el logo (`Mark`). Movimiento con transiciones de Svelte; respeta
-  `prefers-reduced-motion`.
-- [ ] CA3 — Navegación por pantallas (router mínimo propio o `svelte-spa-router`; justificar), con safe areas de iOS
-  (`env(safe-area-inset-*)`) y `viewport-fit=cover`.
-- [ ] CA4 — Avisos (toasts) desde el evento `toast` de 013: máximo 3, caducan por tipo (info 4 s, error 8 s).
-- [ ] CA5 — Barra de estado de conexión: conectando, conectado (por qué ruta), reintentando en N s, faltan comandos
-  (lista de 010), token inválido.
-- [ ] CA6 — Sin máquinas: pantalla de bienvenida con un campo "pega la URL del puente" + nombre, que llama a
-  `machine_add` y conecta. (La pantalla completa de Máquinas es 027.)
-- [ ] CA7 — vitest para la lógica sin marcado: caducidad de avisos, formato del estado de conexión.
+- [ ] CA1 — Navegación por pantallas (router mínimo propio o `svelte-spa-router`; justificar), sobre las safe areas
+  que ya pone la 034. La pantalla "sin máquinas" de la 034 pasa a ser una ruta.
+- [ ] CA2 — Avisos (toasts) desde el evento `toast` de 013: máximo 3, caducan por tipo (info 4 s, error 8 s), en la
+  tarjeta de cristal de la 034, entrando desde arriba con las transiciones de `motion.ts`.
+- [ ] CA3 — Barra de estado de conexión: conectando (el punto y el cursor de la marca laten, solo mientras conecta),
+  conectado (por qué ruta), reintentando en N s, faltan comandos (lista de 010), token inválido.
+- [ ] CA4 — Primera máquina: el `Add machine` en reposo de la 034 se activa y abre un formulario con "pega la URL del
+  puente" + nombre, que llama a `machine_add` y conecta; mientras trabaja, `Spinner` en el botón (`busy_button` de
+  gpui). (La pantalla completa de Máquinas es 027.)
+- [ ] CA5 — Los componentes que esto estrena, con el aspecto de gpui: `Spinner`, `Sheet` (sube desde abajo) si el
+  formulario va en una, `Field` (anillo cobalto de 3 px al enfocar, ≥ 16 px de letra para que iOS no haga zoom), y los
+  tonos normal/peligro de `Button` que se usen.
+- [ ] CA6 — vitest para la lógica sin marcado: caducidad de avisos, formato del estado de conexión, validación de la
+  URL del formulario.
 
 ## Referencias
-- cornercase-gpui: `design/widgets.md` (cristal en capas, radios, cobalto sin barras, el logo, movimiento, "nada se
-  anima para siempre en reposo"), `src/theme.rs`, `src/ui/glass.rs`, `src/ui/signs.rs`, `src/ui/motion.rs`,
-  `src/ui/brand.rs`, `src/app/toasts.rs`.
+- cornercase-gpui: `src/app/toasts.rs`, `src/ui/motion.rs` (`pulse`, `spin`), `src/ui/brand.rs` (cursor que late),
+  `src/ui/text_field.rs` y `design/widgets.md` (`busy_button`, "What takes a while turns a spinner", "Nothing animates
+  forever while idle"), `design/connection.md` (estado de la conexión), `design/machines.md` (el formulario).
 - Orca: `mobile/app/` (estructura de pantallas en móvil).
 
 ## design/ que actualiza
-- `design/look.md`: qué tokens se portaron, qué cambia en táctil (tamaños de toque ≥ 44 pt, sin hover), el router elegido.
+- `design/look.md`: el router elegido, los avisos, los componentes nuevos y qué cambia en táctil.
+- `design/connection.md`: cómo se enseña el estado de la conexión.
 
 ## Verificación
 `pnpm check`, `pnpm lint`, `pnpm test` verdes; en el simulador se añade la máquina pegando la URL y la barra pasa a

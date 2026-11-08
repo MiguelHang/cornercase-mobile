@@ -1,0 +1,48 @@
+:root {
+  --glass: #0b0c0e;
+  --raised: #1d2025;
+  --surface: #2a2e354d;
+  --panel: #ffffff0a;
+  --field: #0506088c;
+  --veil: #0a0b109e;
+  --border: #ffffff17;
+  --edge: #ffffff2b;
+  --hover: #ffffff0f;
+  --selected: #ffffff1a;
+
+  --text: #eceef1;
+  --soft: #b6bcc4;
+  --muted: #8b929b;
+  --faint: #6b727c;
+
+  --brand: #005fff;
+  --brand-hover: #0050d8;
+  --brand-light: #2b7bff;
+  --on-brand: #f7f8fa;
+  --accent: #74a3ff;
+  --accent-soft: #005fff2e;
+  --selection: #005fff47;
+
+  --working: #f5d76e;
+  --waiting: #ff8700;
+  --done: #58e6a0;
+  --failed: #ff6b8b;
+  --merged: #875fff;
+
+  --radius-chip: 5px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-sheet: 16px;
+
+  --gap: 8px;
+  --inset: 12px;
+  --inset-wide: 16px;
+  --inset-card: 28px;
+
+  --font-ui: system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --enter: 180ms;
+  --leave: 120ms;
+  --pop: 110ms;
+}
