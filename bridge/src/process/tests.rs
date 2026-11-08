@@ -238,6 +238,15 @@ mod kill {
     }
 
     #[tokio::test]
+    async fn gives_a_slow_terminating_leader_time_before_killing_it() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "trap 'sleep 0.5; exit 7' TERM; sleep 30 & echo $$ $!; wait", &[]);
+        let (leader, sleep) = pids(&mut running).await;
+        assert_eq!((in_time(running.kill()).await, reaped(leader)), (7, true));
+        wait_until(async || gone(sleep)).await;
+    }
+
+    #[tokio::test]
     async fn returns_the_real_code_once_the_child_has_exited() {
         let dir = TempDir::new();
         let mut running = start(&dir, "exit 5", &[]);
