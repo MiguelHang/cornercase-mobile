@@ -228,6 +228,34 @@ mod connections {
     }
 }
 
+mod handshakes {
+    use super::*;
+
+    async fn crowded(within: Duration) -> (Served, [TcpStream; 2]) {
+        let served = Served::start(|config| {
+            config.handshakes = 2;
+            config.handshake = within;
+        })
+        .await;
+        let silent = [served.silent().await, served.silent().await];
+        (served, silent)
+    }
+
+    #[tokio::test]
+    async fn closes_a_connection_past_the_limit_without_answering() {
+        let (served, _silent) = crowded(Duration::from_secs(60)).await;
+        closed(served.silent().await).await;
+    }
+
+    #[tokio::test]
+    async fn lets_a_client_in_once_the_silent_ones_run_out_of_time() {
+        let (served, [first, second]) = crowded(Duration::from_millis(50)).await;
+        closed(first).await;
+        closed(second).await;
+        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SWITCHING_PROTOCOLS);
+    }
+}
+
 mod opening {
     use super::*;
 

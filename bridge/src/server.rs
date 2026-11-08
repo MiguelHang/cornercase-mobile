@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{Semaphore, watch};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::tungstenite::Error;
@@ -26,6 +26,7 @@ const SILENCE: Duration = Duration::from_secs(45);
 const HELLO: Duration = Duration::from_secs(10);
 const HANDSHAKE: Duration = Duration::from_secs(10);
 const CONNECTIONS: usize = 64;
+const HANDSHAKES: usize = 64;
 const LARGEST_MESSAGE: usize = 1 << 20;
 const WRITE_BUFFER_LIMIT: usize = 7 * LONGEST_LINE;
 const ACCEPT_PAUSE: Duration = Duration::from_millis(100);
@@ -40,6 +41,7 @@ pub struct Config {
     pub hello: Duration,
     pub handshake: Duration,
     pub connections: usize,
+    pub handshakes: usize,
 }
 
 impl Config {
@@ -52,6 +54,7 @@ impl Config {
             hello: HELLO,
             handshake: HANDSHAKE,
             connections: CONNECTIONS,
+            handshakes: HANDSHAKES,
         }
     }
 }
@@ -79,8 +82,8 @@ impl Server {
         if let Ok(address) = listener.local_addr() {
             log(format_args!("listening on {address}"));
         }
-        let permits = Arc::new(Semaphore::new(config.connections));
         let (stop, stopping) = watch::channel(false);
+        let shared = Shared::new(config, stopping);
         let mut connections = JoinSet::new();
         let mut shutdown = pin!(shutdown);
         loop {
@@ -89,10 +92,7 @@ impl Server {
                 () = &mut shutdown => break,
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
                 accepted = listener.accept() => match accepted {
-                    Ok((stream, peer)) => {
-                        let serving = serve(stream, peer, Arc::clone(&config), Arc::clone(&permits), stopping.clone());
-                        connections.spawn(serving);
-                    }
+                    Ok((stream, peer)) => admit(stream, peer, &shared, &mut connections),
                     Err(error) => {
                         log(format_args!("could not accept a connection: {error}"));
                         sleep(ACCEPT_PAUSE).await;
@@ -111,13 +111,39 @@ async fn wind_down(listener: TcpListener, stop: &watch::Sender<bool>, mut connec
     while connections.join_next().await.is_some() {}
 }
 
-async fn serve(stream: TcpStream, peer: SocketAddr, config: Arc<Config>, permits: Arc<Semaphore>, mut stop: Stop) {
+#[derive(Clone)]
+struct Shared {
+    config: Arc<Config>,
+    connections: Arc<Semaphore>,
+    handshakes: Arc<Semaphore>,
+    stop: Stop,
+}
+
+impl Shared {
+    fn new(config: Arc<Config>, stop: Stop) -> Self {
+        let connections = Arc::new(Semaphore::new(config.connections));
+        let handshakes = Arc::new(Semaphore::new(config.handshakes));
+        Self { config, connections, handshakes, stop }
+    }
+}
+
+fn admit(stream: TcpStream, peer: SocketAddr, shared: &Shared, connections: &mut JoinSet<()>) {
+    let Ok(handshaking) = Arc::clone(&shared.handshakes).try_acquire_owned() else {
+        log(format_args!("refused {peer}: too many handshakes"));
+        return;
+    };
+    connections.spawn(serve(stream, peer, shared.clone(), handshaking));
+}
+
+async fn serve(stream: TcpStream, peer: SocketAddr, shared: Shared, handshaking: OwnedSemaphorePermit) {
+    let Shared { config, connections, mut stop, .. } = shared;
     let mut permit = None;
-    let gate = Gate { token: &config.token, peer, permits: &permits, permit: &mut permit };
+    let gate = Gate { token: &config.token, peer, permits: &connections, permit: &mut permit };
     let shaken = tokio::select! {
         socket = handshake(stream, peer, gate, config.handshake) => socket,
         () = stopped(&mut stop) => None,
     };
+    drop(handshaking);
     let (Some(socket), Some(_permit)) = (shaken, permit) else {
         return;
     };

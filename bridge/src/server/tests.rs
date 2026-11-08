@@ -7,8 +7,15 @@ mod config {
     fn starts_with_the_production_limits() {
         let config = Config::new("t".to_owned(), PathBuf::from("cornercase"));
         assert_eq!(
-            (config.ping, config.silence, config.hello, config.handshake, config.connections),
-            (Duration::from_secs(15), Duration::from_secs(45), Duration::from_secs(10), Duration::from_secs(10), 64)
+            (config.ping, config.silence, config.hello, config.handshake, config.connections, config.handshakes),
+            (
+                Duration::from_secs(15),
+                Duration::from_secs(45),
+                Duration::from_secs(10),
+                Duration::from_secs(10),
+                64,
+                64
+            )
         );
     }
 }
