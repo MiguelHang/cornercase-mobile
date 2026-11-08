@@ -6,7 +6,7 @@ export const MAX_LINES = 1000
 
 const ROOTS = ['crates', 'bridge', 'src-tauri/src', 'src-tauri/build.rs', 'src', 'scripts']
 const ROOT_CONFIG = /^[^/]+\.config\.(ts|js|mjs)$/
-const EXTENSIONS = new Set(['.rs', '.ts', '.js', '.mjs', '.svelte'])
+const EXTENSIONS = new Set(['.rs', '.ts', '.js', '.mjs', '.svelte', '.css'])
 const GENERATED = { folders: new Set(['gen', 'target', 'node_modules', 'dist']), files: new Set(['src/lib/bindings.ts']) }
 const LONG_FILES = []
 const COMMENTED_FILES = []
@@ -246,6 +246,7 @@ const LEXERS = {
   '.js': tsComments,
   '.mjs': tsComments,
   '.svelte': svelteComments,
+  '.css': cssComments,
 }
 
 function walk(root, path) {
