@@ -4,9 +4,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
-use rustix::io::Errno;
-use rustix::process::{Pid, test_kill_process};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -17,7 +15,7 @@ use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 use cornercase_bridge::server::{self, Config};
-use cornercase_bridge::test_util::{TempDir, fake_cornercase, in_time, wait_until};
+use cornercase_bridge::test_util::{HUNG, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until};
 
 const TOKEN: &str = "s3cret";
 const RIGHT: &str = "/?token=s3cret";
@@ -27,7 +25,6 @@ const EXITED: &str = r#"{"exit":0}"#;
 const ARGV: &str = r#"{"argv":["status"]}"#;
 const EOF: &str = r#"{"eof":true}"#;
 const READY: &str = r#"{"stdout":"ready"}"#;
-const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
 
 type Client = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -96,6 +93,10 @@ impl Exchange {
         Self { texts: texts.iter().map(|&text| text.to_owned()).collect(), close: Some(CloseCode::Normal) }
     }
 
+    fn away() -> Self {
+        Self { texts: Vec::new(), close: Some(CloseCode::Away) }
+    }
+
     async fn read(mut socket: Client) -> Self {
         let mut exchange = Self::default();
         while let Some(message) = in_time(socket.next()).await {
@@ -136,14 +137,6 @@ fn ran(dir: &Path) -> bool {
     dir.join("ran").exists()
 }
 
-fn reaped(pid: i32) -> bool {
-    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
-}
-
-fn number_in(dir: &Path, name: &str) -> Option<i32> {
-    std::fs::read_to_string(dir.join(name)).ok()?.trim().parse().ok()
-}
-
 async fn next_text(socket: &mut Client) -> String {
     loop {
         match in_time(socket.next()).await {
@@ -152,6 +145,13 @@ async fn next_text(socket: &mut Client) -> String {
             other => panic!("a text message, not {other:?}"),
         }
     }
+}
+
+async fn started(served: &Served) -> Client {
+    let mut socket = served.connect().await;
+    send(&mut socket, vec![Message::text(ARGV)]).await;
+    assert_eq!(next_text(&mut socket).await, READY);
+    socket
 }
 
 async fn closed(mut stream: TcpStream) {
@@ -292,11 +292,25 @@ mod running {
     async fn ends_the_command_on_a_bad_message(#[case] message: Message, #[case] reason: &str) {
         let dir = TempDir::new();
         let served = Served::start(faking(&dir, HUNG)).await;
-        let mut socket = served.connect().await;
-        send(&mut socket, vec![Message::text(ARGV)]).await;
-        assert_eq!(next_text(&mut socket).await, READY);
+        let mut socket = started(&served).await;
         send(&mut socket, vec![message]).await;
         assert_eq!(Exchange::read(socket).await, Exchange::of(&[&stderr(reason), USAGE]));
+        assert!(reaped(number_in(dir.path(), "pid").expect("the fake wrote its pid")));
+    }
+
+    #[tokio::test]
+    async fn ends_the_command_on_a_message_past_one_mib() {
+        let dir = TempDir::new();
+        let served = Served::start(faking(&dir, HUNG)).await;
+        let mut socket = started(&served).await;
+        let MaybeTlsStream::Plain(tcp) = socket.get_mut() else { panic!("a plain connection") };
+        let header = [&[0x81, 0xFF][..], &((1_u64 << 20) + 1).to_be_bytes(), &[0; 4]].concat();
+        tcp.write_all(&header).await.expect("the header of a text frame past 1 MiB is sent");
+        let texts = socket.filter_map(async |message| match message {
+            Ok(Message::Text(text)) => Some(text.as_str().to_owned()),
+            _ => None,
+        });
+        assert_eq!(in_time(texts.collect::<Vec<_>>()).await, [stderr("a message passed 1 MiB").as_str(), USAGE]);
         assert!(reaped(number_in(dir.path(), "pid").expect("the fake wrote its pid")));
     }
 
@@ -328,13 +342,6 @@ mod ending {
             config.ping = Duration::from_millis(ping);
             config.silence = Duration::from_millis(silence);
         }
-    }
-
-    async fn started(served: &Served) -> Client {
-        let mut socket = served.connect().await;
-        send(&mut socket, vec![Message::text(ARGV)]).await;
-        assert_eq!(next_text(&mut socket).await, READY);
-        socket
     }
 
     async fn settled(dir: &Path) -> i32 {
@@ -377,17 +384,18 @@ mod ending {
 
     #[tokio::test]
     async fn keeps_a_client_that_reads_past_the_silence() {
+        const SILENCE: u64 = 1000;
         let dir = TempDir::new();
         let fake = faking(&dir, HUNG);
         let served = Served::start(|config| {
             fake(config);
-            heartbeat(20, 100)(config);
+            heartbeat(20, SILENCE)(config);
         })
         .await;
         let mut socket = started(&served).await;
-        let mut pings = 0;
-        while pings < 10 {
-            pings += usize::from(matches!(in_time(socket.next()).await, Some(Ok(Message::Ping(_)))));
+        let past = Instant::now() + Duration::from_millis(SILENCE * 3 / 2);
+        while Instant::now() < past {
+            assert!(matches!(in_time(socket.next()).await, Some(Ok(Message::Ping(_)))));
         }
         assert!(!reaped(number_in(dir.path(), "pid").expect("the fake wrote its pid")));
     }
@@ -435,8 +443,8 @@ mod stopping {
         assert!(reaped(pid));
         wait_until(async || reaped(grandchild)).await;
         assert!(in_time(connect_async(url)).await.is_err());
-        assert_eq!(running.await.expect("the client reads"), Exchange::of(&[]));
-        assert_eq!(greeting.await.expect("the client reads"), Exchange::of(&[]));
+        assert_eq!(running.await.expect("the client reads"), Exchange::away());
+        assert_eq!(greeting.await.expect("the client reads"), Exchange::away());
         closed(shaking).await;
     }
 }

@@ -3,21 +3,19 @@ use std::process::{Command, Stdio};
 
 use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
-use rustix::io::Errno;
-use rustix::process::{Pid, Signal, kill_process, test_kill_process};
+use rustix::process::{Pid, Signal, kill_process};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::{Child, ChildStderr};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
-use cornercase_bridge::test_util::{TempDir, fake_cornercase, in_time};
+use cornercase_bridge::test_util::{HUNG, TempDir, fake_cornercase, in_time, number_in, reaped};
 
 const BRIDGE: &str = env!("CARGO_BIN_EXE_cornercase-bridge");
 const LOCAL: [&str; 4] = ["--listen", "127.0.0.1:0", "--token", "t"];
 const TOKEN: &str = "s3cret-token";
 const LISTENING: &str = "cornercase-bridge: listening on 127.0.0.1:";
-const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
 
 mod starting {
     use super::*;
@@ -73,17 +71,16 @@ mod stopping {
         socket.send(Message::text(r#"{"argv":["status"]}"#)).await.expect("the argv is sent");
         let ready = in_time(socket.next()).await.expect("a message").expect("a message");
         assert_eq!(ready, Message::text(r#"{"stdout":"ready"}"#));
-        let pid = std::fs::read_to_string(dir.path().join("pid")).expect("the fake wrote its pid");
-        let pid = Pid::from_raw(pid.trim().parse().expect("a pid")).expect("a positive pid");
+        let pid = number_in(dir.path(), "pid").expect("the fake wrote its pid");
         let bridge_pid = Pid::from_raw(bridge.id().and_then(|id| id.try_into().ok()).expect("the bridge's pid"));
         let reading =
             tokio::spawn(async move { socket.filter_map(async |message| message.ok()).collect::<Vec<_>>().await });
         kill_process(bridge_pid.expect("a positive pid"), signal).expect("the signal is sent");
         let status = in_time(bridge.wait()).await.expect("the bridge exits");
         let farewell = in_time(reading).await.expect("the client reads to the end");
-        assert!(matches!(farewell.as_slice(), [.., Message::Close(Some(frame))] if frame.code == CloseCode::Normal));
+        assert!(matches!(farewell.as_slice(), [.., Message::Close(Some(frame))] if frame.code == CloseCode::Away));
         in_time(stderr.read_to_string(&mut said)).await.expect("the bridge's stderr");
-        assert_eq!((status.code(), test_kill_process(pid)), (Some(0), Err(Errno::SRCH)), "{said}");
+        assert_eq!((status.code(), reaped(pid)), (Some(0), true), "{said}");
         assert!(!said.contains(TOKEN), "{said}");
     }
 }

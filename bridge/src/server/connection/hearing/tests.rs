@@ -49,10 +49,10 @@ mod ending {
     }
 
     #[tokio::test]
-    async fn is_silence_when_the_reader_is_gone_without_a_word() {
+    async fn is_the_reader_gone_when_it_ends_without_a_word() {
         let (ears, mut hearing, _stop) = listening(LONG);
         drop(ears);
-        assert!(matches!(hearing.ending().await, Ending::Silent(_)));
+        assert!(matches!(hearing.ending().await, Ending::ReaderGone));
     }
 
     #[tokio::test]
@@ -81,6 +81,7 @@ mod display {
     #[case::broken(Ending::Broken(Error::ConnectionClosed), "the connection broke: Connection closed normally")]
     #[case::silent(Ending::Silent(SILENCE), "the client was silent for 30ms")]
     #[case::stopped(Ending::Stopped, "the bridge is stopping")]
+    #[case::reader_gone(Ending::ReaderGone, "the connection's reader ended")]
     fn says_why_the_connection_ended(#[case] ending: Ending, #[case] said: &str) {
         assert_eq!(ending.to_string(), said);
     }

@@ -36,7 +36,7 @@ struct Args {
 }
 
 fn loopback(text: &str) -> Result<SocketAddr, String> {
-    let address: SocketAddr = text.parse().map_err(|error| format!("{error}"))?;
+    let address = text.parse::<SocketAddr>().map_err(|error| error.to_string())?;
     if address.ip().is_loopback() {
         Ok(address)
     } else {

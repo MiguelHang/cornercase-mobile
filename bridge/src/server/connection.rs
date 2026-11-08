@@ -22,7 +22,6 @@ mod hearing;
 mod input;
 
 const CLOSING: Duration = Duration::from_secs(2);
-const PLUGIN: &str = "plugin";
 
 type Socket = WebSocketStream<TcpStream>;
 
@@ -31,7 +30,7 @@ pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config,
         opened = open(&mut socket, peer, config) => opened,
         () = stopped(&mut stop) => {
             log(format_args!("closed {peer}'s connection because {}", Ending::Stopped));
-            return close(&mut socket).await;
+            return close(&mut socket, CloseCode::Away).await;
         }
     };
     match opened {
@@ -39,7 +38,7 @@ pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config,
         Err(refusal) => {
             log(format_args!("refused {peer}'s command: {refusal}"));
             refuse(&mut socket, refusal).await;
-            close(&mut socket).await;
+            close(&mut socket, CloseCode::Normal).await;
         }
     }
 }
@@ -73,7 +72,7 @@ async fn first_text(socket: &mut Socket) -> Result<Utf8Bytes, Refusal> {
 
 fn command(argv: &[String]) -> String {
     match argv {
-        [first, action, ..] if first == PLUGIN => format!("{first} {action}"),
+        [first, action, ..] if first == allowlist::PLUGIN => format!("{first} {action}"),
         [first, ..] => first.clone(),
         [] => String::new(),
     }
@@ -89,11 +88,12 @@ async fn run(socket: Socket, mut running: Running, peer: SocketAddr, config: &Co
         log(format_args!("refused {peer}'s message: {refusal}"));
     }
     log(format_args!("closed {peer}'s connection because {ending}, with exit code {code}"));
+    let parting = parting(&ending);
     let farewell = async {
         if let Ending::Refused(refusal) = ending {
             refuse(&mut sink, refusal).await;
         }
-        say_goodbye(&mut sink).await.is_ok() && (&mut reader).await.is_ok()
+        say_goodbye(&mut sink, parting).await.is_ok() && (&mut reader).await.is_ok()
     };
     if !timeout(CLOSING, farewell).await.unwrap_or(false) {
         reader.abort();
@@ -155,13 +155,17 @@ fn encode(message: &BridgeMessage) -> Result<Message, Error> {
     Ok(Message::text(text))
 }
 
-async fn say_goodbye(sink: &mut impl Outgoing) -> Result<(), Error> {
-    let frame = CloseFrame { code: CloseCode::Normal, reason: "".into() };
+fn parting(ending: &Ending) -> CloseCode {
+    if matches!(ending, Ending::Stopped) { CloseCode::Away } else { CloseCode::Normal }
+}
+
+async fn say_goodbye(sink: &mut impl Outgoing, code: CloseCode) -> Result<(), Error> {
+    let frame = CloseFrame { code, reason: "".into() };
     sink.send(Message::Close(Some(frame))).await
 }
 
-async fn close(socket: &mut Socket) {
-    if say_goodbye(socket).await.is_err() {
+async fn close(socket: &mut Socket, code: CloseCode) {
+    if say_goodbye(socket, code).await.is_err() {
         return;
     }
     let _ = timeout(CLOSING, async { while let Some(Ok(_)) = socket.next().await {} }).await;

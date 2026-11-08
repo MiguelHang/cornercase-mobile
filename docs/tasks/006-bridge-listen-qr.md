@@ -36,3 +36,8 @@ Arrancar el puente sin opciones y que escuche solo donde debe, con un token y un
 ## Verificación
 Tests verdes; a mano: el puente en el Mac imprime la URL de la LAN y la de Tailscale; `websocat` desde otra máquina
 de la tailnet ejecuta `contract --json`.
+
+## Notas de la review de 005
+- La plaza de conexión se toma al aceptar el TCP, antes de autenticar: con LAN, tomarla tras el upgrade (o un tope aparte para handshakes) y acotar las conexiones que reciben 503.
+- `--token` se ve en `ps`; el token persistente lo resuelve.
+- Memoria en el peor caso por conexión (~16 × 16 MiB de canal + frame de hasta ~96 MiB): anotarlo si el puente deja de ser solo de desarrollo.

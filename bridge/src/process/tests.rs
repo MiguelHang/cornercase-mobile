@@ -4,14 +4,12 @@ use std::process::ExitStatus;
 use std::time::Duration;
 
 use rstest::rstest;
-use rustix::io::Errno;
-use rustix::process::{Pid, test_kill_process};
 use tokio::time::timeout;
 
 use cornercase_core::protocol::{Input, USAGE_EXIT};
 
 use super::*;
-use crate::test_util::{TempDir, collect, fake_cornercase, in_time, wait_until, write_executable};
+use crate::test_util::{TempDir, collect, fake_cornercase, in_time, reaped, wait_until, write_executable};
 
 fn start(dir: &TempDir, script: &str, argv: &[&str]) -> Running {
     let argv: Vec<String> = argv.iter().map(|argument| (*argument).to_owned()).collect();
@@ -34,10 +32,6 @@ async fn pids(running: &mut Running) -> (i32, i32) {
     };
     let (first, second) = line.split_once(' ').expect("two pids");
     (first.parse().expect("the first pid"), second.parse().expect("the second pid"))
-}
-
-fn reaped(pid: i32) -> bool {
-    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
 }
 
 fn gone(pid: i32) -> bool {

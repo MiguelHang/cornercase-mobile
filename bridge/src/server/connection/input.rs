@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use futures_util::StreamExt;
 use futures_util::stream::SplitStream;
-use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::{Error, Message};
 
 use cornercase_core::protocol::{Input, Refusal, next_message};
 
@@ -10,6 +10,8 @@ use super::Socket;
 use super::hearing::{Ears, Ending};
 use crate::process::Stdin;
 use crate::server::log;
+
+const TOO_BIG: &str = "a message passed 1 MiB";
 
 pub(super) async fn read(mut stream: SplitStream<Socket>, mut stdin: Option<Stdin>, peer: SocketAddr, ears: Ears) {
     let ending = listen(&mut stream, stdin.as_mut(), peer, &ears).await;
@@ -29,6 +31,7 @@ async fn listen(
     loop {
         let message = match stream.next().await {
             Some(Ok(message)) => message,
+            Some(Err(Error::Capacity(_))) => return Ending::Refused(Refusal::new(TOO_BIG)),
             Some(Err(error)) => return Ending::Broken(error),
             None => return Ending::Closed,
         };

@@ -4,6 +4,8 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use rustix::io::Errno;
+use rustix::process::{Pid, test_kill_process};
 use tokio::time::{Instant, sleep, timeout};
 
 use cornercase_core::protocol::BridgeMessage;
@@ -12,6 +14,8 @@ use crate::process::Running;
 
 const PATIENCE: Duration = Duration::from_secs(10);
 const POLL: Duration = Duration::from_millis(10);
+
+pub const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
 
 pub struct TempDir(PathBuf);
 
@@ -58,6 +62,14 @@ pub fn fake_cornercase(dir: &Path, script: &str) -> PathBuf {
     let path = dir.join("cornercase");
     write_executable(&path, &format!("#!/bin/sh\n{script}\n"));
     path
+}
+
+pub fn reaped(pid: i32) -> bool {
+    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
+}
+
+pub fn number_in(dir: &Path, name: &str) -> Option<i32> {
+    std::fs::read_to_string(dir.join(name)).ok()?.trim().parse().ok()
 }
 
 pub async fn collect(running: &mut Running) -> Vec<BridgeMessage> {

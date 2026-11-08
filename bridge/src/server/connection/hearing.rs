@@ -18,6 +18,7 @@ pub(super) enum Ending {
     Broken(Error),
     Silent(Duration),
     Stopped,
+    ReaderGone,
 }
 
 impl fmt::Display for Ending {
@@ -29,6 +30,7 @@ impl fmt::Display for Ending {
             Self::Broken(error) => write!(formatter, "the connection broke: {error}"),
             Self::Silent(silence) => write!(formatter, "the client was silent for {silence:?}"),
             Self::Stopped => formatter.write_str("the bridge is stopping"),
+            Self::ReaderGone => formatter.write_str("the connection's reader ended"),
         }
     }
 }
@@ -72,18 +74,18 @@ impl Hearing {
             biased;
             Some(ending) = self.endings.recv() => ending,
             () = stopped(&mut self.stop) => Ending::Stopped,
-            () = silent(&mut self.heard, silence) => Ending::Silent(silence),
+            ending = silent(&mut self.heard, silence) => ending,
         }
     }
 }
 
-async fn silent(heard: &mut watch::Receiver<Option<Instant>>, silence: Duration) {
+async fn silent(heard: &mut watch::Receiver<Option<Instant>>, silence: Duration) -> Ending {
     loop {
         let last = *heard.borrow_and_update();
         tokio::select! {
-            () = quiet(last, silence) => return,
+            () = quiet(last, silence) => return Ending::Silent(silence),
             changed = heard.changed() => if changed.is_err() {
-                return;
+                return Ending::ReaderGone;
             },
         }
     }
