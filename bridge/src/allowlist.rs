@@ -66,7 +66,7 @@ const CONTROL: &[&str] = &[
     "profile",
 ];
 const OTHERS: &[&str] = &["stats"];
-const PLUGIN: &str = "plugin";
+pub(crate) const PLUGIN: &str = "plugin";
 const PLUGIN_ACTIONS: &[&str] = &["actions", "status", "run", "popup-close"];
 
 pub fn allowed(argv: &[String]) -> Result<(), Refusal> {

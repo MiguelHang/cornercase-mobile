@@ -8,30 +8,58 @@ use cornercase_core::protocol::BridgeMessage;
 
 const BUFFER: usize = 1 << 20;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum End {
+    Closed,
+    TooLong,
+}
+
 pub(super) async fn forward<R>(
     stream: R,
     message: fn(String) -> BridgeMessage,
     sender: mpsc::Sender<BridgeMessage>,
     mut deadline: watch::Receiver<Option<Instant>>,
-) where
+    longest: usize,
+) -> End
+where
     R: AsyncRead + Unpin,
 {
     let mut reader = BufReader::with_capacity(BUFFER, stream);
     loop {
-        let mut line = Vec::new();
-        let read = tokio::select! {
+        let line = tokio::select! {
             biased;
-            read = reader.read_until(b'\n', &mut line) => read,
-            () = gave_up(&mut deadline) => return,
+            line = next_line(&mut reader, longest) => line,
+            () = gave_up(&mut deadline) => return End::Closed,
         };
-        if matches!(read, Ok(0) | Err(_)) {
-            return;
-        }
-        if line.last() == Some(&b'\n') {
-            line.pop();
-        }
+        let line = match line {
+            Ok(line) => line,
+            Err(end) => return end,
+        };
         if sender.send(message(text(line))).await.is_err() {
-            return;
+            return End::Closed;
+        }
+    }
+}
+
+async fn next_line<R>(reader: &mut BufReader<R>, longest: usize) -> Result<Vec<u8>, End>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut line = Vec::new();
+    loop {
+        let available = reader.fill_buf().await.map_err(|_| End::Closed)?;
+        if available.is_empty() {
+            return if line.is_empty() { Err(End::Closed) } else { Ok(line) };
+        }
+        let newline = available.iter().position(|&byte| byte == b'\n');
+        let taken = newline.unwrap_or(available.len());
+        if line.len() + taken > longest {
+            return Err(End::TooLong);
+        }
+        line.extend_from_slice(&available[..taken]);
+        reader.consume(newline.map_or(taken, |at| at + 1));
+        if newline.is_some() {
+            return Ok(line);
         }
     }
 }

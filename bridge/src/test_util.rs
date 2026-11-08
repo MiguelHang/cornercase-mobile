@@ -4,6 +4,8 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use rustix::io::Errno;
+use rustix::process::{Pid, test_kill_process};
 use tokio::time::{Instant, sleep, timeout};
 
 use cornercase_core::protocol::BridgeMessage;
@@ -13,10 +15,12 @@ use crate::process::Running;
 const PATIENCE: Duration = Duration::from_secs(10);
 const POLL: Duration = Duration::from_millis(10);
 
-pub(crate) struct TempDir(PathBuf);
+pub const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
+
+pub struct TempDir(PathBuf);
 
 impl TempDir {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!("cornercase-bridge-test-{}-{n}", std::process::id()));
@@ -24,8 +28,14 @@ impl TempDir {
         Self(dir.canonicalize().expect("canonicalize the temp dir"))
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.0
+    }
+}
+
+impl Default for TempDir {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -35,7 +45,7 @@ impl Drop for TempDir {
     }
 }
 
-pub(crate) fn write_executable(path: &Path, contents: &str) {
+pub fn write_executable(path: &Path, contents: &str) {
     let mut child = Command::new("/bin/sh")
         .arg("-c")
         .arg("cat > \"$1\" && chmod 755 \"$1\"")
@@ -48,7 +58,21 @@ pub(crate) fn write_executable(path: &Path, contents: &str) {
     assert!(child.wait().expect("wait for sh").success(), "failed to write {}", path.display());
 }
 
-pub(crate) async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
+pub fn fake_cornercase(dir: &Path, script: &str) -> PathBuf {
+    let path = dir.join("cornercase");
+    write_executable(&path, &format!("#!/bin/sh\n{script}\n"));
+    path
+}
+
+pub fn reaped(pid: i32) -> bool {
+    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
+}
+
+pub fn number_in(dir: &Path, name: &str) -> Option<i32> {
+    std::fs::read_to_string(dir.join(name)).ok()?.trim().parse().ok()
+}
+
+pub async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
     let mut messages = Vec::new();
     while let Some(message) = timeout(PATIENCE, running.next()).await.expect("the process ends in time") {
         messages.push(message);
@@ -56,11 +80,11 @@ pub(crate) async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
     messages
 }
 
-pub(crate) async fn in_time<F: Future>(future: F) -> F::Output {
+pub async fn in_time<F: Future>(future: F) -> F::Output {
     timeout(PATIENCE, future).await.expect("it ends in time")
 }
 
-pub(crate) async fn wait_until(mut condition: impl AsyncFnMut() -> bool) {
+pub async fn wait_until(mut condition: impl AsyncFnMut() -> bool) {
     let deadline = Instant::now() + PATIENCE;
     while !condition().await {
         assert!(Instant::now() < deadline, "the condition holds in time");

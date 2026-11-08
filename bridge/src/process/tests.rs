@@ -1,28 +1,19 @@
 use std::io::ErrorKind;
 use std::os::unix::process::ExitStatusExt;
-use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::time::Duration;
 
 use rstest::rstest;
-use rustix::io::Errno;
-use rustix::process::{Pid, test_kill_process};
 use tokio::time::timeout;
 
-use cornercase_core::protocol::Input;
+use cornercase_core::protocol::{Input, USAGE_EXIT};
 
 use super::*;
-use crate::test_util::{TempDir, collect, in_time, wait_until, write_executable};
-
-fn fake(dir: &TempDir, script: &str) -> PathBuf {
-    let path = dir.path().join("cornercase");
-    write_executable(&path, &format!("#!/bin/sh\n{script}\n"));
-    path
-}
+use crate::test_util::{TempDir, collect, fake_cornercase, in_time, reaped, wait_until, write_executable};
 
 fn start(dir: &TempDir, script: &str, argv: &[&str]) -> Running {
     let argv: Vec<String> = argv.iter().map(|argument| (*argument).to_owned()).collect();
-    spawn(&fake(dir, script), &argv).expect("the fake starts")
+    spawn(&fake_cornercase(dir.path(), script), &argv).expect("the fake starts")
 }
 
 async fn run(script: &str, argv: &[&str]) -> Vec<BridgeMessage> {
@@ -41,10 +32,6 @@ async fn pids(running: &mut Running) -> (i32, i32) {
     };
     let (first, second) = line.split_once(' ').expect("two pids");
     (first.parse().expect("the first pid"), second.parse().expect("the second pid"))
-}
-
-fn reaped(pid: i32) -> bool {
-    Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
 }
 
 fn gone(pid: i32) -> bool {
@@ -96,6 +83,19 @@ mod spawn {
     async fn delivers_a_line_of_more_than_a_mebibyte_in_one_message() {
         let messages = run("head -c 1048577 /dev/zero | tr '\\0' a; echo", &[]).await;
         assert_eq!(messages, [stdout(&"a".repeat((1 << 20) + 1)), BridgeMessage::Exit(0)]);
+    }
+
+    #[rstest]
+    #[case::by_the_command("echo $$ $$; exec tr '\\0' a </dev/zero")]
+    #[case::by_a_grandchild("(sleep 0.2; exec tr '\\0' a </dev/zero) & echo $$ $!")]
+    #[tokio::test]
+    async fn ends_with_a_usage_error_once_a_line_passes_the_limit(#[case] script: &str) {
+        let dir = TempDir::new();
+        let mut running = launch(&fake_cornercase(dir.path(), script), &[], 4096).expect("the fake starts");
+        let (_, writer) = pids(&mut running).await;
+        let rest = collect(&mut running).await;
+        assert_eq!(rest, [BridgeMessage::Stderr(TOO_LONG.to_owned()), BridgeMessage::Exit(USAGE_EXIT)]);
+        wait_until(async || gone(writer)).await;
     }
 
     #[rstest]
