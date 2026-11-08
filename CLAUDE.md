@@ -23,11 +23,28 @@
 - No network code in the WebView: everything goes through Tauri commands and events.
 
 ## Commands
-Filled in by the scaffolding task (001). Expected:
-- Install: `pnpm install`
-- Development: `pnpm tauri ios dev`, `pnpm tauri android dev`, `cargo run -p cornercase-bridge`
-- Tests: `cargo test --workspace`, `pnpm test`
-- Lint / format / typecheck: `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, `pnpm check`, `pnpm lint`
+```sh
+pnpm install                                      # frontend packages and the Tauri CLI (pnpm from packageManager)
+pnpm build                                        # dist/: run it before cargo touches src-tauri, as CI does
+pnpm tauri ios dev "<iPhone>"                     # the app in the iOS simulator; names from `xcrun simctl list devices`
+cargo run -p cornercase-bridge                    # the development bridge, on the Mac
+cargo fmt --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+pnpm check                                        # svelte-check
+pnpm lint                                         # eslint
+pnpm test                                         # vitest
+```
+
+- **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets; rustup installs it on the first
+  cargo command. Node 22.
+- **CI runs the list above, in that order** (`design/code-layout.md`). Before calling a task done, run it and fix
+  what fails.
+- **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
+  `sudo xcodebuild -license accept` (until then `git` and `clang` refuse to run), open Xcode once and download an iOS
+  simulator runtime. Install CocoaPods or xcodegen (`brew install cocoapods xcodegen`) only if `pnpm tauri ios init`
+  asks for them.
+- Android has no project yet (task 030).
 
 ## Structure
 - `crates/core/`: pure, testable logic: transport trait, bridge protocol, CLI types over `--json`,
