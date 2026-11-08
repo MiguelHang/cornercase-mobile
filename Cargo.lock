@@ -477,6 +477,7 @@ name = "cornercase-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "cornercase-bridge",
  "futures-util",
  "rstest",
  "serde",
