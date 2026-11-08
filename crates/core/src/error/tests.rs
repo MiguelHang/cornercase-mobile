@@ -24,10 +24,6 @@ mod display {
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"
     )]
-    #[case::unscripted(
-        Error::Unscripted(vec!["status".to_owned(), "--json".to_owned()]),
-        r#"no answer is scripted for ["status", "--json"]"#
-    )]
     fn says_what_failed(#[case] error: Error, #[case] message: &str) {
         assert_eq!(error.to_string(), message);
     }

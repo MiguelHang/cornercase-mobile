@@ -54,14 +54,9 @@ pub trait Transport: Send + Sync {
 }
 
 pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Output, Error> {
-    let (out, mut receiver) = listen();
+    let (out, mut receiver) = listen(only_stdout);
     let exit = transport.run(argv, stream::empty().boxed(), out).await?;
-    let stdout: Vec<String> = iter::from_fn(|| receiver.try_recv().ok())
-        .filter_map(|out| match out {
-            Out::Stdout(line) => Some(line),
-            Out::Stderr(_) => None,
-        })
-        .collect();
+    let stdout: Vec<String> = iter::from_fn(|| receiver.try_recv().ok()).collect();
     Ok(Output { stdout: stdout.join("\n"), stderr: exit.stderr, code: exit.code })
 }
 
@@ -73,13 +68,22 @@ pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<Stri
     serde_json::from_str(&output.stdout).map_err(|error| json_error(&error))
 }
 
-pub(crate) fn listen() -> (OutSink, mpsc::UnboundedReceiver<Out>) {
+pub(crate) fn listen<T: Send + 'static>(keep: fn(Out) -> Option<T>) -> (OutSink, mpsc::UnboundedReceiver<T>) {
     let (sender, receiver) = mpsc::unbounded_channel();
-    let sink = sink::unfold(sender, async |sender, out| {
-        sender.send(out).map_err(|_| Closed)?;
-        Ok(sender)
+    let sink = sink::unfold((sender, keep), async |(sender, keep), out| {
+        if let Some(kept) = keep(out) {
+            sender.send(kept).map_err(|_| Closed)?;
+        }
+        Ok((sender, keep))
     });
     (Box::pin(sink), receiver)
+}
+
+fn only_stdout(out: Out) -> Option<String> {
+    match out {
+        Out::Stdout(line) => Some(line),
+        Out::Stderr(_) => None,
+    }
 }
 
 fn json_error(error: &serde_json::Error) -> Error {

@@ -134,7 +134,8 @@ mod run {
     async fn gives_up_on_a_listener_that_never_answers() {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("a listener");
         let url = format!("ws://{}/?token={TOKEN}", listener.local_addr().expect("its address"));
-        let transport = BridgeTransport::new(url, BridgeConfig { connect_timeout: DEADLINE });
+        let transport =
+            BridgeTransport::new(url, BridgeConfig { connect_timeout: DEADLINE, ..BridgeConfig::default() });
         let started = Instant::now();
         assert_eq!(run(&transport, Vec::new()).await, (Err(Error::Timeout), Vec::new()));
         let waited = started.elapsed();

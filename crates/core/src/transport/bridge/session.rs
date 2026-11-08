@@ -23,25 +23,23 @@ type Incoming = SplitStream<Socket>;
 
 pub(super) async fn run(
     socket: Socket,
+    silence: Duration,
     argv: Vec<String>,
     stdin: BoxStream<'static, Stdin>,
     out: OutSink,
 ) -> Result<Exit, Error> {
     let (mut sink, mut stream) = socket.split();
-    let ended = exchange(&mut sink, &mut stream, argv, stdin, out).await;
+    let ended = exchange(pump(&mut sink, argv, stdin), read(&mut stream, out, silence)).await;
     let _ = timeout(CLOSING, farewell(&mut sink, &mut stream)).await;
     ended
 }
 
 async fn exchange(
-    sink: &mut Outgoing,
-    stream: &mut Incoming,
-    argv: Vec<String>,
-    stdin: BoxStream<'static, Stdin>,
-    out: OutSink,
+    pumping: impl Future<Output = Result<(), WebSocketError>>,
+    reading: impl Future<Output = Result<Exit, Error>>,
 ) -> Result<Exit, Error> {
-    let pumping = pin!(pump(sink, argv, stdin));
-    let reading = pin!(read(stream, out));
+    let pumping = pin!(pumping);
+    let reading = pin!(reading);
     match future::select(reading, pumping).await {
         Either::Left((ended, _)) => ended,
         Either::Right((_, reading)) => reading.await,
@@ -68,10 +66,11 @@ fn encode(message: &ClientMessage) -> Result<Message, WebSocketError> {
     Ok(Message::text(text))
 }
 
-async fn read(stream: &mut Incoming, mut out: OutSink) -> Result<Exit, Error> {
+async fn read(stream: &mut Incoming, mut out: OutSink, silence: Duration) -> Result<Exit, Error> {
     let mut tail = StderrTail::default();
     loop {
-        let line = match heard(stream.next().await)? {
+        let message = timeout(silence, stream.next()).await.map_err(|_| Error::Dropped)?;
+        let line = match heard(message)? {
             Some(BridgeMessage::Exit(code)) => return Ok(Exit { code, stderr: tail.finish() }),
             Some(BridgeMessage::Stdout(line)) => Out::Stdout(line),
             Some(BridgeMessage::Stderr(line)) => {

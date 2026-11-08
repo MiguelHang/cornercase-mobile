@@ -18,8 +18,6 @@ pub enum Error {
     Failed { code: i32, stderr: String },
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
-    #[error("no answer is scripted for {0:?}")]
-    Unscripted(Vec<String>),
 }
 
 #[cfg(test)]

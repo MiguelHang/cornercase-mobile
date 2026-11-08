@@ -58,9 +58,13 @@ impl Transport for FakeTransport {
     ) -> BoxFuture<'_, Result<Exit, Error>> {
         match self.scripts.get(&argv) {
             Some(script) => script(stdin, out),
-            None => future::ready(Err(Error::Unscripted(argv))).boxed(),
+            None => future::ready(Err(unscripted(&argv))).boxed(),
         }
     }
+}
+
+fn unscripted(argv: &[String]) -> Error {
+    Error::Failed { code: 127, stderr: format!("no answer is scripted for {argv:?}") }
 }
 
 fn owned(words: &[&str]) -> Vec<String> {

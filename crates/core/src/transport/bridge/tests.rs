@@ -20,6 +20,7 @@ use crate::protocol::{BridgeMessage, ClientMessage};
 use crate::transport::{Out, listen};
 
 const URL: &str = "ws://bridge.example:7777/?token=secret";
+const UNRESOLVED: &str = "the address could not be resolved or reached";
 
 fn refusal(status: u16) -> WebSocketError {
     let response = http::Response::builder().status(status).body(None).expect("a response");
@@ -63,6 +64,11 @@ mod config {
     }
 
     #[test]
+    fn bears_the_bridges_silence_by_default() {
+        assert_eq!(BridgeConfig::default().silence_timeout, Duration::from_secs(45));
+    }
+
+    #[test]
     fn takes_frames_and_messages_of_seven_longest_lines() {
         let config = websocket();
         assert_eq!(config.max_frame_size, Some(7 * LONGEST_LINE));
@@ -90,7 +96,7 @@ mod connect {
     #[tokio::test]
     async fn gives_up_when_the_upgrade_does_not_come_in_time() {
         let (url, _listener) = listener().await;
-        let config = BridgeConfig { connect_timeout: Duration::from_millis(100) };
+        let config = BridgeConfig { connect_timeout: Duration::from_millis(100), ..BridgeConfig::default() };
         assert_eq!(BridgeTransport::new(url, config).connect().await.err(), Some(Error::Timeout));
     }
 }
@@ -105,7 +111,11 @@ mod connect_error {
         WebSocketError::Io(io::Error::from_raw_os_error(1)),
         Error::Connect(io::Error::from_raw_os_error(1).to_string())
     )]
-    #[case::other_io(WebSocketError::Io(io::Error::other(URL)), Error::Connect("other error".to_owned()))]
+    #[case::other_io(WebSocketError::Io(io::Error::other(URL)), Error::Connect(UNRESOLVED.to_owned()))]
+    #[case::no_address(
+        WebSocketError::Io(io::Error::new(io::ErrorKind::InvalidInput, "could not resolve to any address")),
+        Error::Connect(UNRESOLVED.to_owned())
+    )]
     #[case::url(
         WebSocketError::Url(UrlError::UnableToConnect(URL.to_owned())),
         Error::Connect("not a ws:// address".to_owned())
@@ -126,12 +136,18 @@ mod secrecy {
     #[test]
     fn shows_neither_the_url_nor_the_token_of_the_transport() {
         let transport = BridgeTransport::new(URL.to_owned(), BridgeConfig::default());
-        assert_eq!(format!("{transport:?}"), "BridgeTransport { config: BridgeConfig { connect_timeout: 3s }, .. }");
+        assert_eq!(
+            format!("{transport:?}"),
+            "BridgeTransport { config: BridgeConfig { connect_timeout: 3s, silence_timeout: 45s }, .. }"
+        );
     }
 
     #[test]
-    fn shows_only_the_timeout_of_the_config() {
-        assert_eq!(format!("{:?}", BridgeConfig::default()), "BridgeConfig { connect_timeout: 3s }");
+    fn shows_only_the_timeouts_of_the_config() {
+        assert_eq!(
+            format!("{:?}", BridgeConfig::default()),
+            "BridgeConfig { connect_timeout: 3s, silence_timeout: 45s }"
+        );
     }
 
     #[rstest]
@@ -189,7 +205,7 @@ mod run {
         closed
     }
 
-    async fn bridge<S, F>(script: S) -> (BridgeTransport, tokio::task::JoinHandle<F::Output>)
+    async fn bridge<S, F>(config: BridgeConfig, script: S) -> (BridgeTransport, tokio::task::JoinHandle<F::Output>)
     where
         S: FnOnce(Bridge) -> F + Send + 'static,
         F: Future + Send + 'static,
@@ -200,17 +216,17 @@ mod run {
             let (stream, _) = listener.accept().await.expect("a connection");
             script(accept_async(stream).await.expect("an upgrade")).await
         });
-        (BridgeTransport::new(url, BridgeConfig::default()), script)
+        (BridgeTransport::new(url, config), script)
     }
 
     async fn answer(messages: Vec<BridgeMessage>) -> (Result<Exit, Error>, Vec<Out>, (Vec<String>, bool)) {
-        let (transport, script) = bridge(async move |mut bridge| {
+        let (transport, script) = bridge(BridgeConfig::default(), async move |mut bridge| {
             let heard = heard(&mut bridge).await;
             say(&mut bridge, &messages).await;
             (heard, closed_cleanly(&mut bridge).await)
         })
         .await;
-        let (out, mut receiver) = listen();
+        let (out, mut receiver) = listen(Some);
         let stdin = stream::iter([Stdin::Text("one".to_owned()), Stdin::Bytes(vec![0, 255])]).boxed();
         let ended = transport.run(argv(), stdin, out).await;
         let outs = iter::from_fn(|| receiver.try_recv().ok()).collect();
@@ -259,7 +275,7 @@ mod run {
     #[case::broken(None)]
     #[tokio::test]
     async fn drops_when_the_bridge_goes_without_an_exit(#[case] code: Option<CloseCode>) {
-        let (transport, script) = bridge(async move |mut bridge| {
+        let (transport, script) = bridge(BridgeConfig::default(), async move |mut bridge| {
             heard(&mut bridge).await;
             say(&mut bridge, &[BridgeMessage::Stdout("a".to_owned())]).await;
             if let Some(code) = code {
@@ -267,7 +283,7 @@ mod run {
             }
         })
         .await;
-        let (out, mut receiver) = listen();
+        let (out, mut receiver) = listen(Some);
         assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::Dropped));
         assert_eq!(receiver.try_recv().ok(), Some(Out::Stdout("a".to_owned())));
         script.await.expect("the bridge's script");
@@ -278,27 +294,65 @@ mod run {
     #[case::not_the_bridges(Message::text(r#"{"stdin":"x"}"#))]
     #[tokio::test]
     async fn refuses_what_the_bridge_never_sends(#[case] message: Message) {
-        let (transport, script) = bridge(async move |mut bridge| {
+        let (transport, script) = bridge(BridgeConfig::default(), async move |mut bridge| {
             heard(&mut bridge).await;
             bridge.send(message).await.expect("sent");
             closed_cleanly(&mut bridge).await
         })
         .await;
-        let (out, _receiver) = listen();
+        let (out, _receiver) = listen(Some);
         let ended = transport.run(argv(), stream::empty().boxed(), out).await;
         assert!(matches!(ended, Err(Error::Protocol(_))), "{ended:?}");
         assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
+    fn silent_after(silence: Duration) -> BridgeConfig {
+        BridgeConfig { silence_timeout: silence, ..BridgeConfig::default() }
+    }
+
+    #[tokio::test]
+    async fn drops_when_the_bridge_falls_silent() {
+        let silence = Duration::from_millis(100);
+        let (transport, script) = bridge(silent_after(silence), async move |mut bridge| {
+            heard(&mut bridge).await;
+            closed_cleanly(&mut bridge).await
+        })
+        .await;
+        let (out, _receiver) = listen(Some);
+        let started = tokio::time::Instant::now();
+        assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::Dropped));
+        assert!(started.elapsed() >= silence, "it gave up after {:?}", started.elapsed());
+        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+    }
+
+    #[tokio::test]
+    async fn bears_a_long_command_while_the_bridge_pings() {
+        let silence = Duration::from_millis(300);
+        let (transport, script) = bridge(silent_after(silence), async move |mut bridge| {
+            heard(&mut bridge).await;
+            for _ in 0..10 {
+                tokio::time::sleep(silence / 6).await;
+                bridge.send(Message::Ping(Vec::new().into())).await.expect("pinged");
+            }
+            say(&mut bridge, &[BridgeMessage::Exit(0)]).await;
+            closed_cleanly(&mut bridge).await
+        })
+        .await;
+        let (out, _receiver) = listen(Some);
+        let ended = transport.run(argv(), stream::empty().boxed(), out).await;
+        assert_eq!(ended, Ok(Exit { code: 0, stderr: String::new() }));
+        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+    }
+
     #[tokio::test]
     async fn closes_when_nobody_listens_to_the_output() {
-        let (transport, script) = bridge(async move |mut bridge| {
+        let (transport, script) = bridge(BridgeConfig::default(), async move |mut bridge| {
             heard(&mut bridge).await;
             say(&mut bridge, &[BridgeMessage::Stdout("a".to_owned())]).await;
             closed_cleanly(&mut bridge).await
         })
         .await;
-        let (out, receiver) = listen();
+        let (out, receiver) = listen(Some);
         drop(receiver);
         assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::OutputClosed));
         assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
@@ -307,13 +361,13 @@ mod run {
     #[tokio::test]
     async fn lets_go_of_the_connection_once_dropped() {
         let (argv_came, came) = oneshot::channel();
-        let (transport, script) = bridge(async move |mut bridge| {
+        let (transport, script) = bridge(BridgeConfig::default(), async move |mut bridge| {
             bridge.next().await;
             argv_came.send(()).expect("the test waits");
             closed_cleanly(&mut bridge).await
         })
         .await;
-        let (out, _receiver) = listen();
+        let (out, _receiver) = listen(Some);
         let running = transport.run(argv(), stream::pending().boxed(), out);
         let Either::Right((_, running)) = future::select(running, came).await else {
             panic!("the run ended by itself");

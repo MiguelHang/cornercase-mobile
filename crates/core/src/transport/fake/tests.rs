@@ -18,7 +18,7 @@ fn received(mut receiver: mpsc::UnboundedReceiver<Out>) -> Vec<Out> {
 }
 
 async fn run(fake: &FakeTransport, argv: &[&str]) -> (Result<Exit, Error>, Vec<Out>) {
-    let (out, receiver) = listen();
+    let (out, receiver) = listen(Some);
     let result = fake.run(words(argv), no_stdin(), out).await;
     (result, received(receiver))
 }
@@ -58,7 +58,7 @@ mod answer {
     async fn needs_the_exact_argv(#[case] argv: &[&str]) {
         let fake = FakeTransport::default().answer(&["status", "--json"], &["{}"], &[], 0);
         let (result, lines) = run(&fake, argv).await;
-        assert_eq!(result, Err(Error::Unscripted(words(argv))));
+        assert_eq!(result, Err(unscripted(&words(argv))));
         assert_eq!(lines, []);
     }
 
@@ -91,7 +91,7 @@ mod script {
     async fn echoes_the_stdin_while_it_comes() {
         let (input, inputs) = mpsc::unbounded_channel();
         let stdin = stream::unfold(inputs, async |mut inputs| inputs.recv().await.map(|line| (line, inputs))).boxed();
-        let (out, mut receiver) = listen();
+        let (out, mut receiver) = listen(Some);
         let fake = echo();
         let running = tokio::spawn(async move { fake.run(words(&["cat"]), stdin, out).await });
         input.send(Stdin::Text("first".to_owned())).expect("the script reads its stdin");
@@ -129,8 +129,8 @@ mod unscripted {
     #[tokio::test]
     async fn names_the_argv_instead_of_panicking() {
         let (result, lines) = run(&FakeTransport::default(), &["projects", "--json"]).await;
-        assert_eq!(result, Err(Error::Unscripted(words(&["projects", "--json"]))));
-        assert_eq!(result.expect_err("unscripted").to_string(), r#"no answer is scripted for ["projects", "--json"]"#);
+        let expected = r#"no answer is scripted for ["projects", "--json"]"#;
+        assert_eq!(result, Err(Error::Failed { code: 127, stderr: expected.to_owned() }));
         assert_eq!(lines, []);
     }
 }

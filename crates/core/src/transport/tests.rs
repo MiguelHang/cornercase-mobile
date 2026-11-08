@@ -113,6 +113,19 @@ mod output {
     }
 }
 
+mod listen {
+    use super::*;
+
+    #[tokio::test]
+    async fn hands_on_only_what_it_keeps() {
+        let (mut out, mut receiver) = listen(only_stdout);
+        let lines = [Out::Stderr("a".to_owned()), Out::Stdout("b".to_owned()), Out::Stderr("c".to_owned())];
+        out.send_all(&mut stream::iter(lines.map(Ok))).await.expect("someone listens");
+        drop(out);
+        assert_eq!(iter::from_fn(|| receiver.try_recv().ok()).collect::<Vec<_>>(), ["b"]);
+    }
+}
+
 mod json {
     use super::*;
     use crate::transport::fake::FakeTransport;

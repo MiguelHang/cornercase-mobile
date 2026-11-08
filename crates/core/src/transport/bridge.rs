@@ -24,11 +24,12 @@ pub(crate) type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BridgeConfig {
     pub connect_timeout: Duration,
+    pub silence_timeout: Duration,
 }
 
 impl Default for BridgeConfig {
     fn default() -> Self {
-        Self { connect_timeout: Duration::from_secs(3) }
+        Self { connect_timeout: Duration::from_secs(3), silence_timeout: Duration::from_secs(45) }
     }
 }
 
@@ -43,7 +44,7 @@ impl BridgeTransport {
     }
 
     pub(crate) async fn connect(&self) -> Result<Socket, Error> {
-        let upgrade = connect_async_with_config(self.url.as_str(), Some(websocket()), false);
+        let upgrade = connect_async_with_config(self.url.as_str(), Some(websocket()), true);
         match tokio::time::timeout(self.config.connect_timeout, upgrade).await {
             Ok(Ok((socket, _))) => Ok(socket),
             Ok(Err(error)) => Err(connect_error(error)),
@@ -59,7 +60,7 @@ impl Transport for BridgeTransport {
         stdin: BoxStream<'static, Stdin>,
         out: OutSink,
     ) -> BoxFuture<'_, Result<Exit, Error>> {
-        async move { session::run(self.connect().await?, argv, stdin, out).await }.boxed()
+        async move { session::run(self.connect().await?, self.config.silence_timeout, argv, stdin, out).await }.boxed()
     }
 }
 
@@ -87,7 +88,7 @@ fn connect_error(error: WebSocketError) -> Error {
 fn network_error(error: &io::Error) -> String {
     match error.raw_os_error() {
         Some(_) => error.to_string(),
-        None => error.kind().to_string(),
+        None => "the address could not be resolved or reached".to_owned(),
     }
 }
 
