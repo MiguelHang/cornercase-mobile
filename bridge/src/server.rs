@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
+use tokio::sync::{Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::tungstenite::Error;
@@ -90,8 +90,8 @@ impl Server {
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
                 accepted = listener.accept() => match accepted {
                     Ok((stream, peer)) => {
-                        let permit = Arc::clone(&permits).try_acquire_owned().ok();
-                        connections.spawn(serve(stream, peer, Arc::clone(&config), permit, stopping.clone()));
+                        let serving = serve(stream, peer, Arc::clone(&config), Arc::clone(&permits), stopping.clone());
+                        connections.spawn(serving);
                     }
                     Err(error) => {
                         log(format_args!("could not accept a connection: {error}"));
@@ -111,17 +111,9 @@ async fn wind_down(listener: TcpListener, stop: &watch::Sender<bool>, mut connec
     while connections.join_next().await.is_some() {}
 }
 
-async fn serve(
-    stream: TcpStream,
-    peer: SocketAddr,
-    config: Arc<Config>,
-    permit: Option<OwnedSemaphorePermit>,
-    mut stop: Stop,
-) {
-    let gate = match &permit {
-        Some(_) => Gate::Open { token: &config.token, peer },
-        None => Gate::Full { peer },
-    };
+async fn serve(stream: TcpStream, peer: SocketAddr, config: Arc<Config>, permits: Arc<Semaphore>, mut stop: Stop) {
+    let mut permit = None;
+    let gate = Gate { token: &config.token, peer, permits: &permits, permit: &mut permit };
     let shaken = tokio::select! {
         socket = handshake(stream, peer, gate, config.handshake) => socket,
         () = stopped(&mut stop) => None,

@@ -190,22 +190,41 @@ mod handshake {
 mod connections {
     use super::*;
 
+    async fn full(dir: &TempDir) -> (Served, Client) {
+        let served = Served::start(|config| {
+            faking(dir, HUNG)(config);
+            config.connections = 1;
+        })
+        .await;
+        let held = started(&served).await;
+        (served, held)
+    }
+
+    #[rstest]
+    #[case::no_token("/", StatusCode::UNAUTHORIZED)]
+    #[case::a_wrong_token("/?token=wrong", StatusCode::UNAUTHORIZED)]
+    #[case::another_path("/x?token=s3cret", StatusCode::NOT_FOUND)]
+    #[case::the_right_token(RIGHT, StatusCode::SERVICE_UNAVAILABLE)]
     #[tokio::test]
-    async fn answers_busy_past_the_limit() {
+    async fn answers_busy_past_the_limit_only_to_the_right_token(#[case] target: &str, #[case] status: StatusCode) {
+        let dir = TempDir::new();
+        let (served, _held) = full(&dir).await;
+        assert_eq!(served.upgrade(target).await, status);
+    }
+
+    #[tokio::test]
+    async fn takes_no_place_for_a_connection_that_has_not_upgraded() {
         let served = Served::start(|config| config.connections = 1).await;
-        let _held = served.silent().await;
-        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SERVICE_UNAVAILABLE);
+        let _silent = served.silent().await;
+        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SWITCHING_PROTOCOLS);
     }
 
     #[tokio::test]
     async fn frees_a_place_once_a_connection_ends() {
-        let served = Served::start(|config| {
-            config.connections = 1;
-            config.handshake = Duration::from_millis(50);
-        })
-        .await;
-        closed(served.silent().await).await;
-        assert_eq!(served.upgrade(RIGHT).await, StatusCode::SWITCHING_PROTOCOLS);
+        let dir = TempDir::new();
+        let (served, mut held) = full(&dir).await;
+        held.close(None).await.expect("the client closes");
+        wait_until(async || served.upgrade(RIGHT).await == StatusCode::SWITCHING_PROTOCOLS).await;
     }
 }
 

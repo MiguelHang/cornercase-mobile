@@ -1,5 +1,7 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http::{StatusCode, Uri};
 
@@ -60,18 +62,25 @@ fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-pub(super) enum Gate<'a> {
-    Open { token: &'a str, peer: SocketAddr },
-    Full { peer: SocketAddr },
+pub(super) struct Gate<'a> {
+    pub(super) token: &'a str,
+    pub(super) peer: SocketAddr,
+    pub(super) permits: &'a Arc<Semaphore>,
+    pub(super) permit: &'a mut Option<OwnedSemaphorePermit>,
+}
+
+impl Gate<'_> {
+    fn admit(self, uri: &Uri) -> Result<(), Refusal> {
+        check(uri, self.token)?;
+        *self.permit = Some(Arc::clone(self.permits).try_acquire_owned().map_err(|_| Refusal::Busy)?);
+        Ok(())
+    }
 }
 
 impl Callback for Gate<'_> {
     fn on_request(self, request: &Request, response: Response) -> Result<Response, ErrorResponse> {
-        let (peer, refused) = match self {
-            Self::Open { token, peer } => (peer, check(request.uri(), token)),
-            Self::Full { peer } => (peer, Err(Refusal::Busy)),
-        };
-        match refused {
+        let peer = self.peer;
+        match self.admit(request.uri()) {
             Ok(()) => Ok(response),
             Err(refusal) => {
                 log(format_args!("refused {peer}: {}", refusal.reason()));
