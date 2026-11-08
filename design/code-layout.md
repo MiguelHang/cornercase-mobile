@@ -15,7 +15,8 @@
   4. pnpm, at the version of `packageManager`, and Node 22 with pnpm's store cached.
   5. `pnpm install --frozen-lockfile`, then `pnpm build`.
   6. `cargo fmt --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`.
-  7. `pnpm check`, `pnpm lint`, `pnpm test`.
+  7. `pnpm check` (svelte-check on `src/`, then `tsc -p tsconfig.node.json` on `vite.config.ts`, which svelte-check
+     leaves out), `pnpm lint`, `pnpm test`.
 - **Clippy and the tests cover the whole workspace**, `src-tauri` included, built for Linux desktop. That is why the job installs WebKitGTK and its friends. Rejected: excluding `src-tauri` to skip them, which would leave the shell unchecked.
 - **`pnpm build` runs before cargo**: `tauri::generate_context!` embeds `dist/` (`frontendDist`) when Tauri builds with `custom-protocol`, as `tauri build` and `tauri ios build` do, and fails without it. A dev build, which is what clippy and the tests compile, does not need it (checked on 2026-11-08 with Tauri 2.12.5). The step still goes first, so that CI proves the frontend bundles and cargo stays green if a check ever enables `custom-protocol`.
 - **The Rust cache is saved from `main` only**, as in cornercase-terminal: pull requests restore `main`'s cache and do not fill the repository's quota with caches no other branch can read. The first pull request builds everything from scratch.

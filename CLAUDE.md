@@ -25,21 +25,21 @@
 ## Commands
 ```sh
 pnpm install                                      # frontend packages and the Tauri CLI (pnpm from packageManager)
-pnpm build                                        # dist/: run it before cargo touches src-tauri, as CI does
+pnpm build                                        # dist/: needed by release builds (custom-protocol); CI runs it before cargo
 pnpm tauri ios dev "<iPhone>"                     # the app in the iOS simulator; names from `xcrun simctl list devices`
 cargo run -p cornercase-bridge                    # the development bridge, on the Mac
 cargo fmt --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
-pnpm check                                        # svelte-check
+pnpm check                                        # svelte-check, then tsc on vite.config.ts
 pnpm lint                                         # eslint
 pnpm test                                         # vitest
 ```
 
 - **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets; rustup installs it on the first
   cargo command. Node 22.
-- **CI runs the list above, in that order** (`design/code-layout.md`). Before calling a task done, run it and fix
-  what fails.
+- **CI runs `pnpm install --frozen-lockfile`, `pnpm build` and the checks from `cargo fmt --check` down, in that
+  order** (`design/code-layout.md`). Before calling a task done, run them and fix what fails.
 - **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
   `sudo xcodebuild -license accept` (until then `git` and `clang` refuse to run), open Xcode once and download an iOS
   simulator runtime. With Homebrew, the Tauri CLI installs the Apple tools it is missing on its own (xcodegen and
