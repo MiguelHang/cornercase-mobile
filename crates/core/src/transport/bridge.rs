@@ -2,18 +2,23 @@ use std::fmt;
 use std::io;
 use std::time::Duration;
 
+use futures_util::FutureExt;
+use futures_util::future::BoxFuture;
+use futures_util::stream::BoxStream;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Error as WebSocketError;
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 
+use super::{Exit, OutSink, Stdin, Transport};
 use crate::error::Error;
 use crate::protocol::LONGEST_LINE;
 
+mod session;
+
 const LARGEST_ANSWER: usize = 7 * LONGEST_LINE;
 
-#[cfg_attr(not(test), expect(dead_code, reason = "the bridge transport runs its commands over it"))]
 pub(crate) type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,7 +42,6 @@ impl BridgeTransport {
         Self { url, config }
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "the bridge transport runs its commands over it"))]
     pub(crate) async fn connect(&self) -> Result<Socket, Error> {
         let upgrade = connect_async_with_config(self.url.as_str(), Some(websocket()), false);
         match tokio::time::timeout(self.config.connect_timeout, upgrade).await {
@@ -45,6 +49,17 @@ impl BridgeTransport {
             Ok(Err(error)) => Err(connect_error(error)),
             Err(_) => Err(Error::Timeout),
         }
+    }
+}
+
+impl Transport for BridgeTransport {
+    fn run(
+        &self,
+        argv: Vec<String>,
+        stdin: BoxStream<'static, Stdin>,
+        out: OutSink,
+    ) -> BoxFuture<'_, Result<Exit, Error>> {
+        async move { session::run(self.connect().await?, argv, stdin, out).await }.boxed()
     }
 }
 

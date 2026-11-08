@@ -91,14 +91,12 @@ fn json_error(error: &serde_json::Error) -> Error {
     Error::Json(format!("{reason} at line {} column {}", error.line(), error.column()))
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "the bridge transport collects its stderr with it"))]
 #[derive(Debug, Default)]
 pub(crate) struct StderrTail {
     text: String,
     started: bool,
 }
 
-#[cfg_attr(not(test), expect(dead_code, reason = "the bridge transport collects its stderr with it"))]
 impl StderrTail {
     pub(crate) const LIMIT: usize = 64 << 10;
 
