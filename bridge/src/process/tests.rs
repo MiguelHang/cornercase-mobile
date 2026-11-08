@@ -4,9 +4,11 @@ use std::path::PathBuf;
 use std::process::ExitStatus;
 
 use rstest::rstest;
+use rustix::io::Errno;
+use rustix::process::{Pid, test_kill_process};
 
 use super::*;
-use crate::test_util::{TempDir, collect, wait_until, write_executable};
+use crate::test_util::{TempDir, collect, in_time, wait_until, write_executable};
 
 fn fake(dir: &TempDir, script: &str) -> PathBuf {
     let path = dir.path().join("cornercase");
@@ -118,6 +120,66 @@ mod write {
         assert_eq!(collect(&mut running).await, [BridgeMessage::Exit(4)]);
         wait_until(async || running.write(text("a")).await.is_err()).await;
         assert_eq!(running.next().await, None);
+    }
+}
+
+mod kill {
+    use super::*;
+
+    const HUNG: &str = "sleep 30 & echo $$ $!; wait";
+    const STUBBORN: &str = "trap '' TERM; sleep 30 & echo $$ $!; wait";
+
+    async fn pids(running: &mut Running) -> (i32, i32) {
+        let line = match in_time(running.next()).await {
+            Some(BridgeMessage::Stdout(line)) => line,
+            other => panic!("the fake prints its pids, not {other:?}"),
+        };
+        let (leader, sleep) = line.split_once(' ').expect("two pids");
+        (leader.parse().expect("the leader's pid"), sleep.parse().expect("the sleep's pid"))
+    }
+
+    fn reaped(pid: i32) -> bool {
+        Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
+    }
+
+    fn gone(pid: i32) -> bool {
+        reaped(pid) || zombie(pid)
+    }
+
+    fn zombie(pid: i32) -> bool {
+        std::process::Command::new("ps")
+            .args(["-o", "stat=", "-p", &pid.to_string()])
+            .output()
+            .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim_start().starts_with('Z'))
+    }
+
+    #[tokio::test]
+    async fn dropping_it_ends_the_whole_group() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, HUNG, &[]);
+        let (leader, sleep) = pids(&mut running).await;
+        drop(running);
+        wait_until(async || reaped(leader) && gone(sleep)).await;
+    }
+
+    #[rstest]
+    #[case::by_terminating_it(HUNG, 143)]
+    #[case::by_killing_what_ignores_termination(STUBBORN, 137)]
+    #[tokio::test]
+    async fn ends_the_whole_group_and_returns_once_reaped(#[case] script: &str, #[case] code: i32) {
+        let dir = TempDir::new();
+        let mut running = start(&dir, script, &[]);
+        let (leader, sleep) = pids(&mut running).await;
+        assert_eq!((in_time(running.kill()).await, reaped(leader)), (code, true));
+        wait_until(async || gone(sleep)).await;
+    }
+
+    #[tokio::test]
+    async fn returns_the_real_code_once_the_child_has_exited() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "exit 5", &[]);
+        assert_eq!(collect(&mut running).await, [BridgeMessage::Exit(5)]);
+        assert_eq!(running.kill().await, 5);
     }
 }
 

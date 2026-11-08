@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process::Stdio;
 
 use tokio::process::Command;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use cornercase_core::protocol::{BridgeMessage, Input};
 
@@ -17,6 +17,8 @@ const MESSAGES: usize = 16;
 pub struct Running {
     messages: mpsc::Receiver<BridgeMessage>,
     input: input::Writer,
+    order: Option<oneshot::Sender<()>>,
+    code: Option<i32>,
 }
 
 pub fn spawn(binary: &Path, argv: &[String]) -> io::Result<Running> {
@@ -34,17 +36,28 @@ pub fn spawn(binary: &Path, argv: &[String]) -> io::Result<Running> {
     let mut child = command.spawn()?;
     let input = input::Writer::new(child.stdin.take());
     let (sender, messages) = mpsc::channel(MESSAGES);
-    group::supervise(child, sender);
-    Ok(Running { messages, input })
+    let (order, stop) = oneshot::channel();
+    group::supervise(child, sender, stop);
+    Ok(Running { messages, input, order: Some(order), code: None })
 }
 
 impl Running {
     pub async fn next(&mut self) -> Option<BridgeMessage> {
-        self.messages.recv().await
+        let message = self.messages.recv().await;
+        if let Some(BridgeMessage::Exit(code)) = message {
+            self.code = Some(code);
+        }
+        message
     }
 
     pub async fn write(&mut self, input: Input) -> io::Result<()> {
         self.input.write(input).await
+    }
+
+    pub async fn kill(mut self) -> i32 {
+        drop(self.order.take());
+        while self.next().await.is_some() {}
+        self.code.unwrap_or(group::UNKNOWN)
     }
 }
 

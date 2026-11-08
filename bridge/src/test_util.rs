@@ -56,6 +56,10 @@ pub(crate) async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
     messages
 }
 
+pub(crate) async fn in_time<F: Future>(future: F) -> F::Output {
+    timeout(PATIENCE, future).await.expect("it ends in time")
+}
+
 pub(crate) async fn wait_until(mut condition: impl AsyncFnMut() -> bool) {
     let deadline = Instant::now() + PATIENCE;
     while !condition().await {
