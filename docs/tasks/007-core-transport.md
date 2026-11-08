@@ -10,16 +10,16 @@ Una interfaz única para ejecutar comandos de cornercase desde la app, con el pu
 implementación; SSH, iroh y Cloudflare serán otras implementaciones sin tocar a quien la usa.
 
 ## Criterios de aceptación
-- [ ] CA1 — `crates/core/src/transport.rs`: trait `Transport` (async) con `run(argv, stdin: Stream<Line>, stdout:
+- [x] CA1 — `crates/core/src/transport.rs`: trait `Transport` (async) con `run(argv, stdin: Stream<Line>, stdout:
   Sink<Line>) -> Result<Exit>`, donde las líneas de stderr también llegan (por un `Sink` aparte o un enum
   `Out::Stdout|Stderr`) y `Exit` lleva el código y el stderr reunido. Cancelar el futuro = cerrar el comando.
-- [ ] CA2 — Ayudantes encima: `output(argv) -> (stdout, stderr, code)` para comandos de una vez y `json::<T>(argv)`
+- [x] CA2 — Ayudantes encima: `output(argv) -> (stdout, stderr, code)` para comandos de una vez y `json::<T>(argv)`
   que añade nada por su cuenta (el argv ya trae `--json`) y deserializa.
-- [ ] CA3 — `crates/core/src/transport/bridge.rs`: implementación con tokio-tungstenite: abre `ws://…/?token=…`,
+- [x] CA3 — `crates/core/src/transport/bridge.rs`: implementación con tokio-tungstenite: abre `ws://…/?token=…`,
   manda `argv`, reenvía stdin, entrega stdout/stderr, termina con `exit`; un cierre sin `exit` es `Error::Dropped`;
   un 401 es `Error::Unauthorized` (distinto, la app dirá "token inválido").
-- [ ] CA4 — Plazo de conexión configurable (por defecto 3 s) para que 008 pueda probar rutas rápido.
-- [ ] CA5 — Tests: `FakeTransport` para el resto del núcleo (respuestas enlatadas por argv, streams programables) y
+- [x] CA4 — Plazo de conexión configurable (por defecto 3 s) para que 008 pueda probar rutas rápido.
+- [x] CA5 — Tests: `FakeTransport` para el resto del núcleo (respuestas enlatadas por argv, streams programables) y
   tests de integración contra el puente real en proceso (`bridge` como dev-dependency, `cornercase` falso): eco,
   stderr, código de salida, 401, cierre a mitad.
 
