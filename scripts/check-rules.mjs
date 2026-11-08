@@ -10,15 +10,89 @@ const EXTENSIONS = new Set(['.rs', '.ts', '.js', '.mjs', '.svelte'])
 const GENERATED = { folders: new Set(['gen', 'target', 'node_modules', 'dist']), files: new Set(['src/lib/bindings.ts']) }
 const LONG_FILES = []
 const COMMENTED_FILES = []
-const LEXERS = {}
 const SCRIPT = 'scripts/check-rules.mjs'
 const GUIDE = 'The rules and why they exist are in design/code-layout.md.'
+const RUST_RAW_STRING = /r(#*)"/y
+const RUST_CHAR = /'(?:\\.|[^\\'])'/y
 
 export function lineCount(text) {
   if (text === '') return 0
   const breaks = text.split('\n').length - 1
   return text.endsWith('\n') ? breaks : breaks + 1
 }
+
+function matchAt(pattern, text, cursor) {
+  pattern.lastIndex = cursor
+  return pattern.exec(text)
+}
+
+function lineAt(text, offset) {
+  return text.slice(0, offset).split('\n').length
+}
+
+function lineEnd(text, cursor) {
+  const end = text.indexOf('\n', cursor)
+  return end === -1 ? text.length : end
+}
+
+function quotedEnd(text, quote) {
+  let cursor = quote + 1
+  while (cursor < text.length && text[cursor] !== text[quote]) cursor += text[cursor] === '\\' ? 2 : 1
+  return cursor + 1
+}
+
+function rawStringEnd(text, body, hashes) {
+  const ending = `"${hashes}`
+  const close = text.indexOf(ending, body)
+  return close === -1 ? text.length : close + ending.length
+}
+
+function nestedCommentEnd(text, start) {
+  let depth = 0
+  let cursor = start
+  do {
+    if (text.startsWith('/*', cursor)) {
+      depth += 1
+      cursor += 2
+    } else if (text.startsWith('*/', cursor)) {
+      depth -= 1
+      cursor += 2
+    } else {
+      cursor += 1
+    }
+  } while (depth > 0 && cursor < text.length)
+  return cursor
+}
+
+function rustLiteralEnd(text, cursor) {
+  const raw = matchAt(RUST_RAW_STRING, text, cursor)
+  if (raw) return rawStringEnd(text, RUST_RAW_STRING.lastIndex, raw[1])
+  if (text[cursor] === '"') return quotedEnd(text, cursor)
+  return matchAt(RUST_CHAR, text, cursor) ? RUST_CHAR.lastIndex : cursor + 1
+}
+
+function rustStep(text, cursor) {
+  if (text.startsWith('//', cursor)) return { end: lineEnd(text, cursor), reason: 'line comment' }
+  if (text.startsWith('/*', cursor)) return { end: nestedCommentEnd(text, cursor), reason: 'block comment' }
+  return { end: rustLiteralEnd(text, cursor) }
+}
+
+function comments(text, step) {
+  const found = []
+  let cursor = 0
+  while (cursor < text.length) {
+    const { end, reason } = step(text, cursor)
+    if (reason) found.push({ line: lineAt(text, cursor), reason })
+    cursor = end
+  }
+  return found
+}
+
+export function rustComments(text) {
+  return comments(text, rustStep)
+}
+
+const LEXERS = { '.rs': rustComments }
 
 function walk(root, path) {
   const full = join(root, path)
