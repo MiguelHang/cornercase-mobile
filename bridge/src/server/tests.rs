@@ -20,6 +20,34 @@ mod config {
     }
 }
 
+mod local_addr {
+    use super::*;
+
+    fn config() -> Config {
+        Config::new("t".to_owned(), PathBuf::from("cornercase"))
+    }
+
+    async fn listener() -> TcpListener {
+        TcpListener::bind("127.0.0.1:0").await.expect("a listener")
+    }
+
+    #[tokio::test]
+    async fn of_several_listeners_is_the_first_of_their_addresses_in_order() {
+        let server = Server::from_listeners(vec![listener().await, listener().await], config());
+        let addresses = server.local_addrs().expect("the addresses");
+        assert_eq!(addresses.len(), 2);
+        assert_ne!(addresses[0], addresses[1]);
+        assert_eq!(server.local_addr().expect("an address"), addresses[0]);
+    }
+
+    #[test]
+    fn is_an_error_without_listeners() {
+        let server = Server::from_listeners(Vec::new(), config());
+        assert_eq!(server.local_addr().map_err(|error| error.kind()), Err(io::ErrorKind::NotFound));
+        assert_eq!(server.local_addrs().expect("no addresses"), Vec::<SocketAddr>::new());
+    }
+}
+
 mod websocket {
     use super::*;
 

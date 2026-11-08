@@ -6,6 +6,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::stream::{self, Stream, StreamExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
 use tokio::task::JoinSet;
@@ -60,7 +61,7 @@ impl Config {
 }
 
 pub struct Server {
-    listener: TcpListener,
+    listeners: Vec<TcpListener>,
     config: Arc<Config>,
 }
 
@@ -70,18 +71,28 @@ pub async fn bind(address: SocketAddr, config: Config) -> io::Result<Server> {
 
 impl Server {
     pub fn from_listener(listener: TcpListener, config: Config) -> Self {
-        Self { listener, config: Arc::new(config) }
+        Self::from_listeners(vec![listener], config)
+    }
+
+    pub fn from_listeners(listeners: Vec<TcpListener>, config: Config) -> Self {
+        Self { listeners, config: Arc::new(config) }
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.listener.local_addr()
+        let first = self.listeners.first().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no listener"))?;
+        first.local_addr()
+    }
+
+    pub fn local_addrs(&self) -> io::Result<Vec<SocketAddr>> {
+        self.listeners.iter().map(TcpListener::local_addr).collect()
     }
 
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
-        let Self { listener, config } = self;
-        if let Ok(address) = listener.local_addr() {
+        let Self { listeners, config } = self;
+        for address in listeners.iter().filter_map(|listener| listener.local_addr().ok()) {
             log(format_args!("listening on {address}"));
         }
+        let mut accepting = accepting(listeners);
         let (stop, stopping) = watch::channel(false);
         let shared = Shared::new(config, stopping);
         let mut connections = JoinSet::new();
@@ -91,22 +102,34 @@ impl Server {
                 biased;
                 () = &mut shutdown => break,
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
-                accepted = listener.accept() => match accepted {
-                    Ok((stream, peer)) => admit(stream, peer, &shared, &mut connections),
-                    Err(error) => {
-                        log(format_args!("could not accept a connection: {error}"));
-                        sleep(ACCEPT_PAUSE).await;
-                    }
-                },
+                Some((stream, peer)) = accepting.next() => admit(stream, peer, &shared, &mut connections),
             }
         }
-        wind_down(listener, &stop, connections).await;
+        wind_down(accepting, &stop, connections).await;
     }
 }
 
-async fn wind_down(listener: TcpListener, stop: &watch::Sender<bool>, mut connections: JoinSet<()>) {
+fn accepting(listeners: Vec<TcpListener>) -> impl Stream<Item = (TcpStream, SocketAddr)> + Unpin {
+    stream::select_all(listeners.into_iter().map(|listener| {
+        Box::pin(stream::unfold(listener, async |listener| Some((accepted(&listener).await, listener))))
+    }))
+}
+
+async fn accepted(listener: &TcpListener) -> (TcpStream, SocketAddr) {
+    loop {
+        match listener.accept().await {
+            Ok(accepted) => return accepted,
+            Err(error) => {
+                log(format_args!("could not accept a connection: {error}"));
+                sleep(ACCEPT_PAUSE).await;
+            }
+        }
+    }
+}
+
+async fn wind_down(accepting: impl Stream, stop: &watch::Sender<bool>, mut connections: JoinSet<()>) {
     log(format_args!("stopping"));
-    drop(listener);
+    drop(accepting);
     stop.send_replace(true);
     while connections.join_next().await.is_some() {}
 }
