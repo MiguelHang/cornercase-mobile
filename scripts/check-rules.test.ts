@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -307,5 +308,46 @@ describe('Svelte comments', () => {
     ['src/lib/Card.svelte', '<script>\n  // why\n</script>\n', 'line comment'],
   ])('fails %s with a comment at its line', (path, text, reason) => {
     expect(check(tree({ [path]: text }))).toEqual([expect.stringMatching(new RegExp(`^${path}:2: ${reason}\\. `))])
+  })
+})
+
+describe('the command', () => {
+  function copied(files: Record<string, string>) {
+    const root = realpathSync(tree(files))
+    mkdirSync(join(root, 'scripts'), { recursive: true })
+    copyFileSync(new URL('./check-rules.mjs', import.meta.url), join(root, 'scripts/check-rules.mjs'))
+    return root
+  }
+
+  function run(files: Record<string, string>) {
+    const root = copied(files)
+    return spawnSync(process.execPath, [join(root, 'scripts/check-rules.mjs')], { cwd: root, encoding: 'utf8' })
+  }
+
+  it('exits 0 and prints nothing on a clean tree', () => {
+    const result = run({ 'src/a.ts': 'const a = 1\n' })
+    expect([result.status, result.stderr]).toEqual([0, ''])
+  })
+
+  it('exits 1 with path:line, the reason and the guide on a comment', () => {
+    const result = run({ 'src/a.ts': 'const a = 1\n// why\n' })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toMatch(/^src\/a\.ts:2: line comment\. /m)
+    expect(result.stderr).toContain('design/code-layout.md')
+  })
+
+  it('exits 1 on a file over 1,000 lines', () => {
+    const result = run({ 'src/a.ts': lines(1001) })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toMatch(/^src\/a\.ts:1001: /m)
+  })
+
+  it('exits 1 when started through a symlink to the checkout', () => {
+    const root = copied({ 'src/a.ts': 'const a = 1\n// why\n' })
+    const link = join(realpathSync(tmpdir()), `check-rules-link-${process.pid}`)
+    roots.push(link)
+    symlinkSync(root, link)
+    const result = spawnSync(process.execPath, [join(link, 'scripts/check-rules.mjs')], { cwd: link, encoding: 'utf8' })
+    expect(result.status).toBe(1)
   })
 })
