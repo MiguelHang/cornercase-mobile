@@ -385,6 +385,10 @@ dependencies = [
 [[package]]
 name = "cornercase-bridge"
 version = "0.1.0"
+dependencies = [
+ "cornercase-core",
+ "rstest",
+]
 
 [[package]]
 name = "cornercase-core"
