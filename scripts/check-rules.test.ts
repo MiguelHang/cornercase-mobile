@@ -157,6 +157,8 @@ describe('Rust comments', () => {
     ['an escaped quote char', "let quote = '\\''; let url = \"https://x\";\n"],
     ['an escaped double quote char', "let quote = '\\\"'; let url = \"https://x\";\n"],
     ['an escaped char', "let tab = '\\t'; let byte = '\\x2f'; let code = '\\u{2f}';\n"],
+    ['a unicode char before a quote char', "let a = ['\\u{41}','\"']; let url = \"https://x\";\n"],
+    ['a hex char before a quote char', "let a = ['\\x41','\"']; let url = \"https://x\";\n"],
     ['a lifetime next to a char', "fn a<'a>(text: &'a str) -> char { '\"' }\nlet url = \"https://x\";\n"],
     ['a division', 'let half = 4 / 2;\n'],
     ['an unclosed string to the end', 'let text = "open // no\n'],
@@ -204,6 +206,8 @@ describe('TypeScript and JavaScript comments', () => {
     ['a comment after a division of a template', 'const half = `4` / 2 // why\n', 1, 'line comment'],
     ['a comment after a string in a template', "const a = `${'`'}` // why\n", 1, 'line comment'],
     ['a comment after a template regex', 'function a() { return `${a}${/`/.source}` } // why\n', 1, 'line comment'],
+    ['a comment after a postfix increment and a division', 'const a = i++ / 2 // why\n', 1, 'line comment'],
+    ['a comment after a postfix decrement and a division', 'const a = n-- / 2 // why\n', 1, 'line comment'],
     ['a comment after a hash bang past the start', 'const a = 1\n#! // why\n', 2, 'line comment'],
   ])('finds %s', (_, text, line, reason) => {
     expect(tsComments(text)).toEqual([{ line, reason }])
@@ -344,10 +348,10 @@ describe('the command', () => {
 
   it('exits 1 when started through a symlink to the checkout', () => {
     const root = copied({ 'src/a.ts': 'const a = 1\n// why\n' })
-    const link = join(realpathSync(tmpdir()), `check-rules-link-${process.pid}`)
-    roots.push(link)
+    const link = join(realpathSync(tree({})), 'link')
     symlinkSync(root, link)
     const result = spawnSync(process.execPath, [join(link, 'scripts/check-rules.mjs')], { cwd: link, encoding: 'utf8' })
     expect(result.status).toBe(1)
+    expect(result.stderr).toMatch(/^src\/a\.ts:2: line comment\. /m)
   })
 })

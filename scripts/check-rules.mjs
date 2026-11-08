@@ -13,9 +13,10 @@ const COMMENTED_FILES = []
 const SCRIPT = 'scripts/check-rules.mjs'
 const GUIDE = 'The rules and why they exist are in design/code-layout.md.'
 const RUST_RAW_STRING = /r(#*)"/y
-const RUST_CHAR = /'(?:\\.|[^\\'])'/y
+const RUST_CHAR = /'(?:\\u\{[0-9a-fA-F_]{1,6}\}|\\x[0-9a-fA-F]{2}|\\.|[^\\'\n])'/y
 const TS_SPACE = /\s+/y
 const TS_WORD = /[\p{ID_Continue}$]+/uy
+const TS_POSTFIX = /\+\+|--/y
 const TS_REGEX_KEYWORDS = new Set(
   'await case delete do else in instanceof new of return throw typeof void yield'.split(' '),
 )
@@ -168,6 +169,10 @@ function otherEnd(text, cursor, state) {
     state.regex = TS_REGEX_KEYWORDS.has(word[0])
     return TS_WORD.lastIndex
   }
+  if (matchAt(TS_POSTFIX, text, cursor)) {
+    state.regex = false
+    return TS_POSTFIX.lastIndex
+  }
   state.regex = !')]'.includes(text[cursor])
   return cursor + 1
 }
@@ -312,4 +317,5 @@ function main() {
   process.exitCode = 1
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main()
+const started = process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1])
+if (started && import.meta.url === pathToFileURL(started).href) main()
