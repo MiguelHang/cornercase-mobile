@@ -1,6 +1,6 @@
 # 007 — Núcleo: `Transport` y cliente del puente
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 005
 - Riesgo: bajo
 - Rama: `feat/007-core-transport` · PR: `feat: run cornercase commands through a transport`
