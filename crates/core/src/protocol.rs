@@ -3,12 +3,19 @@ use std::fmt;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use serde::{Deserialize, Serialize};
+use serde_json::error::Category;
 
 pub const USAGE_EXIT: i32 = 2;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
     pub message: String,
+}
+
+impl Refusal {
+    pub fn new(message: &str) -> Self {
+        Self { message: message.replace(char::is_control, " ") }
+    }
 }
 
 impl fmt::Display for Refusal {
@@ -64,7 +71,7 @@ impl From<ClientMessage> for WireMessage {
 }
 
 pub fn parse_client(text: &str) -> Result<ClientMessage, Refusal> {
-    let wire: WireMessage = serde_json::from_str(text).map_err(|error| bad_message(&error.to_string()))?;
+    let wire: WireMessage = serde_json::from_str(text).map_err(|error| bad_message(json_reason(&error)))?;
     decode(wire)
 }
 
@@ -72,14 +79,14 @@ pub fn first_message(text: &str) -> Result<Vec<String>, Refusal> {
     match parse_client(text)? {
         ClientMessage::Argv(argv) => Ok(argv),
         ClientMessage::Stdin(_) | ClientMessage::StdinBase64(_) | ClientMessage::Eof => {
-            Err(refused("the first message must be `argv`"))
+            Err(Refusal::new("the first message must be `argv`"))
         }
     }
 }
 
 pub fn next_message(text: &str) -> Result<Input, Refusal> {
     match parse_client(text)? {
-        ClientMessage::Argv(_) => Err(refused("`argv` was already sent")),
+        ClientMessage::Argv(_) => Err(Refusal::new("`argv` was already sent")),
         ClientMessage::Stdin(text) => Ok(Input::Text(text)),
         ClientMessage::StdinBase64(bytes) => Ok(Input::Bytes(bytes)),
         ClientMessage::Eof => Ok(Input::Eof),
@@ -93,18 +100,22 @@ fn decode(wire: WireMessage) -> Result<ClientMessage, Refusal> {
         WireMessage::StdinBase64(encoded) => STANDARD
             .decode(encoded)
             .map(ClientMessage::StdinBase64)
-            .map_err(|error| bad_message(&format!("`stdin_base64` is not base64: {error}"))),
+            .map_err(|_| bad_message("`stdin_base64` is not standard base64")),
         WireMessage::Eof(true) => Ok(ClientMessage::Eof),
         WireMessage::Eof(false) => Err(bad_message("`eof` must be true")),
     }
 }
 
-fn bad_message(reason: &str) -> Refusal {
-    refused(&format!("bad message: {reason}").replace(char::is_control, " "))
+fn json_reason(error: &serde_json::Error) -> &'static str {
+    match error.classify() {
+        Category::Syntax | Category::Io => "not one JSON object with one key",
+        Category::Eof => "the JSON ends too early",
+        Category::Data => "not one of `argv`, `stdin`, `stdin_base64` and `eof` with a value of its type",
+    }
 }
 
-fn refused(message: &str) -> Refusal {
-    Refusal { message: message.to_owned() }
+fn bad_message(reason: &str) -> Refusal {
+    Refusal::new(&format!("bad message: {reason}"))
 }
 
 #[cfg(test)]

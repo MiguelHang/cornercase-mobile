@@ -42,6 +42,11 @@ mod refusal {
     fn displays_its_stderr_line() {
         assert_eq!(refusal().to_string(), "`kill-server` is not allowed through the bridge");
     }
+
+    #[test]
+    fn turns_control_characters_into_spaces() {
+        assert_eq!(Refusal::new("`a\nb\rc\td` is not allowed").message, "`a b c d` is not allowed");
+    }
 }
 
 mod client_message {
@@ -78,6 +83,22 @@ mod client_message {
         let refusal = parse_client(text).expect_err("refuse the message");
         assert!(refusal.message.starts_with("bad message: "), "{}", refusal.message);
     }
+
+    #[rstest]
+    #[case::invalid_json(r#"{"argv":["~/x/secret"] secret"#, SYNTAX)]
+    #[case::trailing_text(r#"{"eof":true} secret"#, SYNTAX)]
+    #[case::cut_short(r#"{"argv":["~/x/secret""#, "bad message: the JSON ends too early")]
+    #[case::wrong_type(r#"{"argv":"~/x/secret"}"#, DATA)]
+    #[case::unknown_key(r#"{"secret":["status"]}"#, DATA)]
+    #[case::two_keys(r#"{"stdin":"secret","eof":true}"#, SYNTAX)]
+    #[case::invalid_base64(r#"{"stdin_base64":"secret!"}"#, "bad message: `stdin_base64` is not standard base64")]
+    fn names_the_reason_without_echoing_the_message(#[case] text: &str, #[case] reason: &str) {
+        let refusal = parse_client(text).expect_err("refuse the message");
+        assert_eq!(refusal.message, reason);
+    }
+
+    const SYNTAX: &str = "bad message: not one JSON object with one key";
+    const DATA: &str = "bad message: not one of `argv`, `stdin`, `stdin_base64` and `eof` with a value of its type";
 
     #[test]
     fn refuses_with_a_single_line_even_when_the_key_holds_a_newline() {

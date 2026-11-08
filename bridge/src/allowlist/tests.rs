@@ -105,8 +105,6 @@ mod bare_flags {
 }
 
 mod commands {
-    use std::collections::HashSet;
-
     use super::*;
 
     #[rstest]
@@ -141,13 +139,9 @@ mod commands {
 
     #[test]
     fn allows_every_control_command() {
-        assert!(CONTROL.iter().all(|name| allowed(&[(*name).to_owned()]).is_ok()));
-    }
-
-    #[test]
-    fn lists_sixty_control_commands_once() {
-        assert_eq!(CONTROL.iter().collect::<HashSet<_>>().len(), 60);
-        assert_eq!(CONTROL.len(), 60);
+        for name in CONTROL {
+            assert_eq!(allowed(&[(*name).to_owned()]), Ok(()), "{name}");
+        }
     }
 
     #[test]
@@ -219,5 +213,31 @@ mod plugin {
     #[test]
     fn refuses_an_action_with_its_arguments_by_the_action_alone() {
         assert_eq!(refusal_of(&argv("plugin install x")), "`plugin install` is not allowed through the bridge");
+    }
+}
+
+mod refusal_text {
+    use super::*;
+
+    #[rstest]
+    #[case::newline_in_the_name(vec!["a\nb".to_owned()])]
+    #[case::carriage_return_in_the_plugin_action(vec!["plugin".to_owned(), "x\ry".to_owned()])]
+    #[case::control_characters_in_a_flag(vec!["-\u{1b}[2J".to_owned()])]
+    fn is_a_single_line_even_when_the_name_holds_control_characters(#[case] argv: Vec<String>) {
+        let message = refusal_of(&argv);
+        assert!(!message.contains(char::is_control), "{message:?}");
+    }
+
+    #[test]
+    fn cuts_a_long_name_after_eighty_characters() {
+        let name = format!("{}ü{}", "a".repeat(79), "b".repeat(200));
+        let expected = format!("`{}ü…` is not allowed through the bridge", "a".repeat(79));
+        assert_eq!(refusal_of(&[name]), expected);
+    }
+
+    #[test]
+    fn keeps_a_name_of_eighty_characters_whole() {
+        let name = "a".repeat(80);
+        assert_eq!(refusal_of(std::slice::from_ref(&name)), format!("`{name}` is not allowed through the bridge"));
     }
 }

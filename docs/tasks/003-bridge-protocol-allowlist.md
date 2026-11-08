@@ -12,7 +12,8 @@ Lógica pura del puente, sin red ni procesos: los mensajes JSON y la decisión d
 - [x] CA1 — `bridge/src/protocol.rs`: tipos serde de los mensajes. Cliente → puente: `{"argv": [...]}` (primero y
   obligatorio), `{"stdin": "<línea>"}` (+ lo que fije D1: `{"stdin_base64": "…"}`, `{"eof": true}`). Puente →
   cliente: `{"stdout": "<línea>"}`, `{"stderr": "<línea>"}`, `{"exit": n}`. Un objeto por mensaje, claves
-  desconocidas rechazadas (`deny_unknown_fields`), un mensaje con dos claves rechazado.
+  desconocidas rechazadas (`deny_unknown_fields`), un mensaje con dos claves rechazado (vive en
+  `crates/core/src/protocol.rs`: ver `design/bridge.md`).
 - [x] CA2 — `bridge/src/allowlist.rs`: `allowed(argv) -> Result<(), Refusal>`. Permite los comandos `Kind::There` de
   `src/cli/reach.rs` (los subcomandos de control, `stats` y las acciones de `plugin` cuyo `asks_the_server()` es
   verdadero). Rechaza: argv vacío (= TUI), `start-server`, `kill-server`, `update`, `restart`, `logs`, `remote`,
