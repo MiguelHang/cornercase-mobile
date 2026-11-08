@@ -4,13 +4,15 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
+use rustix::io::Errno;
+use rustix::process::{Pid, test_kill_process};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error, Message};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 use cornercase_bridge::server::{self, Config};
 use cornercase_bridge::test_util::{TempDir, fake_cornercase, in_time};
@@ -19,6 +21,11 @@ const TOKEN: &str = "s3cret";
 const RIGHT: &str = "/?token=s3cret";
 const WITNESS: &str = "touch \"${0%/*}/ran\"";
 const USAGE: &str = r#"{"exit":2}"#;
+const EXITED: &str = r#"{"exit":0}"#;
+const ARGV: &str = r#"{"argv":["status"]}"#;
+const EOF: &str = r#"{"eof":true}"#;
+
+type Client = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 struct Served {
     address: SocketAddr,
@@ -55,20 +62,14 @@ impl Served {
         TcpStream::connect(self.address).await.expect("a connection")
     }
 
+    async fn connect(&self) -> Client {
+        in_time(connect_async(self.url(RIGHT))).await.expect("the upgrade").0
+    }
+
     async fn exchange(&self, sent: Vec<Message>) -> Exchange {
-        let (mut socket, _) = in_time(connect_async(self.url(RIGHT))).await.expect("the upgrade");
-        for message in sent {
-            socket.send(message).await.expect("the message is sent");
-        }
-        let mut exchange = Exchange::default();
-        while let Some(message) = in_time(socket.next()).await {
-            match message.expect("a message") {
-                Message::Text(text) => exchange.texts.push(text.as_str().to_owned()),
-                Message::Close(frame) => exchange.close = frame.map(|frame| frame.code),
-                _ => {}
-            }
-        }
-        exchange
+        let mut socket = self.connect().await;
+        send(&mut socket, sent).await;
+        Exchange::read(socket).await
     }
 }
 
@@ -82,6 +83,37 @@ impl Exchange {
     fn of(texts: &[&str]) -> Self {
         Self { texts: texts.iter().map(|&text| text.to_owned()).collect(), close: Some(CloseCode::Normal) }
     }
+
+    async fn read(mut socket: Client) -> Self {
+        let mut exchange = Self::default();
+        while let Some(message) = in_time(socket.next()).await {
+            match message.expect("a message") {
+                Message::Text(text) => exchange.texts.push(text.as_str().to_owned()),
+                Message::Close(frame) => exchange.close = frame.map(|frame| frame.code),
+                _ => {}
+            }
+        }
+        exchange
+    }
+}
+
+async fn send(socket: &mut Client, messages: Vec<Message>) {
+    for message in messages {
+        socket.send(message).await.expect("the message is sent");
+    }
+}
+
+fn faking(dir: &TempDir, script: &str) -> impl FnOnce(&mut Config) + use<> {
+    let binary = fake_cornercase(dir.path(), script);
+    move |config| config.binary = binary
+}
+
+fn stdin(text: &str) -> Message {
+    Message::text(format!(r#"{{"stdin":"{text}"}}"#))
+}
+
+fn pieces(encoded: &str) -> Message {
+    Message::text(format!(r#"{{"stdin_base64":"{encoded}"}}"#))
 }
 
 fn stderr(line: &str) -> String {
@@ -151,9 +183,9 @@ mod opening {
     use super::*;
 
     fn witness(dir: &TempDir) -> impl FnOnce(&mut Config) {
-        let binary = fake_cornercase(dir.path(), &format!("{WITNESS}\necho hi"));
+        let fake = faking(dir, &format!("{WITNESS}\necho hi"));
         move |config| {
-            config.binary = binary;
+            fake(config);
             config.hello = Duration::from_millis(100);
         }
     }
@@ -180,7 +212,7 @@ mod opening {
         let dir = TempDir::new();
         let served = Served::start(witness(&dir)).await;
         std::fs::remove_file(dir.path().join("cornercase")).expect("remove the binary");
-        let exchange = served.exchange(vec![Message::text(r#"{"argv":["status"]}"#)]).await;
+        let exchange = served.exchange(vec![Message::text(ARGV)]).await;
         assert!(exchange.texts[0].starts_with(r#"{"stderr":"could not run cornercase: "#));
         assert_eq!(exchange, Exchange::of(&[&exchange.texts[0], USAGE]));
     }
@@ -189,8 +221,79 @@ mod opening {
     async fn runs_an_allowed_command() {
         let dir = TempDir::new();
         let served = Served::start(witness(&dir)).await;
-        let exchange = served.exchange(vec![Message::text(r#"{"argv":["status"]}"#)]).await;
-        assert_eq!(exchange, Exchange::of(&[r#"{"stdout":"hi"}"#, r#"{"exit":0}"#]));
+        let exchange = served.exchange(vec![Message::text(ARGV)]).await;
+        assert_eq!(exchange, Exchange::of(&[r#"{"stdout":"hi"}"#, EXITED]));
         assert!(ran(dir.path()));
+    }
+}
+
+mod running {
+    use super::*;
+
+    const CAT: &str = "exec cat";
+    const HUNG: &str = "echo $$ > \"${0%/*}/pid\"\necho ready\nexec sleep 30";
+
+    fn reaped(pid: i32) -> bool {
+        Pid::from_raw(pid).is_some_and(|pid| matches!(test_kill_process(pid), Err(Errno::SRCH)))
+    }
+
+    async fn next_text(socket: &mut Client) -> String {
+        match in_time(socket.next()).await {
+            Some(Ok(Message::Text(text))) => text.as_str().to_owned(),
+            other => panic!("a text message, not {other:?}"),
+        }
+    }
+
+    #[rstest]
+    #[case::to_stdout(CAT, vec![stdin("hi"), stdin("there"), Message::text(EOF)], &[
+        r#"{"stdout":"hi"}"#, r#"{"stdout":"there"}"#, EXITED
+    ])]
+    #[case::to_stderr("exec cat >&2", vec![stdin("hi"), Message::text(EOF)], &[r#"{"stderr":"hi"}"#, EXITED])]
+    #[case::only_eof(CAT, vec![Message::text(EOF)], &[EXITED])]
+    #[case::stdin_base64_in_pieces(CAT, vec![pieces("aGVs"), pieces("bG8K"), Message::text(EOF)], &[
+        r#"{"stdout":"hello"}"#, EXITED
+    ])]
+    #[case::stdin_after_eof(CAT, vec![stdin("a"), Message::text(EOF), stdin("b")], &[r#"{"stdout":"a"}"#, EXITED])]
+    #[tokio::test]
+    async fn sends_the_output_then_the_exit_then_closes(
+        #[case] script: &str,
+        #[case] input: Vec<Message>,
+        #[case] texts: &[&str],
+    ) {
+        let dir = TempDir::new();
+        let served = Served::start(faking(&dir, script)).await;
+        let exchange = served.exchange([vec![Message::text(ARGV)], input].concat()).await;
+        assert_eq!(exchange, Exchange::of(texts));
+    }
+
+    #[rstest]
+    #[case::bad_json(Message::text("{"), "bad message: the JSON ends too early")]
+    #[case::a_second_argv(Message::text(ARGV), "`argv` was already sent")]
+    #[case::a_binary_frame(Message::binary(vec![1]), "a message must be text, not binary")]
+    #[tokio::test]
+    async fn ends_the_command_on_a_bad_message(#[case] message: Message, #[case] reason: &str) {
+        let dir = TempDir::new();
+        let served = Served::start(faking(&dir, HUNG)).await;
+        let mut socket = served.connect().await;
+        send(&mut socket, vec![Message::text(ARGV)]).await;
+        assert_eq!(next_text(&mut socket).await, r#"{"stdout":"ready"}"#);
+        send(&mut socket, vec![message]).await;
+        assert_eq!(Exchange::read(socket).await, Exchange::of(&[&stderr(reason), USAGE]));
+        let pid = std::fs::read_to_string(dir.path().join("pid")).expect("the fake wrote its pid");
+        assert!(reaped(pid.trim().parse().expect("a pid")));
+    }
+
+    #[tokio::test]
+    async fn keeps_each_connection_to_its_own_output() {
+        let dir = TempDir::new();
+        let served = Served::start(faking(&dir, CAT)).await;
+        let mut one = served.connect().await;
+        let mut two = served.connect().await;
+        send(&mut one, vec![Message::text(ARGV), stdin("one")]).await;
+        send(&mut two, vec![Message::text(ARGV), stdin("two")]).await;
+        send(&mut one, vec![Message::text(EOF)]).await;
+        send(&mut two, vec![Message::text(EOF)]).await;
+        assert_eq!(Exchange::read(one).await, Exchange::of(&[r#"{"stdout":"one"}"#, EXITED]));
+        assert_eq!(Exchange::read(two).await, Exchange::of(&[r#"{"stdout":"two"}"#, EXITED]));
     }
 }

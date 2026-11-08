@@ -2,8 +2,9 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{Sink, SinkExt, StreamExt};
 use tokio::net::TcpStream;
+use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
@@ -16,6 +17,8 @@ use super::{Config, log};
 use crate::allowlist;
 use crate::process::{self, Running};
 
+mod input;
+
 const CLOSING: Duration = Duration::from_secs(2);
 const PLUGIN: &str = "plugin";
 
@@ -23,13 +26,13 @@ type Socket = WebSocketStream<TcpStream>;
 
 pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config) {
     match open(&mut socket, peer, config).await {
-        Ok(running) => forward(&mut socket, running).await,
+        Ok(running) => run(socket, running, peer).await,
         Err(refusal) => {
             log(format_args!("refused {peer}'s command: {refusal}"));
             refuse(&mut socket, refusal).await;
+            close(&mut socket).await;
         }
     }
-    close(&mut socket).await;
 }
 
 async fn open(socket: &mut Socket, peer: SocketAddr, config: &Config) -> Result<Running, Refusal> {
@@ -67,31 +70,70 @@ fn command(argv: &[String]) -> String {
     }
 }
 
-async fn forward(socket: &mut Socket, mut running: Running) {
-    while let Some(message) = running.next().await {
-        if send(socket, &message).await.is_err() {
-            running.kill().await;
-            return;
+async fn run(socket: Socket, mut running: Running, peer: SocketAddr) {
+    let (mut sink, stream) = socket.split();
+    let (refused, refusals) = mpsc::channel(1);
+    let mut reader = tokio::spawn(input::read(stream, running.take_stdin(), peer, refused));
+    forward(&mut sink, running, refusals, peer).await;
+    if say_goodbye(&mut sink).await.is_ok() && timeout(CLOSING, &mut reader).await.is_ok() {
+        return;
+    }
+    reader.abort();
+}
+
+async fn forward(
+    sink: &mut impl Outgoing,
+    mut running: Running,
+    mut refusals: mpsc::Receiver<Refusal>,
+    peer: SocketAddr,
+) {
+    loop {
+        tokio::select! {
+            message = running.next() => {
+                let Some(message) = message else { return };
+                let last = matches!(message, BridgeMessage::Exit(_));
+                if send(sink, &message).await.is_err() {
+                    running.kill().await;
+                    return;
+                }
+                if last {
+                    return;
+                }
+            }
+            Some(refusal) = refusals.recv() => {
+                running.kill().await;
+                log(format_args!("refused {peer}'s message: {refusal}"));
+                refuse(sink, refusal).await;
+                return;
+            }
         }
     }
 }
 
-async fn refuse(socket: &mut Socket, refusal: Refusal) {
+trait Outgoing: Sink<Message, Error = Error> + Unpin {}
+
+impl<S: Sink<Message, Error = Error> + Unpin> Outgoing for S {}
+
+async fn refuse(sink: &mut impl Outgoing, refusal: Refusal) {
     for message in [BridgeMessage::Stderr(refusal.message), BridgeMessage::Exit(USAGE_EXIT)] {
-        if send(socket, &message).await.is_err() {
+        if send(sink, &message).await.is_err() {
             return;
         }
     }
 }
 
-async fn send(socket: &mut Socket, message: &BridgeMessage) -> Result<(), Error> {
+async fn send(sink: &mut impl Outgoing, message: &BridgeMessage) -> Result<(), Error> {
     let text = serde_json::to_string(message).map_err(|error| Error::Io(io::Error::other(error)))?;
-    socket.send(Message::text(text)).await
+    sink.send(Message::text(text)).await
+}
+
+async fn say_goodbye(sink: &mut impl Outgoing) -> Result<(), Error> {
+    let frame = CloseFrame { code: CloseCode::Normal, reason: "".into() };
+    sink.send(Message::Close(Some(frame))).await
 }
 
 async fn close(socket: &mut Socket) {
-    let frame = CloseFrame { code: CloseCode::Normal, reason: "".into() };
-    if socket.close(Some(frame)).await.is_err() {
+    if say_goodbye(socket).await.is_err() {
         return;
     }
     let _ = timeout(CLOSING, async { while let Some(Ok(_)) = socket.next().await {} }).await;
