@@ -2,10 +2,12 @@ use std::io::ErrorKind;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::ExitStatus;
+use std::time::Duration;
 
 use rstest::rstest;
 use rustix::io::Errno;
-use rustix::process::{Pid, test_kill_process};
+use rustix::process::{Pid, Signal, kill_process, test_kill_process};
+use tokio::time::timeout;
 
 use super::*;
 use crate::test_util::{TempDir, collect, in_time, wait_until, write_executable};
@@ -78,6 +80,19 @@ mod spawn {
             std::fs::write(&path, "#!/bin/sh\n").expect("write the file");
         }
         assert_eq!(spawn(&path, &[]).err().map(|error| error.kind()), Some(kind));
+    }
+
+    #[tokio::test]
+    async fn exits_in_time_while_a_grandchild_holds_its_output() {
+        let dir = TempDir::new();
+        let mut running = start(&dir, "sleep 30 & echo $!", &[]);
+        let sleep = match in_time(running.next()).await {
+            Some(BridgeMessage::Stdout(line)) => Pid::from_raw(line.parse().expect("the sleep's pid")),
+            other => panic!("the fake prints the sleep's pid, not {other:?}"),
+        };
+        let rest = timeout(Duration::from_secs(4), collect(&mut running)).await;
+        let killed = sleep.map(|pid| kill_process(pid, Signal::KILL));
+        assert_eq!((rest.ok(), killed), (Some(vec![BridgeMessage::Exit(0)]), Some(Ok(()))));
     }
 }
 
