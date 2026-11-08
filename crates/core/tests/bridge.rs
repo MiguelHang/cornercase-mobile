@@ -11,7 +11,7 @@ use cornercase_bridge::test_util::{
     HUNG, Served, TOKEN, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until,
 };
 use cornercase_core::error::Error;
-use cornercase_core::protocol::LARGEST_MESSAGE;
+use cornercase_core::protocol::{LARGEST_MESSAGE, LONGEST_LINE};
 use cornercase_core::transport::bridge::{BridgeConfig, BridgeTransport};
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
 
@@ -104,6 +104,16 @@ mod run {
         assert_eq!(ended, Ok(exit(0, "")));
         let [Out::Stdout(count)] = lines.as_slice() else { panic!("one line on stdout, not {lines:?}") };
         assert_eq!(count.trim(), length.to_string());
+    }
+
+    #[tokio::test]
+    async fn delivers_a_line_of_the_longest_size_whole() {
+        let length = LONGEST_LINE - 1;
+        let bridge = Bridge::start(&format!("head -c {length} /dev/zero | tr '\\0' a; echo")).await;
+        let (ended, lines) = run(&bridge.transport(TOKEN), Vec::new()).await;
+        assert_eq!(ended, Ok(exit(0, "")));
+        let [Out::Stdout(line)] = lines.as_slice() else { panic!("one line on stdout, not {} lines", lines.len()) };
+        assert_eq!(line.len(), length);
     }
 
     #[tokio::test]
