@@ -8,6 +8,8 @@ use tokio_tungstenite::tungstenite::Error;
 
 use cornercase_core::protocol::Refusal;
 
+use crate::server::{Stop, stopped};
+
 #[derive(Debug)]
 pub(super) enum Ending {
     Finished,
@@ -15,6 +17,7 @@ pub(super) enum Ending {
     Closed,
     Broken(Error),
     Silent(Duration),
+    Stopped,
 }
 
 impl fmt::Display for Ending {
@@ -25,6 +28,7 @@ impl fmt::Display for Ending {
             Self::Closed => formatter.write_str("the client closed it"),
             Self::Broken(error) => write!(formatter, "the connection broke: {error}"),
             Self::Silent(silence) => write!(formatter, "the client was silent for {silence:?}"),
+            Self::Stopped => formatter.write_str("the bridge is stopping"),
         }
     }
 }
@@ -38,12 +42,13 @@ pub(super) struct Hearing {
     heard: watch::Receiver<Option<Instant>>,
     endings: mpsc::Receiver<Ending>,
     silence: Duration,
+    stop: Stop,
 }
 
-pub(super) fn listen(silence: Duration) -> (Ears, Hearing) {
+pub(super) fn listen(silence: Duration, stop: Stop) -> (Ears, Hearing) {
     let (heard, last) = watch::channel(Some(Instant::now()));
     let (ended, endings) = mpsc::channel(1);
-    (Ears { heard, ended }, Hearing { heard: last, endings, silence })
+    (Ears { heard, ended }, Hearing { heard: last, endings, silence, stop })
 }
 
 impl Ears {
@@ -66,6 +71,7 @@ impl Hearing {
         tokio::select! {
             biased;
             Some(ending) = self.endings.recv() => ending,
+            () = stopped(&mut self.stop) => Ending::Stopped,
             () = silent(&mut self.heard, silence) => Ending::Silent(silence),
         }
     }

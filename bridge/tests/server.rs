@@ -9,6 +9,7 @@ use rustix::process::{Pid, test_kill_process};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
+use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
@@ -32,7 +33,8 @@ type Client = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 struct Served {
     address: SocketAddr,
-    _stop: oneshot::Sender<()>,
+    stop: oneshot::Sender<()>,
+    running: JoinHandle<()>,
 }
 
 impl Served {
@@ -43,10 +45,17 @@ impl Served {
         let server = server::bind(address, config).await.expect("the server binds");
         let address = server.local_addr().expect("the server's address");
         let (stop, stopped) = oneshot::channel::<()>();
-        tokio::spawn(server.run(async {
+        let running = tokio::spawn(server.run(async {
             let _ = stopped.await;
         }));
-        Self { address, _stop: stop }
+        Self { address, stop, running }
+    }
+
+    async fn stop(self) -> String {
+        let url = self.url(RIGHT);
+        let _ = self.stop.send(());
+        in_time(self.running).await.expect("the server stops");
+        url
     }
 
     fn url(&self, target: &str) -> String {
@@ -395,5 +404,39 @@ mod ending {
             number_in(dir.path(), "count").is_some_and(|count| count > held)
         })
         .await;
+    }
+}
+
+mod stopping {
+    use super::*;
+
+    const FAMILY: &str = "echo $$ > \"${0%/*}/pid\"\nsleep 30 &\necho $! > \"${0%/*}/grandchild\"\necho ready\nwait";
+    const LONG: Duration = Duration::from_secs(60);
+
+    #[tokio::test]
+    async fn kills_every_command_and_stops_accepting() {
+        let dir = TempDir::new();
+        let fake = faking(&dir, FAMILY);
+        let served = Served::start(|config| {
+            fake(config);
+            config.hello = LONG;
+            config.handshake = LONG;
+        })
+        .await;
+        let shaking = served.silent().await;
+        let mut running = served.connect().await;
+        send(&mut running, vec![Message::text(ARGV)]).await;
+        assert_eq!(next_text(&mut running).await, READY);
+        let greeting = tokio::spawn(Exchange::read(served.connect().await));
+        let running = tokio::spawn(Exchange::read(running));
+        let pid = number_in(dir.path(), "pid").expect("the fake wrote its pid");
+        let grandchild = number_in(dir.path(), "grandchild").expect("the fake wrote its child's pid");
+        let url = served.stop().await;
+        assert!(reaped(pid));
+        wait_until(async || reaped(grandchild)).await;
+        assert!(in_time(connect_async(url)).await.is_err());
+        assert_eq!(running.await.expect("the client reads"), Exchange::of(&[]));
+        assert_eq!(greeting.await.expect("the client reads"), Exchange::of(&[]));
+        closed(shaking).await;
     }
 }

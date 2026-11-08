@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, watch};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, timeout};
 use tokio_tungstenite::tungstenite::Error;
@@ -29,6 +29,8 @@ const CONNECTIONS: usize = 64;
 const LARGEST_MESSAGE: usize = 1 << 20;
 const WRITE_BUFFER_LIMIT: usize = 7 * LONGEST_LINE;
 const ACCEPT_PAUSE: Duration = Duration::from_millis(100);
+
+type Stop = watch::Receiver<bool>;
 
 pub struct Config {
     pub token: String,
@@ -73,10 +75,12 @@ impl Server {
     }
 
     pub async fn run(self, shutdown: impl Future<Output = ()>) {
-        if let Ok(address) = self.local_addr() {
+        let Self { listener, config } = self;
+        if let Ok(address) = listener.local_addr() {
             log(format_args!("listening on {address}"));
         }
-        let permits = Arc::new(Semaphore::new(self.config.connections));
+        let permits = Arc::new(Semaphore::new(config.connections));
+        let (stop, stopping) = watch::channel(false);
         let mut connections = JoinSet::new();
         let mut shutdown = pin!(shutdown);
         loop {
@@ -84,10 +88,10 @@ impl Server {
                 biased;
                 () = &mut shutdown => break,
                 Some(_) = connections.join_next(), if !connections.is_empty() => {}
-                accepted = self.listener.accept() => match accepted {
+                accepted = listener.accept() => match accepted {
                     Ok((stream, peer)) => {
                         let permit = Arc::clone(&permits).try_acquire_owned().ok();
-                        connections.spawn(serve(stream, peer, Arc::clone(&self.config), permit));
+                        connections.spawn(serve(stream, peer, Arc::clone(&config), permit, stopping.clone()));
                     }
                     Err(error) => {
                         log(format_args!("could not accept a connection: {error}"));
@@ -96,20 +100,37 @@ impl Server {
                 },
             }
         }
+        wind_down(listener, &stop, connections).await;
     }
 }
 
-async fn serve(stream: TcpStream, peer: SocketAddr, config: Arc<Config>, permit: Option<OwnedSemaphorePermit>) {
-    let Some(_permit) = permit else {
-        handshake(stream, peer, Gate::Full { peer }, config.handshake).await;
-        return;
+async fn wind_down(listener: TcpListener, stop: &watch::Sender<bool>, mut connections: JoinSet<()>) {
+    log(format_args!("stopping"));
+    drop(listener);
+    stop.send_replace(true);
+    while connections.join_next().await.is_some() {}
+}
+
+async fn serve(
+    stream: TcpStream,
+    peer: SocketAddr,
+    config: Arc<Config>,
+    permit: Option<OwnedSemaphorePermit>,
+    mut stop: Stop,
+) {
+    let gate = match &permit {
+        Some(_) => Gate::Open { token: &config.token, peer },
+        None => Gate::Full { peer },
     };
-    let Some(socket) = handshake(stream, peer, Gate::Open { token: &config.token, peer }, config.handshake).await
-    else {
+    let shaken = tokio::select! {
+        socket = handshake(stream, peer, gate, config.handshake) => socket,
+        () = stopped(&mut stop) => None,
+    };
+    let (Some(socket), Some(_permit)) = (shaken, permit) else {
         return;
     };
     log(format_args!("accepted {peer}"));
-    connection::serve(socket, peer, &config).await;
+    connection::serve(socket, peer, &config, stop).await;
 }
 
 async fn handshake(
@@ -137,6 +158,10 @@ fn websocket() -> WebSocketConfig {
         .max_message_size(Some(LARGEST_MESSAGE))
         .max_frame_size(Some(LARGEST_MESSAGE))
         .max_write_buffer_size(WRITE_BUFFER_LIMIT)
+}
+
+async fn stopped(stop: &mut Stop) {
+    let _ = stop.wait_for(|&stopped| stopped).await;
 }
 
 fn log(message: fmt::Arguments<'_>) {

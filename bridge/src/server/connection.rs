@@ -12,7 +12,7 @@ use tokio_tungstenite::tungstenite::{Bytes, Error, Message, Utf8Bytes};
 
 use cornercase_core::protocol::{BridgeMessage, Refusal, USAGE_EXIT, first_message};
 
-use super::{Config, log};
+use super::{Config, Stop, log, stopped};
 use crate::allowlist;
 use crate::process::{self, Running};
 
@@ -26,9 +26,16 @@ const PLUGIN: &str = "plugin";
 
 type Socket = WebSocketStream<TcpStream>;
 
-pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config) {
-    match open(&mut socket, peer, config).await {
-        Ok(running) => run(socket, running, peer, config).await,
+pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config, mut stop: Stop) {
+    let opened = tokio::select! {
+        opened = open(&mut socket, peer, config) => opened,
+        () = stopped(&mut stop) => {
+            log(format_args!("closed {peer}'s connection because {}", Ending::Stopped));
+            return close(&mut socket).await;
+        }
+    };
+    match opened {
+        Ok(running) => run(socket, running, peer, config, stop).await,
         Err(refusal) => {
             log(format_args!("refused {peer}'s command: {refusal}"));
             refuse(&mut socket, refusal).await;
@@ -72,9 +79,9 @@ fn command(argv: &[String]) -> String {
     }
 }
 
-async fn run(socket: Socket, mut running: Running, peer: SocketAddr, config: &Config) {
+async fn run(socket: Socket, mut running: Running, peer: SocketAddr, config: &Config, stop: Stop) {
     let (mut sink, stream) = socket.split();
-    let (ears, mut hearing) = hearing::listen(config.silence);
+    let (ears, mut hearing) = hearing::listen(config.silence, stop);
     let mut reader = tokio::spawn(input::read(stream, running.take_stdin(), peer, ears));
     let ending = forward(&mut sink, &mut running, &mut hearing, config.ping).await;
     let code = running.kill().await;
