@@ -1,5 +1,8 @@
 use std::fmt;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::io;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+
+use tokio::net::TcpListener;
 
 const TAILSCALE_V4_FIRST: u8 = 100;
 const TAILSCALE_V4_MASK: u8 = 0b1100_0000;
@@ -69,6 +72,28 @@ pub fn targets(addresses: &[(String, IpAddr)]) -> Result<Vec<Target>, NoAddress>
     targets.sort_by_key(|target| (target.kind, target.ip));
     targets.dedup_by_key(|target| target.ip);
     if targets.is_empty() { Err(NoAddress) } else { Ok(targets) }
+}
+
+pub fn interfaces() -> io::Result<Vec<(String, IpAddr)>> {
+    let named = |interface: if_addrs::Interface| {
+        let ip = interface.ip();
+        (interface.name, ip)
+    };
+    Ok(if_addrs::get_if_addrs()?.into_iter().map(named).collect())
+}
+
+pub async fn listen(ips: &[IpAddr], port: u16) -> io::Result<Vec<TcpListener>> {
+    let mut listeners = Vec::with_capacity(ips.len());
+    let mut port = port;
+    for &ip in ips {
+        let address = SocketAddr::new(ip, port);
+        let listener = TcpListener::bind(address)
+            .await
+            .map_err(|error| io::Error::new(error.kind(), format!("could not listen on {address}: {error}")))?;
+        port = listener.local_addr()?.port();
+        listeners.push(listener);
+    }
+    Ok(listeners)
 }
 
 #[cfg(test)]

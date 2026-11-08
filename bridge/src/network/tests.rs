@@ -124,3 +124,54 @@ mod targets {
         assert_eq!(targets(&list), targets(&reversed));
     }
 }
+
+mod interfaces {
+    use super::*;
+
+    #[test]
+    fn list_the_loopback_address() {
+        let interfaces = interfaces().expect("the interfaces");
+        assert!(interfaces.iter().any(|(_, address)| *address == ip("127.0.0.1")), "{interfaces:?}");
+    }
+}
+
+mod listen {
+    use std::net::TcpStream;
+
+    use super::*;
+
+    fn addresses_of(listeners: &[TcpListener]) -> Vec<SocketAddr> {
+        listeners.iter().map(|listener| listener.local_addr().expect("the address")).collect()
+    }
+
+    #[tokio::test]
+    async fn opens_every_address_on_the_port_the_first_one_picked() {
+        let listeners = listen(&[ip("127.0.0.1"), ip("::1")], 0).await.expect("the listeners");
+        let addresses = addresses_of(&listeners);
+        let port = addresses[0].port();
+        assert_ne!(port, 0);
+        assert_eq!(addresses, [SocketAddr::new(ip("127.0.0.1"), port), SocketAddr::new(ip("::1"), port)]);
+    }
+
+    #[tokio::test]
+    async fn opens_every_address_on_the_port_it_is_given() {
+        let port =
+            listen(&[ip("::1")], 0).await.expect("a free port").remove(0).local_addr().expect("its address").port();
+        let listeners = listen(&[ip("::1"), ip("127.0.0.1")], port).await.expect("the listeners");
+        assert_eq!(
+            addresses_of(&listeners),
+            [SocketAddr::new(ip("::1"), port), SocketAddr::new(ip("127.0.0.1"), port)]
+        );
+    }
+
+    #[tokio::test]
+    async fn names_the_address_it_could_not_listen_on_and_closes_the_others() {
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("a taken port");
+        let port = taken.local_addr().expect("its address").port();
+        let error = listen(&[ip("::1"), ip("127.0.0.1")], port).await.expect_err("the port is taken");
+        assert_eq!(error.kind(), io::ErrorKind::AddrInUse);
+        let wanted = format!("could not listen on 127.0.0.1:{port}: ");
+        assert!(error.to_string().starts_with(&wanted), "{error}");
+        assert!(TcpStream::connect(SocketAddr::new(ip("::1"), port)).is_err(), "the listener on ::1 is closed");
+    }
+}
