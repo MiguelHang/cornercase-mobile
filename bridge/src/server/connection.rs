@@ -4,12 +4,11 @@ use std::time::Duration;
 
 use futures_util::{Sink, SinkExt, StreamExt};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio::time::timeout;
+use tokio::time::{Instant, Interval, MissedTickBehavior, interval_at, timeout};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
-use tokio_tungstenite::tungstenite::{Error, Message, Utf8Bytes};
+use tokio_tungstenite::tungstenite::{Bytes, Error, Message, Utf8Bytes};
 
 use cornercase_core::protocol::{BridgeMessage, Refusal, USAGE_EXIT, first_message};
 
@@ -17,6 +16,9 @@ use super::{Config, log};
 use crate::allowlist;
 use crate::process::{self, Running};
 
+use hearing::{Ending, Hearing};
+
+mod hearing;
 mod input;
 
 const CLOSING: Duration = Duration::from_secs(2);
@@ -26,7 +28,7 @@ type Socket = WebSocketStream<TcpStream>;
 
 pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config) {
     match open(&mut socket, peer, config).await {
-        Ok(running) => run(socket, running, peer).await,
+        Ok(running) => run(socket, running, peer, config).await,
         Err(refusal) => {
             log(format_args!("refused {peer}'s command: {refusal}"));
             refuse(&mut socket, refusal).await;
@@ -70,44 +72,59 @@ fn command(argv: &[String]) -> String {
     }
 }
 
-async fn run(socket: Socket, mut running: Running, peer: SocketAddr) {
+async fn run(socket: Socket, mut running: Running, peer: SocketAddr, config: &Config) {
     let (mut sink, stream) = socket.split();
-    let (refused, refusals) = mpsc::channel(1);
-    let mut reader = tokio::spawn(input::read(stream, running.take_stdin(), peer, refused));
-    forward(&mut sink, running, refusals, peer).await;
-    if say_goodbye(&mut sink).await.is_ok() && timeout(CLOSING, &mut reader).await.is_ok() {
-        return;
+    let (ears, mut hearing) = hearing::listen(config.silence);
+    let mut reader = tokio::spawn(input::read(stream, running.take_stdin(), peer, ears));
+    let ending = forward(&mut sink, &mut running, &mut hearing, config.ping).await;
+    let code = running.kill().await;
+    if let Ending::Refused(refusal) = &ending {
+        log(format_args!("refused {peer}'s message: {refusal}"));
     }
-    reader.abort();
+    log(format_args!("closed {peer}'s connection because {ending}, with exit code {code}"));
+    let farewell = async {
+        if let Ending::Refused(refusal) = ending {
+            refuse(&mut sink, refusal).await;
+        }
+        say_goodbye(&mut sink).await.is_ok() && (&mut reader).await.is_ok()
+    };
+    if !timeout(CLOSING, farewell).await.unwrap_or(false) {
+        reader.abort();
+    }
 }
 
-async fn forward(
-    sink: &mut impl Outgoing,
-    mut running: Running,
-    mut refusals: mpsc::Receiver<Refusal>,
-    peer: SocketAddr,
-) {
+async fn forward(sink: &mut impl Outgoing, running: &mut Running, hearing: &mut Hearing, ping: Duration) -> Ending {
+    let mut ticks = interval_at(Instant::now() + ping, ping);
+    ticks.set_missed_tick_behavior(MissedTickBehavior::Delay);
     loop {
-        tokio::select! {
-            message = running.next() => {
-                let Some(message) = message else { return };
-                let last = matches!(message, BridgeMessage::Exit(_));
-                if send(sink, &message).await.is_err() {
-                    running.kill().await;
-                    return;
-                }
-                if last {
-                    return;
-                }
-            }
-            Some(refusal) = refusals.recv() => {
-                running.kill().await;
-                log(format_args!("refused {peer}'s message: {refusal}"));
-                refuse(sink, refusal).await;
-                return;
-            }
+        if let Err(ending) = step(sink, running, hearing, &mut ticks).await {
+            return ending;
         }
     }
+}
+
+async fn step(
+    sink: &mut impl Outgoing,
+    running: &mut Running,
+    hearing: &mut Hearing,
+    ticks: &mut Interval,
+) -> Result<(), Ending> {
+    let (message, last) = tokio::select! {
+        message = running.next() => outgoing(message)?,
+        _ = ticks.tick() => (Message::Ping(Bytes::new()), false),
+        ending = hearing.ending() => return Err(ending),
+    };
+    tokio::select! {
+        sent = sink.send(message) => sent.map_err(Ending::Broken)?,
+        ending = hearing.ending() => return Err(ending),
+    }
+    if last { Err(Ending::Finished) } else { Ok(()) }
+}
+
+fn outgoing(message: Option<BridgeMessage>) -> Result<(Message, bool), Ending> {
+    let message = message.ok_or(Ending::Finished)?;
+    let last = matches!(message, BridgeMessage::Exit(_));
+    Ok((encode(&message).map_err(Ending::Broken)?, last))
 }
 
 trait Outgoing: Sink<Message, Error = Error> + Unpin {}
@@ -123,8 +140,12 @@ async fn refuse(sink: &mut impl Outgoing, refusal: Refusal) {
 }
 
 async fn send(sink: &mut impl Outgoing, message: &BridgeMessage) -> Result<(), Error> {
+    sink.send(encode(message)?).await
+}
+
+fn encode(message: &BridgeMessage) -> Result<Message, Error> {
     let text = serde_json::to_string(message).map_err(|error| Error::Io(io::Error::other(error)))?;
-    sink.send(Message::text(text)).await
+    Ok(Message::text(text))
 }
 
 async fn say_goodbye(sink: &mut impl Outgoing) -> Result<(), Error> {

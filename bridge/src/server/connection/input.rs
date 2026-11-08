@@ -2,30 +2,45 @@ use std::net::SocketAddr;
 
 use futures_util::StreamExt;
 use futures_util::stream::SplitStream;
-use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
 use cornercase_core::protocol::{Input, Refusal, next_message};
 
 use super::Socket;
+use super::hearing::{Ears, Ending};
 use crate::process::Stdin;
 use crate::server::log;
 
-pub(super) async fn read(
-    mut stream: SplitStream<Socket>,
-    mut stdin: Option<Stdin>,
+pub(super) async fn read(mut stream: SplitStream<Socket>, mut stdin: Option<Stdin>, peer: SocketAddr, ears: Ears) {
+    let ending = listen(&mut stream, stdin.as_mut(), peer, &ears).await;
+    let refused = matches!(ending, Ending::Refused(_));
+    ears.end(ending);
+    if refused {
+        while let Some(Ok(_)) = stream.next().await {}
+    }
+}
+
+async fn listen(
+    stream: &mut SplitStream<Socket>,
+    mut stdin: Option<&mut Stdin>,
     peer: SocketAddr,
-    refusals: mpsc::Sender<Refusal>,
-) {
-    while let Some(Ok(message)) = stream.next().await {
+    ears: &Ears,
+) -> Ending {
+    loop {
+        let message = match stream.next().await {
+            Some(Ok(message)) => message,
+            Some(Err(error)) => return Ending::Broken(error),
+            None => return Ending::Closed,
+        };
+        ears.heard();
         match input(message) {
-            Ok(Some(input)) => write(stdin.as_mut(), input, peer).await,
-            Ok(None) => {}
-            Err(refusal) => {
-                let _ = refusals.send(refusal).await;
-                while let Some(Ok(_)) = stream.next().await {}
-                return;
+            Ok(Some(input)) => {
+                ears.busy();
+                write(stdin.as_deref_mut(), input, peer).await;
+                ears.heard();
             }
+            Ok(None) => {}
+            Err(refusal) => return Ending::Refused(refusal),
         }
     }
 }
