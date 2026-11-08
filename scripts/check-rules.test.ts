@@ -159,6 +159,7 @@ describe('Rust comments', () => {
     ['an escaped char', "let tab = '\\t'; let byte = '\\x2f'; let code = '\\u{2f}';\n"],
     ['a unicode char before a quote char', "let a = ['\\u{41}','\"']; let url = \"https://x\";\n"],
     ['a hex char before a quote char', "let a = ['\\x41','\"']; let url = \"https://x\";\n"],
+    ['an astral char before a quote char', "let a = ['😀','\"']; let url = \"https://x\";\n"],
     ['a lifetime next to a char', "fn a<'a>(text: &'a str) -> char { '\"' }\nlet url = \"https://x\";\n"],
     ['a division', 'let half = 4 / 2;\n'],
     ['an unclosed string to the end', 'let text = "open // no\n'],
