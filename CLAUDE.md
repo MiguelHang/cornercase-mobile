@@ -27,7 +27,8 @@
 pnpm install                                      # frontend packages and the Tauri CLI (pnpm from packageManager)
 pnpm build                                        # dist/: release builds need it; CI runs it before cargo
 pnpm tauri ios dev "<iPhone>"                     # the app in the iOS simulator; names from `xcrun simctl list devices`
-cargo run -p cornercase-bridge -- --listen 127.0.0.1:0 --token t   # the development bridge, on the Mac
+cargo run -p cornercase-bridge                    # the development bridge, on the Mac's LAN and Tailscale addresses
+cargo run -p cornercase-bridge -- --loopback --port 0   # the same, only on 127.0.0.1, to try it on the Mac
 cargo fmt --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
