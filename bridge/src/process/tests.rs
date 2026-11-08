@@ -1,6 +1,5 @@
 use std::io::ErrorKind;
 use std::os::unix::process::ExitStatusExt;
-use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::time::Duration;
 
@@ -12,17 +11,11 @@ use tokio::time::timeout;
 use cornercase_core::protocol::Input;
 
 use super::*;
-use crate::test_util::{TempDir, collect, in_time, wait_until, write_executable};
-
-fn fake(dir: &TempDir, script: &str) -> PathBuf {
-    let path = dir.path().join("cornercase");
-    write_executable(&path, &format!("#!/bin/sh\n{script}\n"));
-    path
-}
+use crate::test_util::{TempDir, collect, fake_cornercase, in_time, wait_until, write_executable};
 
 fn start(dir: &TempDir, script: &str, argv: &[&str]) -> Running {
     let argv: Vec<String> = argv.iter().map(|argument| (*argument).to_owned()).collect();
-    spawn(&fake(dir, script), &argv).expect("the fake starts")
+    spawn(&fake_cornercase(dir.path(), script), &argv).expect("the fake starts")
 }
 
 async fn run(script: &str, argv: &[&str]) -> Vec<BridgeMessage> {

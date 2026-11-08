@@ -12,7 +12,11 @@ cornercase-core = { path = "../crates/core" }
 rustix = { version = "1.1.5", features = ["fs", "process"] }
 tokio = { version = "1.54.1", features = ["process", "io-util", "rt", "sync", "time", "macros"] }
 
+[features]
+test-util = []
+
 [dev-dependencies]
+cornercase-bridge = { path = ".", features = ["test-util"] }
 rstest = "0.27.0"
 
 [lints]

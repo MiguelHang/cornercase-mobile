@@ -1,22 +1,11 @@
 use std::path::Path;
-use std::time::Duration;
 
-use tokio::time::timeout;
-
-use cornercase_bridge::process::{self, Running};
+use cornercase_bridge::process;
+use cornercase_bridge::test_util::collect;
 use cornercase_core::protocol::BridgeMessage;
 
 const VARIABLES: [&str; 4] = ["CORNERCASE_PANE", "CORNERCASE_SERVER", "CORNERCASE_REMOTE", "CORNERCASE_SOCKET"];
 const SCRIPT: &str = r#"for name in "$@"; do eval "value=\${$name-unset}"; printf '%s=%s\n' "$name" "$value"; done"#;
-const PATIENCE: Duration = Duration::from_secs(10);
-
-async fn collect(running: &mut Running) -> Vec<BridgeMessage> {
-    let mut messages = Vec::new();
-    while let Some(message) = timeout(PATIENCE, running.next()).await.expect("the child ends") {
-        messages.push(message);
-    }
-    messages
-}
 
 #[tokio::test]
 async fn the_child_inherits_the_environment_but_the_pane_variables() {

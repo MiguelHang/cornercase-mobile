@@ -432,6 +432,7 @@ name = "cornercase-bridge"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "cornercase-bridge",
  "cornercase-core",
  "rstest",
  "rustix",
