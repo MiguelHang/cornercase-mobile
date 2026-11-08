@@ -121,6 +121,11 @@ mod spawn {
     }
 
     #[tokio::test]
+    async fn sends_a_last_line_without_a_newline_while_a_grandchild_holds_the_pipe() {
+        assert_eq!(run("sleep 30 & printf partial", &[]).await, [stdout("partial"), BridgeMessage::Exit(0)]);
+    }
+
+    #[tokio::test]
     async fn keeps_the_output_nobody_read_before_the_patience_ran_out() {
         let dir = TempDir::new();
         let mut running = start(&dir, "echo $$ $$; seq 100", &[]);

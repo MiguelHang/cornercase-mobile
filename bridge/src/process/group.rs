@@ -19,13 +19,13 @@ const SIGNALLED: i32 = 128;
 pub(super) const UNKNOWN: i32 = -1;
 
 pub(super) fn supervise(mut child: Child, sender: mpsc::Sender<BridgeMessage>, stop: oneshot::Receiver<()>) {
-    let (deadline, reaped) = watch::channel(None);
-    let readers = read(&mut child, &sender, &reaped);
+    let (deadline, gone) = watch::channel(None);
+    let readers = read(&mut child, &sender, &gone);
     let group = leader(&child);
     tokio::spawn(async move {
         let (status, until) = end(&mut child, stop).await;
-        deadline.send_replace(Some(until));
         sweep(group, until).await;
+        deadline.send_replace(Some(Instant::now() + POLL));
         for reader in readers {
             let _ = reader.await;
         }
@@ -78,13 +78,20 @@ fn signal(child: &Child, which: Signal) {
 
 async fn sweep(group: Option<Pid>, deadline: Instant) {
     let Some(group) = group else { return };
+    if !emptied(group, deadline).await {
+        let _ = kill_process_group(group, Signal::KILL);
+        emptied(group, deadline + PATIENCE).await;
+    }
+}
+
+async fn emptied(group: Pid, deadline: Instant) -> bool {
     while test_kill_process_group(group).is_ok() {
         if Instant::now() >= deadline {
-            let _ = kill_process_group(group, Signal::KILL);
-            return;
+            return false;
         }
         sleep(POLL).await;
     }
+    true
 }
 
 pub(super) fn exit_code(status: io::Result<ExitStatus>) -> i32 {
