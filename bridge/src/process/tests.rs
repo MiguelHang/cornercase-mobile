@@ -66,6 +66,12 @@ mod spawn {
         );
     }
 
+    #[tokio::test]
+    async fn delivers_a_line_of_more_than_a_mebibyte_in_one_message() {
+        let messages = run("head -c 1048577 /dev/zero | tr '\\0' a; echo", &[]).await;
+        assert_eq!(messages, [stdout(&"a".repeat((1 << 20) + 1)), BridgeMessage::Exit(0)]);
+    }
+
     #[rstest]
     #[case::not_executable(false, ErrorKind::PermissionDenied)]
     #[case::deleted(true, ErrorKind::NotFound)]
@@ -80,6 +86,12 @@ mod spawn {
             std::fs::write(&path, "#!/bin/sh\n").expect("write the file");
         }
         assert_eq!(spawn(&path, &[]).err().map(|error| error.kind()), Some(kind));
+    }
+
+    #[tokio::test]
+    async fn waits_for_the_output_a_grandchild_still_writes_before_the_exit() {
+        let messages = run("(sleep 1; echo late) &", &[]).await;
+        assert_eq!(messages, [stdout("late"), BridgeMessage::Exit(0)]);
     }
 
     #[tokio::test]
