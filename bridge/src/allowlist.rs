@@ -2,14 +2,81 @@ use cornercase_core::protocol::Refusal;
 
 const REMOTE_FLAGS: &[&str] = &["--remote", "--remote-command"];
 const BARE_FLAGS: &[&str] = &["--help", "-h", "--version", "-V"];
+const CONTROL: &[&str] = &[
+    "status",
+    "open",
+    "clone",
+    "new-workspace",
+    "new-tab",
+    "split",
+    "setup",
+    "start",
+    "send",
+    "keys",
+    "held",
+    "read",
+    "wait",
+    "close",
+    "rename",
+    "focus",
+    "go",
+    "notify",
+    "away",
+    "mark",
+    "search",
+    "todo",
+    "queue",
+    "events",
+    "flow",
+    "contract",
+    "surface",
+    "view",
+    "view-set",
+    "input",
+    "requests",
+    "scroll",
+    "selection",
+    "resize",
+    "redraw",
+    "ratio",
+    "link",
+    "paste-file",
+    "theme",
+    "config",
+    "move",
+    "move-pane",
+    "collapse",
+    "expand",
+    "group",
+    "issue",
+    "changes",
+    "files",
+    "usage",
+    "ports",
+    "pull-request",
+    "context",
+    "recap",
+    "processes",
+    "worktrees",
+    "machines",
+    "tour",
+    "agents",
+    "account",
+    "profile",
+];
+const OTHERS: &[&str] = &["stats"];
+const PLUGIN: &str = "plugin";
+const PLUGIN_ACTIONS: &[&str] = &["actions", "status", "run", "popup-close"];
 
 pub fn allowed(argv: &[String]) -> Result<(), Refusal> {
     refuse_remote(argv)?;
     let (first, rest) = refuse_empty(argv)?;
-    if first.starts_with('-') {
-        return bare_flag(first, rest);
+    match first {
+        flag if flag.starts_with('-') => bare_flag(flag, rest),
+        PLUGIN => plugin_action(rest),
+        name if CONTROL.contains(&name) || OTHERS.contains(&name) => Ok(()),
+        name => Err(not_allowed(name)),
     }
-    Err(not_allowed(first))
 }
 
 fn refuse_remote(argv: &[String]) -> Result<(), Refusal> {
@@ -39,6 +106,14 @@ fn bare_flag(flag: &str, rest: &[String]) -> Result<(), Refusal> {
         (true, true) => Ok(()),
         (true, false) => Err(refused(&format!("`{flag}` is only allowed alone through the bridge"))),
         (false, _) => Err(not_allowed(flag)),
+    }
+}
+
+fn plugin_action(rest: &[String]) -> Result<(), Refusal> {
+    match rest.first() {
+        Some(action) if PLUGIN_ACTIONS.contains(&action.as_str()) => Ok(()),
+        Some(action) => Err(not_allowed(&format!("{PLUGIN} {action}"))),
+        None => Err(not_allowed(PLUGIN)),
     }
 }
 

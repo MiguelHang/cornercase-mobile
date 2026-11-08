@@ -105,13 +105,106 @@ mod bare_flags {
 }
 
 mod commands {
+    use std::collections::HashSet;
+
     use super::*;
 
     #[rstest]
-    #[case::status("status --json", "`status` is not allowed through the bridge")]
-    #[case::kill_server("kill-server", "`kill-server` is not allowed through the bridge")]
-    #[case::unknown("nope", "`nope` is not allowed through the bridge")]
-    fn refuses_every_name_until_the_list_exists(#[case] line: &str, #[case] message: &str) {
-        assert_eq!(refusal_of(&argv(line)), message);
+    #[case::contract("contract")]
+    #[case::status("status --follow --json")]
+    #[case::events("events --json")]
+    #[case::read("read --last-message")]
+    #[case::send("send --enter")]
+    #[case::keys("keys")]
+    #[case::paste_file("paste-file")]
+    #[case::view("view")]
+    #[case::view_set("view-set --claim")]
+    #[case::surface("surface --patches")]
+    #[case::input("input --follow --json -")]
+    #[case::requests("requests --follow -")]
+    #[case::scroll("scroll")]
+    #[case::redraw("redraw")]
+    #[case::start("start --worktree")]
+    #[case::new_workspace("new-workspace")]
+    #[case::issue_list("issue list")]
+    #[case::issue_read("issue read")]
+    #[case::changes_list("changes list")]
+    #[case::changes_viewed("changes viewed")]
+    #[case::files_list("files list")]
+    #[case::files_read("files read")]
+    #[case::files_search("files search")]
+    #[case::stats("stats")]
+    #[case::machine_after_the_command("status --machine vps")]
+    fn allows_the_commands_of_the_app(#[case] line: &str) {
+        assert_eq!(allowed(&argv(line)), Ok(()));
+    }
+
+    #[test]
+    fn allows_every_control_command() {
+        assert!(CONTROL.iter().all(|name| allowed(&[(*name).to_owned()]).is_ok()));
+    }
+
+    #[test]
+    fn lists_sixty_control_commands_once() {
+        assert_eq!(CONTROL.iter().collect::<HashSet<_>>().len(), 60);
+        assert_eq!(CONTROL.len(), 60);
+    }
+
+    #[rstest]
+    #[case::start_server("start-server")]
+    #[case::kill_server("kill-server")]
+    #[case::update("update")]
+    #[case::restart("restart")]
+    #[case::logs("logs")]
+    #[case::remote("remote")]
+    #[case::skill("skill")]
+    #[case::server("server")]
+    #[case::proxy("proxy")]
+    #[case::help("help")]
+    #[case::other_case("Status")]
+    #[case::prefix("stat")]
+    #[case::unknown("nope")]
+    fn refuses_the_rest(#[case] name: &str) {
+        assert_eq!(refusal_of(&argv(name)), format!("`{name}` is not allowed through the bridge"));
+    }
+}
+
+mod plugin {
+    use super::*;
+
+    #[rstest]
+    #[case::actions("plugin actions")]
+    #[case::status("plugin status --json")]
+    #[case::run("plugin run some-plugin some-action")]
+    #[case::popup_close("plugin popup-close")]
+    fn allows_the_actions_that_ask_the_server(#[case] line: &str) {
+        assert_eq!(allowed(&argv(line)), Ok(()));
+    }
+
+    #[rstest]
+    #[case::windows("plugin windows")]
+    #[case::link("plugin link")]
+    #[case::install("plugin install")]
+    #[case::update("plugin update")]
+    #[case::remove("plugin remove")]
+    #[case::unlink("plugin unlink")]
+    #[case::list("plugin list")]
+    #[case::enable("plugin enable")]
+    #[case::disable("plugin disable")]
+    #[case::logs("plugin logs")]
+    #[case::an_option_first("plugin --json")]
+    #[case::other_case("plugin Run")]
+    fn refuses_the_other_actions(#[case] line: &str) {
+        assert_eq!(refusal_of(&argv(line)), format!("`{line}` is not allowed through the bridge"));
+    }
+
+    #[test]
+    fn refuses_plugin_alone() {
+        assert_eq!(refusal_of(&argv("plugin")), "`plugin` is not allowed through the bridge");
+    }
+
+    #[test]
+    fn refuses_an_action_with_its_arguments_by_the_action_alone() {
+        assert_eq!(refusal_of(&argv("plugin install x")), "`plugin install` is not allowed through the bridge");
     }
 }
