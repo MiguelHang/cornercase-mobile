@@ -1,0 +1,11 @@
+{
+  "path": ["crates", "bridge", "src-tauri/src", "src", "scripts"],
+  "format": ["rust", "typescript", "javascript"],
+  "ignore": ["**/gen/**", "src/lib/bindings.ts"],
+  "minTokens": 50,
+  "maxLines": 100000,
+  "maxSize": "10mb",
+  "threshold": 1,
+  "reporters": ["console"],
+  "gitignore": true
+}
