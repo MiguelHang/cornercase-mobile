@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -6,18 +5,17 @@ use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
-use cornercase_bridge::server::{self, Config, Server};
-use cornercase_bridge::test_util::{HUNG, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until};
+use cornercase_bridge::server::{Config, Server};
+use cornercase_bridge::test_util::{
+    HUNG, Served, TOKEN, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until,
+};
 
-const TOKEN: &str = "s3cret";
 const RIGHT: &str = "/?token=s3cret";
 const WITNESS: &str = "touch \"${0%/*}/ran\"";
 const USAGE: &str = r#"{"exit":2}"#;
@@ -28,40 +26,14 @@ const READY: &str = r#"{"stdout":"ready"}"#;
 
 type Client = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-struct Served {
-    address: SocketAddr,
-    stop: oneshot::Sender<()>,
-    running: JoinHandle<()>,
+trait Reach {
+    async fn upgrade(&self, target: &str) -> StatusCode;
+    async fn silent(&self) -> TcpStream;
+    async fn connect(&self) -> Client;
+    async fn exchange(&self, sent: Vec<Message>) -> Exchange;
 }
 
-impl Served {
-    async fn start(change: impl FnOnce(&mut Config)) -> Self {
-        let mut config = Config::new(TOKEN.to_owned(), PathBuf::from("/nonexistent/cornercase"));
-        change(&mut config);
-        let address = "127.0.0.1:0".parse().expect("an address");
-        Self::serving(server::bind(address, config).await.expect("the server binds"))
-    }
-
-    fn serving(server: Server) -> Self {
-        let address = server.local_addr().expect("the server's address");
-        let (stop, stopped) = oneshot::channel::<()>();
-        let running = tokio::spawn(server.run(async {
-            let _ = stopped.await;
-        }));
-        Self { address, stop, running }
-    }
-
-    async fn stop(self) -> String {
-        let url = self.url(RIGHT);
-        let _ = self.stop.send(());
-        in_time(self.running).await.expect("the server stops");
-        url
-    }
-
-    fn url(&self, target: &str) -> String {
-        format!("ws://{}{target}", self.address)
-    }
-
+impl Reach for Served {
     async fn upgrade(&self, target: &str) -> StatusCode {
         match in_time(connect_async(self.url(target))).await {
             Ok((_, response)) => response.status(),

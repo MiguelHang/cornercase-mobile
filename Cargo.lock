@@ -477,9 +477,14 @@ name = "cornercase-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
+ "cornercase-bridge",
+ "futures-util",
  "rstest",
  "serde",
  "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
