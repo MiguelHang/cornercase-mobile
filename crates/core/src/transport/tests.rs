@@ -207,4 +207,24 @@ mod stderr_tail {
         assert!(tail.len() <= StderrTail::LIMIT && tail.len() > StderrTail::LIMIT - character.len());
         assert_eq!(tail.trim_start_matches(character), "", "only whole characters are kept");
     }
+
+    #[rstest]
+    #[case::just_over_the_limit(StderrTail::LIMIT + 1, StderrTail::LIMIT + 1)]
+    #[case::one_and_a_half_limits(3 * StderrTail::LIMIT / 2, 3 * StderrTail::LIMIT / 2)]
+    #[case::twice_the_limit(2 * StderrTail::LIMIT, 2 * StderrTail::LIMIT)]
+    #[case::past_twice_the_limit(2 * StderrTail::LIMIT + 1, StderrTail::LIMIT)]
+    fn trims_what_it_holds_only_past_twice_the_limit(#[case] length: usize, #[case] held: usize) {
+        let mut tail = StderrTail::default();
+        tail.push(&"x".repeat(length));
+        assert_eq!(tail.text.len(), held);
+    }
+
+    #[test]
+    fn holds_no_more_than_twice_the_limit_between_lines() {
+        let mut tail = StderrTail::default();
+        for _ in 0..1000 {
+            tail.push(&"y".repeat(1000));
+            assert!(tail.text.len() <= 2 * StderrTail::LIMIT + 1000);
+        }
+    }
 }
