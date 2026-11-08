@@ -32,7 +32,8 @@ cargo fmt --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 pnpm check                                        # svelte-check, then tsc on vite.config.ts
-pnpm lint                                         # eslint
+pnpm lint                                         # eslint, then scripts/check-rules.mjs (1,000 lines, comments)
+npx -y jscpd@4.3.0                                # copy-paste detector, reads .jscpd.json
 pnpm test                                         # vitest
 ```
 
@@ -58,10 +59,14 @@ pnpm test                                         # vitest
 - `design/`, `DESIGN.md`: decisions by area. `docs/`: idea, roadmap and tasks.
 
 ## Code rules
-- No comments, in Rust or TypeScript. Names and small functions say what the code does; the why goes
-  to `design/`.
-- At most 1,000 lines per file. Small functions with one purpose.
-- Rust: `pub(crate)` by default; `pub` only for what another crate of the workspace uses.
+- No comments, in Rust, TypeScript or Svelte, directives such as `eslint-disable` included. Names and small functions
+  say what the code does; the why goes to `design/`. `scripts/check-rules.mjs` checks it.
+- At most 1,000 lines per file (`scripts/check-rules.mjs`). Small functions with one purpose: at most 40 lines,
+  complexity 10 and three levels of nesting, checked by clippy (`clippy.toml`, also 5 arguments) and ESLint; the two
+  count differently (`design/code-layout.md`). Split the function; never silence these rules, and never add a file to
+  the script's lists of exceptions, which only shrink.
+- No copied code: jscpd fails above 1 % duplication. Extract the shared code; do not raise the threshold.
+- Rust: `pub(crate)` by default; `pub` only for what another crate of the workspace uses (`unreachable_pub`).
 - The CLI is the only contract with cornercase: never read its files, sockets or internal state.
 - No workarounds for what cornercase lacks: note the gap in `design/upstream-gaps.md`.
 - No new dependency without a line in the area's `design/` file saying why.
@@ -71,7 +76,7 @@ pnpm test                                         # vitest
 - `crates/core` and `bridge/` carry the logic and its unit tests (protocol, allowlist, queue, Store,
   applying frames and patches, route selection), with JSON fixtures from cornercase's `--json` output.
 - UI logic that is not markup (stores, formatting, key mapping) has vitest tests.
-- Every task closes with tests green and fmt, clippy, svelte-check and lint clean.
+- Every task closes with tests green and fmt, clippy, svelte-check, lint and jscpd clean.
 
 ## Workflow
 - One task in `docs/tasks/` = one branch = one PR.
