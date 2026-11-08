@@ -4,7 +4,14 @@
   let { resting = false, children }: { resting?: boolean; children: Snippet } = $props()
 </script>
 
-<button class="button" class:resting type="button" disabled={resting} aria-disabled={resting ? 'true' : undefined}>
+<button
+  class="button"
+  class:resting
+  type="button"
+  disabled={resting}
+  aria-disabled={resting ? 'true' : undefined}
+  ontouchstart={() => {}}
+>
   {@render children()}
 </button>
 

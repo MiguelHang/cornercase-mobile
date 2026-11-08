@@ -51,5 +51,6 @@
     color: var(--muted);
     font-size: 16px;
     line-height: 1.4;
+    text-wrap: pretty;
   }
 </style>

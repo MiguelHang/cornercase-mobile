@@ -47,6 +47,10 @@ describe('Button', () => {
     expect(buttonSource).toContain('.button:not(.resting):active {\n    background: var(--brand-hover);')
     expect(buttonSource).toMatch(/\.resting \{\s*opacity: 0\.4;\s*pointer-events: none;\s*\}/)
   })
+
+  it('listens to touches so that WebKit on iOS shows the press', () => {
+    expect(buttonSource).toContain('ontouchstart={() => {}}')
+  })
 })
 
 describe('Emblem', () => {
