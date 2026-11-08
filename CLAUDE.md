@@ -42,8 +42,10 @@ pnpm test                                         # vitest
   what fails.
 - **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
   `sudo xcodebuild -license accept` (until then `git` and `clang` refuse to run), open Xcode once and download an iOS
-  simulator runtime. Install CocoaPods or xcodegen (`brew install cocoapods xcodegen`) only if `pnpm tauri ios init`
-  asks for them.
+  simulator runtime. With Homebrew, the Tauri CLI installs the Apple tools it is missing on its own (xcodegen and
+  libimobiledevice on `ios init`, ios-deploy on `ios dev`); CocoaPods is `brew install cocoapods`.
+- **`src-tauri/gen/apple` is in git** (`design/architecture.md`): change the Xcode project in its `project.yml`,
+  which the Tauri CLI turns into the `.xcodeproj`, and commit both; `.gitignore` leaves out what the builds write.
 - Android has no project yet (task 030).
 
 ## Structure

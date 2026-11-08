@@ -10,10 +10,10 @@ name = "cornercase_mobile_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = "2.7"
+tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
-tauri = "2.12"
+tauri = { version = "2.12", features = [] }
 
 [lints]
 workspace = true

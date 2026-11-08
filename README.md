@@ -15,7 +15,8 @@ Early days: the app opens an empty screen.
   - `sudo xcode-select -s /Applications/Xcode.app`
   - `sudo xcodebuild -license accept`
   - open Xcode once and download an iOS simulator runtime
-  - CocoaPods or xcodegen (`brew install cocoapods xcodegen`), only if `pnpm tauri ios init` asks for them
+  - Homebrew and CocoaPods (`brew install cocoapods`); the Tauri CLI installs the other Apple tools it needs (xcodegen,
+    libimobiledevice, ios-deploy) with Homebrew on its own
 
 ## Getting started
 
