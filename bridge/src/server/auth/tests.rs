@@ -49,6 +49,7 @@ mod same {
     #[case::both_empty("", "", true)]
     #[case::the_last_byte_differs("s3cret", "s3creT", false)]
     #[case::the_first_byte_differs("s3cret", "S3cret", false)]
+    #[case::swapped_bytes_that_cancel_out("ab", "ba", false)]
     #[case::a_prefix("s3cre", "s3cret", false)]
     #[case::empty_against_a_token("", "s3cret", false)]
     fn is_true_only_for_the_same_bytes(#[case] a: &str, #[case] b: &str, #[case] expected: bool) {
