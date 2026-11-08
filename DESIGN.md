@@ -18,7 +18,7 @@ Why cornercase-mobile works the way it does, area by area. The rules every chang
 ## Areas
 
 - [Architecture](design/architecture.md) (`crates/core/`, `src-tauri/`, `bridge/`, `src/`): the workspace, what lives in Rust and what in the WebView, the bundle id, Svelte without SvelteKit, the native projects in git, the versions and each dependency.
-- [Code layout](design/code-layout.md) (`.github/`): no comments, 1,000 lines per file, small functions, `pub(crate)`, what CI runs and in which order, Dependabot.
+- [Code layout](design/code-layout.md) (`.github/`, `clippy.toml`, `eslint.config.js`, `scripts/`, `.jscpd.json`): no comments, 1,000 lines per file, small functions and how clippy and ESLint count them, what `scripts/check-rules.mjs` checks, jscpd, `pub(crate)`, what CI runs and in which order, Dependabot.
 - [Bridge](design/bridge.md) (`bridge/`): the development bridge, its protocol, the allowlist, listening, the proposal for `/cli`.
 - [Connection](design/connection.md) (`crates/core/`): the command line as the only contract, the transport, machines and routes, identity, `contract` and `boot`.
 - [Terminal](design/terminal.md) (`src/`, `crates/core/`): the live terminal, passive by default, claiming the tab by hand.
