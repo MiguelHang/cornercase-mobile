@@ -10,10 +10,14 @@ Referencias (siempre del `main` de upstream; la copia local de cornercase-termin
 Leyenda: ⚠ = tarea con riesgo (plan B en la propia tarea). Tamaño = líneas añadidas estimadas (+30 %), tests incluidos.
 
 ## Hito 0 — Base del repo
+La 034 va aquí aunque es UI: no necesita red ni la 013, y deja la app con el aspecto de cornercase en el simulador
+antes de empezar el puente. Su id no sigue el orden para no renumerar el roadmap.
+
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
 | 001 | [Scaffolding Tauri 2 + Svelte 5 + workspace Cargo + CI](tasks/001-scaffolding.md) | — | ~600 (+ ficheros generados) |
 | 002 | [Guardarraíles: límites de clippy, 1.000 líneas, sin comentarios](tasks/002-guardrails.md) | 001 | ~250 |
+| 034 | [UI look: tema de gpui, cristal, logo y pantalla "sin máquinas" (sin red, se ve en el simulador)](tasks/034-ui-look.md) | 002 | ~650 |
 
 ## Hito 1 — Puente de desarrollo (fase 0)
 El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
@@ -39,7 +43,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 ## Hito 3 — UI del MVP (iOS), en el orden de IDEA.md
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
-| 014 | [UI base: tema de gpui, cristal, navegación, avisos, primera máquina pegando la URL](tasks/014-ui-base-theme.md) | 013 | ~700 |
+| 014 | [UI base: navegación, avisos, estado de la conexión, primera máquina pegando la URL](tasks/014-ui-base-theme.md) | 013, 034 | ~550 |
 | 015 | [Pantalla 1 — Tablero de agentes](tasks/015-ui-agents-board.md) | 014 | ~550 |
 | 016 | [Pantalla 2 — Chat: último mensaje y responder](tasks/016-ui-chat-reply.md) | 015 | ~500 |
 | 017 | [Pantalla 2 — Chat: fila de teclas](tasks/017-ui-chat-keys.md) | 016 | ~300 |
@@ -70,11 +74,12 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 
 ## Camino crítico
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
+Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
 · `028` (tras 013) · `030 → 031, 032` (tras 029) · `033` (tras 006; se cierra tras 029).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
-- 002, 003 y 009 tras 001. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
+- 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
 - Las pantallas 023–027 son independientes entre sí tras 015 (027 solo pide 014 y 008).
 
 ## Riesgos y dónde se tratan
@@ -98,3 +103,6 @@ Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020
 - **D3**: 014 trae un formulario mínimo "pegar URL"; 027 la pantalla completa (QR, varias rutas, editar).
 - **D4**: `src-tauri/gen/apple` y `gen/android` se versionan.
 - **D5**: la app comprueba operaciones y `features` de `contract`, no una versión mínima.
+- **D6** (2026-11-08): la parte visual de la 014 (tema, cristal, logo, movimiento, pantalla "sin máquinas" estática)
+  se adelanta a la 034, justo tras la 002, para ver la app en el simulador cuanto antes; la 014 se queda con
+  navegación, avisos, estado de la conexión y el formulario de la primera máquina.
