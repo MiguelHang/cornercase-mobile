@@ -19,6 +19,7 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 - Rust 1.99.1 (Tauri 2.12 needs 1.90), pinned in `rust-toolchain.toml` with `aarch64-apple-ios` and `aarch64-apple-ios-sim`, so rustup brings the iOS targets with the toolchain.
 - Tauri 2.12.5, tauri-build 2.7.4, `@tauri-apps/cli` 2.12.4. Tauri 3.0 is an alpha: not used.
 - Svelte 5.57.3, Vite 8.3.6, `@sveltejs/vite-plugin-svelte` 7.3.1, Node 22, pnpm 12.18.0.
+- **pnpm, not Yarn**: Tauri's and Svelte's templates and docs use it; its strict `node_modules` fails on a package imported without being declared; pnpm 12 refuses versions published less than 24 hours ago, a guard against compromised releases. Rejected: Yarn 4, whose strength is Plug'n'Play, which breaks svelte-check, the ESLint plugins and the Tauri CLI; with `node-modules` it brings nothing pnpm lacks (decided on 2026-11-08).
 - **TypeScript 6.0, not 7**: 7.0 has been npm's `latest` since November 2026, but svelte-check accepts `^5 || ^6` and typescript-eslint `<6.1.0`, and create-tauri-app pins `~6.0.3` too. TypeScript is `~6.0.3` and Dependabot ignores its majors; move to 7 once both tools accept it.
 
 ## Dependencies
