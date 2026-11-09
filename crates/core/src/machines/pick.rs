@@ -16,11 +16,12 @@ use crate::transport::{self, Transport};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PickConfig {
     pub deadline: Duration,
+    pub head_start: Duration,
 }
 
 impl Default for PickConfig {
     fn default() -> Self {
-        Self { deadline: Duration::from_secs(5) }
+        Self { deadline: Duration::from_secs(5), head_start: Duration::from_millis(300) }
     }
 }
 
@@ -57,19 +58,32 @@ where
     if machine.routes.is_empty() {
         return Err(PickError::NoRoutes);
     }
-    let deadline = Instant::now() + config.deadline;
+    let started = Instant::now();
+    let deadline = started + config.deadline;
+    let favourite = favourite(machine);
     let mut failures = vec![None; machine.routes.len()];
-    let racing = FuturesUnordered::new();
+    let mut racing = FuturesUnordered::new();
+    let mut others = Vec::new();
     for (index, route) in machine.routes.iter().enumerate() {
         match connect(route, &factory) {
-            Ok(transport) => racing.push(attempt(index, route, transport)),
+            Ok(transport) if favourite == Some(index) => racing.push(attempt(index, route, transport)),
+            Ok(transport) => others.push(attempt(index, route, transport)),
             Err(error) => failures[index] = Some(error),
         }
     }
-    match race(racing, deadline, &mut failures).await {
+    if let Some(picked) = race(&mut racing, deadline.min(started + config.head_start), &mut failures).await {
+        return Ok(picked);
+    }
+    racing.extend(others);
+    match race(&mut racing, deadline, &mut failures).await {
         Some(picked) => Ok(picked),
         None => Err(PickError::AllFailed(timed_out(machine, failures))),
     }
+}
+
+fn favourite(machine: &Machine) -> Option<usize> {
+    let saved = machine.last_route.as_ref()?;
+    machine.routes.iter().position(|route| route.address() == saved)
 }
 
 fn connect<F>(route: &Route, factory: &F) -> Result<Arc<dyn Transport>, Error>
@@ -91,7 +105,7 @@ fn attempt(index: usize, route: &Route, transport: Arc<dyn Transport>) -> Attemp
 }
 
 async fn race(
-    mut racing: FuturesUnordered<Attempt<'_>>,
+    racing: &mut FuturesUnordered<Attempt<'_>>,
     deadline: Instant,
     failures: &mut [Option<Error>],
 ) -> Option<Picked> {
