@@ -203,6 +203,87 @@ describe('Agent, without its row', () => {
   })
 })
 
+const ATTACHED = [
+  { name: 'IMG_0042.jpg', size: '47 KB' },
+  { name: 'pasted.png', size: '900 B' },
+]
+
+const attachButton = (body: string) =>
+  body.match(/<button class="([^"]*)" type="button"([^>]*) aria-label="Attach image"[^>]*>(.*?)<\/button>/)
+
+const withChips = (draft = '') => {
+  const chat = chatWith({ ...ROW, status: 'done' }, draft)
+  chat.attachments.chips = ATTACHED
+  return chat
+}
+
+describe('Agent, its attachments', () => {
+  it('offers attaching an image between the field and Send, named for every reader', () => {
+    const body = draw(chatWith({ ...ROW, status: 'done' }))
+    const found = attachButton(body)
+    expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact$/)
+    expect(found?.[2]).not.toContain('disabled')
+    expect(found?.[3]).toContain('<circle cx="9" cy="9" r="2"></circle>')
+    expect(body.indexOf('<textarea')).toBeLessThan(body.indexOf('aria-label="Attach image"'))
+    expect(body.indexOf('aria-label="Attach image"')).toBeLessThan(send(body)?.index ?? -1)
+  })
+
+  it('offers it while the agent is asking, as it pastes into whatever is there', () => {
+    expect(attachButton(draw(chatWith(ROW)))?.[2]).not.toContain('disabled')
+  })
+
+  it('shows the attaching under way with a spinner in place of the icon, taking no second tap', () => {
+    const chat = chatWith({ ...ROW, status: 'done' })
+    void chat.attach()
+    const found = attachButton(draw(chat))
+    expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact busy$/)
+    expect(found?.[2]).toContain('disabled=""')
+    expect(found?.[2]).toContain('aria-busy="true"')
+    expect(found?.[3]).toContain('class="spinner')
+    expect(found?.[3]).not.toContain('<circle')
+  })
+
+  it('hands the reason of a failed attaching over, to be told', () => {
+    expect(flat(agentSource)).toContain('const failed = await chat.attach() if (failed !== null) { onfailed(failed) }')
+    expect(flat(agentSource)).toContain('busy={chat.attachments.attaching} onclick={attach}>')
+  })
+
+  it('shows each attached image as a chip with its name and size, between the keys and the field', () => {
+    const body = draw(withChips())
+    const chips = [...body.matchAll(/<li class="chip svelte-[\w-]+"><span class="name svelte-[\w-]+">([^<]*)<\/span><span class="size svelte-[\w-]+">([^<]*)<\/span><\/li>/g)]
+    expect(chips.map((chip) => [chip[1], chip[2]])).toEqual([
+      ['IMG_0042.jpg', '47 KB'],
+      ['pasted.png', '900 B'],
+    ])
+    expect(body).toMatch(/<ul class="chips svelte-[\w-]+" aria-label="Attached images">/)
+    expect(body.indexOf('aria-label="Keys"')).toBeLessThan(body.indexOf('aria-label="Attached images"'))
+    expect(body.indexOf('aria-label="Attached images"')).toBeLessThan(body.indexOf('<textarea'))
+  })
+
+  it('shows no chips before an image is attached', () => {
+    expect(draw(chatWith({ ...ROW, status: 'done' }))).not.toContain('Attached images')
+  })
+
+  it('can send an empty field once an image is attached', () => {
+    const body = draw(withChips())
+    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
+    expect(send(body)?.[2]).not.toContain('disabled')
+  })
+
+  it('cuts a long name rather than its size', () => {
+    expect(flat(agentSource)).toContain('.name { overflow: hidden; color: var(--soft); text-overflow: ellipsis; white-space: nowrap; }')
+    expect(flat(agentSource)).toContain('.size { flex: none; color: var(--faint); }')
+  })
+
+  it('offers no attaching without its agent, nor once it is gone', () => {
+    const gone = withChips()
+    gone.see(1, [{ ...ROW, pane: 30 }])
+    expect(attachButton(draw(chatWith(null)))).toBeNull()
+    expect(attachButton(draw(gone))).toBeNull()
+    expect(draw(gone)).not.toContain('Attached images')
+  })
+})
+
 const keys = (chat: Chat, initialDigits = false) =>
   render(KeyRow, { props: { chat, initialDigits, onfailed: () => {} } }).body
 
@@ -219,7 +300,7 @@ describe('Agent, its keys', () => {
     const body = draw(chatWith({ ...ROW, status: 'done' }))
     expect(labels(group(body, 'Keys'))).toEqual(['Escape', 'Tab', 'Up', 'Down', 'Left', 'Right', 'Enter', 'Ctrl-C', 'Digits'])
     expect(body.indexOf('aria-label="Keys"')).toBeLessThan(body.indexOf('<textarea'))
-    expect(flat(agentSource)).toContain('{/if} <KeyRow {chat} {onfailed} /> <div class="fields">')
+    expect(flat(agentSource)).toContain('{/if} <KeyRow {chat} {onfailed} /> {#if chat.attachments.chips.length > 0}')
   })
 
   it('offers the keys while the agent is asking, when the field cannot send', () => {

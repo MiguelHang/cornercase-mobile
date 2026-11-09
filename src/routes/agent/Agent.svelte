@@ -3,6 +3,7 @@
   import { elapsed, label, place, statusName } from '../../lib/board'
   import type { Chat } from '../../lib/chat.svelte'
   import Button from '../../lib/ui/Button.svelte'
+  import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import Markdown from '../../lib/ui/Markdown.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
@@ -39,6 +40,13 @@
 
   const send = async () => {
     const failed = await chat.send()
+    if (failed !== null) {
+      onfailed(failed)
+    }
+  }
+
+  const attach = async () => {
+    const failed = await chat.attach()
     if (failed !== null) {
       onfailed(failed)
     }
@@ -87,10 +95,22 @@
           <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
         {/if}
         <KeyRow {chat} {onfailed} />
+        {#if chat.attachments.chips.length > 0}
+          <ul class="chips" aria-label="Attached images">
+            {#each chat.attachments.chips as chip, index (index)}
+              <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
+            {/each}
+          </ul>
+        {/if}
         <div class="fields">
           <div class="field">
             <TextArea label="Answer" placeholder="Answer {row.agent}" disabled={chat.sending} bind:value={chat.draft} />
           </div>
+          <Button tone="plain" compact label="Attach image" busy={chat.attachments.attaching} onclick={attach}>
+            {#if !chat.attachments.attaching}
+              <Icon name="image-plus" size={20} />
+            {/if}
+          </Button>
           <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={send}>Send</Button>
         </div>
       </div>
@@ -182,6 +202,39 @@
   .field {
     flex: 1;
     min-width: 0;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 4px var(--gap);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-chip);
+    background: var(--hover);
+    font-size: 13px;
+  }
+
+  .name {
+    overflow: hidden;
+    color: var(--soft);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .size {
+    flex: none;
+    color: var(--faint);
   }
 
   .waiting {
