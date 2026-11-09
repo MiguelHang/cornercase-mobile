@@ -1,0 +1,84 @@
+{
+  "agents": [
+    {
+      "agent": "claude",
+      "command": "claude",
+      "installed": true
+    },
+    {
+      "agent": "codex",
+      "command": "codex",
+      "installed": false
+    },
+    {
+      "agent": "gemini",
+      "command": "gemini",
+      "installed": false
+    },
+    {
+      "agent": "opencode",
+      "command": "opencode",
+      "installed": false
+    },
+    {
+      "agent": "grok",
+      "command": "grok",
+      "installed": false
+    },
+    {
+      "agent": "cursor",
+      "command": "cursor-agent",
+      "installed": false
+    },
+    {
+      "agent": "copilot",
+      "command": "copilot",
+      "installed": false
+    },
+    {
+      "agent": "vibe",
+      "command": "vibe",
+      "installed": false
+    },
+    {
+      "agent": "amp",
+      "command": "amp",
+      "installed": false
+    },
+    {
+      "agent": "droid",
+      "command": "droid",
+      "installed": false
+    },
+    {
+      "agent": "pi",
+      "command": "pi",
+      "installed": false
+    },
+    {
+      "agent": "qwen",
+      "command": "qwen",
+      "installed": false
+    },
+    {
+      "agent": "kimi",
+      "command": "kimi",
+      "installed": false
+    },
+    {
+      "agent": "cline",
+      "command": "cline",
+      "installed": false
+    },
+    {
+      "agent": "goose",
+      "command": "goose",
+      "installed": false
+    },
+    {
+      "agent": "aider",
+      "command": "aider",
+      "installed": false
+    }
+  ]
+}

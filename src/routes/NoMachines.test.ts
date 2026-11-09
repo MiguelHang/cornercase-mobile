@@ -75,7 +75,7 @@ describe('MachineForm', () => {
 
   it('asks for the bridge URL in a field that leaves it as pasted', () => {
     expect(body).toMatch(
-      /<label class="label svelte-[\w-]+" for="(\w+)-input">Bridge URL<\/label> <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" value=""\/>/,
+      /<label class="label svelte-[\w-]+" for="(\w+)-input">Bridge URL<\/label>(?:<!--[^>]*-->)* <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" value=""\/>/,
     )
   })
 
@@ -88,7 +88,7 @@ describe('MachineForm', () => {
 
   it('asks for a name, with a placeholder until there is a URL', () => {
     expect(body).toMatch(
-      /<label class="label svelte-[\w-]+" for="(\w+)-input">Name<\/label> <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" placeholder="Name" value=""\/>/,
+      /<label class="label svelte-[\w-]+" for="(\w+)-input">Name<\/label>(?:<!--[^>]*-->)* <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" placeholder="Name" value=""\/>/,
     )
   })
 

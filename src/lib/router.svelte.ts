@@ -4,10 +4,11 @@ import type { Screen } from './connection'
 export type Route =
   | { name: 'no-machines' }
   | { name: 'home' }
-  | { name: 'agent'; machine: number | null; pane: number }
+  | { name: 'agent'; machine: number | null; pane: number; starting?: true }
   | { name: 'terminal'; machine: number; row: AgentRow }
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
+  | { name: 'start'; machine: number }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
@@ -46,6 +47,10 @@ export class Router {
 
   go(route: Route) {
     this.#stack = [...this.#stack, route]
+  }
+
+  replace(route: Route) {
+    this.#stack = [...this.#stack.slice(0, Math.max(1, this.#stack.length - 1)), route]
   }
 
   setBase(base: Base) {

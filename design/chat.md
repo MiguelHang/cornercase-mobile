@@ -57,6 +57,7 @@ The agent's screen a row of the board opens (`src/routes/agent/Agent.svelte`, Bo
 - **The agent is gone** when a list of rows lacks its pane (the pane was closed, or the agent quit and left its shell), or when the rows turn `null` after the screen had seen its row (a restart, a new `Store`), or when the active machine is not the one it was opened on (The screen). Then it says `This agent is no longer running.` with `Back to the board`, the field goes and the text typed is lost.
 - **For good**: a later list with the same pane does not bring it back. After a restart the server may give that id to another agent, and the screen must neither show that agent's text nor send it what was typed for the first one (Upstream gaps › `--boot`).
 - **Before the first list** (`null` without having seen the row: connecting, a new `Store`) the screen does not know yet and shows the board's mark (Board › A row).
+- **An agent the app just started** has no row yet: `Chat.see` takes `starting` from its route, and until the row comes a list without the pane does not count it as gone, while the screen says `Starting <agent>…` (Starting work › After it starts). Once the row was seen, or on another machine, the rules above hold.
 
 ## Checked live
 

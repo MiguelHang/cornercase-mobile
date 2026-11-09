@@ -46,8 +46,12 @@ const chatWith = (row: AgentRow | null, draft = '') => {
   return chat
 }
 
-const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED) =>
-  render(Agent, { props: { chat, connection, below, onback: () => {}, onfailed: () => {}, onterminal: () => {} } }).body
+const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED, starting: string | null = null) =>
+  render(Agent, {
+    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {} },
+  }).body
+
+const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
 
 const send = (body: string) => body.match(/<button class="([^"]*)" type="button"([^>]*)>(?:<!--[^>]*-->|\s|<span class="spinner[^>]*>.*?<\/span>)*Send/)
 
@@ -166,6 +170,32 @@ describe('Agent, without its row', () => {
     expect(body).not.toContain('<textarea')
     expect(body).not.toContain('<h1')
     expect(body).not.toContain('role="img"')
+  })
+
+  it('says the agent it started is starting until its row comes, with Back and no field', () => {
+    const chat = chatWith(null)
+    chat.see(1, [{ ...ROW, pane: 30 }], true)
+    const body = draw(chat, 0, CONNECTED, 'claude')
+    expect(body).toMatch(STARTING)
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
+    expect(body).not.toContain('no longer running')
+    expect(body).not.toContain('<textarea')
+    expect(body).not.toContain('class="cell cursor')
+  })
+
+  it('shows the agent it started once its row comes', () => {
+    const body = draw(chatWith(ROW), 0, CONNECTED, 'claude')
+    expect(body).not.toMatch(STARTING)
+    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>/)
+  })
+
+  it('says it stopped running when its row goes, though it was started from here', () => {
+    const chat = chatWith(null)
+    chat.see(1, [ROW], true)
+    chat.see(1, [{ ...ROW, pane: 30 }], true)
+    const body = draw(chat, 0, CONNECTED, 'claude')
+    expect(body).toContain('This agent is no longer running.')
+    expect(body).not.toMatch(STARTING)
   })
 
   it('pulses the mark while it connects, before the first list', () => {

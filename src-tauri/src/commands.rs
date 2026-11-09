@@ -5,4 +5,5 @@ pub(crate) mod identity;
 pub(crate) mod machines;
 pub(crate) mod probe;
 pub(crate) mod routes;
+pub(crate) mod start;
 pub(crate) mod terminal;

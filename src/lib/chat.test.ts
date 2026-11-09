@@ -372,6 +372,25 @@ describe('Chat, its row', () => {
     expect([unseen.gone, unseen.row, seen.gone, seen.row]).toEqual([true, null, true, null])
   })
 
+  it('waits for the row of an agent it started, even once it stops being asked to', () => {
+    const chat = fresh()
+    chat.see(MACHINE, [row(3, 'working')], true)
+    chat.see(MACHINE, [row(3, 'working')])
+    expect([chat.row, chat.gone]).toEqual([null, false])
+    chat.see(MACHINE, [row(PANE, 'working')])
+    expect([chat.row?.status, chat.gone]).toEqual(['working', false])
+  })
+
+  it.each<[string, number, AgentRow[] | null]>([
+    ['its row goes once seen', MACHINE, [row(3, 'working')]],
+    ['another machine becomes active', 2, [row(PANE, 'done')]],
+  ])('is gone when it started the agent and %s', (_, machine, agents) => {
+    const chat = fresh()
+    chat.see(MACHINE, [row(PANE, 'working')], true)
+    chat.see(machine, agents, true)
+    expect([chat.gone, chat.row]).toEqual([true, null])
+  })
+
   it('stays gone when a row with its pane comes back', () => {
     const chat = ready()
     chat.see(MACHINE, null)
