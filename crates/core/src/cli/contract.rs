@@ -33,6 +33,7 @@ pub const REQUIRED: Required = Required {
         "view-set",
         "start",
         "new-workspace",
+        "account-list",
         "issue-sources",
         "issue-list",
         "issue-read",

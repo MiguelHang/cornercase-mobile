@@ -1,6 +1,19 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
-import { Chat, deliver, read, touches, type ReadLast, type SendText } from './chat.svelte'
+import {
+  Chat,
+  deliver,
+  INTERRUPT_WINDOW_MS,
+  read,
+  timers,
+  touches,
+  type Clock,
+  type PressKey,
+  type ReadLast,
+  type SendText,
+} from './chat.svelte'
+import type { HapticsApi } from './haptics'
+import type { KeyName } from './keys'
 
 const MACHINE = 1
 const PANE = 12
@@ -40,11 +53,45 @@ const noRead: ReadLast = () => Promise.resolve(ok(message('')))
 
 const sentOk: SendText = () => Promise.resolve(ok(null))
 
-const ready = (sendText: SendText = sentOk, status: string | null = 'done', readLast: ReadLast = noRead) => {
-  const chat = new Chat(MACHINE, PANE, readLast, sendText)
+const pressedOk: PressKey = () => Promise.resolve(ok(null))
+
+const still = (): HapticsApi => ({ impactFeedback: vi.fn(() => Promise.resolve(ok(null))) })
+
+const fakeClock = () => {
+  let now = 0
+  const waiting: { at: number; then: () => void; live: boolean }[] = []
+  const clock: Clock = {
+    after: (ms, then) => {
+      const timer = { at: now + ms, then, live: true }
+      waiting.push(timer)
+      return () => (timer.live = false)
+    },
+  }
+  const tick = (ms: number) => {
+    now += ms
+    waiting.filter((timer) => timer.live && timer.at <= now).forEach((timer) => ((timer.live = false), timer.then()))
+  }
+  return { clock, tick }
+}
+
+type Calls = { readLast?: ReadLast; sendText?: SendText; pressKey?: PressKey; haptics?: HapticsApi; clock?: Clock }
+
+const fresh = ({
+  readLast = noRead,
+  sendText = sentOk,
+  pressKey = pressedOk,
+  haptics = still(),
+  clock = fakeClock().clock,
+}: Calls = {}) => new Chat(MACHINE, PANE, readLast, sendText, pressKey, haptics, clock)
+
+const seen = (calls: Calls = {}, status: string | null = 'done') => {
+  const chat = fresh(calls)
   chat.see(MACHINE, [row(3, 'working'), row(PANE, status)])
   return chat
 }
+
+const ready = (sendText: SendText = sentOk, status: string | null = 'done', readLast: ReadLast = noRead) =>
+  seen({ sendText, readLast }, status)
 
 const settle = () => new Promise((resolve) => setTimeout(resolve))
 
@@ -84,7 +131,7 @@ describe('deliver', () => {
     ['the reason of a refusal', () => Promise.resolve(refused('the agent is asking a question')), 'the agent is asking a question'],
     ['the message of a rejected call', () => Promise.reject(new Error('no window')), 'no window'],
   ])('gives %s', async (_, sendText, failed) => {
-    expect(await deliver(sendText, PANE, 'hi')).toBe(failed)
+    expect(await deliver(() => sendText(PANE, 'hi'))).toBe(failed)
   })
 })
 
@@ -122,7 +169,7 @@ describe('Chat, its field', () => {
   })
 
   it('cannot send before its row is seen', () => {
-    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
+    const chat = fresh()
     chat.draft = 'go on'
     expect(chat.canSend).toBe(false)
   })
@@ -226,7 +273,7 @@ describe('Chat, its reading', () => {
 
   it('reads nothing before its row is seen', async () => {
     const readLast = vi.fn(noRead)
-    const chat = new Chat(MACHINE, PANE, readLast, sentOk)
+    const chat = fresh({ readLast })
     await chat.refresh()
     expect([readLast.mock.calls.length, chat.reading]).toEqual([0, { kind: 'loading' }])
   })
@@ -290,7 +337,7 @@ describe('Chat, its row', () => {
   })
 
   it('waits while the agents are not known, before its row is seen', () => {
-    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
+    const chat = fresh()
     chat.see(MACHINE, null)
     expect([chat.row, chat.gone]).toEqual([null, false])
     chat.see(MACHINE, [row(PANE, 'done')])
@@ -308,7 +355,7 @@ describe('Chat, its row', () => {
   })
 
   it('is gone when the agents are known without its row', () => {
-    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
+    const chat = fresh()
     chat.see(MACHINE, [row(3, 'working')])
     expect(chat.gone).toBe(true)
   })
@@ -318,11 +365,30 @@ describe('Chat, its row', () => {
     ['another machine has not sent its agents yet', 2, null],
     ['no machine is active', null, null],
   ])('is gone when %s, before or after its row was seen', (_, machine, agents) => {
-    const unseen = new Chat(MACHINE, PANE, noRead, sentOk)
+    const unseen = fresh()
     const seen = ready()
     unseen.see(machine, agents)
     seen.see(machine, agents)
     expect([unseen.gone, unseen.row, seen.gone, seen.row]).toEqual([true, null, true, null])
+  })
+
+  it('waits for the row of an agent it started, even once it stops being asked to', () => {
+    const chat = fresh()
+    chat.see(MACHINE, [row(3, 'working')], true)
+    chat.see(MACHINE, [row(3, 'working')])
+    expect([chat.row, chat.gone]).toEqual([null, false])
+    chat.see(MACHINE, [row(PANE, 'working')])
+    expect([chat.row?.status, chat.gone]).toEqual(['working', false])
+  })
+
+  it.each<[string, number, AgentRow[] | null]>([
+    ['its row goes once seen', MACHINE, [row(3, 'working')]],
+    ['another machine becomes active', 2, [row(PANE, 'done')]],
+  ])('is gone when it started the agent and %s', (_, machine, agents) => {
+    const chat = fresh()
+    chat.see(MACHINE, [row(PANE, 'working')], true)
+    chat.see(machine, agents, true)
+    expect([chat.gone, chat.row]).toEqual([true, null])
   })
 
   it('stays gone when a row with its pane comes back', () => {
@@ -330,5 +396,190 @@ describe('Chat, its row', () => {
     chat.see(MACHINE, null)
     chat.see(MACHINE, [row(PANE, 'done')])
     expect([chat.gone, chat.row]).toEqual([true, null])
+  })
+})
+
+type Pressed = Awaited<ReturnType<PressKey>>
+
+describe('Chat, its keys', () => {
+  it('sends a key to its pane, and gives no reason once sent', async () => {
+    const pressKey = vi.fn(pressedOk)
+    expect(await seen({ pressKey }).press('down')).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, 'down']])
+  })
+
+  it('sends keys pressed quickly in the order pressed, without waiting for an answer', async () => {
+    const answers = [gate<Pressed>(), gate<Pressed>(), gate<Pressed>()]
+    const pressKey = vi.fn<PressKey>()
+    answers.forEach((answer) => pressKey.mockReturnValueOnce(answer.promise))
+    const chat = seen({ pressKey })
+    const pressed = [chat.press('down'), chat.press('down'), chat.press('enter')]
+    expect(pressKey.mock.calls).toEqual([
+      [PANE, 'down'],
+      [PANE, 'down'],
+      [PANE, 'enter'],
+    ])
+    answers[2].open(ok(null))
+    answers[0].open(refused('nothing was sent', 'not_sent'))
+    answers[1].open(ok(null))
+    expect(await Promise.all(pressed)).toEqual(['nothing was sent', null, null])
+  })
+
+  it('sends a key while a send is on its way, without waiting for it', async () => {
+    const answer = gate<{ status: 'ok'; data: null }>()
+    const pressKey = vi.fn(pressedOk)
+    const chat = seen({ sendText: () => answer.promise, pressKey })
+    chat.draft = 'go on'
+    const sent = chat.send()
+    expect([chat.sending, chat.canPress]).toEqual([true, true])
+    expect(await chat.press('enter')).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, 'enter']])
+    answer.open(ok(null))
+    await sent
+  })
+
+  it.each<[string, PressKey, string]>([
+    ["cornercase's reason", () => Promise.resolve(refused('no pane 12')), 'no pane 12'],
+    ['a key skipped', () => Promise.resolve(refused('nothing was sent', 'not_sent')), 'nothing was sent'],
+    [
+      'a key left unanswered',
+      () => Promise.resolve(refused('it may have been sent, but no answer came back', 'unanswered')),
+      'it may have been sent, but no answer came back',
+    ],
+    [
+      'no machine',
+      () => Promise.resolve(refused('no machine is connected', 'not_connected')),
+      'no machine is connected',
+    ],
+    ['a rejected call', () => Promise.reject(new Error('IPC is gone')), 'IPC is gone'],
+  ])('gives %s when a key fails', async (_, pressKey, failed) => {
+    expect(await seen({ pressKey }).press('esc')).toBe(failed)
+  })
+
+  it.each<[string, string | null]>([
+    ['done', 'done'],
+    ['working', 'working'],
+    ['asking on its screen', 'waiting'],
+    ['without a status', null],
+  ])('can press keys to an agent %s', (_, status) => {
+    expect(seen({}, status).canPress).toBe(true)
+  })
+
+  it.each<[string, (chat: Chat) => void]>([
+    ['before its row is seen', () => {}],
+    ['once gone', (chat) => chat.see(MACHINE, [row(3, 'working')])],
+    ['once another machine is active', (chat) => chat.see(2, [row(PANE, 'done')])],
+  ])('sends no key, and taps nothing, %s', async (_, after) => {
+    const pressKey = vi.fn(pressedOk)
+    const haptics = still()
+    const chat = fresh({ pressKey, haptics })
+    after(chat)
+    const pressed = [await chat.press('enter'), await chat.press('ctrl+c'), await chat.press('ctrl+c')]
+    expect([chat.canPress, chat.interrupting, pressed]).toEqual([false, false, [null, null, null]])
+    expect(pressKey).not.toHaveBeenCalled()
+    expect(haptics.impactFeedback).not.toHaveBeenCalled()
+  })
+
+  it('taps lightly for every key sent and for arming Ctrl-C', async () => {
+    const haptics = still()
+    const chat = seen({ haptics })
+    await chat.press('down')
+    await chat.press('ctrl+c')
+    await chat.press('ctrl+c')
+    expect(vi.mocked(haptics.impactFeedback).mock.calls).toEqual([['light'], ['light'], ['light']])
+  })
+
+  it('sends the key when the tap fails', async () => {
+    const pressKey = vi.fn(pressedOk)
+    const chat = seen({ pressKey, haptics: { impactFeedback: () => Promise.reject(new Error('no plugin')) } })
+    expect(await chat.press('tab')).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, 'tab']])
+  })
+})
+
+describe('Chat, its Ctrl-C', () => {
+  const armed = () => {
+    const { clock, tick } = fakeClock()
+    const pressKey = vi.fn(pressedOk)
+    return { chat: seen({ pressKey, clock }), pressKey, tick }
+  }
+
+  it('arms on the first tap and sends nothing', async () => {
+    const { chat, pressKey } = armed()
+    expect(await chat.press('ctrl+c')).toBeNull()
+    expect(chat.interrupting).toBe(true)
+    expect(pressKey).not.toHaveBeenCalled()
+  })
+
+  it('sends ctrl+c once on a second tap within the window, and disarms', async () => {
+    const { chat, pressKey, tick } = armed()
+    await chat.press('ctrl+c')
+    tick(INTERRUPT_WINDOW_MS - 1)
+    expect(await chat.press('ctrl+c')).toBeNull()
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, 'ctrl+c']]])
+  })
+
+  it('gives the reason when the confirmed ctrl+c fails', async () => {
+    const chat = seen({ pressKey: () => Promise.resolve(refused('nothing was sent', 'not_sent')) })
+    await chat.press('ctrl+c')
+    expect(await chat.press('ctrl+c')).toBe('nothing was sent')
+  })
+
+  it('disarms once the window is over, and the next tap arms again', async () => {
+    const { chat, pressKey, tick } = armed()
+    await chat.press('ctrl+c')
+    tick(INTERRUPT_WINDOW_MS)
+    expect(chat.interrupting).toBe(false)
+    await chat.press('ctrl+c')
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([true, []])
+  })
+
+  it('disarms when another key is pressed, which is sent', async () => {
+    const { chat, pressKey } = armed()
+    await chat.press('ctrl+c')
+    expect(await chat.press('down')).toBeNull()
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, 'down']]])
+  })
+
+  it.each<[string, KeyName]>([
+    ['another key', 'down'],
+    ['the confirming tap', 'ctrl+c'],
+  ])('forgets the window of an arming disarmed by %s', async (_, key) => {
+    const { chat, tick } = armed()
+    await chat.press('ctrl+c')
+    tick(1000)
+    await chat.press(key)
+    tick(1000)
+    await chat.press('ctrl+c')
+    tick(INTERRUPT_WINDOW_MS - 1000)
+    expect(chat.interrupting).toBe(true)
+    tick(1000)
+    expect(chat.interrupting).toBe(false)
+  })
+
+  it('sends one ctrl+c for three quick taps, and stays armed', async () => {
+    const { chat, pressKey } = armed()
+    await chat.press('ctrl+c')
+    await chat.press('ctrl+c')
+    await chat.press('ctrl+c')
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([true, [[PANE, 'ctrl+c']]])
+  })
+})
+
+describe('timers', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('runs a callback once its time has passed, unless cancelled', () => {
+    vi.useFakeTimers()
+    const kept = vi.fn()
+    const cancelled = vi.fn()
+    timers.after(INTERRUPT_WINDOW_MS, kept)
+    timers.after(INTERRUPT_WINDOW_MS, cancelled)()
+    vi.advanceTimersByTime(INTERRUPT_WINDOW_MS - 1)
+    expect(kept).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect([kept.mock.calls.length, cancelled.mock.calls.length]).toEqual([1, 0])
   })
 })

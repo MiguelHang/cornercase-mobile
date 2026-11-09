@@ -1,19 +1,44 @@
 <script lang="ts">
   import type { HTMLTextareaAttributes } from 'svelte/elements'
+  import Labelled from './Labelled.svelte'
 
   let {
     label,
     value = $bindable(''),
+    error,
     ...rest
   }: {
     label: string
     value?: string
+    error?: string | null
   } & Omit<HTMLTextareaAttributes, 'value'> = $props()
+
+  const id = $props.id()
+  const field = $derived(error !== undefined)
 </script>
 
-<div class="grow" data-value={value}>
-  <textarea class="area" rows="1" aria-label={label} {...rest} bind:value></textarea>
-</div>
+{#snippet area()}
+  <div class="grow" data-value={value}>
+    <textarea
+      id={field ? `${id}-input` : undefined}
+      class="area"
+      rows="1"
+      aria-label={field ? undefined : label}
+      {...rest}
+      aria-invalid={error ? 'true' : undefined}
+      aria-describedby={error ? `${id}-error` : undefined}
+      bind:value
+    ></textarea>
+  </div>
+{/snippet}
+
+{#if field}
+  <Labelled {id} {label} error={error ?? null}>
+    {@render area()}
+  </Labelled>
+{:else}
+  {@render area()}
+{/if}
 
 <style>
   .grow {

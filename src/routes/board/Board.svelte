@@ -2,6 +2,7 @@
   import { flip } from 'svelte/animate'
   import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
   import { items } from '../../lib/board'
+  import Button from '../../lib/ui/Button.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
   import AgentRow from './AgentRow.svelte'
@@ -13,11 +14,13 @@
     connection,
     below = 0,
     onopen,
+    onstart,
   }: {
     agents: Agent[] | null
     connection: ConnectionView_Serialize
     below?: number
     onopen: (pane: number) => void
+    onstart: () => void
   } = $props()
 
   let now = $state(Date.now())
@@ -32,6 +35,9 @@
 
 <section class="board" style:--below="{below}px">
   <h1 class="spoken">Agents</h1>
+  <div class="actions">
+    <Button resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>
+  </div>
   {#if agents === null}
     <div class="waiting">
       <Mark unit={5} pulsing={connection.state === 'connecting'} />
@@ -56,6 +62,12 @@
 <style>
   .board {
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
+  }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--inset);
   }
 
   .waiting {

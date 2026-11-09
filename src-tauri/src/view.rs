@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use cornercase_core::cli::contract::Missing;
+use cornercase_core::cli::status::Project;
 use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
@@ -107,6 +108,19 @@ pub(crate) struct ConnectionState {
     pub(crate) connection: ConnectionView,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct ProjectChoice {
+    #[specta(type = u32)]
+    pub(crate) id: u64,
+    pub(crate) name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct StartChoices {
+    pub(crate) boot: Option<String>,
+    pub(crate) projects: Vec<ProjectChoice>,
+}
+
 impl From<&Machine> for MachineView {
     fn from(machine: &Machine) -> Self {
         Self {
@@ -146,6 +160,12 @@ impl From<&Connection> for ConnectionView {
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
             Connection::Offline => Self::Offline,
         }
+    }
+}
+
+impl From<&Project> for ProjectChoice {
+    fn from(project: &Project) -> Self {
+        Self { id: project.id, name: project.custom_name.clone().unwrap_or_else(|| project.name.clone()) }
     }
 }
 

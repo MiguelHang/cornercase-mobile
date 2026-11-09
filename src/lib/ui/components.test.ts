@@ -6,12 +6,14 @@ import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
 import Icon from './Icon.svelte'
+import Labelled from './Labelled.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
+import labelledSource from './Labelled.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
 import baseSource from '../theme/base.css?raw'
@@ -100,6 +102,20 @@ describe('Button', () => {
     expect(buttonSource).toMatch(/\.resting \{\s*opacity: 0\.4;\s*pointer-events: none;\s*\}/)
   })
 
+  it('names itself and says whether what it opens is open', () => {
+    const named = (expanded?: boolean) =>
+      render(Button, { props: { tone: 'plain', label: 'Digits', expanded, children: html('0–9') } }).body
+    expect(named()).toMatch(/<button class="button plain svelte-[\w-]+" type="button" aria-label="Digits">/)
+    expect(named(false)).toContain('aria-label="Digits" aria-expanded="false">')
+    expect(named(true)).toContain('aria-label="Digits" aria-expanded="true">')
+  })
+
+  it('narrows to a square of 44 px when compact', () => {
+    const body = render(Button, { props: { tone: 'plain', compact: true, children: html('Esc') } }).body
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+ compact" type="button">/)
+    expect(flat(buttonSource)).toContain('.compact { min-width: 44px; padding: 0 var(--inset); }')
+  })
+
   it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
     expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
@@ -146,15 +162,39 @@ describe('Field', () => {
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
     '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
-    'color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(fieldSource)).toContain(text)
   })
 })
 
+describe('Labelled', () => {
+  const labelled = (control: boolean) =>
+    render(Labelled, { props: { id: 'f', label: 'Agent', error: 'Choose one', control, children: html('<i>x</i>') } })
+      .body
+
+  it('labels its control above it and shows the error under it', () => {
+    expect(labelled(true)).toMatch(
+      /<div class="field svelte-[\w-]+"><!--\[0--><label class="label svelte-[\w-]+" for="f-input">Agent<\/label><!--]--> <i>x<\/i><!----> <p class="error svelte-[\w-]+" id="f-error">Choose one<\/p><\/div>/,
+    )
+  })
+
+  it('names what is there without a label when there is no control to point at', () => {
+    expect(labelled(false)).toMatch(/<p class="label svelte-[\w-]+">Agent<\/p><!--]--> <i>x<\/i>/)
+  })
+
+  it.each([
+    '.field { display: flex; flex-direction: column; gap: 6px; }',
+    '.label { margin: 0; color: var(--soft); font-size: 13px; font-weight: 500; }',
+    '.error { min-height: 16px; margin: 0; color: var(--failed); font-size: 13px; line-height: 16px; }',
+  ])('holds %s', (text) => {
+    expect(flat(labelledSource)).toContain(text)
+  })
+})
+
 describe('TextArea', () => {
-  type Props = { label: string; value?: string; disabled?: boolean; placeholder?: string }
+  type Props = { label: string; value?: string; error?: string | null; disabled?: boolean; placeholder?: string }
   const area = (props: Props) => render(TextArea, { props }).body
+  const textarea = (body: string) => body.match(/<textarea [^>]*>/)?.[0] ?? ''
 
   it('shows its value, one line high, named for readers', () => {
     expect(area({ label: 'Message', value: 'two\nlines' })).toMatch(
@@ -170,7 +210,26 @@ describe('TextArea', () => {
 
   it('binds its value', () => {
     expect(textAreaSource).toContain('value = $bindable(\'\')')
-    expect(textAreaSource).toContain('bind:value></textarea>')
+    expect(flat(textAreaSource)).toContain('bind:value ></textarea>')
+  })
+
+  it('shows its label above it and keeps an empty slot for the error in a form', () => {
+    const body = area({ label: 'Prompt', value: 'fix it', error: null })
+    const id = body.match(/<label class="label svelte-[\w-]+" for="([\w-]+)">Prompt<\/label>/)?.[1]
+    expect(textarea(body)).toContain(`id="${id}"`)
+    expect(textarea(body)).not.toMatch(/aria-label|aria-invalid|aria-describedby/)
+    expect(body).toMatch(/data-value="fix it"><textarea [^>]*>fix it<\/textarea>/)
+    expect(body).toMatch(/<\/div><!----> <p class="error svelte-[\w-]+" id="[\w-]+"><\/p><\/div>/)
+  })
+
+  it('points the textarea at the error it shows', () => {
+    const body = area({ label: 'Prompt', error: 'Write what the agent should do' })
+    const id = body.match(/<p class="error svelte-[\w-]+" id="([\w-]+)">Write what the agent should do<\/p>/)?.[1]
+    expect(textarea(body)).toContain(`aria-invalid="true" aria-describedby="${id}"`)
+  })
+
+  it('shows no label and no error outside a form', () => {
+    expect(area({ label: 'Answer' })).not.toMatch(/<label|<p class="error/)
   })
 
   it('leaves Return to the textarea, which adds a line, and sends nothing on a key', () => {

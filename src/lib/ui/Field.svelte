@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from 'svelte/elements'
+  import Labelled from './Labelled.svelte'
 
   const URL_MODE = {
     autocapitalize: 'off',
@@ -24,8 +25,7 @@
   const id = $props.id()
 </script>
 
-<div class="field">
-  <label class="label" for="{id}-input">{label}</label>
+<Labelled {id} {label} {error}>
   <input
     id="{id}-input"
     class="input"
@@ -37,22 +37,9 @@
     aria-describedby={error === null ? undefined : `${id}-error`}
     bind:value
   />
-  <p class="error" id="{id}-error">{error ?? ''}</p>
-</div>
+</Labelled>
 
 <style>
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .label {
-    color: var(--soft);
-    font-size: 13px;
-    font-weight: 500;
-  }
-
   .input {
     box-sizing: border-box;
     min-height: 44px;
@@ -79,13 +66,5 @@
 
   .input::placeholder {
     color: var(--faint);
-  }
-
-  .error {
-    min-height: 16px;
-    margin: 0;
-    color: var(--failed);
-    font-size: 13px;
-    line-height: 16px;
   }
 </style>

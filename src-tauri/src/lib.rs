@@ -22,7 +22,7 @@ pub fn run() {
     let (hear, paths) = network::listen();
     let builder = tauri::Builder::default().plugin(tauri_plugin_network::init(hear));
     #[cfg(mobile)]
-    let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    let builder = builder.plugin(tauri_plugin_barcode_scanner::init()).plugin(tauri_plugin_haptics::init());
     builder
         .invoke_handler(specta.invoke_handler())
         .setup(move |app| {

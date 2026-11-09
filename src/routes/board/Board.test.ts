@@ -28,7 +28,9 @@ const BASE: Agent = {
 const at = (pane: number, status: string | null, more: Partial<Agent> = {}): Agent => ({ ...BASE, pane, status, ...more })
 
 const draw = (agents: Agent[] | null, connection: ConnectionView_Serialize = CONNECTED, below = 0) =>
-  render(Board, { props: { agents, connection, below, onopen: () => {} } }).body
+  render(Board, { props: { agents, connection, below, onopen: () => {}, onstart: () => {} } }).body
+
+const START = /<button class="button primary svelte-[\w-]+( resting)?" type="button"([^>]*)>(?:<!--[^>]*-->| )*Start</
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -121,6 +123,25 @@ describe('Board', () => {
 
   it.each([null, [], [at(1, 'waiting')]])('heads the screen with an h1 only a screen reader reads, for %o', (agents) => {
     expect(draw(agents)).toContain('<h1 class="spoken">Agents</h1>')
+  })
+
+  it.each([[], null, [at(1, 'working')]])('offers starting new work once connected, for %o', (agents) => {
+    const button = draw(agents).match(START)
+    expect(button?.[1]).toBeUndefined()
+    expect(button?.[2]).not.toContain('disabled')
+    expect(flat(boardSource)).toContain(
+      "<Button resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>",
+    )
+  })
+
+  it.each<ConnectionView_Serialize>([
+    { state: 'connecting' },
+    { state: 'none' },
+    { state: 'unauthorized' },
+  ])('holds Start while the connection is $state', (connection) => {
+    const button = draw([], connection).match(START)
+    expect(button?.[1]).toBe(' resting')
+    expect(button?.[2]).toContain('disabled=""')
   })
 
   it('starts below the connection bar', () => {
