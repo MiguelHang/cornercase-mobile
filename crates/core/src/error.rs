@@ -22,6 +22,12 @@ pub enum Error {
     Outdated,
     #[error("cornercase speaks contract {server} but this app knows up to {app}; update the app")]
     ContractTooNew { server: u32, app: u32 },
+    #[error("the command may have run but its answer was lost")]
+    Unanswered,
+    #[error("the terminal input got no answer in time, so the next command did not wait for it")]
+    SettleTimeout,
+    #[error("cornercase input: {0}")]
+    InputRejected(String),
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
     #[error("cannot read or write the saved machines: {0}")]
