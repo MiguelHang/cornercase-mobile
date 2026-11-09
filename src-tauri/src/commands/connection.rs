@@ -61,6 +61,7 @@ pub(crate) fn session(state: State<'_, AppState>) -> Option<Snapshot> {
 }
 
 pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: MachineId) -> Result<(), CommandError> {
+    let mut active = state.active();
     let machine = state.machines(|machines| machines.machine(id).cloned().ok_or(Error::UnknownMachine.into()))?;
     let transports = Arc::clone(&launcher.transports);
     let (store, driver) = Store::new(machine, move |route: &Route| transports(route), PickConfig::default());
@@ -68,7 +69,7 @@ pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: 
     let forwarder = forward(id, store.clone(), changes, state.shared_machines(), emit);
     let driver = (launcher.spawn)(Box::pin(driver));
     let forwarder = (launcher.spawn)(Box::pin(forwarder));
-    *state.active() = Some(Active::new(id, store, driver, forwarder));
+    *active = Some(Active::new(id, store, driver, forwarder));
     Ok(())
 }
 

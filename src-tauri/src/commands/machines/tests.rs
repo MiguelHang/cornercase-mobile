@@ -1,12 +1,16 @@
 use std::fs;
-use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::thread;
 
 use cornercase_bridge::test_util::TempDir;
+use cornercase_core::error::Error;
 use cornercase_core::secrets::Secrets;
 use rstest::rstest;
+use tauri::async_runtime::{self, JoinHandle};
 
 use super::*;
-use crate::commands::connection::start;
+use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::ErrorCode;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::Active;
@@ -16,6 +20,18 @@ use crate::test_util::{
 use crate::view::RouteView;
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+
+static GATE: Mutex<Option<(Sender<()>, Receiver<()>)>> = Mutex::new(None);
+
+fn gated(task: Task) -> JoinHandle<()> {
+    drop(task);
+    let gate = GATE.lock().unwrap_or_else(PoisonError::into_inner).take();
+    if let Some((entered, go)) = gate {
+        entered.send(()).expect("the test waits for the connect");
+        go.recv().expect("the test lets the connect go on");
+    }
+    async_runtime::spawn(async {})
+}
 
 fn names(state: &AppState) -> Vec<String> {
     list(state).expect("the machines load").into_iter().map(|machine| machine.name).collect()
@@ -91,6 +107,27 @@ mod removing_a_machine {
         assert_eq!(studio.state.active().as_ref().map(Active::machine), Some(studio.id));
         assert!(!recorder.connections().contains(&changed(laptop, ConnectionView::None)));
         assert_eq!(names(&studio.state), ["studio"]);
+    }
+
+    #[test]
+    fn while_it_connects_ends_the_new_store() {
+        let studio = Studio::new();
+        let recorder = Recorder::default();
+        let (entered, inside) = mpsc::channel();
+        let (go, waiting) = mpsc::channel();
+        *GATE.lock().unwrap_or_else(PoisonError::into_inner) = Some((entered, waiting));
+        let launcher = Launcher::new(|_: &Route| Err(Error::UnknownMachine), gated);
+        thread::scope(|scope| {
+            scope.spawn(|| start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connecting"));
+            inside.recv().expect("the connect has read the machine");
+            scope.spawn(|| remove(&studio.state, &recorder, studio.id).expect("removed"));
+            while !names(&studio.state).is_empty() {
+                thread::yield_now();
+            }
+            go.send(()).expect("the connect waits");
+        });
+        assert!(studio.state.active().is_none());
+        assert_eq!(recorder.connections(), [changed(studio.id, ConnectionView::None)]);
     }
 
     #[test]
