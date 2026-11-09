@@ -532,3 +532,5 @@ mod a_projection_the_view_has_left_behind {
         assert!(grid.is_current());
     }
 }
+
+mod bench;
