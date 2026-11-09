@@ -11,10 +11,15 @@ vez de un botón `Back` con texto. Pedido por el usuario al probar en su iPhone 
 gestos para ir atrás? O por lo menos poner el chevron en vez de un botón Back".
 
 ## Criterios de aceptación
-- [ ] CA1 — Un solo botón de volver en todas las pantallas con pila (agente/chat, terminal, Start, cambios, un diff,
-  Machines, una máquina): `chevron-left` de 44 px arriba a la izquierda, con `aria-label="Back"`, como ya hacen Machines y
-  una máquina (027). Desaparecen los `Back` y `Back to the board` con texto (el agente que ya no está ofrece el mismo
-  chevron). Un componente compartido (p. ej. `ScreenHeader` o `BackButton`) si evita repetir CSS.
+- [ ] CA1 — Barra de navegación como en las apps de Apple (Mail, Ajustes, Notas), en todas las pantallas con pila
+  (agente/chat, terminal, Start, cambios, un diff, Machines, una máquina): una cabecera fija arriba, sobre `--veil` con
+  el desenfoque del vidrio, con el botón de volver a la izquierda **dentro de esa cabecera**: `‹` (`chevron-left`) seguido
+  del título de la pantalla anterior en `--brand` (`‹ Agents`, `‹ Machines`; solo `‹` si no cabe), zona táctil de 44 px,
+  `aria-label="Back to <pantalla>"`. El título de la pantalla actual va centrado en la barra (o grande debajo, que se
+  encoge al hacer scroll, como pide la 036 para el chat). Desaparecen los botones `Back` y `Back to the board` con texto;
+  el agente que ya no está usa la misma barra. Un componente compartido (p. ej. `NavBar`) que reemplace las cabeceras
+  repetidas (`.top`, `.back`, `.title` de Machines, Machine, Changes, Diff, Start). Pedido por el usuario el 2026-11-09:
+  "que el chevron de back vaya como en las apps de Apple, en la cabecera".
 - [ ] CA2 — Gesto de borde: deslizar desde el borde izquierdo (≤ 20–24 pt) hacia la derecha hace `router.back()`, con la
   pantalla siguiendo al dedo y la de debajo asomando (o, como mínimo, un desplazamiento con umbral y la transición de
   `motion`); soltar antes del umbral la devuelve a su sitio. Respeta Reduce Motion.
@@ -29,4 +34,4 @@ gestos para ir atrás? O por lo menos poner el chevron en vez de un botón Back"
 - [ ] CA7 — `hx check full` y mutation en verde.
 
 ## design/ que actualiza
-- `design/look.md` › Navigation: el chevron, el gesto de borde y su convivencia con los demás gestos.
+- `design/look.md` › Navigation: la barra de navegación, el botón de volver con el título anterior, el gesto de borde y su convivencia con los demás gestos.
