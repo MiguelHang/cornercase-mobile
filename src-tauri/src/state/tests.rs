@@ -145,6 +145,8 @@ mod the_identity {
 }
 
 mod the_network {
+    use rstest::rstest;
+
     use super::*;
 
     const WIFI: Network = Network { kind: Kind::Wifi, expensive: false };
@@ -162,6 +164,18 @@ mod the_network {
         state.replace_network(NONE);
         assert_eq!(state.replace_network(WIFI), Some(NONE));
         assert_eq!(state.replace_network(WIFI), Some(WIFI));
+    }
+
+    #[rstest]
+    #[case::unknown(None, false)]
+    #[case::none(Some(NONE), true)]
+    #[case::wifi(Some(WIFI), false)]
+    fn is_down_only_once_none_is_applied(#[case] applied: Option<Network>, #[case] down: bool) {
+        let state = AppState::load(NO_FOLDER, keychain());
+        if let Some(network) = applied {
+            state.replace_network(network);
+        }
+        assert_eq!(state.network_is_down(), down);
     }
 }
 

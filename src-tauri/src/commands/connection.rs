@@ -65,6 +65,9 @@ pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: 
     let machine = state.machines(|machines| machines.machine(id).cloned().ok_or(Error::UnknownMachine.into()))?;
     let transports = Arc::clone(&launcher.transports);
     let (store, driver) = Store::new(machine, move |route: &Route| transports(route), PickConfig::default());
+    if state.network_is_down() {
+        store.offline();
+    }
     let changes = store.changes();
     let forwarder = forward(id, store.clone(), changes, state.shared_machines(), emit);
     let driver = (launcher.spawn)(Box::pin(driver));

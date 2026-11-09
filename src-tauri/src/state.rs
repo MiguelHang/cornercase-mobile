@@ -72,6 +72,10 @@ impl AppState {
     pub(crate) fn replace_network(&self, network: Network) -> Option<Network> {
         self.network.lock().unwrap_or_else(PoisonError::into_inner).replace(network)
     }
+
+    pub(crate) fn network_is_down(&self) -> bool {
+        self.network.lock().unwrap_or_else(PoisonError::into_inner).is_some_and(Network::is_down)
+    }
 }
 
 impl SharedMachines {

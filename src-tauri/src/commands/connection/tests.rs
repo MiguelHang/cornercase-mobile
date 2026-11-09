@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use cornercase_core::machines::MachineId;
+use cornercase_core::transport::fake::FakeTransport;
 
 use super::*;
 use crate::commands::error::ErrorCode;
@@ -52,6 +53,71 @@ mod connecting {
         released(&first_transport).await;
         assert!(Arc::strong_count(&second_transport) > 2);
         assert_eq!(studio.state.active().as_ref().map(Active::machine), Some(studio.id));
+    }
+}
+
+mod with_the_network {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use cornercase_core::network::{Kind, Network};
+
+    use super::*;
+
+    const NONE: Network = Network { kind: Kind::None, expensive: false };
+    const WIFI: Network = Network { kind: Kind::Wifi, expensive: false };
+
+    fn counting(fake: FakeTransport) -> (Launcher, Arc<AtomicUsize>) {
+        let transport: Arc<dyn Transport> = Arc::new(fake);
+        let tries = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&tries);
+        let launcher = Launcher::new(
+            move |_: &Route| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(Arc::clone(&transport))
+            },
+            |task| JoinHandle::Tokio(tokio::spawn(task)),
+        );
+        (launcher, tries)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn down_starts_the_new_store_offline_without_trying() {
+        let studio = Studio::new();
+        studio.state.replace_network(NONE);
+        let recorder = Recorder::default();
+        let (launcher, tries) = counting(serving(&first_snapshot()));
+        start(&studio.state, recorder.clone(), &launcher, studio.id).expect("started");
+        settle().await;
+        assert_eq!(recorder.connections(), [changed(studio.id, ConnectionView::Offline)]);
+        assert_eq!(tries.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn down_connects_once_it_comes_back() {
+        let studio = Studio::new();
+        studio.state.replace_network(NONE);
+        let recorder = Recorder::default();
+        let (launcher, _) = counting(serving(&first_snapshot()));
+        start(&studio.state, recorder.clone(), &launcher, studio.id).expect("started");
+        settle().await;
+        studio.state.active().as_ref().expect("an active store").store().online();
+        settle().await;
+        assert_eq!(recorder.connections().last(), Some(&changed(studio.id, connected())));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn up_connects_as_before() {
+        let studio = Studio::new();
+        studio.state.replace_network(WIFI);
+        let recorder = Recorder::default();
+        let (launcher, tries) = counting(serving(&first_snapshot()));
+        start(&studio.state, recorder.clone(), &launcher, studio.id).expect("started");
+        settle().await;
+        assert_eq!(
+            recorder.connections(),
+            [changed(studio.id, ConnectionView::Connecting), changed(studio.id, connected())]
+        );
+        assert!(tries.load(Ordering::SeqCst) > 0);
     }
 }
 
