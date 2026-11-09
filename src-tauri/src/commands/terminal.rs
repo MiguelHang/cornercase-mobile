@@ -16,6 +16,8 @@ use crate::commands::error::CommandError;
 use crate::events::{Emit, Emitted, TerminalChanged, warned};
 use crate::state::AppState;
 
+pub(crate) mod input;
+
 const FRAME: Duration = Duration::from_millis(16);
 
 #[tauri::command(async)]

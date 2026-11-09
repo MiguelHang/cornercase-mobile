@@ -16,6 +16,8 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             identity::identity_fingerprint,
             terminal::terminal_open::<Wry>,
             terminal::terminal_close,
+            terminal::input::terminal_input,
+            terminal::input::terminal_scroll,
         ])
         .events(collect_events![ConnectionChanged, AgentsChanged, TerminalChanged, Toast])
 }
