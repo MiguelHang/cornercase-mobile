@@ -1,5 +1,6 @@
-import type { AgentRow_Serialize as AgentRow } from './bindings'
+import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
 import { elapsed, span } from './board'
+import type { Reading } from './chat.svelte'
 
 export const STALL_MS = 120_000
 
@@ -34,3 +35,23 @@ export const agentLine = (row: AgentRow, now: number, lastNews: number): AgentLi
   const time = said.timed ? elapsed(row.since, now) : ''
   return { tone: said.tone, phrase: `${row.agent} ${said.doing}`, time, stalled: false }
 }
+
+export type Part = 'agent' | 'you'
+
+export const AT_END_MARGIN = 48
+
+export const isAnswer = (answered: LastMessage | null, reading: Reading) =>
+  reading.kind === 'message' &&
+  (answered === null || reading.message.text !== answered.text || reading.message.written !== answered.written)
+
+export const threadOf = (reading: Reading, outgoing: { answered: LastMessage | null } | null): Part[] => {
+  if (outgoing === null) {
+    return ['agent']
+  }
+  return isAnswer(outgoing.answered, reading) ? ['you', 'agent'] : ['agent', 'you']
+}
+
+export const atEnd = (scrollY: number, viewport: number, height: number, margin = AT_END_MARGIN) =>
+  scrollY + viewport >= height - margin
+
+export const compactHeader = (scrollY: number, headerBottom: number) => headerBottom > 0 && scrollY > headerBottom
