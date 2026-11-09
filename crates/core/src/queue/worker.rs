@@ -7,6 +7,7 @@ use futures_util::future::{self, Either};
 use futures_util::{StreamExt, stream};
 use tokio::sync::{mpsc, oneshot};
 
+use super::batch;
 use super::requests::{self, Asked, Requests};
 use super::typist::{Event, Typed, Typist};
 use super::{OnError, Outcome};
@@ -18,11 +19,13 @@ pub(crate) type Reply = oneshot::Sender<Result<Outcome, Error>>;
 pub(crate) enum Job {
     Command(Command),
     Input(Event),
+    Scroll(u64, i64),
 }
 
 pub(crate) struct Command {
     pub(crate) args: Vec<String>,
-    pub(crate) stdin: Option<String>,
+    pub(crate) stdin: Option<Stdin>,
+    pub(crate) key: Option<&'static str>,
     pub(crate) reply: Option<Reply>,
 }
 
@@ -60,8 +63,9 @@ impl Worker {
     pub(crate) async fn work(mut self) {
         while let Some(job) = self.next().await {
             match job {
-                Job::Command(command) => self.command(command).await,
+                Job::Command(command) => self.coalesced(command).await,
                 Job::Input(event) => self.input(event).await,
+                Job::Scroll(pane, rows) => self.scroll(pane, rows).await,
             }
         }
         self.settle().await;
@@ -91,16 +95,33 @@ impl Worker {
         }
     }
 
+    async fn coalesced(&mut self, command: Command) {
+        let command = batch::coalesced(&mut self.pending, command);
+        self.command(command).await;
+    }
+
+    async fn scroll(&mut self, pane: u64, rows: i64) {
+        let rows = batch::scrolled(&mut self.pending, pane, rows);
+        if rows != 0 {
+            self.command(batch::scroll(pane, rows)).await;
+        }
+    }
+
     async fn command(&mut self, command: Command) {
         self.settle().await;
-        let result = self.run(&command.args, command.stdin.as_deref()).await;
+        let result = self.run(&command.args, command.stdin).await;
         self.reply(command.reply, result.map(Outcome::Done));
     }
 
-    async fn run(&mut self, args: &[String], stdin: Option<&str>) -> Result<String, Error> {
-        match self.ask(&requests::line(args, stdin)).await {
+    async fn run(&mut self, args: &[String], stdin: Option<Stdin>) -> Result<String, Error> {
+        let text = match stdin {
+            Some(Stdin::Bytes(bytes)) => return once(self.transport.as_ref(), args, Some(Stdin::Bytes(bytes))).await,
+            Some(Stdin::Text(text)) => Some(text),
+            None => None,
+        };
+        match self.ask(&requests::line(args, text.as_deref())).await {
             Asked::Answered(result) => result,
-            Asked::Unsent | Asked::Absent => once(self.transport.as_ref(), args, stdin).await,
+            Asked::Unsent | Asked::Absent => once(self.transport.as_ref(), args, text.map(Stdin::Text)).await,
         }
     }
 
@@ -207,13 +228,13 @@ async fn type_once(transport: &dyn Transport, on_error: &OnError, events: Vec<Ev
     for run in events.chunk_by(|(one, _), (other, _)| one == other) {
         let args = ["input", "--pane", &run[0].0.to_string(), "--json", "-"].map(str::to_owned);
         let lines: String = run.iter().map(|(_, event)| event.to_string() + "\n").collect();
-        if let Err(error) = once(transport, &args, Some(&lines)).await {
+        if let Err(error) = once(transport, &args, Some(Stdin::Text(lines))).await {
             on_error(error);
         }
     }
 }
 
-async fn once(transport: &dyn Transport, args: &[String], stdin: Option<&str>) -> Result<String, Error> {
-    let stdin = stream::iter(stdin.map(|text| Stdin::Text(text.to_owned()))).boxed();
+async fn once(transport: &dyn Transport, args: &[String], stdin: Option<Stdin>) -> Result<String, Error> {
+    let stdin = stream::iter(stdin).boxed();
     transport::printed(transport::fed(transport, args.to_vec(), stdin).await?)
 }

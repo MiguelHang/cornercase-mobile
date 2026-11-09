@@ -14,6 +14,7 @@ use super::*;
 use crate::transport::fake::FakeTransport;
 use crate::transport::{Closed, Exit, Out, OutSink, Stdin};
 
+mod batch;
 mod commands;
 mod input;
 

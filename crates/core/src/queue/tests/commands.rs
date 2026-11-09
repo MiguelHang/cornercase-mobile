@@ -45,7 +45,7 @@ mod ask {
         let starts = Starts::default();
         let Started { queue, .. } = start(answering(FakeTransport::default(), &log, &starts));
         let focus = queue.ask(words(&["focus", "--tab", "6"]), None);
-        let send = queue.ask(words(&["send", "--pane", "5", "-"]), Some("ls".to_owned()));
+        let send = queue.ask(words(&["send", "--pane", "5", "-"]), Some(Stdin::Text("ls".to_owned())));
         let status = queue.ask(words(&["status"]), None);
         assert_eq!(status.await, Ok(done("status")));
         assert_eq!(send.await, Ok(done("send --pane 5 - < ls")));
@@ -76,7 +76,7 @@ mod ask {
             None => fake,
         };
         let Started { queue, .. } = start(fake);
-        let sent = queue.ask(words(&["send", "--pane", "5", "-"]), Some("ls".to_owned())).await;
+        let sent = queue.ask(words(&["send", "--pane", "5", "-"]), Some(Stdin::Text("ls".to_owned()))).await;
         assert_eq!(sent, Ok(done("once read ls")));
     }
 

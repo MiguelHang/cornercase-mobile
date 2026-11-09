@@ -9,15 +9,15 @@ const STOPPED: &str = "Error: the server stopped";
 const SETTLE: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy)]
-struct Answers {
+pub(super) struct Answers {
     per: usize,
     answer: &'static str,
     after: Duration,
 }
 
-const EACH: Answers = Answers { per: 1, answer: "{}", after: Duration::ZERO };
+pub(super) const EACH: Answers = Answers { per: 1, answer: "{}", after: Duration::ZERO };
 
-fn key(code: &str) -> Value {
+pub(super) fn key(code: &str) -> Value {
     json!({ "key": code })
 }
 
@@ -25,7 +25,7 @@ fn refused() -> Error {
     Error::InputRejected("there is no pane 9".to_owned())
 }
 
-fn typing(
+pub(super) fn typing(
     fake: FakeTransport,
     log: &mpsc::UnboundedSender<String>,
     starts: &Starts,
