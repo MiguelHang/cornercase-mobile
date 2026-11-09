@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HTMLTextareaAttributes } from 'svelte/elements'
+  import Labelled from './Labelled.svelte'
 
   let {
     label,
@@ -32,28 +33,14 @@
 {/snippet}
 
 {#if field}
-  <div class="field">
-    <label class="label" for="{id}-input">{label}</label>
+  <Labelled {id} {label} error={error ?? null}>
     {@render area()}
-    <p class="error" id="{id}-error">{error ?? ''}</p>
-  </div>
+  </Labelled>
 {:else}
   {@render area()}
 {/if}
 
 <style>
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .label {
-    color: var(--soft);
-    font-size: 13px;
-    font-weight: 500;
-  }
-
   .grow {
     display: grid;
     min-width: 0;
@@ -102,13 +89,5 @@
 
   .area::placeholder {
     color: var(--faint);
-  }
-
-  .error {
-    min-height: 16px;
-    margin: 0;
-    color: var(--failed);
-    font-size: 13px;
-    line-height: 16px;
   }
 </style>

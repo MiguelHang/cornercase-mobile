@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { CommandError, ProjectChoice, Started_Serialize as Started } from './bindings'
+import type {
+  CommandError,
+  ProjectChoice,
+  StartChoices_Serialize as StartChoices,
+  Started_Serialize as Started,
+} from './bindings'
 import {
   AGENT_EMPTY,
   AGENT_UNANSWERED,
+  CHOICES_UNANSWERED,
   NAME_EMPTY,
   PROJECT_EMPTY,
   PROMPT_EMPTY,
@@ -27,6 +33,8 @@ const agent = (name: string) => ({ agent: name, command: name, installed: true }
 
 const project = (id: number, name = `p${id}`): ProjectChoice => ({ id, name })
 
+const choices = (projects: ProjectChoice[], boot: string | null = 'boot-1'): StartChoices => ({ boot, projects })
+
 const gate = <T>() => {
   let open: (value: T) => void = () => {}
   const promise = new Promise<T>((resolve) => (open = resolve))
@@ -34,7 +42,7 @@ const gate = <T>() => {
 }
 
 const calls = (overrides: Partial<StartCalls> = {}) => ({
-  startProjects: vi.fn(overrides.startProjects ?? (() => ok([project(1), project(2)]))),
+  startProjects: vi.fn(overrides.startProjects ?? (() => ok(choices([project(1), project(2)])))),
   installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
   newWorkspace: vi.fn(overrides.newWorkspace ?? (() => ok(STARTED))),
@@ -97,7 +105,7 @@ describe('StartForm choices', () => {
   })
 
   it('picks the only project', async () => {
-    const { form } = await loaded({ startProjects: () => ok([project(5)]) })
+    const { form } = await loaded({ startProjects: () => ok(choices([project(5)])) })
     expect(form.project).toBe(5)
   })
 
@@ -131,6 +139,25 @@ describe('StartForm choices', () => {
     expect(form.projects).toEqual({ kind: 'failed', reason: 'offline' })
   })
 
+  it('shows the projects loading again on Try again', async () => {
+    const again = gate<{ status: 'ok'; data: StartChoices }>()
+    const answers = [failed('offline'), again.promise]
+    const { form } = await loaded({ startProjects: () => answers.shift() ?? ok(choices([])) })
+    const reading = form.loadProjects()
+    expect(form.projects.kind).toBe('loading')
+    again.open({ status: 'ok', data: choices([project(1)]) })
+    await reading
+    expect(form.projects).toEqual({ kind: 'ready', items: [project(1)] })
+  })
+
+  it.each<[string, CommandError, string]>([
+    ['its own text when cornercase does not answer', UNANSWERED, CHOICES_UNANSWERED],
+    ['what the app says when nothing was sent', { code: 'not_sent', message: 'nothing was sent' }, 'nothing was sent'],
+  ])('tells %s about the agents', async (_, error, reason) => {
+    const { form } = await loaded({ installedAgents: () => refused(error) })
+    expect(form.agents).toEqual({ kind: 'failed', reason })
+  })
+
   it('knows when no agent is installed and refuses to start', async () => {
     const { form, commands } = await loaded({ installedAgents: () => ok([]) })
     form.project = 1
@@ -152,30 +179,55 @@ describe('StartForm choices', () => {
   })
 })
 
-describe('StartForm after the server restarts', () => {
-  it('reads the choices again only when the boot changes', async () => {
+describe('StartForm when the connection comes back', () => {
+  const reconnect = async (form: StartForm) => {
+    await form.see(false)
+    await form.see(true)
+  }
+
+  const reads = (commands: ReturnType<typeof calls>) => [
+    commands.startProjects.mock.calls.length,
+    commands.installedAgents.mock.calls.length,
+  ]
+
+  it('reads nothing more while it stays connected', async () => {
     const { form, commands } = await loaded()
-    await form.see('boot-1')
-    await form.see('boot-1')
-    await form.see(null)
-    expect(commands.startProjects).toHaveBeenCalledTimes(1)
-    await form.see('boot-2')
-    expect([commands.startProjects.mock.calls.length, commands.installedAgents.mock.calls.length]).toEqual([2, 2])
+    await form.see(true)
+    await form.see(true)
+    expect(reads(commands)).toEqual([1, 1])
+  })
+
+  it('reads the projects again, and the agents only when the server restarted', async () => {
+    const boots = ['boot-1', 'boot-1', null, 'boot-2']
+    const { form, commands } = await loaded({ startProjects: () => ok(choices([project(1)], boots.shift())) })
+    await form.see(true)
+    await reconnect(form)
+    await reconnect(form)
+    expect(reads(commands)).toEqual([3, 1])
+    await reconnect(form)
+    expect(reads(commands)).toEqual([4, 2])
+  })
+
+  it('reads them again after a restart while it opened not connected', async () => {
+    const boots = ['boot-1', 'boot-2']
+    const { form, commands } = await loaded({ startProjects: () => ok(choices([project(1)], boots.shift())) })
+    await form.see(false)
+    await form.see(true)
+    expect(reads(commands)).toEqual([2, 2])
   })
 
   it('empties only a project that is gone', async () => {
-    const answers = [ok([project(1), project(2)]), ok([project(1), project(3)])]
-    const { form } = await filled({ startProjects: () => answers.shift() ?? ok([]) })
-    await form.see('boot-1')
+    const answers = [ok(choices([project(1), project(2)])), ok(choices([project(1), project(3)], 'boot-2'))]
+    const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     const before = typed(form)
-    await form.see('boot-2')
+    await reconnect(form)
     expect(typed(form)).toEqual({ ...before, project: null })
   })
 
   it('keeps a project that is still there', async () => {
-    const { form } = await filled()
-    await form.see('boot-1')
-    await form.see('boot-2')
+    const answers = [ok(choices([project(1), project(2)])), ok(choices([project(2)], 'boot-2'))]
+    const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
+    await reconnect(form)
     expect(form.project).toBe(2)
   })
 })
@@ -251,7 +303,7 @@ describe('StartForm create', () => {
     form.ownWorktree = true
     await form.create()
     expect(commands.newWorkspace.mock.calls).toEqual([[{ project: 2, name: ' -login ', worktree: true }]])
-    expect(oncreated.mock.calls).toEqual([[STARTED, '-login']])
+    expect(oncreated.mock.calls).toEqual([['-login']])
   })
 
   it.each<[string, string]>([

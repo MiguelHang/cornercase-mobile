@@ -2,17 +2,13 @@
   import type { StartForm } from '../../lib/startForm.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Field from '../../lib/ui/Field.svelte'
+  import FormFrame from './FormFrame.svelte'
   import ProjectPicker from './ProjectPicker.svelte'
 
   let { form, sendable }: { form: StartForm; sendable: boolean } = $props()
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    void form.create()
-  }
 </script>
 
-<form class="form" onsubmit={submit}>
+<FormFrame problem={form.formError} onsubmit={() => void form.create()}>
   <ProjectPicker {form} />
   <label class="switch">
     <span class="words">Own worktree</span>
@@ -24,24 +20,14 @@
     error={form.nameError}
     disabled={form.sending}
   />
-  {#if form.formError !== null}
-    <p class="problem" role="alert">{form.formError}</p>
-  {/if}
-  <div class="buttons">
+  {#snippet button()}
     <Button type="submit" resting={!sendable} busy={form.sending}>
       {form.sending ? 'Creating…' : 'Create workspace'}
     </Button>
-  </div>
-</form>
+  {/snippet}
+</FormFrame>
 
 <style>
-  .form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap);
-    padding: var(--inset-card);
-  }
-
   .switch {
     display: flex;
     align-items: center;
@@ -88,17 +74,5 @@
 
   .toggle:disabled {
     opacity: 0.6;
-  }
-
-  .problem {
-    margin: 0;
-    color: var(--failed);
-    font-size: 13px;
-    overflow-wrap: anywhere;
-  }
-
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
   }
 </style>

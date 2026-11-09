@@ -20,7 +20,7 @@ const installed = (...names: string[]): AgentChoice_Serialize[] =>
   names.map((name) => ({ agent: name, command: name, installed: true }))
 
 const CALLS: StartCalls = {
-  startProjects: () => answer([{ id: 1, name: 'web' }, { id: 2, name: 'api' }]),
+  startProjects: () => answer({ boot: 'boot-1', projects: [{ id: 1, name: 'web' }, { id: 2, name: 'api' }] }),
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
   newWorkspace: never,
@@ -108,7 +108,7 @@ describe('Start, its agent form', () => {
   })
 
   it('chooses the only project', async () => {
-    const body = agentForm(await formOf({ startProjects: () => answer([{ id: 5, name: 'web' }]) }))
+    const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects: [{ id: 5, name: 'web' }] }) }))
     expect(body).toMatch(/<select[^>]*>(?:<!--[^>]*-->)*<option value="5" selected="">web<\/option>/)
   })
 
@@ -203,16 +203,17 @@ describe('Start, its workspace form', () => {
 })
 
 describe('Start wiring', () => {
-  it('reads the choices on opening and again when the server restarts', () => {
+  it('reads the choices on opening and again when the connection comes back', () => {
     const script = flat(startSource)
     expect(script).toContain('onMount(() => { void form.load() })')
-    expect(script).toContain('const seen = boot untrack(() => void form.see(seen))')
+    expect(script).toContain("const sendable = $derived(connection.state === 'connected')")
+    expect(script).toContain('$effect(() => { const connected = sendable untrack(() => void form.see(connected)) })')
   })
 
   it('hands over what started or was made, goes back on Back and switches between the two forms', () => {
     const script = flat(startSource)
     expect(script).toContain('(started, agent) => onstarted(started, agent),')
-    expect(script).toContain('(started, name) => oncreated(started, name),')
+    expect(script).toContain('(name) => oncreated(name),')
     expect(script).toContain('onclick={onback}')
     expect(script).toContain('onclick={() => (action = name)}')
     expect(script).toContain("{#if action === 'agent'} <AgentForm {form} {sendable} /> {:else}")

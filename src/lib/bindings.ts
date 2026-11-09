@@ -22,7 +22,7 @@ export const commands = {
 	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
-	startProjects: () => typedError<ProjectChoice[], CommandError>(__TAURI_INVOKE("start_projects")),
+	startProjects: () => typedError<StartChoices_Serialize, CommandError>(__TAURI_INVOKE("start_projects")),
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
 	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
@@ -312,6 +312,18 @@ export type StartAgent = {
 	model: string,
 	prompt: string,
 	worktree: string,
+};
+
+export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;
+
+export type StartChoices_Deserialize = {
+	boot?: string | null,
+	projects: ProjectChoice[],
+};
+
+export type StartChoices_Serialize = {
+	boot: string | null,
+	projects: ProjectChoice[],
 };
 
 export type Started = Started_Serialize | Started_Deserialize;

@@ -6,12 +6,14 @@ import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
 import Icon from './Icon.svelte'
+import Labelled from './Labelled.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
+import labelledSource from './Labelled.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
 import baseSource from '../theme/base.css?raw'
@@ -146,9 +148,32 @@ describe('Field', () => {
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
     '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
-    'color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(fieldSource)).toContain(text)
+  })
+})
+
+describe('Labelled', () => {
+  const labelled = (control: boolean) =>
+    render(Labelled, { props: { id: 'f', label: 'Agent', error: 'Choose one', control, children: html('<i>x</i>') } })
+      .body
+
+  it('labels its control above it and shows the error under it', () => {
+    expect(labelled(true)).toMatch(
+      /<div class="field svelte-[\w-]+"><!--\[0--><label class="label svelte-[\w-]+" for="f-input">Agent<\/label><!--]--> <i>x<\/i><!----> <p class="error svelte-[\w-]+" id="f-error">Choose one<\/p><\/div>/,
+    )
+  })
+
+  it('names what is there without a label when there is no control to point at', () => {
+    expect(labelled(false)).toMatch(/<p class="label svelte-[\w-]+">Agent<\/p><!--]--> <i>x<\/i>/)
+  })
+
+  it.each([
+    '.field { display: flex; flex-direction: column; gap: 6px; }',
+    '.label { margin: 0; color: var(--soft); font-size: 13px; font-weight: 500; }',
+    '.error { min-height: 16px; margin: 0; color: var(--failed); font-size: 13px; line-height: 16px; }',
+  ])('holds %s', (text) => {
+    expect(flat(labelledSource)).toContain(text)
   })
 })
 
@@ -206,8 +231,6 @@ describe('TextArea', () => {
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
     '.area:focus { border-color: var(--accent);',
-    '.label { color: var(--soft); font-size: 13px;',
-    '.error { min-height: 16px; margin: 0; color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(textAreaSource)).toContain(text)
   })

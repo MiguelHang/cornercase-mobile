@@ -3,6 +3,7 @@ import type {
   AgentChoice_Serialize as AgentChoice,
   CommandError,
   ProjectChoice,
+  StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
   commands,
 } from './bindings'
@@ -24,6 +25,7 @@ export const AGENT_UNANSWERED =
   'cornercase did not answer, so the agent may have started: look at the board before trying again.'
 export const WORKSPACE_UNANSWERED =
   'cornercase did not answer, so the workspace may exist already: look on the Mac before trying again.'
+export const CHOICES_UNANSWERED = 'cornercase did not answer.'
 
 const remembered: Memory = { agent: null }
 
@@ -45,6 +47,9 @@ export const ask = async <T>(call: () => Promise<Answer<T>>, unanswered: string)
 const choicesOf = <T>(reply: Reply<T[]>): Choices<T> =>
   reply.ok ? { kind: 'ready', items: reply.data } : { kind: 'failed', reason: reply.error }
 
+const projectsOf = (reply: Reply<StartChoices>): Reply<ProjectChoice[]> =>
+  reply.ok ? { ok: true, data: reply.data.projects } : reply
+
 const errorIf = (empty: boolean, error: string) => (empty ? error : null)
 
 export class StartForm {
@@ -65,16 +70,17 @@ export class StartForm {
   sending = $state(false)
   #calls: StartCalls
   #onstarted: (started: Started, agent: string) => void
-  #oncreated: (started: Started, name: string) => void
+  #oncreated: (name: string) => void
   #memory: Memory
   #boot: string | null = null
+  #connected: boolean | null = null
   #projectsAsked = 0
   #agentsAsked = 0
 
   constructor(
     calls: StartCalls,
     onstarted: (started: Started, agent: string) => void,
-    oncreated: (started: Started, name: string) => void,
+    oncreated: (name: string) => void,
     memory: Memory = remembered,
   ) {
     this.#calls = calls
@@ -92,33 +98,49 @@ export class StartForm {
   }
 
   async loadProjects() {
-    const asked = ++this.#projectsAsked
-    const projects = choicesOf(await ask(() => this.#calls.startProjects(), ''))
-    if (asked === this.#projectsAsked) {
-      this.projects = projects
-      this.#pickProject()
-    }
+    this.projects = { kind: 'loading' }
+    await this.refresh()
   }
 
   async loadAgents() {
     const asked = ++this.#agentsAsked
     this.agents = { kind: 'loading' }
-    const agents = choicesOf(await ask(() => this.#calls.installedAgents(), ''))
+    const agents = choicesOf(await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED))
     if (asked === this.#agentsAsked) {
       this.agents = agents
       this.#pickAgent()
     }
   }
 
-  async see(boot: string | null) {
-    if (boot === null || boot === this.#boot) {
-      return
+  async refresh() {
+    if (await this.#readProjects()) {
+      await this.loadAgents()
     }
-    const known = this.#boot !== null
-    this.#boot = boot
-    if (known) {
-      await this.load()
+  }
+
+  async see(connected: boolean) {
+    const back = connected && this.#connected === false
+    this.#connected = connected
+    if (back) {
+      await this.refresh()
     }
+  }
+
+  async #readProjects() {
+    const asked = ++this.#projectsAsked
+    const reply = await ask(() => this.#calls.startProjects(), CHOICES_UNANSWERED)
+    if (asked !== this.#projectsAsked) {
+      return false
+    }
+    this.projects = choicesOf(projectsOf(reply))
+    this.#pickProject()
+    return reply.ok && this.#restarted(reply.data.boot)
+  }
+
+  #restarted(boot: string | null) {
+    const known = this.#boot
+    this.#boot = boot ?? known
+    return known !== null && boot !== null && boot !== known
   }
 
   async start() {
@@ -157,7 +179,7 @@ export class StartForm {
       WORKSPACE_UNANSWERED,
     )
     if (reply.ok) {
-      this.#oncreated(reply.data, name.trim())
+      this.#oncreated(name.trim())
     }
   }
 

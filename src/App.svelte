@@ -47,7 +47,6 @@
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
   const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)
-  const boot = $derived(current.agents?.[0]?.boot ?? null)
 
   $effect(() => {
     const { machine, agents } = current
@@ -81,8 +80,13 @@
   }
 
   const started = (placed: Started, agent: string) => {
-    launched = agent
-    router.replace({ name: 'agent', machine: current.machine, pane: placed.pane, starting: true })
+    const at = router.current
+    if (at.name === 'start') {
+      launched = agent
+      router.replace({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true })
+    } else {
+      toasts.push({ level: 'info', message: `${agent} started` })
+    }
     if (placed.warning !== null) {
       toasts.push({ level: 'info', message: placed.warning })
     }
@@ -90,7 +94,9 @@
 
   const created = (name: string) => {
     toasts.push({ level: 'info', message: `Workspace ${name} created` })
-    router.back()
+    if (router.current.name === 'start') {
+      router.back()
+    }
   }
 
   const remember = (listed: Listed) => {
@@ -194,10 +200,9 @@
   {:else if route.name === 'start'}
     <Start
       connection={current.connection}
-      {boot}
       onback={() => router.back()}
       onstarted={started}
-      oncreated={(_, name) => created(name)}
+      oncreated={created}
     />
   {:else if route.name === 'machines'}
     <Machines

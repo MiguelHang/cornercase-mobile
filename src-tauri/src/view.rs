@@ -115,6 +115,12 @@ pub(crate) struct ProjectChoice {
     pub(crate) name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct StartChoices {
+    pub(crate) boot: Option<String>,
+    pub(crate) projects: Vec<ProjectChoice>,
+}
+
 impl From<&Machine> for MachineView {
     fn from(machine: &Machine) -> Self {
         Self {

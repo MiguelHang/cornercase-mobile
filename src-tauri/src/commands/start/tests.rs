@@ -1,4 +1,5 @@
 use cornercase_core::transport::fake::FakeTransport;
+use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
@@ -51,17 +52,24 @@ mod projects {
     use super::*;
 
     #[tokio::test(start_paused = true)]
-    async fn names_each_project_as_the_mac_does_in_the_order_of_the_session() {
+    async fn names_each_project_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot() {
         let studio = connected(serving(&[two_projects()])).await;
         let expected =
             [ProjectChoice { id: 5, name: "Shop".to_owned() }, ProjectChoice { id: 2, name: "api".to_owned() }];
-        assert_eq!(projects(&studio.state), Ok(expected.to_vec()));
+        let choices = StartChoices { boot: Some(BOOT.to_owned()), projects: expected.to_vec() };
+        assert_eq!(projects(&studio.state), Ok(choices));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gives_the_boot_without_any_agent_on_the_board() {
+        let studio = connected(serving(&[with_projects(&json!([]))])).await;
+        assert_eq!(projects(&studio.state), Ok(StartChoices { boot: Some(BOOT.to_owned()), projects: Vec::new() }));
     }
 
     #[tokio::test(start_paused = true)]
     async fn lists_none_before_the_first_snapshot() {
         let studio = connected(serving(&[])).await;
-        assert_eq!(projects(&studio.state), Ok(Vec::new()));
+        assert_eq!(projects(&studio.state).map(|choices| choices.projects), Ok(Vec::new()));
     }
 
     #[test]
@@ -97,8 +105,7 @@ mod agents {
         let fake = serving(&[two_projects()]).answer(&ACCOUNT_LIST, &[], &["Error: accounts are locked"], 1);
         let studio = connected(fake).await;
         let error = installed(&studio.state).await.expect_err("a failure");
-        assert_eq!(error.code, ErrorCode::Failed);
-        assert!(error.message.contains("accounts are locked"), "{}", error.message);
+        assert_eq!(error, CommandError { code: ErrorCode::Failed, message: "accounts are locked".to_owned() });
     }
 
     #[tokio::test(start_paused = true)]
@@ -201,6 +208,30 @@ mod workspace {
     }
 }
 
+mod answered {
+    use super::*;
+
+    fn read(text: &str) -> Result<String, Error> {
+        if text == "bad" { Err(Error::Json("not JSON".to_owned())) } else { Ok(text.to_owned()) }
+    }
+
+    #[rstest]
+    #[case::done(Ok(Outcome::Done("ids".to_owned())), Ok("ids".to_owned()))]
+    #[case::unreadable(Ok(Outcome::Done("bad".to_owned())), Err(Error::Json("not JSON".to_owned()).into()))]
+    #[case::skipped(Ok(Outcome::Skipped), Err(CommandError::not_sent()))]
+    #[case::unanswered(Err(Error::Unanswered), Err(Error::Unanswered.into()))]
+    #[case::refused(
+        Err(Error::Failed { code: 1, stderr: "Error: no such project\n".to_owned() }),
+        Err(CommandError { code: ErrorCode::Failed, message: "no such project".to_owned() })
+    )]
+    fn maps_what_the_queue_answered(
+        #[case] outcome: Result<Outcome, Error>,
+        #[case] mapped: Result<String, CommandError>,
+    ) {
+        assert_eq!(answered(outcome, read), mapped);
+    }
+}
+
 mod over_ipc {
     use super::*;
 
@@ -208,8 +239,8 @@ mod over_ipc {
     async fn answers_the_projects_of_the_active_machine() {
         let studio = connected(serving(&[two_projects()])).await;
         let ipc = Ipc::new(studio.state);
-        let expected = json!([{ "id": 5, "name": "Shop" }, { "id": 2, "name": "api" }]);
-        assert_eq!(ipc.invoke("start_projects", json!({})), Ok(expected));
+        let projects = json!([{ "id": 5, "name": "Shop" }, { "id": 2, "name": "api" }]);
+        assert_eq!(ipc.invoke("start_projects", json!({})), Ok(json!({ "boot": BOOT, "projects": projects })));
     }
 
     #[test]

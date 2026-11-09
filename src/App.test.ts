@@ -160,28 +160,28 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
   })
 
-  it('opens Start from the board on the active machine, with the boot of its agents and without the bar', () => {
+  it('opens Start from the board on the active machine, with its connection and without the bar', () => {
     expect(source).toContain(
       "const start = () => { if (current.machine !== null) { router.go({ name: 'start', machine: current.machine }) } }",
     )
-    expect(source).toContain('const boot = $derived(current.agents?.[0]?.boot ?? null)')
+    expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} {boot} onback={() => router.back()} onstarted={started} oncreated={(_, name) => created(name)} /> {:else if route.name === 'machines'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} onback={() => router.back()} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
     )
   })
 
-  it('puts the agent it started in place of Start, says it is starting and tells its warning', () => {
+  it('puts the agent it started in place of Start on its machine, says it is starting and tells its warning', () => {
     expect(source).toContain(
-      "const started = (placed: Started, agent: string) => { launched = agent router.replace({ name: 'agent', machine: current.machine, pane: placed.pane, starting: true }) if (placed.warning !== null) { toasts.push({ level: 'info', message: placed.warning }) } }",
+      "const started = (placed: Started, agent: string) => { const at = router.current if (at.name === 'start') { launched = agent router.replace({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true }) } else { toasts.push({ level: 'info', message: `${agent} started` }) } if (placed.warning !== null) { toasts.push({ level: 'info', message: placed.warning }) } }",
     )
     expect(source).toContain(
       "const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)",
     )
   })
 
-  it('tells the workspace it made and goes back to the board', () => {
+  it('tells the workspace it made and goes back to the board only from Start', () => {
     expect(source).toContain(
-      'const created = (name: string) => { toasts.push({ level: \'info\', message: `Workspace ${name} created` }) router.back() }',
+      "const created = (name: string) => { toasts.push({ level: 'info', message: `Workspace ${name} created` }) if (router.current.name === 'start') { router.back() } }",
     )
   })
 

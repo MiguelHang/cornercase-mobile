@@ -1,6 +1,7 @@
 <script lang="ts" generics="T, V">
   import type { Choices } from '../../lib/startForm.svelte'
   import Button from '../../lib/ui/Button.svelte'
+  import Labelled from '../../lib/ui/Labelled.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
 
   let {
@@ -30,9 +31,8 @@
   const chosen = $derived(options.some((option) => option.value === value))
 </script>
 
-<div class="field">
+<Labelled {id} {label} {error} control={options.length > 0}>
   {#if options.length > 0}
-    <label class="label" for="{id}-input">{label}</label>
     <select
       id="{id}-input"
       class="input"
@@ -49,7 +49,6 @@
       {/each}
     </select>
   {:else}
-    <p class="label">{label}</p>
     {#if choices.kind === 'loading'}
       <p class="state"><Spinner />{reading}</p>
     {:else if choices.kind === 'failed'}
@@ -61,23 +60,9 @@
       <p class="state">{empty}</p>
     {/if}
   {/if}
-  <p class="error" id="{id}-error">{error ?? ''}</p>
-</div>
+</Labelled>
 
 <style>
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .label {
-    margin: 0;
-    color: var(--soft);
-    font-size: 13px;
-    font-weight: 500;
-  }
-
   .input {
     box-sizing: border-box;
     min-height: 44px;
@@ -121,13 +106,5 @@
     min-width: 0;
     color: var(--failed);
     overflow-wrap: anywhere;
-  }
-
-  .error {
-    min-height: 16px;
-    margin: 0;
-    color: var(--failed);
-    font-size: 13px;
-    line-height: 16px;
   }
 </style>

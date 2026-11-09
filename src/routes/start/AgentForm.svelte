@@ -3,18 +3,14 @@
   import Button from '../../lib/ui/Button.svelte'
   import Field from '../../lib/ui/Field.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
+  import FormFrame from './FormFrame.svelte'
   import Picker from './Picker.svelte'
   import ProjectPicker from './ProjectPicker.svelte'
 
   let { form, sendable }: { form: StartForm; sendable: boolean } = $props()
-
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault()
-    void form.start()
-  }
 </script>
 
-<form class="form" onsubmit={submit}>
+<FormFrame problem={form.formError} onsubmit={() => void form.start()}>
   <ProjectPicker {form} />
   <Picker
     label="Agent"
@@ -34,24 +30,14 @@
     <p class="note">With a branch, the agent works in its own worktree. Without one, it starts in a new tab in the
       project's folder.</p>
   </div>
-  {#if form.formError !== null}
-    <p class="problem" role="alert">{form.formError}</p>
-  {/if}
-  <div class="buttons">
+  {#snippet button()}
     <Button type="submit" resting={!sendable || form.noAgents} busy={form.sending}>
       {form.sending ? 'Starting…' : 'Start'}
     </Button>
-  </div>
-</form>
+  {/snippet}
+</FormFrame>
 
 <style>
-  .form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap);
-    padding: var(--inset-card);
-  }
-
   .branch {
     display: flex;
     flex-direction: column;
@@ -61,17 +47,5 @@
     margin: 0;
     color: var(--muted);
     font-size: 13px;
-  }
-
-  .problem {
-    margin: 0;
-    color: var(--failed);
-    font-size: 13px;
-    overflow-wrap: anywhere;
-  }
-
-  .buttons {
-    display: flex;
-    justify-content: flex-end;
   }
 </style>

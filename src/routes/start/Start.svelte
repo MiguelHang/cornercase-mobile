@@ -11,21 +11,19 @@
 
   let {
     connection,
-    boot = null,
     onback,
     onstarted,
     oncreated,
     form = new StartForm(
       commands,
       (started, agent) => onstarted(started, agent),
-      (started, name) => oncreated(started, name),
+      (name) => oncreated(name),
     ),
   }: {
     connection: ConnectionView_Serialize
-    boot?: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
-    oncreated: (started: Started, name: string) => void
+    oncreated: (name: string) => void
     form?: StartForm
   } = $props()
 
@@ -43,8 +41,8 @@
   })
 
   $effect(() => {
-    const seen = boot
-    untrack(() => void form.see(seen))
+    const connected = sendable
+    untrack(() => void form.see(connected))
   })
 </script>
 
