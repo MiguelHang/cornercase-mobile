@@ -106,6 +106,13 @@ fn spawned(fake: FakeTransport, asked: &Asked) -> (Store, Changes) {
     (store, changes)
 }
 
+fn poke(store: &Store, resume: Resume) {
+    match resume {
+        Resume::Foreground => store.resume_now(),
+        Resume::Network => store.network_changed(),
+    }
+}
+
 async fn bounded<T>(work: impl Future<Output = T>) -> T {
     time::timeout(Duration::from_secs(300), work).await.expect("the store gets there within five minutes")
 }

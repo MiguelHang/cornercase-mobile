@@ -6,13 +6,14 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use futures_util::FutureExt;
-use futures_util::future::{self, BoxFuture, Either};
+use futures_util::future::{self, BoxFuture};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time;
 
 use self::backoff::Backoff;
 use self::connect::Failure;
+use self::resume::{Resume, Resumes, Woken};
 use self::streams::Ended;
 use crate::cli::contract::Missing;
 use crate::cli::contract::boot::{Boot, BootWatch, Observed};
@@ -27,6 +28,7 @@ use crate::transport::Transport;
 
 mod backoff;
 mod connect;
+mod resume;
 mod streams;
 
 const DISAGREE: &str = "the server's contract and its snapshots name different boots";
@@ -61,7 +63,7 @@ pub enum Change {
 #[derive(Clone)]
 pub struct Store {
     shared: Arc<Shared>,
-    resumes: mpsc::UnboundedSender<()>,
+    resumes: mpsc::UnboundedSender<Resume>,
 }
 
 impl Store {
@@ -96,7 +98,11 @@ impl Store {
     }
 
     pub fn resume_now(&self) {
-        let _ = self.resumes.send(());
+        let _ = self.resumes.send(Resume::Foreground);
+    }
+
+    pub fn network_changed(&self) {
+        let _ = self.resumes.send(Resume::Network);
     }
 }
 
@@ -235,8 +241,8 @@ where
         (Self { machine, factory, config, shared, backoff, restarted: false, worker: Some(worker) }, started)
     }
 
-    async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>, worker: oneshot::Receiver<Worker>) {
-        let mut resumes = Resumes(resumes);
+    async fn drive(mut self, resumes: mpsc::UnboundedReceiver<Resume>, worker: oneshot::Receiver<Worker>) {
+        let mut resumes = Resumes::new(resumes);
         let attempts = async { while self.attempt(&mut resumes).await {} };
         future::select(pin!(attempts), pin!(worked(worker))).await;
     }
@@ -257,7 +263,7 @@ where
     async fn attempt(&mut self, resumes: &mut Resumes) -> bool {
         resumes.forget();
         self.shared.set_connection(Connection::Connecting);
-        let woken = match resumes.race(self.connect(), || false).await {
+        let woken = match resumes.race(self.connect(), Resume::interrupts).await {
             Woken::Done(Ok(picked)) => self.follow(&picked, resumes).await,
             Woken::Done(Err(Failure::Retry(error))) => Woken::Done(error),
             Woken::Done(Err(Failure::Stop(connection))) => return self.stop(connection, resumes).await,
@@ -273,7 +279,8 @@ where
 
     async fn follow(&mut self, picked: &Picked, resumes: &mut Resumes) -> Woken<Error> {
         let shared = &self.shared;
-        let woken = resumes.race(streams::follow(shared, picked), || shared.connected()).await;
+        let woken =
+            resumes.race(streams::follow(shared, picked), |resume| resume.interrupts() || shared.connected()).await;
         if self.shared.connected() {
             self.backoff.reset();
             self.restarted = false;
@@ -296,50 +303,19 @@ where
 
     async fn stop(&self, connection: Connection, resumes: &mut Resumes) -> bool {
         self.shared.set_connection(connection);
-        resumes.asked(|| true).await
+        resumes.asked(|_| true).await
     }
 
     async fn retry(&mut self, error: Error, resumes: &mut Resumes) -> bool {
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
-        !matches!(resumes.race(time::sleep(wait), || true).await, Woken::Dropped)
+        !matches!(resumes.race(time::sleep(wait), |_| true).await, Woken::Dropped)
     }
 }
 
 async fn worked(worker: oneshot::Receiver<Worker>) {
     if let Ok(worker) = worker.await {
         worker.await;
-    }
-}
-
-enum Woken<T> {
-    Done(T),
-    Resumed,
-    Dropped,
-}
-
-struct Resumes(mpsc::UnboundedReceiver<()>);
-
-impl Resumes {
-    fn forget(&mut self) {
-        while self.0.try_recv().is_ok() {}
-    }
-
-    async fn asked(&mut self, now: impl Fn() -> bool) -> bool {
-        while self.0.recv().await.is_some() {
-            if now() {
-                return true;
-            }
-        }
-        false
-    }
-
-    async fn race<T>(&mut self, work: impl Future<Output = T>, now: impl Fn() -> bool) -> Woken<T> {
-        match future::select(pin!(work), pin!(self.asked(now))).await {
-            Either::Left((done, _)) => Woken::Done(done),
-            Either::Right((true, _)) => Woken::Resumed,
-            Either::Right((false, _)) => Woken::Dropped,
-        }
     }
 }
 
