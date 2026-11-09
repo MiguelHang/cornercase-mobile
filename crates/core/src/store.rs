@@ -290,9 +290,13 @@ where
         let shared = &self.shared;
         let woken =
             resumes.race(streams::follow(shared, picked), |resume| resume.interrupts() || shared.connected()).await;
-        if self.shared.connected() {
+        let reached = self.shared.connected();
+        if reached {
             self.backoff.reset();
             self.restarted = false;
+        }
+        if reached && !matches!(woken, Woken::Offline) {
+            resumes.up();
         }
         match woken {
             Woken::Done(Ended::Failed(error)) => Woken::Done(error),
@@ -318,6 +322,9 @@ where
     }
 
     async fn retry(&mut self, error: Error, resumes: &mut Resumes) -> bool {
+        if resumes.is_down() {
+            return self.offline(resumes).await;
+        }
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
         let woken = resumes.race(time::sleep(wait), |_| true).await;
@@ -334,7 +341,7 @@ where
 
     async fn offline(&mut self, resumes: &mut Resumes) -> bool {
         self.shared.set_connection(Connection::Offline);
-        let woken = resumes.asked::<()>(|resume| resume == Resume::Online).await;
+        let woken = resumes.asked::<()>(|resume| matches!(resume, Resume::Online | Resume::Foreground)).await;
         self.backoff.reset();
         !matches!(woken, Woken::Dropped)
     }

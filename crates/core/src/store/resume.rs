@@ -40,10 +40,20 @@ impl Resumes {
     }
 
     pub(super) fn forget(&mut self) -> bool {
+        let mut went = false;
         while let Ok(resume) = self.asked.try_recv() {
+            went |= resume == Resume::Offline;
             self.heard(resume);
         }
+        went && self.down
+    }
+
+    pub(super) fn is_down(&self) -> bool {
         self.down
+    }
+
+    pub(super) fn up(&mut self) {
+        self.down = false;
     }
 
     pub(super) async fn asked<T>(&mut self, now: impl Fn(Resume) -> bool) -> Woken<T> {
