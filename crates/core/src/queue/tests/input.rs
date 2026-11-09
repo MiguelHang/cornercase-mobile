@@ -23,6 +23,10 @@ pub(super) fn key(code: &str) -> Value {
     json!({ "key": code })
 }
 
+fn failed(code: i32) -> Error {
+    Error::Failed { code, stderr: String::new() }
+}
+
 fn refused() -> Error {
     Error::InputRejected("there is no pane 9".to_owned())
 }
@@ -214,6 +218,25 @@ mod keys {
         queue.input(9, key("a"));
         assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
         assert_eq!(notices.taken(), [refused()]);
+    }
+
+    #[rstest]
+    #[case::partial_without_a_refusal(3, &[], vec![failed(3)])]
+    #[case::failed_with_a_refusal(1, &[REFUSED], vec![refused(), failed(1)])]
+    #[tokio::test]
+    async fn tells_a_key_typed_once_failed_unless_the_refusals_explain_it(
+        #[case] code: i32,
+        #[case] said: &[&str],
+        #[case] told: Vec<Error>,
+    ) {
+        let (log, _said) = heard();
+        let args = ["input", "--pane", "9", "--json", "-"];
+        let fake = answering(FakeTransport::default(), &log, &Starts::default()).answer(&args, said, &[], code);
+        let Started { queue, mut notices, .. } =
+            start(unstarted(fake, Ok(exit(2, NO_FOLLOW_FLAG)), false, &Starts::default()));
+        queue.input(9, key("a"));
+        assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
+        assert_eq!(notices.taken(), told);
     }
 }
 
