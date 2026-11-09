@@ -43,7 +43,10 @@ The agent's screen a row of the board opens (`src/routes/agent/Agent.svelte`, Bo
 
 ## Checked live
 
-- Not checked live yet.
+- **On 2026-11-09** in the iPhone 17 simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), against the bridge on the LAN and cornercase 0.13.19, with Claude Code 2.1.319, the taps made by XCUITest. A Claude in `done` showed its one sentence with when it was written. An answer that starts with `--`, typed in the field and sent, emptied the field and turned the header to working in the same second; the queue opened its `requests --follow` at that first send. While it worked, the screen kept the old message, since the agent ran a tool first and wrote no text. When it finished, 16 s later, its new message showed within a second of its record's time: a heading, a list with inline code, and a code block wider than the screen that scrolls sideways.
+- **Waiting**: asked from the field to put a question with `AskUserQuestion`, the agent turned `waiting` 2 s later, and the screen showed the note over the field, with `Send` resting while text was typed.
+- **Gone**: closing its pane on the Mac (`cornercase close --pane`) while it waited turned the screen into `This agent is no longer running.`, the field and its text gone, and `Back to the board` returned to a board without its row.
+- **The keyboard**: when the field takes focus, WKWebView scrolls the page so the field, grown to its maximum, stays above the keyboard and its bar, the header out of sight, with a gap between them. It can be reached; the finer fit stays 021's and 032's.
 
 ## Left out
 
