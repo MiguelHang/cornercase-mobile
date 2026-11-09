@@ -53,7 +53,7 @@ pub trait Transport: Send + Sync {
     ) -> BoxFuture<'_, Result<Exit, Error>>;
 }
 
-const STALE_BOOT: i32 = 4;
+pub(crate) const STALE_BOOT: i32 = 4;
 
 pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Output, Error> {
     let (out, mut receiver) = listen(only_stdout);
