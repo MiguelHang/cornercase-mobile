@@ -6,6 +6,7 @@
   import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import Markdown from '../../lib/ui/Markdown.svelte'
+  import Spinner from '../../lib/ui/Spinner.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
   import KeyRow from './KeyRow.svelte'
@@ -16,6 +17,7 @@
     chat,
     connection,
     below = 0,
+    starting = null,
     onback,
     onfailed,
     onterminal,
@@ -23,6 +25,7 @@
     chat: Chat
     connection: ConnectionView_Serialize
     below?: number
+    starting?: string | null
     onback: () => void
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
@@ -67,7 +70,9 @@
         <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button>
       {/if}
     </div>
-    {#if row === null}
+    {#if row === null && starting !== null}
+      <p class="starting"><Spinner />Starting {starting}…</p>
+    {:else if row === null}
       <div class="waiting">
         <Mark unit={5} pulsing={connection.state === 'connecting'} />
       </div>
@@ -244,6 +249,14 @@
   }
 
   .gone {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  .starting {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     color: var(--muted);
   }

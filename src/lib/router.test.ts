@@ -8,6 +8,8 @@ const NO_MACHINES = { name: 'no-machines' } as const
 const MACHINES = { name: 'machines' } as const
 const MACHINE = { name: 'machine', id: 2 } as const
 const AGENT = { name: 'agent', machine: 1, pane: 7 } as const
+const START = { name: 'start', machine: 1 } as const
+const STARTING = { name: 'agent', machine: 1, pane: 7, starting: true } as const
 const ROW: AgentRow = {
   boot: 'b1',
   agent: 'claude',
@@ -127,6 +129,40 @@ describe('Router', () => {
     expect(router.current).toEqual(AGENT)
     router.back()
     expect(router.current).toEqual(HOME)
+  })
+})
+
+describe('Router.replace', () => {
+  it('puts the started agent in place of the start screen', () => {
+    const router = new Router(HOME)
+    router.go(START)
+    router.replace(STARTING)
+    expect(router.current).toEqual(STARTING)
+  })
+
+  it('goes back from the started agent to home, not to the start screen', () => {
+    const router = new Router(HOME)
+    router.go(START)
+    router.replace(STARTING)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the base and goes on top of it when nothing is above it', () => {
+    const router = new Router(HOME)
+    router.replace(STARTING)
+    expect(router.current).toEqual(STARTING)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the routes below the one it replaces', () => {
+    const router = new Router(HOME)
+    router.go(MACHINES)
+    router.go(START)
+    router.replace(STARTING)
+    router.back()
+    expect(router.current).toEqual(MACHINES)
   })
 })
 

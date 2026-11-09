@@ -26,6 +26,10 @@ export const commands = {
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
 	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
+	startProjects: () => typedError<StartChoices_Serialize, CommandError>(__TAURI_INVOKE("start_projects")),
+	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
+	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
+	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 };
 
 /** Events */
@@ -38,6 +42,20 @@ export const events = {
 };
 
 /* Types */
+export type AgentChoice = AgentChoice_Serialize | AgentChoice_Deserialize;
+
+export type AgentChoice_Deserialize = {
+	agent?: string,
+	command?: string,
+	installed?: boolean,
+};
+
+export type AgentChoice_Serialize = {
+	agent: string,
+	command: string,
+	installed: boolean,
+};
+
 export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
 
 export type AgentRow_Deserialize = {
@@ -314,6 +332,12 @@ export type Mouse_Serialize = {
 	mods?: Modifier[],
 };
 
+export type NewWorkspace = {
+	project: number,
+	name: string,
+	worktree: boolean,
+};
+
 export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;
 
 export type PaneStatusChanged_Deserialize = {
@@ -341,6 +365,11 @@ export type Pasted_Serialize = {
 };
 
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+
+export type ProjectChoice = {
+	id: number,
+	name: string,
+};
 
 export type RouteFailure = {
 	route: string,
@@ -375,6 +404,44 @@ export type Size_Deserialize = {
 export type Size_Serialize = {
 	cols: number,
 	rows: number,
+};
+
+export type StartAgent = {
+	project: number,
+	agent: string,
+	model: string,
+	prompt: string,
+	worktree: string,
+};
+
+export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;
+
+export type StartChoices_Deserialize = {
+	boot?: string | null,
+	projects: ProjectChoice[],
+};
+
+export type StartChoices_Serialize = {
+	boot: string | null,
+	projects: ProjectChoice[],
+};
+
+export type Started = Started_Serialize | Started_Deserialize;
+
+export type Started_Deserialize = {
+	project?: number,
+	workspace?: number,
+	tab?: number,
+	pane?: number,
+	warning?: string | null,
+};
+
+export type Started_Serialize = {
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	warning: string | null,
 };
 
 export type Style = Style_Serialize | Style_Deserialize;

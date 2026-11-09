@@ -133,7 +133,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} />",
+      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} onstart={start} />",
     )
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
@@ -148,16 +148,41 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} />",
+      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} />",
     )
   })
 
   it('gives the chat every list of agents, and reads once its row is seen', () => {
     expect(source).toContain(
-      '$effect(() => { const { machine, agents } = current if (chat !== null) { untrack(() => chat.see(machine, agents)) } })',
+      '$effect(() => { const { machine, agents } = current if (chat !== null) { const waiting = starting !== null untrack(() => chat.see(machine, agents, waiting)) } })',
     )
     expect(source).toContain('const seen = $derived(chat?.row != null)')
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
+  })
+
+  it('opens Start from the board on the active machine, with its connection and without the bar', () => {
+    expect(source).toContain(
+      "const start = () => { if (current.machine !== null) { router.go({ name: 'start', machine: current.machine }) } }",
+    )
+    expect(source).not.toContain('boot')
+    expect(source).toContain(
+      "{:else if route.name === 'start'} <Start connection={current.connection} onback={() => router.back()} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
+    )
+  })
+
+  it('puts the agent it started in place of Start on its machine, says it is starting and tells its warning', () => {
+    expect(source).toContain(
+      "const started = (placed: Started, agent: string) => { const at = router.current if (at.name === 'start') { launched = agent router.replace({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true }) } else { toasts.push({ level: 'info', message: `${agent} started` }) } if (placed.warning !== null) { toasts.push({ level: 'info', message: placed.warning }) } }",
+    )
+    expect(source).toContain(
+      "const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)",
+    )
+  })
+
+  it('tells the workspace it made and goes back to the board only from Start', () => {
+    expect(source).toContain(
+      "const created = (name: string) => { toasts.push({ level: 'info', message: `Workspace ${name} created` }) if (router.current.name === 'start') { router.back() } }",
+    )
   })
 
   it('reads again on a status change of its pane on its machine', () => {
@@ -181,7 +206,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} /> {/if}",
     )
   })
 })

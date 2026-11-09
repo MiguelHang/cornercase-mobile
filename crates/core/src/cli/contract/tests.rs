@@ -163,6 +163,12 @@ mod missing {
         assert_eq!(missing(&descriptor), [one("send", Kind::Operation, Some("no project is open"))]);
     }
 
+    #[test]
+    fn reports_a_server_that_cannot_list_the_agents() {
+        let descriptor = real_but(|value| without(value, "operations", "account-list"));
+        assert_eq!(missing(&descriptor), [one("account-list", Kind::Operation, None)]);
+    }
+
     #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
