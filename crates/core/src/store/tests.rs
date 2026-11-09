@@ -14,6 +14,7 @@ use crate::transport::{Exit, OutSink, Stdin};
 
 mod boot;
 mod connect;
+mod offline;
 mod resume;
 mod retry;
 mod streams;
@@ -104,6 +105,15 @@ fn spawned(fake: FakeTransport, asked: &Asked) -> (Store, Changes) {
     let changes = store.changes();
     tokio::spawn(driver);
     (store, changes)
+}
+
+fn poke(store: &Store, resume: Resume) {
+    match resume {
+        Resume::Foreground => store.resume_now(),
+        Resume::Network => store.network_changed(),
+        Resume::Offline => store.offline(),
+        Resume::Online => store.online(),
+    }
 }
 
 async fn bounded<T>(work: impl Future<Output = T>) -> T {

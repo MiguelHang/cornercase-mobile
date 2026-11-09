@@ -47,7 +47,7 @@ fn answering_only(fake: FakeTransport, first: bool) -> FakeTransport {
     by_call(fake, CONTRACT, move |call, out| answered(out, ((call == 0) == first).then(served)))
 }
 
-fn late(fake: FakeTransport) -> FakeTransport {
+pub(super) fn late(fake: FakeTransport) -> FakeTransport {
     fake.script(STATUS, |_, mut out| async move {
         time::sleep(Duration::from_secs(5)).await;
         said(&mut out, line(WATCH)).await?;
@@ -171,8 +171,11 @@ mod a_restart {
 mod the_queue {
     use super::*;
 
+    #[rstest]
     #[tokio::test(start_paused = true)]
-    async fn moves_to_another_route_and_keeps_the_session() {
+    async fn moves_to_another_route_and_keeps_the_session(
+        #[values(Resume::Foreground, Resume::Network)] resume: Resume,
+    ) {
         let asked = Asked::default();
         let lan = held(answering_only(serving(fine()), true), REQUESTS, &Arc::default());
         let tailnet = held(answering_only(serving(Lines::default()), false), REQUESTS, &Arc::default());
@@ -183,7 +186,7 @@ mod the_queue {
         let queue = store.queue().expect("a queue once connected");
         let hung = queue.ask(words(&["focus"]), None);
         time::sleep(Duration::from_secs(1)).await;
-        store.resume_now();
+        poke(&store, resume);
         time::sleep(Duration::from_secs(60)).await;
         assert_eq!(hung.now_or_never(), Some(Err(Error::Unanswered)));
         queue.run(words(&["status"]), None);

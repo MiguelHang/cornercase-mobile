@@ -53,9 +53,9 @@ export type ConnectionState_Serialize = {
 
 export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
 
-export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError };
+export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
-export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError };
+export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity";
 

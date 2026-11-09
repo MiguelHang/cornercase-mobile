@@ -41,7 +41,7 @@ fn failing_but(snapshot_at: usize) -> FakeTransport {
     })
 }
 
-fn closing_later(fake: FakeTransport) -> FakeTransport {
+pub(super) fn closing_later(fake: FakeTransport) -> FakeTransport {
     fake.script(STATUS, |_, out| async {
         let exit = answered(out, Some(line(WATCH))).await;
         time::sleep(Duration::from_secs(5)).await;

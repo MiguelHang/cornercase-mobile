@@ -85,6 +85,7 @@ mod a_connection {
         Connection::Incompatible(Error::Outdated),
         json!({ "state": "incompatible", "error": { "code": "outdated", "message": Error::Outdated.to_string() } })
     )]
+    #[case::offline(Connection::Offline, json!({ "state": "offline" }))]
     fn carries_its_label_and_its_fields(#[case] connection: Connection, #[case] expected: Value) {
         assert_eq!(json_of(&ConnectionView::from(&connection)), expected);
     }

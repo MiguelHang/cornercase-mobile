@@ -91,5 +91,7 @@ export const status = (connection: ConnectionView_Serialize, machineName: string
       return failed("The bridge rejected this phone's token")
     case 'incompatible':
       return failed(`Incompatible: ${connection.error.message}`)
+    case 'offline':
+      return failed('No network')
   }
 }

@@ -15,6 +15,9 @@ dejar constancia; lo que falle se convierte en tareas nuevas.
 - [ ] CA2 — Cada fallo tiene su tarea nueva en `docs/tasks/` (numeración siguiente) enlazada desde el ROADMAP.
 - [ ] CA3 — `CLAUDE.md` › Commands con cómo instalar en un iPhone con perfil gratuito (y la caducidad de 7 días).
 - [ ] CA4 — Las notas "probado en vivo" de `design/*.md` actualizadas con lo visto.
+- [ ] CA5 — Si nadie lo hizo antes, el CA4 de la 028: wifi → datos (con Tailscale) y datos → wifi, con el tablero
+  y la terminal abiertos; tiempo desde la línea `network` hasta `connected`, anotado en
+  `design/connection/network.md` (lo que falta, en su apartado Checked live).
 
 ## Referencias
 - `docs/IDEA.md` › Criterios de éxito del MVP.

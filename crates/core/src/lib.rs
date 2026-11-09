@@ -2,6 +2,7 @@ pub mod cli;
 pub mod error;
 pub mod identity;
 pub mod machines;
+pub mod network;
 pub mod protocol;
 pub mod queue;
 pub mod secrets;
