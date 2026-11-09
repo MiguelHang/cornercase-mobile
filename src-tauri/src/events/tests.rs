@@ -291,3 +291,29 @@ mod the_app {
         assert_eq!(heard.try_recv(), Ok(expected));
     }
 }
+
+mod a_change {
+    use cornercase_core::cli::events::Event;
+
+    use super::*;
+
+    fn event(what: What) -> Change {
+        Change::Event(Box::new(Event {
+            time: HEARD.to_owned(),
+            project: None,
+            workspace: None,
+            tab: None,
+            pane: Some(4),
+            what,
+        }))
+    }
+
+    #[rstest]
+    #[case::session(Change::Session, true)]
+    #[case::status(event(What::Status { agent: "claude".into(), from: None, to: Some("waiting".into()) }), true)]
+    #[case::exited(event(What::Exited { program: "sh".into() }), false)]
+    #[case::app(Change::App, false)]
+    fn touches_the_agents_only_when_a_row_may_change(#[case] change: Change, #[case] touches: bool) {
+        assert_eq!(touches_agents(&change), touches);
+    }
+}
