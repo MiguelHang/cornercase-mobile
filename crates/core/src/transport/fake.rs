@@ -88,4 +88,6 @@ fn owned(words: &[&str]) -> Vec<String> {
 }
 
 #[cfg(test)]
+mod launched;
+#[cfg(test)]
 mod tests;

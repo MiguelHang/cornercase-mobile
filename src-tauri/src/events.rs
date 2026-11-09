@@ -52,6 +52,7 @@ pub(crate) struct TerminalChanged {
     pub(crate) replaced: bool,
     pub(crate) rows: BTreeMap<u16, Line>,
     pub(crate) closed: bool,
+    pub(crate) unfitted: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
@@ -63,7 +64,6 @@ pub(crate) struct Toast {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ToastLevel {
-    #[cfg_attr(not(test), expect(dead_code, reason = "the contract has an info toast that nothing sends yet"))]
     Info,
     Error,
 }
@@ -95,6 +95,10 @@ impl<R: Runtime> Emit for AppHandle<R> {
 }
 
 impl Toast {
+    pub(crate) fn info(message: impl Into<String>) -> Self {
+        Self { level: ToastLevel::Info, message: message.into() }
+    }
+
     pub(crate) fn error(message: impl Into<String>) -> Self {
         Self { level: ToastLevel::Error, message: message.into() }
     }

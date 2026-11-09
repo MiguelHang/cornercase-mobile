@@ -148,3 +148,17 @@ mod unscripted {
         assert_eq!(lines, []);
     }
 }
+
+mod launched {
+    use super::*;
+
+    #[tokio::test]
+    async fn runs_the_fake_and_names_each_argv_in_turn() {
+        let (transport, mut launched) = FakeTransport::default().answer(&["status"], &[], &[], 0).launched();
+        let (out, _) = listen(Some);
+        assert_eq!(transport.run(words(&["status"]), no_stdin(), out).await.map(|exit| exit.code), Ok(0));
+        let (out, _) = listen(Some);
+        assert!(transport.run(words(&["projects"]), no_stdin(), out).await.is_err());
+        assert_eq!(std::iter::from_fn(|| launched.try_recv().ok()).collect::<Vec<_>>(), ["status", "projects"]);
+    }
+}

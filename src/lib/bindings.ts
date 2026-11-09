@@ -22,7 +22,7 @@ export const commands = {
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
-	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
+	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
 	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
@@ -394,6 +394,18 @@ export type Run_Serialize = {
 
 export type SameWhy = "address" | "token" | "boot" | "name";
 
+export type Shape = Shape_Serialize | Shape_Deserialize;
+
+export type Shape_Deserialize = {
+	size: Size_Deserialize,
+	fit: boolean,
+};
+
+export type Shape_Serialize = {
+	size: Size_Serialize,
+	fit: boolean,
+};
+
 export type Size = Size_Serialize | Size_Deserialize;
 
 export type Size_Deserialize = {
@@ -491,6 +503,7 @@ export type TerminalChanged_Deserialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Deserialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type TerminalChanged_Serialize = {
@@ -504,6 +517,7 @@ export type TerminalChanged_Serialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Serialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type Toast = {

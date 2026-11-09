@@ -7,10 +7,11 @@ use futures_util::{FutureExt, StreamExt, stream};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 
+use super::fit::{Claim, Fitted, follow_fitted};
 use super::grid::{Applied, Changes, Grid};
 use super::shown::{Shown, Update};
 use crate::cli::status::Snapshot;
-use crate::cli::surface::{Frame, Size};
+use crate::cli::surface::{Frame, Size, on_tab};
 use crate::error::Error;
 use crate::queue::Queue;
 use crate::store::{Connection, Store};
@@ -19,6 +20,7 @@ use crate::transport::{Exit, Output, Transport, json_error, listen, only_stdout,
 const REDRAW: &str = "redraw";
 const SETTLE: Duration = Duration::from_secs(1);
 const REDRAW_AGAIN: Duration = Duration::from_secs(2);
+const LEAVING: Duration = Duration::from_secs(5);
 
 type End = Result<Exit, Error>;
 
@@ -36,32 +38,80 @@ pub enum Step {
     Ended(Ended),
 }
 
-pub struct Live {
-    queue: Queue,
-    grid: Grid,
-    redrawing: Option<Instant>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Source {
+    Tab { tab: u64, size: Size },
+    View { view: u64, tab: u64 },
+}
+
+impl Source {
+    fn shows(self, frame: &Frame) -> bool {
+        match self {
+            Self::Tab { .. } => true,
+            Self::View { view, tab } => frame.view == Some(view) && frame.tab == tab,
+        }
+    }
+}
+
+pub(crate) struct Followed {
     lines: mpsc::UnboundedReceiver<String>,
     run: Fuse<BoxFuture<'static, End>>,
     ended: Option<Ended>,
+    told: bool,
+}
+
+impl Followed {
+    pub(crate) fn open(transport: Arc<dyn Transport>, argv: Vec<String>) -> Self {
+        let (out, lines) = listen(only_stdout);
+        let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
+        Self { lines, run, ended: None, told: false }
+    }
+
+    pub(crate) async fn next(&mut self) -> Either<String, Ended> {
+        if self.ended.is_none() {
+            let end = match future::select(pin!(self.lines.recv()), &mut self.run).await {
+                Either::Left((Some(line), _)) => return Either::Left(line),
+                Either::Left((None, run)) => run.await,
+                Either::Right((end, _)) => end,
+            };
+            self.ended = Some(ended(end));
+        }
+        if let Ok(line) = self.lines.try_recv() {
+            return Either::Left(line);
+        }
+        if self.told {
+            return future::pending().await;
+        }
+        self.told = true;
+        Either::Right(self.ended.clone().unwrap_or(Ended::Exited))
+    }
+}
+
+pub(crate) struct Live {
+    source: Source,
+    queue: Queue,
+    grid: Grid,
+    redrawing: Option<Instant>,
+    followed: Followed,
 }
 
 impl Live {
-    #[must_use]
-    pub fn open(transport: Arc<dyn Transport>, queue: Queue, tab: u64, size: Size) -> Self {
-        let (out, lines) = listen(only_stdout);
-        let argv = surface(tab, size);
-        let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
-        Self { queue, grid: Grid::default(), redrawing: None, lines, run, ended: None }
+    pub(crate) fn open(transport: Arc<dyn Transport>, queue: Queue, source: Source) -> Self {
+        let followed = Followed::open(transport, surface(source));
+        Self { source, queue, grid: Grid::default(), redrawing: None, followed }
     }
 
-    #[must_use]
-    pub fn grid(&self) -> &Grid {
+    pub(crate) fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    pub async fn next(&mut self) -> Step {
+    pub(crate) fn saw_projection(&mut self, projection: u64) {
+        self.grid.saw_projection(projection);
+    }
+
+    pub(crate) async fn next(&mut self) -> Step {
         loop {
-            let line = match self.heard().await {
+            let line = match self.followed.next().await {
                 Either::Left(line) => line,
                 Either::Right(ended) => return Step::Ended(ended),
             };
@@ -71,26 +121,14 @@ impl Live {
         }
     }
 
-    async fn heard(&mut self) -> Either<String, Ended> {
-        if self.ended.is_none() {
-            let end = match future::select(pin!(self.lines.recv()), &mut self.run).await {
-                Either::Left((Some(line), _)) => return Either::Left(line),
-                Either::Left((None, run)) => run.await,
-                Either::Right((end, _)) => end,
-            };
-            self.ended = Some(ended(end));
-        }
-        match self.lines.try_recv() {
-            Ok(line) => Either::Left(line),
-            Err(_) => Either::Right(self.ended.clone().unwrap_or(Ended::Exited)),
-        }
-    }
-
     fn applied(&mut self, line: &str) -> Option<Step> {
         let frame: Frame = match serde_json::from_str(line) {
             Ok(frame) => frame,
             Err(error) => return Some(Step::Warned(json_error(&error))),
         };
+        if !self.source.shows(&frame) {
+            return None;
+        }
         let surface = frame.surface;
         if frame.base.is_some() && self.still_redrawing(surface) {
             return None;
@@ -100,7 +138,8 @@ impl Live {
             return None;
         }
         self.redrawing = None;
-        Some(Step::Changed(self.grid.changed_rows()))
+        let changes = self.grid.changed_rows();
+        self.grid.is_current().then_some(Step::Changed(changes))
     }
 
     fn still_redrawing(&mut self, surface: u64) -> bool {
@@ -120,10 +159,17 @@ impl Live {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unfitted {
+    TakenBack,
+    Refused(Error),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     Update(Update),
     Failed(Error),
     Closed,
+    Fit(Unfitted),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,24 +177,58 @@ pub struct Terminal {
     pub tab: u64,
     pub pane: Option<u64>,
     pub size: Size,
+    pub fit: bool,
 }
 
 impl Terminal {
     pub async fn run(self, store: Store, sink: impl FnMut(Screen) + Send) {
         let mut told = Told { sink, failing: false };
+        let mut fit = self.fit;
         while let Some(reached) = reached(&store, self.tab).await {
             if !reached.open {
                 told.closed();
                 return;
             }
-            self.follow(&store, reached, &mut told).await;
+            if !fit {
+                self.follow(&store, reached, &mut told).await;
+            } else if !self.fitted(&store, reached, &mut told).await {
+                fit = false;
+                continue;
+            }
             time::sleep(SETTLE).await;
         }
     }
 
+    async fn fitted(self, store: &Store, reached: Reached, told: &mut Told<impl FnMut(Screen)>) -> bool {
+        let used = reached.transport.clone();
+        let claim = Claim::open(used.clone(), self.tab, self.size);
+        let mut shown = Shown::new(self.pane);
+        let paint = |grid: &Grid, changes: Result<Changes, Error>| match changes {
+            Ok(changes) => told.shown(shown.update(grid, &changes)),
+            Err(error) => told.failed(error),
+        };
+        let fitted = follow_fitted(claim, reached.transport, reached.queue, moved_on(store, &used), paint).await;
+        let unfitted = match fitted {
+            Fitted::TakenBack => Unfitted::TakenBack,
+            Fitted::Refused(error) if still_on(store, &used) => Unfitted::Refused(error),
+            Fitted::Ended(ended) => {
+                told.ended(ended, still_on(store, &used));
+                return true;
+            }
+            Fitted::MovedAway => {
+                left(store, self.tab).await;
+                return true;
+            }
+            Fitted::Refused(_) | Fitted::MovedOn => return true,
+        };
+        told.unfitted(unfitted);
+        false
+    }
+
     async fn follow(self, store: &Store, reached: Reached, told: &mut Told<impl FnMut(Screen)>) {
         let used = reached.transport.clone();
-        let mut live = Live::open(reached.transport, reached.queue, self.tab, self.size);
+        let source = Source::Tab { tab: self.tab, size: self.size };
+        let mut live = Live::open(reached.transport, reached.queue, source);
         let mut moved = pin!(moved_on(store, &used));
         let mut shown = Shown::new(self.pane);
         loop {
@@ -185,6 +265,10 @@ impl<S: FnMut(Screen)> Told<S> {
         (self.sink)(Screen::Closed);
     }
 
+    fn unfitted(&mut self, unfitted: Unfitted) {
+        (self.sink)(Screen::Fit(unfitted));
+    }
+
     fn failed(&mut self, error: Error) {
         if !self.failing {
             self.failing = true;
@@ -213,6 +297,18 @@ async fn moved_on(store: &Store, used: &Arc<dyn Transport>) {
             return;
         }
     }
+}
+
+async fn left(store: &Store, tab: u64) {
+    let mut changes = store.changes();
+    let gone = async {
+        while store.session().is_some_and(|session| holds(&session, tab)) {
+            if changes.next().await.is_none() {
+                return;
+            }
+        }
+    };
+    let _ = time::timeout(LEAVING, gone).await;
 }
 
 struct Reached {
@@ -246,9 +342,14 @@ fn holds(session: &Snapshot, tab: u64) -> bool {
     workspaces.flat_map(|workspace| &workspace.tabs).any(|open| open.id == tab)
 }
 
-fn surface(tab: u64, size: Size) -> Vec<String> {
-    let (tab, cols, rows) = (tab.to_string(), size.cols.to_string(), size.rows.to_string());
-    ["surface", "--tab", &tab, "--cols", &cols, "--rows", &rows, "--patches"].map(str::to_owned).to_vec()
+fn surface(source: Source) -> Vec<String> {
+    let mut argv = vec!["surface".to_owned()];
+    match source {
+        Source::Tab { tab, size } => argv.extend(on_tab(tab, size)),
+        Source::View { view, .. } => argv.extend(["--view".to_owned(), view.to_string()]),
+    }
+    argv.push("--patches".to_owned());
+    argv
 }
 
 fn ended(end: End) -> Ended {
