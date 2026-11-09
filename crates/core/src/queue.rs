@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
 
 use self::worker::{Command, Job, Worker};
@@ -9,7 +10,6 @@ use crate::transport::Transport;
 
 mod follow;
 mod requests;
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests type through it until the worker sends input"))]
 mod typist;
 mod worker;
 
@@ -35,7 +35,7 @@ impl Queue {
     }
 
     pub fn run(&self, args: Vec<String>, stdin: Option<String>) {
-        self.push(Command { args, stdin, reply: None });
+        self.push(Job::Command(Command { args, stdin, reply: None }));
     }
 
     pub fn ask(
@@ -44,12 +44,16 @@ impl Queue {
         stdin: Option<String>,
     ) -> impl Future<Output = Result<Outcome, Error>> + Send + 'static {
         let (reply, answer) = oneshot::channel();
-        self.push(Command { args, stdin, reply: Some(reply) });
+        self.push(Job::Command(Command { args, stdin, reply: Some(reply) }));
         async move { answer.await.unwrap_or(Err(Error::Unanswered)) }
     }
 
-    fn push(&self, command: Command) {
-        let _ = self.jobs.send(Job::Command(command));
+    pub fn input(&self, pane: u64, event: Value) {
+        self.push(Job::Input((pane, event)));
+    }
+
+    fn push(&self, job: Job) {
+        let _ = self.jobs.send(job);
     }
 }
 

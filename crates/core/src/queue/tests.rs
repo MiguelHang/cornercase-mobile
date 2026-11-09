@@ -15,6 +15,7 @@ use crate::transport::fake::FakeTransport;
 use crate::transport::{Closed, Exit, Out, OutSink, Stdin};
 
 mod commands;
+mod input;
 
 const REQUESTS: [&str; 3] = ["requests", "--follow", "-"];
 const NO_REQUESTS_COMMAND: &str = "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]";
