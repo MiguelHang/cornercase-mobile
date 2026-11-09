@@ -174,6 +174,14 @@ mod doubting {
     }
 
     #[test]
+    fn says_so_when_a_pane_has_both_a_time_and_an_event_ahead() {
+        let mut since = seen_at(4, "working", EARLIER);
+        since.heard(4, Some("waiting"), LATER);
+        assert!(since.doubt());
+        assert!(!since.doubt());
+    }
+
+    #[test]
     fn takes_the_time_of_an_event_heard_after() {
         let mut since = seen_at(4, "waiting", EARLIER);
         since.doubt();
