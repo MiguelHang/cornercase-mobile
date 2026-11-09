@@ -1,7 +1,8 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { commands, events, type MachineView_Serialize } from './lib/bindings'
+  import { Chat, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { oneAtATime } from './lib/join'
   import { Router, routeFor } from './lib/router.svelte'
@@ -24,12 +25,23 @@
 
   const route = $derived(router.current)
   const machine = $derived(route.name !== 'no-machines')
-  const opened = $derived(
-    route.name === 'agent' && current.agents !== null
-      ? current.agents.find((agent) => agent.pane === route.pane)
-      : null,
-  )
+  const pane = $derived(route.name === 'agent' ? route.pane : null)
+  const chat = $derived(pane === null ? null : new Chat(pane, commands.lastMessage, commands.send))
+  const seen = $derived(chat?.row != null)
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
+
+  $effect(() => {
+    const agents = current.agents
+    if (chat !== null) {
+      untrack(() => chat.see(agents))
+    }
+  })
+
+  $effect(() => {
+    if (chat !== null && seen) {
+      untrack(() => chat.refresh())
+    }
+  })
 
   const show = (next: Screen) => {
     current = next
@@ -78,6 +90,11 @@
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
       events.agentsChanged.listen((event) => show(apply(current, event.payload))),
+      events.paneStatusChanged.listen((event) => {
+        if (chat !== null && touches(event.payload, current.machine, chat.pane)) {
+          void chat.refresh()
+        }
+      }),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
     Promise.all(listening).then(load).catch(toasts.failed)
@@ -88,8 +105,14 @@
 <main>
   {#if machine}
     <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
-    {#if route.name === 'agent'}
-      <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />
+    {#if chat !== null}
+      <Agent
+        {chat}
+        connection={current.connection}
+        below={barHeight}
+        onback={() => router.back()}
+        onfailed={(message) => toasts.push({ level: 'error', message })}
+      />
     {:else}
       <Board
         agents={current.agents}

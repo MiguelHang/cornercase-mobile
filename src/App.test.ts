@@ -87,7 +87,7 @@ describe('App wiring', () => {
 
   it('shows the connection bar with a machine, and puts the board, an agent and the toasts below it', () => {
     expect(source).toContain(
-      "{#if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if route.name === 'agent'}",
+      '{#if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if chat !== null}',
     )
     expect(source).toContain(
       "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', pane })} />",
@@ -97,12 +97,27 @@ describe('App wiring', () => {
     )
   })
 
-  it('opens the agent of the tapped pane, and goes back from it', () => {
+  it('opens a chat for the tapped pane, and goes back from it', () => {
+    expect(source).toContain("const pane = $derived(route.name === 'agent' ? route.pane : null)")
     expect(source).toContain(
-      "route.name === 'agent' && current.agents !== null ? current.agents.find((agent) => agent.pane === route.pane) : null",
+      'const chat = $derived(pane === null ? null : new Chat(pane, commands.lastMessage, commands.send))',
     )
     expect(source).toContain(
-      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />',
+      "<Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} />",
+    )
+  })
+
+  it('gives the chat every list of agents, and reads once its row is seen', () => {
+    expect(source).toContain(
+      '$effect(() => { const agents = current.agents if (chat !== null) { untrack(() => chat.see(agents)) } })',
+    )
+    expect(source).toContain('const seen = $derived(chat?.row != null)')
+    expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
+  })
+
+  it('reads again on a status change of its pane on its machine', () => {
+    expect(source).toContain(
+      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, current.machine, chat.pane)) { void chat.refresh() } }),',
     )
   })
 })

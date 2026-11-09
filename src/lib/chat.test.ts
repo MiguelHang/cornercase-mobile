@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
-import { Chat, deliver, read, type ReadLast, type SendText } from './chat.svelte'
+import { Chat, deliver, read, touches, type ReadLast, type SendText } from './chat.svelte'
 
 const PANE = 12
 
@@ -75,6 +75,22 @@ describe('deliver', () => {
   })
 })
 
+describe('touches', () => {
+  it.each<[string, number, number | null, boolean]>([
+    ['the status of its pane', 7, PANE, true],
+    ['a drop, which may hide any pane', 7, null, true],
+    ['the status of another pane', 7, 30, false],
+    ['the status of its pane on another machine', 8, PANE, false],
+    ['a drop on another machine', 8, null, false],
+  ])('tells %s', (_, machine, pane, touched) => {
+    expect(touches({ machine, pane }, 7, PANE)).toBe(touched)
+  })
+
+  it('touches nothing without a machine', () => {
+    expect(touches({ machine: 7, pane: PANE }, null, PANE)).toBe(false)
+  })
+})
+
 describe('Chat, its field', () => {
   it('starts empty, loading, and unable to send', () => {
     const chat = ready()
@@ -130,11 +146,17 @@ describe('Chat, its field', () => {
     expect(sendText).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the text and the reason when the send fails', async () => {
+  it('keeps the text and the reason when the send fails, and gives the reason', async () => {
     const chat = ready(() => Promise.resolve(refused('nothing was sent')))
     chat.draft = 'go on'
-    await chat.send()
+    expect(await chat.send()).toBe('nothing was sent')
     expect([chat.draft, chat.sending, chat.error]).toEqual(['go on', false, 'nothing was sent'])
+  })
+
+  it('gives no reason once sent', async () => {
+    const chat = ready()
+    chat.draft = 'carry on'
+    expect(await chat.send()).toBeNull()
   })
 
   it('forgets the last reason on the next send', async () => {
@@ -155,7 +177,7 @@ describe('Chat, its field', () => {
     const sendText = vi.fn(sentOk)
     const chat = ready(sendText, status)
     chat.draft = draft
-    await chat.send()
+    expect(await chat.send()).toBeNull()
     expect(sendText).not.toHaveBeenCalled()
     expect(chat.draft).toBe(draft)
   })

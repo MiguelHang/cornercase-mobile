@@ -15,6 +15,15 @@ const SECTION_OF: Record<string, Section> = {
   shell: 'Working',
 }
 
+const NAMES: Record<string, string> = {
+  working: 'Working',
+  shell: 'Shell',
+  waiting: 'Waiting',
+  failed: 'Failed',
+  done: 'Done',
+  pending: 'Pending',
+}
+
 const MINUTE = 60_000
 
 const HOUR = 60 * MINUTE
@@ -22,6 +31,8 @@ const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
 export const sectionOf = (status: string | null): Section => SECTION_OF[status ?? ''] ?? 'Idle'
+
+export const statusName = (status: string | null | undefined) => NAMES[status ?? ''] ?? 'Idle'
 
 const header = (section: Section): Item => ({ kind: 'header', key: `section:${section}`, section })
 

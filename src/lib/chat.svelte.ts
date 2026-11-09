@@ -1,4 +1,9 @@
-import type { AgentRow_Serialize as AgentRow, commands, LastMessage_Serialize as LastMessage } from './bindings'
+import type {
+  AgentRow_Serialize as AgentRow,
+  commands,
+  LastMessage_Serialize as LastMessage,
+  PaneStatusChanged_Serialize as PaneStatusChanged,
+} from './bindings'
 import { messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
@@ -29,6 +34,9 @@ export const deliver = async (sendText: SendText, pane: number, text: string): P
     return messageOf(error)
   }
 }
+
+export const touches = (changed: PaneStatusChanged, machine: number | null, pane: number) =>
+  changed.machine === machine && (changed.pane === null || changed.pane === pane)
 
 export class Chat {
   readonly pane: number
@@ -92,7 +100,7 @@ export class Chat {
 
   async send() {
     if (!this.canSend) {
-      return
+      return null
     }
     this.sending = true
     this.error = null
@@ -103,6 +111,7 @@ export class Chat {
     } else {
       this.error = failed
     }
+    return failed
   }
 
   #leave() {
