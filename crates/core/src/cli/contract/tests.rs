@@ -194,6 +194,14 @@ mod missing {
         ];
         assert_eq!(missing(&descriptor), expected);
     }
+
+    #[rstest]
+    #[case::operation(one("send", Kind::Operation, Some("busy")), json!({ "name": "send", "kind": "operation", "reason": "busy" }))]
+    #[case::feature(one("boot", Kind::Feature, None), json!({ "name": "boot", "kind": "feature", "reason": null }))]
+    #[case::stream(one("view", Kind::Stream, None), json!({ "name": "view", "kind": "stream", "reason": null }))]
+    fn writes_its_name_kind_and_reason(#[case] missing: Missing, #[case] expected: Value) {
+        assert_eq!(serde_json::to_value(missing).expect("JSON"), expected);
+    }
 }
 
 mod outdated {

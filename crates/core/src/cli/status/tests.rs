@@ -120,6 +120,39 @@ mod reading {
     }
 }
 
+mod writing {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::status(STATUS)]
+    #[case::status_follow(WATCH)]
+    fn reads_back_the_same_session_it_writes(#[case] line: &str) {
+        let snapshot = parsed(line);
+        let written = serde_json::to_string(&snapshot).expect("JSON");
+        assert_eq!(parsed(&written), snapshot);
+    }
+
+    #[test]
+    fn writes_every_field_of_a_pane_with_the_names_of_the_contract() {
+        let pane = Pane { id: 5, parent: Some(4), at_prompt: Some(true), ..agent(5, None, None, false) };
+        let expected = json!({
+            "id": 5,
+            "agent": "claude",
+            "status": "working",
+            "program": "claude",
+            "title": null,
+            "path": "/home/me/web-shop",
+            "parent": 4,
+            "active": false,
+            "dialog": false,
+            "at_prompt": true,
+        });
+        assert_eq!(serde_json::to_value(pane).expect("JSON"), expected);
+    }
+}
+
 mod the_real_server {
     use super::*;
 

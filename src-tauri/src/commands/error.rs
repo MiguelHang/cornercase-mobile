@@ -1,0 +1,134 @@
+use std::fmt::Display;
+
+use cornercase_core::error::Error;
+use cornercase_core::machines::route::RouteError;
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct CommandError {
+    pub(crate) code: ErrorCode,
+    pub(crate) message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ErrorCode {
+    Unauthorized,
+    Dropped,
+    OutputClosed,
+    Rejected,
+    Timeout,
+    Connect,
+    Protocol,
+    Failed,
+    StaleBoot,
+    StreamEnded,
+    Outdated,
+    ContractTooNew,
+    Unanswered,
+    SettleTimeout,
+    InputRejected,
+    Json,
+    Store,
+    Secrets,
+    NoToken,
+    UnknownMachine,
+    UnknownRoute,
+    Identity,
+    Random,
+    RouteNotAUrl,
+    RouteScheme,
+    RouteUserInfo,
+    RouteNoHost,
+    RoutePort,
+    RoutePath,
+    RouteNoToken,
+    RouteEmptyToken,
+    RouteTokenTwice,
+    RouteTokenCharacters,
+    NoDataDir,
+    MachinesNotLoaded,
+    NoIdentity,
+}
+
+impl CommandError {
+    fn new(code: ErrorCode, message: impl Display) -> Self {
+        Self { code, message: message.to_string() }
+    }
+
+    pub(crate) fn no_data_dir(reason: impl Display) -> Self {
+        Self::new(ErrorCode::NoDataDir, format!("the app has no folder for its data: {reason}"))
+    }
+
+    pub(crate) fn machines_not_loaded(error: &Error) -> Self {
+        Self::new(ErrorCode::MachinesNotLoaded, format!("the saved machines are not loaded: {error}"))
+    }
+
+    pub(crate) fn no_identity(error: &Error) -> Self {
+        Self::new(ErrorCode::NoIdentity, format!("the app has no identity: {error}"))
+    }
+}
+
+impl From<&Error> for CommandError {
+    fn from(error: &Error) -> Self {
+        Self::new(core_code(error), error)
+    }
+}
+
+impl From<Error> for CommandError {
+    fn from(error: Error) -> Self {
+        Self::from(&error)
+    }
+}
+
+impl From<RouteError> for CommandError {
+    fn from(error: RouteError) -> Self {
+        Self::new(route_code(error), error)
+    }
+}
+
+fn core_code(error: &Error) -> ErrorCode {
+    match error {
+        Error::Unauthorized => ErrorCode::Unauthorized,
+        Error::Dropped => ErrorCode::Dropped,
+        Error::OutputClosed => ErrorCode::OutputClosed,
+        Error::Rejected { .. } => ErrorCode::Rejected,
+        Error::Timeout => ErrorCode::Timeout,
+        Error::Connect(_) => ErrorCode::Connect,
+        Error::Protocol(_) => ErrorCode::Protocol,
+        Error::Failed { .. } => ErrorCode::Failed,
+        Error::StaleBoot(_) => ErrorCode::StaleBoot,
+        Error::StreamEnded => ErrorCode::StreamEnded,
+        Error::Outdated => ErrorCode::Outdated,
+        Error::ContractTooNew { .. } => ErrorCode::ContractTooNew,
+        Error::Unanswered => ErrorCode::Unanswered,
+        Error::SettleTimeout => ErrorCode::SettleTimeout,
+        Error::InputRejected(_) => ErrorCode::InputRejected,
+        Error::Json(_) => ErrorCode::Json,
+        Error::Store(_) => ErrorCode::Store,
+        Error::Secrets(_) => ErrorCode::Secrets,
+        Error::NoToken => ErrorCode::NoToken,
+        Error::UnknownMachine => ErrorCode::UnknownMachine,
+        Error::UnknownRoute => ErrorCode::UnknownRoute,
+        Error::Identity => ErrorCode::Identity,
+        Error::Random => ErrorCode::Random,
+    }
+}
+
+fn route_code(error: RouteError) -> ErrorCode {
+    match error {
+        RouteError::NotAUrl => ErrorCode::RouteNotAUrl,
+        RouteError::Scheme => ErrorCode::RouteScheme,
+        RouteError::UserInfo => ErrorCode::RouteUserInfo,
+        RouteError::NoHost => ErrorCode::RouteNoHost,
+        RouteError::Port => ErrorCode::RoutePort,
+        RouteError::Path => ErrorCode::RoutePath,
+        RouteError::NoToken => ErrorCode::RouteNoToken,
+        RouteError::EmptyToken => ErrorCode::RouteEmptyToken,
+        RouteError::TokenTwice => ErrorCode::RouteTokenTwice,
+        RouteError::TokenCharacters => ErrorCode::RouteTokenCharacters,
+    }
+}
+
+#[cfg(test)]
+mod tests;

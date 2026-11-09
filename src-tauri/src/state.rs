@@ -1,0 +1,101 @@
+use std::fmt::Display;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+
+use cornercase_core::error::Error;
+use cornercase_core::identity::Identity;
+use cornercase_core::machines::MachineId;
+use cornercase_core::machines::registry::Machines;
+use cornercase_core::machines::store::JsonFileStore;
+use cornercase_core::secrets::Secrets;
+use cornercase_core::store::Store;
+use tauri::async_runtime::JoinHandle;
+
+use crate::commands::error::CommandError;
+use crate::identity;
+
+const MACHINES_FILE: &str = "machines.json";
+
+pub(crate) struct AppState {
+    machines: SharedMachines,
+    identity: Result<Identity, Error>,
+    active: Mutex<Option<Active>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct SharedMachines(Arc<Mutex<Result<Machines, CommandError>>>);
+
+pub(crate) struct Active {
+    machine: MachineId,
+    store: Store,
+    driver: JoinHandle<()>,
+    forwarder: JoinHandle<()>,
+}
+
+impl AppState {
+    pub(crate) fn load(data_dir: Result<PathBuf, impl Display>, secrets: Arc<dyn Secrets>) -> Self {
+        let identity = identity::announce(secrets.as_ref());
+        let machines = match data_dir {
+            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), secrets)
+                .map_err(|error| CommandError::machines_not_loaded(&error)),
+            Err(reason) => Err(CommandError::no_data_dir(reason)),
+        };
+        Self { machines: SharedMachines(Arc::new(Mutex::new(machines))), identity, active: Mutex::new(None) }
+    }
+
+    pub(crate) fn machines<T>(
+        &self,
+        work: impl FnOnce(&mut Machines) -> Result<T, CommandError>,
+    ) -> Result<T, CommandError> {
+        self.machines.with(work)
+    }
+
+    pub(crate) fn shared_machines(&self) -> SharedMachines {
+        self.machines.clone()
+    }
+
+    pub(crate) fn identity(&self) -> Result<&Identity, CommandError> {
+        self.identity.as_ref().map_err(CommandError::no_identity)
+    }
+
+    pub(crate) fn active(&self) -> MutexGuard<'_, Option<Active>> {
+        self.active.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl SharedMachines {
+    pub(crate) fn with<T>(
+        &self,
+        work: impl FnOnce(&mut Machines) -> Result<T, CommandError>,
+    ) -> Result<T, CommandError> {
+        let mut machines = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        match machines.as_mut() {
+            Ok(machines) => work(machines),
+            Err(error) => Err(error.clone()),
+        }
+    }
+}
+
+impl Active {
+    pub(crate) fn new(machine: MachineId, store: Store, driver: JoinHandle<()>, forwarder: JoinHandle<()>) -> Self {
+        Self { machine, store, driver, forwarder }
+    }
+
+    pub(crate) fn machine(&self) -> MachineId {
+        self.machine
+    }
+
+    pub(crate) fn store(&self) -> &Store {
+        &self.store
+    }
+}
+
+impl Drop for Active {
+    fn drop(&mut self) {
+        self.driver.abort();
+        self.forwarder.abort();
+    }
+}
+
+#[cfg(test)]
+mod tests;
