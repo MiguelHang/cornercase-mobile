@@ -11,3 +11,7 @@ A topic of [Connection](../connection.md): how the app shows the active machine'
   - `unauthorized`: `The bridge rejected this phone's token`, in `--failed`, and no fix offered. The fix is adding the route again with the new token, which needs 027 (the QR and a route added to a saved machine); pasting the URL again would make a second machine, and `home` has no form. A known limit until 027.
   - `incompatible`: `Incompatible: <message>`, in `--failed`.
   - `none` reads `Not connected`, though `home` does not show it: the route goes back to `no-machines`.
+- **Checked on 2026-11-09** in the iPhone 17 simulator, iOS 27.2, against `cargo run -p cornercase-bridge` on the LAN and cornercase 0.13.19:
+  - after `Add`, `Connecting…` for under half a second, then `MacBook · via 192.168.1.135:8765` and the pane count;
+  - with the bridge stopped by `SIGSTOP`, a relaunch stayed in `connecting`, the dot and the cursor pulsing (their colours, read in screenshots, rose and fell), then went to `Retrying in 1 s` with `the bridge did not answer in time`;
+  - with the bridge killed, `Retrying in N s` with `cannot reach the bridge: Connection refused (os error 61)` under it, counting down a second at a time, the wait growing between attempts (2, 8, 15 s), and no toast; started again on the same port, the app reconnected on its own.

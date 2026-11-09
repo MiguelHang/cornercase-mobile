@@ -19,7 +19,7 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 ## Touch and motion
 
 - **Every control is at least 44 px tall**, Apple's minimum touch target, and the pressed state is `:active`, never hover, which touch screens lack.
-- **WebKit on iOS applies `:active` only to elements with a touch listener**, so `Button` and each toast carry an empty `ontouchstart`. Task 034's button was resting, so its press could not be seen; since task 014 `Add machine`, `Cancel` and `Add` are live, and the press still has to be checked with a real tap in the simulator.
+- **WebKit on iOS applies `:active` only to elements with a touch listener**, so `Button` and each toast carry an empty `ontouchstart`. Checked with a real touch on 2026-11-09 in the iPhone 17 simulator, iOS 27.2 (an XCUITest press, which goes through the simulator's touch events like a finger): while `Add machine` is held it is `--brand-hover` (`#0050d8` read in the screenshots), and it goes back on release. Held for 10 s it does not click, since WebKit takes it as a long press; a tap opens the form.
 - **Two tones, `primary` and `plain`**: primary is cobalt, plain is gpui's `filled` of `Tone::Plain` (a `--hover` fill, a `--border` edge and `--soft` text), pressed to `--selected` with an `--edge` border. A form pairs them: `Cancel` plain, the action primary. gpui's danger tone comes with its first use, removing a machine (027).
 - **A resting button** keeps the primary fill at 40 % opacity and is `disabled`, `aria-disabled` and deaf to touches, like gpui's `resting_button`.
 - **A busy button** is gpui's `busy_button`: the spinner before a label that says what is going on (`Adding…`), `disabled`, `aria-busy` and deaf to touches, but at full opacity, since it is working and not unavailable. With Reduce Motion the spinner stands still and the label alone says that it works.
@@ -55,9 +55,10 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
   - At most 3 rather than 5, the oldest dropped when a fourth comes: a phone has room for fewer.
   - At the top, under the connection bar and inside the safe area, rather than at the bottom right. On a phone the bottom belongs to the keyboard and the home indicator, and iOS's own banners come from the top. They enter downward (`dropIn`).
   - Each lasts 4 s (`info`) or 8 s (`error`) from when it arrives.
-  - A toast equal to one still showing (same level and text) does not stack: it merges into it, counts `×N` and starts its time again, like `push_toast`. A `Store` that keeps retrying sends the same warning on every attempt.
+  - A toast equal to one still showing (same level and text) does not stack: it merges into it, counts `×N` and starts its time again, like `push_toast`. A `Store` repeats a warning, such as one per line of a stream that does not parse (Store › Lines are read leniently). A failed connection attempt is not a toast: its error is the connection bar's second line, so a stopped bridge shows none.
   - A tap dismisses it: there is no hover to show a close button on. The whole card is the button, at least 44 px tall.
 - **Each one is a `Glass` card** with gpui's 3 px bar, `--accent` for info and `--failed` for error, with its glow. The stack lets touches through between the cards, so it never blocks the screen under it, and it is a polite live region.
+- **Checked on 2026-11-09** in the iPhone 17 simulator, iOS 27.2: three equal error toasts and a fourth, pushed by a temporary line in `App.svelte` through a hot reload (nothing in the app sends a toast on demand), showed as one `×3` card and the other, under the two-line bar of `retrying`. A tap on the first removed it and the second moved up.
 
 ## Forms
 
@@ -65,6 +66,7 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 - **A field turns text selection back on**: `base.css` sets `user-select: none` on `body`, and without `user-select: text` (and its `-webkit-` form) iOS neither selects in the field nor offers Paste on a long press, which is how the bridge's URL arrives.
 - **A URL field** has no autocapitalisation, autocorrection or spell check, and `inputmode="url"`, so a pasted URL stays as it was pasted.
 - **The first machine's form is inline**, in the empty screen's card under the emblem, like the Add form of gpui's `design/machines.md`: `Bridge URL`, `Name`, then `Cancel` and `Add`. Rejected: a sheet rising from the bottom. In WKWebView the keyboard covers what is `position: fixed` at the bottom (the visual viewport shrinks, the layout viewport does not), so the sheet would have to follow `visualViewport`. `Sheet` comes with its first real use (023 or 027). What the form checks and does: Connection › Adding a machine.
+- **Checked on 2026-11-09** in the iPhone 17 simulator, iOS 27.2, with real touches: a tap on `Bridge URL` brings the URL keyboard (`/` and `.com`) and scrolls the field above it; a long press then offers Paste and AutoFill, and Paste puts in the bridge's whole URL, after which `Name`'s placeholder is its host. A long press on the field before it has focus offers nothing, as in any iOS text field. The simulator's pasteboard follows the Mac's, so `simctl pbcopy` is overwritten: put the URL on the Mac's. On `Add`, the spinner and `Adding…` show, the fields and `Cancel` rest, and the card fades out under the `Connecting…` bar.
 
 ## Launch
 
