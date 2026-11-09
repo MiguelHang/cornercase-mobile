@@ -58,19 +58,11 @@ pub enum Kind {
     Pane,
 }
 
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct Head {
-    time: String,
-    project: Option<u64>,
-    workspace: Option<u64>,
-    tab: Option<u64>,
-    pane: Option<u64>,
-}
-
 impl From<Value> for Event {
     fn from(value: Value) -> Self {
-        let Head { time, project, workspace, tab, pane } = Head::deserialize(&value).unwrap_or_default();
+        let id = |key| value.get(key).and_then(Value::as_u64);
+        let (project, workspace, tab, pane) = (id("project"), id("workspace"), id("tab"), id("pane"));
+        let time = value.get("time").and_then(Value::as_str).unwrap_or_default().to_owned();
         let what = What::deserialize(&value).unwrap_or(What::Other(value));
         Self { time, project, workspace, tab, pane, what }
     }

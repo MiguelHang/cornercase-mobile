@@ -9,6 +9,7 @@ use crate::cli::status::fixtures as snapshots;
 use crate::store::streams::{APP, EVENTS, STATUS};
 
 const SECRET: &str = "c2VjcmV0";
+pub(super) const BOOT: &str = "4242-1760600000";
 
 pub(super) type Lines = [Vec<String>; 3];
 
@@ -20,8 +21,18 @@ pub(super) fn fine() -> Lines {
     [vec![line(events::OPENED), line(events::EXITED)], vec![line(snapshots::WATCH)], vec![line(snapshots::APP)]]
 }
 
+pub(super) fn contract_of(boot: &str) -> String {
+    let mut contract: Value = serde_json::from_str(REAL).expect("the real contract parses");
+    contract["boot"] = boot.into();
+    contract.to_string()
+}
+
+pub(super) fn served() -> String {
+    contract_of(BOOT)
+}
+
 pub(super) fn serving(lines: Lines) -> FakeTransport {
-    let fake = FakeTransport::default().answer(CONTRACT, &[REAL], &[], 0);
+    let fake = FakeTransport::default().answer(CONTRACT, &[&served()], &[], 0);
     [EVENTS, STATUS, APP].into_iter().zip(lines).fold(fake, |fake, (argv, lines)| {
         let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
         fake.open(argv, &lines)
@@ -53,7 +64,7 @@ fn event(json: &str) -> Event {
     serde_json::from_str(json).expect("an event fixture")
 }
 
-fn connected() -> Vec<Connection> {
+pub(super) fn connected() -> Vec<Connection> {
     vec![Connection::Connecting, Connection::Connected { route: route(LAN).address().clone() }]
 }
 
@@ -102,14 +113,25 @@ mod the_session {
     use super::*;
 
     #[rstest]
-    #[case::older_of_the_same_boot(snapshot("a", 6, "second"), "first")]
-    #[case::as_old_of_the_same_boot(snapshot("a", 7, "second"), "first")]
-    #[case::newer_of_the_same_boot(snapshot("a", 8, "second"), "second")]
+    #[case::older_of_the_same_boot(snapshot(BOOT, 6, "second"), "first")]
+    #[case::as_old_of_the_same_boot(snapshot(BOOT, 7, "second"), "first")]
+    #[case::newer_of_the_same_boot(snapshot(BOOT, 8, "second"), "second")]
     #[tokio::test(start_paused = true)]
     async fn takes_a_snapshot_only_if_newer_in_its_boot(#[case] next: String, #[case] kept: &str) {
         let [events, _, app] = fine();
-        let (store, changes) = started([events, vec![snapshot("a", 7, "first"), next], app]).await;
+        let (store, changes) = started([events, vec![snapshot(BOOT, 7, "first"), next], app]).await;
         assert_eq!(store.session().map(|session| session.version), Some(kept.to_owned()));
+        assert_eq!(connections(&changes), connected());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn skips_a_line_without_a_boot_with_a_warning() {
+        let [events, _, app] = fine();
+        let unbooted = json!({"foo": 1}).to_string();
+        let lines = vec![snapshot(BOOT, 7, "first"), unbooted, snapshot(BOOT, 8, "second")];
+        let (store, changes) = started([events, lines, app]).await;
+        assert!(matches!(&warnings(&changes)[..], [Error::Json(reason)] if reason.contains("without its boot")));
+        assert_eq!(store.session().map(|session| session.version), Some("second".to_owned()));
         assert_eq!(connections(&changes), connected());
     }
 }

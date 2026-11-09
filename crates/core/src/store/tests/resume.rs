@@ -6,10 +6,9 @@ use rstest::rstest;
 
 use super::connect::{contract, refusing, without_notices};
 use super::retry::{exit, held};
-use super::streams::{connections, fine, line, serving};
+use super::streams::{connections, fine, line, served, serving};
 use super::*;
 use crate::cli::contract::Kind;
-use crate::cli::contract::fixtures::REAL;
 use crate::cli::status::fixtures::WATCH;
 use crate::store::streams::{APP, EVENTS, STATUS};
 use crate::transport::Out;
@@ -21,7 +20,7 @@ pub(super) fn contracts(asked: &Asked) -> usize {
 fn slow_contract() -> FakeTransport {
     serving(fine()).script(CONTRACT, |_, mut out| async move {
         time::sleep(Duration::from_secs(1)).await;
-        out.send(Out::Stdout(REAL.to_owned())).await.map_err(|_| Error::OutputClosed)?;
+        out.send(Out::Stdout(served())).await.map_err(|_| Error::OutputClosed)?;
         Ok(exit(0, ""))
     })
 }

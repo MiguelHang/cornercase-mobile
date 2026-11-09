@@ -3,13 +3,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use futures_util::SinkExt;
 use rstest::rstest;
-use serde_json::Value;
 
 use super::resume::{contracts, once};
 use super::retry::{answered, exit, held};
-use super::streams::{Lines, connections, fine, line, serving, snapshot};
+use super::streams::{Lines, connected, connections, contract_of, fine, line, served, serving, snapshot};
 use super::*;
-use crate::cli::contract::fixtures::REAL;
 use crate::cli::status::fixtures::{APP as APP_SNAPSHOT, WATCH};
 use crate::queue::Outcome;
 use crate::store::streams::{APP, EVENTS, STATUS};
@@ -31,20 +29,34 @@ where
     fake.script(argv, move |_, out| script(calls.fetch_add(1, Ordering::SeqCst), out))
 }
 
-fn contract_of(boot: &str) -> String {
-    let mut contract: Value = serde_json::from_str(REAL).expect("the real contract parses");
-    contract["boot"] = boot.into();
-    contract.to_string()
-}
-
-fn rebooting(fake: FakeTransport) -> FakeTransport {
-    by_call(fake, CONTRACT, |call, out| {
-        answered(out, Some(if call == 0 { REAL.to_owned() } else { contract_of(RESTARTED) }))
+fn rebooting_after(fake: FakeTransport, wait: Duration) -> FakeTransport {
+    by_call(fake, CONTRACT, move |call, out| async move {
+        if call == 0 {
+            return answered(out, Some(served())).await;
+        }
+        time::sleep(wait).await;
+        answered(out, Some(contract_of(RESTARTED))).await
     })
 }
 
+fn rebooting(fake: FakeTransport) -> FakeTransport {
+    rebooting_after(fake, Duration::ZERO)
+}
+
 fn answering_only(fake: FakeTransport, first: bool) -> FakeTransport {
-    by_call(fake, CONTRACT, move |call, out| answered(out, ((call == 0) == first).then(|| REAL.to_owned())))
+    by_call(fake, CONTRACT, move |call, out| answered(out, ((call == 0) == first).then(served)))
+}
+
+fn late(fake: FakeTransport) -> FakeTransport {
+    fake.script(STATUS, |_, mut out| async move {
+        time::sleep(Duration::from_secs(5)).await;
+        said(&mut out, line(WATCH)).await?;
+        future::pending().await
+    })
+}
+
+fn stale_at_first(fake: FakeTransport) -> FakeTransport {
+    by_call(fake, CONTRACT, |call, out| answered(out, Some(if call == 0 { contract_of(RESTARTED) } else { served() })))
 }
 
 async fn said(out: &mut OutSink, line: String) -> Result<(), Error> {
@@ -85,8 +97,11 @@ mod a_restart {
 
     #[rstest]
     #[case::in_the_contract(restarting(rebooting(serving(fine())), None, true), retried())]
-    #[case::in_a_snapshot(restarting(serving(fine()), Some(restarted()), false), at_once())]
-    #[case::in_the_last_snapshot_of_a_session(restarting(serving(fine()), Some(restarted()), true), at_once())]
+    #[case::in_a_snapshot(restarting(rebooting(serving(fine())), Some(restarted()), false), at_once())]
+    #[case::in_the_last_snapshot_of_a_session(
+        restarting(rebooting(serving(fine())), Some(restarted()), true),
+        at_once()
+    )]
     #[tokio::test(start_paused = true)]
     async fn forgets_the_session_the_app_and_what_was_queued(
         #[case] fake: FakeTransport,
@@ -107,6 +122,37 @@ mod a_restart {
         let replies = (hung.now_or_never(), queued.now_or_never());
         assert_eq!(replies, (Some(Err(Error::Unanswered)), Some(Ok(Outcome::Skipped))));
         assert_eq!(contracts(&asked), 2);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn in_a_snapshot_moves_the_queue_before_the_contract_answers() {
+        let slow = rebooting_after(serving(fine()), Duration::from_secs(30));
+        let (store, mut changes) = spawned(restarting(slow, Some(restarted()), false), &Asked::default());
+        until_connected(&mut changes).await;
+        let queue = store.queue().expect("a queue once connected");
+        let (hung, queued) = (queue.ask(words(&["focus"]), None), queue.ask(words(&["status"]), None));
+        time::sleep(Duration::from_secs(10)).await;
+        assert_eq!(store.connection(), Connection::Connecting);
+        let replies = (hung.now_or_never(), queued.now_or_never());
+        assert_eq!(replies, (Some(Err(Error::Unanswered)), Some(Ok(Outcome::Skipped))));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn in_the_first_snapshot_is_seen_once() {
+        let asked = Asked::default();
+        let fake = held(late(stale_at_first(serving(fine()))), REQUESTS, &Arc::default());
+        let (store, mut changes) = spawned(fake, &asked);
+        time::sleep(Duration::from_secs(1)).await;
+        let hung = store.queue().expect("a queue once the contract answered").ask(words(&["focus"]), None);
+        until_connected(&mut changes).await;
+        assert_eq!((hung.now_or_never(), contracts(&asked)), (Some(Err(Error::Unanswered)), 2));
+        unread(&mut changes);
+        store.resume_now();
+        time::sleep(Duration::from_secs(60)).await;
+        let changes = unread(&mut changes);
+        assert_eq!(connections(&changes), connected());
+        assert!(!changes.contains(&Change::Session));
+        assert_eq!(store.session(), Some(serde_json::from_str(WATCH).expect("the watch fixture")));
     }
 }
 

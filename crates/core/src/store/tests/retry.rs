@@ -14,6 +14,10 @@ pub(super) fn exit(code: i32, stderr: &str) -> Exit {
     Exit { code, stderr: stderr.to_owned() }
 }
 
+fn failed(code: i32, stderr: &str) -> Error {
+    Error::Failed { code, stderr: stderr.to_owned() }
+}
+
 fn ending(argv: &[&str], end: Result<Exit, Error>) -> FakeTransport {
     serving(fine()).script(argv, move |_, _| future::ready(end.clone()))
 }
@@ -65,8 +69,8 @@ mod a_stream_that_ends {
 
     #[rstest]
     #[case::events_that_exit_cleanly(EVENTS, Ok(exit(0, "")), Error::StreamEnded)]
-    #[case::session_that_exits_with_an_error(STATUS, Ok(exit(1, "boom")), Error::Failed { code: 1, stderr: "boom".to_owned() })]
-    #[case::app_that_exits_with_an_error(APP, Ok(exit(2, "bad")), Error::Failed { code: 2, stderr: "bad".to_owned() })]
+    #[case::session_that_exits_with_an_error(STATUS, Ok(exit(1, "boom")), failed(1, "boom"))]
+    #[case::app_that_exits_with_an_error(APP, Ok(exit(2, "bad")), failed(2, "bad"))]
     #[case::events_whose_connection_drops(EVENTS, Err(Error::Dropped), Error::Dropped)]
     #[case::app_whose_connection_goes_silent(APP, Err(Error::Timeout), Error::Timeout)]
     #[tokio::test(start_paused = true)]

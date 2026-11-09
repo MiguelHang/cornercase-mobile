@@ -8,6 +8,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 use super::{Change, Connection, Shared};
+use crate::cli::contract::boot::Boot;
 use crate::cli::events::Event;
 use crate::cli::status::Snapshot;
 use crate::error::Error;
@@ -18,6 +19,7 @@ use crate::transport::{Exit, Output, Transport, json_error, listen, only_stdout,
 pub(super) const EVENTS: &[&str] = &["events", "--json", "--notices"];
 pub(super) const STATUS: &[&str] = &["status", "--follow", "--json"];
 pub(super) const APP: &[&str] = &["status", "--app", "--follow", "--json"];
+const UNBOOTED: &str = "not the expected shape: a snapshot without its boot";
 
 type End = Result<Exit, Error>;
 
@@ -105,6 +107,10 @@ impl Shared {
         let Some(snapshot) = self.parsed::<Snapshot>(line) else {
             return Continue(());
         };
+        if snapshot.boot.is_empty() {
+            self.publish(&Change::Warning(Error::Json(UNBOOTED.to_owned())));
+            return Continue(());
+        }
         self.snapshot(snapshot)?;
         if !self.connected() {
             self.set_connection(Connection::Connected { route: route.clone() });
@@ -113,14 +119,11 @@ impl Shared {
     }
 
     fn snapshot(&self, snapshot: Snapshot) -> ControlFlow<()> {
-        let mut state = self.state();
-        let last = state.session.as_ref();
-        if last.is_some_and(|last| last.boot != snapshot.boot) {
-            drop(state);
-            self.forget();
+        if self.restarted(Boot(snapshot.boot.clone())) {
             return Break(());
         }
-        if last.is_some_and(|last| snapshot.revision <= last.revision) {
+        let mut state = self.state();
+        if state.session.as_ref().is_some_and(|last| snapshot.revision <= last.revision) {
             return Continue(());
         }
         state.session = Some(snapshot);

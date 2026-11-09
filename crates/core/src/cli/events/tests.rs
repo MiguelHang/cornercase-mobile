@@ -35,7 +35,10 @@ mod known_events {
     use super::*;
 
     #[rstest]
-    #[case::status(STATUS, What::Status { agent: "claude".into(), from: Some("working".into()), to: Some("waiting".into()) })]
+    #[case::status(
+        STATUS,
+        What::Status { agent: "claude".into(), from: Some("working".into()), to: Some("waiting".into()) }
+    )]
     #[case::opened(OPENED, opened(Kind::Tab, None))]
     #[case::opened_with_a_parent(OPENED_PARENT, opened(Kind::Pane, Some(2)))]
     #[case::opened_with_accounts(OPENED_ACCOUNTS, opened(Kind::Pane, Some(2)))]
@@ -99,6 +102,14 @@ mod other_events {
     fn keep_the_ids_of_an_unknown_event() {
         let event = parsed(BELL);
         assert_eq!((event.project, event.workspace, event.tab, event.pane), (Some(1), Some(2), Some(3), Some(4)));
+    }
+
+    #[test]
+    fn keep_the_ids_beside_a_time_that_is_not_text() {
+        let event =
+            parsed(&json!({"time": 5, "event": "bell", "project": 1, "workspace": 2, "tab": 3, "pane": 4}).to_string());
+        assert_eq!((event.project, event.workspace, event.tab, event.pane), (Some(1), Some(2), Some(3), Some(4)));
+        assert_eq!(event.time, "");
     }
 
     #[test]

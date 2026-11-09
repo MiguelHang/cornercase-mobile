@@ -14,7 +14,7 @@ use self::backoff::Backoff;
 use self::connect::Failure;
 use self::streams::Ended;
 use crate::cli::contract::Missing;
-use crate::cli::contract::boot::BootWatch;
+use crate::cli::contract::boot::{Boot, BootWatch, Observed};
 use crate::cli::events::Event;
 use crate::cli::status::Snapshot;
 use crate::error::Error;
@@ -162,6 +162,7 @@ struct State {
     app: Option<Value>,
     queue: Option<Queue>,
     subscribers: Vec<Subscriber>,
+    boots: BootWatch,
 }
 
 impl Shared {
@@ -201,6 +202,14 @@ impl Shared {
         self.publish(&Change::Session);
         self.publish(&Change::App);
     }
+
+    fn restarted(&self, boot: Boot) -> bool {
+        let restarted = self.state().boots.observe(boot) == Observed::Restarted;
+        if restarted {
+            self.forget();
+        }
+        restarted
+    }
 }
 
 struct Driver<F> {
@@ -209,7 +218,6 @@ struct Driver<F> {
     config: PickConfig,
     shared: Arc<Shared>,
     backoff: Backoff,
-    boots: BootWatch,
     worker: Option<oneshot::Sender<Worker>>,
 }
 
@@ -220,7 +228,7 @@ where
     fn new(machine: Machine, factory: F, config: PickConfig, shared: Arc<Shared>) -> (Self, oneshot::Receiver<Worker>) {
         let (worker, started) = oneshot::channel();
         let backoff = Backoff::default();
-        (Self { machine, factory, config, shared, backoff, boots: BootWatch::default(), worker: Some(worker) }, started)
+        (Self { machine, factory, config, shared, backoff, worker: Some(worker) }, started)
     }
 
     async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>, worker: oneshot::Receiver<Worker>) {
@@ -249,7 +257,8 @@ where
             Woken::Done(Ok(picked)) => self.follow(&picked, resumes).await,
             Woken::Done(Err(Failure::Retry(error))) => Woken::Done(error),
             Woken::Done(Err(Failure::Stop(connection))) => return self.stop(connection, resumes).await,
-            Woken::Resumed | Woken::Dropped => return false,
+            Woken::Resumed => return true,
+            Woken::Dropped => return false,
         };
         match woken {
             Woken::Done(error) => self.retry(error, resumes).await,
@@ -266,7 +275,11 @@ where
         }
         match woken {
             Woken::Done(Ended::Failed(error)) => Woken::Done(error),
-            Woken::Done(Ended::Restarted) | Woken::Resumed => Woken::Resumed,
+            Woken::Done(Ended::Restarted) => {
+                self.join(&picked.transport);
+                Woken::Resumed
+            }
+            Woken::Resumed => Woken::Resumed,
             Woken::Dropped => Woken::Dropped,
         }
     }

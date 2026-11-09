@@ -106,24 +106,34 @@ fn spawned(fake: FakeTransport, asked: &Asked) -> (Store, Changes) {
     (store, changes)
 }
 
+async fn bounded<T>(work: impl Future<Output = T>) -> T {
+    time::timeout(Duration::from_secs(300), work).await.expect("the store gets there within five minutes")
+}
+
 async fn next_connection(changes: &mut Changes) -> Connection {
-    loop {
-        if let Some(Change::Connection(connection)) = changes.next().await {
-            return connection;
+    bounded(async {
+        loop {
+            if let Some(Change::Connection(connection)) = changes.next().await {
+                return connection;
+            }
         }
-    }
+    })
+    .await
 }
 
 async fn retrying(changes: &mut Changes) -> (Duration, Error) {
-    loop {
-        if let Connection::Retrying { r#in, error } = next_connection(changes).await {
-            return (r#in, error);
+    bounded(async {
+        loop {
+            if let Connection::Retrying { r#in, error } = next_connection(changes).await {
+                return (r#in, error);
+            }
         }
-    }
+    })
+    .await
 }
 
 async fn until_connected(changes: &mut Changes) {
-    while !matches!(next_connection(changes).await, Connection::Connected { .. }) {}
+    bounded(async { while !matches!(next_connection(changes).await, Connection::Connected { .. }) {} }).await;
 }
 
 async fn next_wait(changes: &mut Changes) -> Duration {
