@@ -3,8 +3,9 @@ use futures_util::future::BoxFuture;
 
 use super::input::{EACH, key, typing};
 use super::*;
+use crate::cli::paste_file;
 
-const PASTE: [&str; 4] = ["paste-file", "--pane", "5", "-"];
+const PASTE: [&str; 6] = ["paste-file", "--pane", "5", "--name=shot.png", "--json", "-"];
 
 #[derive(Clone, Copy)]
 enum Step {
@@ -135,7 +136,7 @@ mod bytes {
         let fake = typing(answering(FakeTransport::default(), &log, &starts), &log, &starts, EACH);
         let Started { queue, mut notices, .. } = start(pasting(fake, &log));
         queue.input(5, key("a"));
-        let pasted = queue.ask(words(&PASTE), Some(Stdin::Bytes(vec![0, 255])));
+        let pasted = queue.ask(paste_file::args(5, "shot.png"), Some(Stdin::Bytes(vec![0, 255])));
         queue.input(5, key("b"));
         assert_eq!(pasted.await, Ok(done("pasted")));
         assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));

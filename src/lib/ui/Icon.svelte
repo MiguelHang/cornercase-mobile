@@ -23,6 +23,8 @@
       <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx={shape.rx} />
     {:else if shape.kind === 'line'}
       <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />
+    {:else if shape.kind === 'circle'}
+      <circle cx={shape.cx} cy={shape.cy} r={shape.r} />
     {:else}
       <path d={shape.d} />
     {/if}

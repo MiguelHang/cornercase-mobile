@@ -79,6 +79,12 @@ mod argv {
     fn sends_from_stdin_with_enter_and_a_timeout() {
         assert_eq!(send_args(12), words(&["send", "--pane", "12", "--enter", "--timeout", "30", "-"]));
     }
+
+    #[test]
+    fn forces_a_send_past_the_hold_with_enter_and_a_timeout() {
+        let forced = words(&["send", "--pane", "12", "--force", "--enter", "--timeout", "30", "-"]);
+        assert_eq!(forced_send_args(12), forced);
+    }
 }
 
 mod over_a_transport {

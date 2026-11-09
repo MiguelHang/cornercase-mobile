@@ -4,6 +4,7 @@ import type {
   LastMessage_Serialize as LastMessage,
   PaneStatusChanged_Serialize as PaneStatusChanged,
 } from './bindings'
+import { Attachments, type AttachImage } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import type { KeyName } from './keys'
 import { messageOf } from './toasts'
@@ -73,6 +74,7 @@ export class Chat {
   row = $state<AgentRow | null>(null)
   gone = $state(false)
   interrupting = $state(false)
+  readonly attachments: Attachments
   #readLast: ReadLast
   #sendText: SendText
   #pressKey: PressKey
@@ -90,6 +92,7 @@ export class Chat {
     readLast: ReadLast,
     sendText: SendText,
     pressKey: PressKey,
+    attachImage: AttachImage,
     haptics: HapticsApi,
     clock: Clock,
   ) {
@@ -98,6 +101,7 @@ export class Chat {
     this.#readLast = readLast
     this.#sendText = sendText
     this.#pressKey = pressKey
+    this.attachments = new Attachments(pane, attachImage)
     this.#haptics = haptics
     this.#clock = clock
   }
@@ -107,7 +111,8 @@ export class Chat {
   }
 
   get canSend() {
-    return this.draft.trim() !== '' && !this.sending && this.row !== null && !this.asking
+    const something = this.draft.trim() !== '' || this.attachments.chips.length > 0
+    return something && !this.sending && this.row !== null && !this.asking
   }
 
   get canPress() {
@@ -153,12 +158,18 @@ export class Chat {
       return null
     }
     this.sending = true
-    const failed = await deliver(() => this.#sendText(this.pane, this.draft))
+    const sent = this.attachments.chips.length
+    const failed = await deliver(() => this.#sendText(this.pane, this.draft, sent > 0))
     this.sending = false
     if (failed === null) {
       this.draft = ''
+      this.attachments.clear(sent)
     }
     return failed
+  }
+
+  async attach(): Promise<string | null> {
+    return this.canPress ? this.attachments.attach() : null
   }
 
   #lost(agents: AgentRow[] | null) {
@@ -175,7 +186,12 @@ export class Chat {
       return null
     }
     this.#disarm()
-    return deliver(() => this.#pressKey(this.pane, key))
+    const pasted = key === 'enter' ? this.attachments.chips.length : 0
+    const failed = await deliver(() => this.#pressKey(this.pane, key))
+    if (failed === null && pasted > 0) {
+      this.attachments.clear(pasted)
+    }
+    return failed
   }
 
   #arm() {
@@ -192,6 +208,7 @@ export class Chat {
     this.gone = true
     this.row = null
     this.draft = ''
+    this.attachments.clear()
     this.#asked += 1
     this.#again = false
   }

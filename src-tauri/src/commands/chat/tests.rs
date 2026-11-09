@@ -9,7 +9,7 @@ use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::{press_key, send_message, sent};
+use super::{answered, press_key, send_message};
 use crate::commands::connection::start;
 use crate::commands::error::CommandError;
 use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle, snapshot};
@@ -22,8 +22,9 @@ const TURN_OVER: &str = include_str!(concat!(
 const NO_PANE: &str = "Error: there is no pane 543; `cornercase status` lists them";
 const REQUESTS: &[&str] = &["requests", "--follow", "-"];
 const SEND: [&str; 7] = ["send", "--pane", "543", "--enter", "--timeout", "30", "-"];
+const FORCED: [&str; 8] = ["send", "--pane", "543", "--force", "--enter", "--timeout", "30", "-"];
 
-async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {
+pub(super) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {
     let studio = Studio::new();
     let state = studio.reloaded();
     let (launcher, _) = launcher(scripted(serving(&[snapshot(BOOT, 7, "first")])));
@@ -96,9 +97,9 @@ fn written(lines: &Receiver<String>) -> Vec<Value> {
     lines.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect()
 }
 
-async fn sending(answer: Option<Value>, text: &str) -> (Result<(), Value>, Vec<Value>) {
+async fn sending(answer: Option<Value>, text: &str, force: bool) -> (Result<(), Value>, Vec<Value>) {
     let (ipc, lines) = queueing(answer).await;
-    let sent = send_message(&ipc.state(), 543, text.to_owned()).await.map_err(|error| json_of(&error));
+    let sent = send_message(&ipc.state(), 543, text.to_owned(), force).await.map_err(|error| json_of(&error));
     (sent, written(&lines))
 }
 
@@ -108,7 +109,7 @@ async fn pressing(answer: Option<Value>, key: &str) -> (Result<(), Value>, Vec<V
     (pressed, written(&lines))
 }
 
-fn json_of(error: &CommandError) -> Value {
+pub(super) fn json_of(error: &CommandError) -> Value {
     serde_json::to_value(error).expect("an error serializes")
 }
 
@@ -127,9 +128,23 @@ mod sending_a_message {
     #[case::on_several_lines("first line\nsecond line")]
     #[tokio::test(start_paused = true)]
     async fn writes_the_text_on_stdin_and_never_in_the_args(#[case] text: &str) {
-        let (sent, written) = sending(Some(json!({ "status": 0, "text": "" })), text).await;
+        let (sent, written) = sending(Some(json!({ "status": 0, "text": "" })), text, false).await;
         assert_eq!(sent, Ok(()));
         assert_eq!(written, [json!({ "args": SEND, "stdin": text })]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn forces_it_past_a_held_draft_when_asked() {
+        let (sent, written) = sending(Some(json!({ "status": 0, "text": "" })), "what is in it?", true).await;
+        assert_eq!(sent, Ok(()));
+        assert_eq!(written, [json!({ "args": FORCED, "stdin": "what is in it?" })]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn presses_enter_when_forced_with_nothing_to_add() {
+        let (sent, written) = sending(Some(json!({ "status": 0, "text": "" })), "", true).await;
+        assert_eq!(sent, Ok(()));
+        assert_eq!(written, [json!({ "args": ["keys", "--pane", "543", "enter"] })]);
     }
 
     #[rstest]
@@ -138,24 +153,27 @@ mod sending_a_message {
     #[tokio::test(start_paused = true)]
     async fn fails_with_the_reason_cornercase_gave(#[case] reason: &str) {
         let refusal = json!({ "status": 1, "error": format!("Error: {reason}\n") });
-        let (sent, _) = sending(Some(refusal), "fix the failing test").await;
+        let (sent, _) = sending(Some(refusal), "fix the failing test", false).await;
         assert_eq!(sent, Err(json!({ "code": "failed", "message": reason })));
     }
 
     #[tokio::test(start_paused = true)]
     async fn may_have_sent_it_when_the_answer_is_lost() {
-        let (sent, written) = sending(None, "fix the failing test").await;
+        let (sent, written) = sending(None, "fix the failing test", false).await;
         assert_eq!(written.len(), 1);
         assert_eq!(sent, Err(json_of(&CommandError::maybe_sent())));
     }
 
     #[rstest]
-    #[case::done(Ok(Outcome::Done(String::new())), Ok(()))]
+    #[case::done(Ok(Outcome::Done("printed".to_owned())), Ok("printed".to_owned()))]
     #[case::skipped(Ok(Outcome::Skipped), Err(CommandError::not_sent()))]
     #[case::unanswered(Err(Error::Unanswered), Err(CommandError::maybe_sent()))]
     #[case::dropped(Err(Error::Dropped), Err(CommandError::from(Error::Dropped)))]
-    fn maps_what_the_queue_answered(#[case] outcome: Result<Outcome, Error>, #[case] mapped: Result<(), CommandError>) {
-        assert_eq!(sent(outcome), mapped);
+    fn maps_what_the_queue_answered(
+        #[case] outcome: Result<Outcome, Error>,
+        #[case] mapped: Result<String, CommandError>,
+    ) {
+        assert_eq!(answered(outcome), mapped);
     }
 }
 
@@ -213,7 +231,8 @@ mod without_a_connection {
     }
 
     #[rstest]
-    #[case::sending("send", json!({ "pane": 543, "text": "hello" }))]
+    #[case::sending("send", json!({ "pane": 543, "text": "hello", "force": false }))]
+    #[case::attaching("attach", json!({ "pane": 543 }))]
     #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
     fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
