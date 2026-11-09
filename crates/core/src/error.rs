@@ -18,6 +18,16 @@ pub enum Error {
     Failed { code: i32, stderr: String },
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
+    #[error("cannot read or write the saved machines: {0}")]
+    Store(String),
+    #[error("the secret store failed: {0}")]
+    Secrets(String),
+    #[error("the route has no saved token; scan the bridge's code again")]
+    NoToken,
+    #[error("no saved machine has that id")]
+    UnknownMachine,
+    #[error("the machine has no route at that address")]
+    UnknownRoute,
 }
 
 #[cfg(test)]
