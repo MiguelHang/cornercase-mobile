@@ -10,7 +10,7 @@ use crate::cli::status::fixtures::{APP as APP_SNAPSHOT, WATCH};
 use crate::store::streams::{APP, EVENTS, STATUS};
 use crate::transport::Out;
 
-fn exit(code: i32, stderr: &str) -> Exit {
+pub(super) fn exit(code: i32, stderr: &str) -> Exit {
     Exit { code, stderr: stderr.to_owned() }
 }
 
@@ -18,7 +18,7 @@ fn ending(argv: &[&str], end: Result<Exit, Error>) -> FakeTransport {
     serving(fine()).script(argv, move |_, _| future::ready(end.clone()))
 }
 
-fn held(fake: FakeTransport, argv: &[&str], alive: &Arc<()>) -> FakeTransport {
+pub(super) fn held(fake: FakeTransport, argv: &[&str], alive: &Arc<()>) -> FakeTransport {
     let alive = alive.clone();
     fake.script(argv, move |_, out| {
         let held = (alive.clone(), out);
@@ -51,24 +51,13 @@ async fn answered(mut out: OutSink, line: Option<String>) -> Result<Exit, Error>
     Ok(exit(0, ""))
 }
 
-fn spawned(fake: FakeTransport) -> (Store, Changes) {
-    let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, fake)], &Asked::default());
-    let changes = store.changes();
-    tokio::spawn(driver);
-    (store, changes)
-}
-
 async fn waits(fake: FakeTransport, count: usize) -> Vec<u64> {
-    let (_store, mut changes) = spawned(fake);
+    let (_store, mut changes) = spawned(fake, &Asked::default());
     let mut waits = Vec::new();
     for _ in 0..count {
         waits.push(next_wait(&mut changes).await.as_secs());
     }
     waits
-}
-
-async fn until_connected(changes: &mut Changes) {
-    while !matches!(next_connection(changes).await, Connection::Connected { .. }) {}
 }
 
 mod a_stream_that_ends {
@@ -82,7 +71,7 @@ mod a_stream_that_ends {
     #[case::app_whose_connection_goes_silent(APP, Err(Error::Timeout), Error::Timeout)]
     #[tokio::test(start_paused = true)]
     async fn retries_with_its_error(#[case] argv: &[&str], #[case] end: Result<Exit, Error>, #[case] error: Error) {
-        let (_store, mut changes) = spawned(ending(argv, end));
+        let (_store, mut changes) = spawned(ending(argv, end), &Asked::default());
         assert_eq!(retrying(&mut changes).await, (Duration::from_secs(1), error));
     }
 
@@ -91,7 +80,7 @@ mod a_stream_that_ends {
         let alive = Arc::new(());
         let fake = held(held(closing_later(serving(fine())), EVENTS, &alive), APP, &alive);
         let idle = Arc::strong_count(&alive);
-        let (_store, mut changes) = spawned(fake);
+        let (_store, mut changes) = spawned(fake, &Asked::default());
         until_connected(&mut changes).await;
         assert_eq!(Arc::strong_count(&alive), idle + 2);
         retrying(&mut changes).await;
@@ -100,7 +89,7 @@ mod a_stream_that_ends {
 
     #[tokio::test(start_paused = true)]
     async fn keeps_the_session_and_the_app_while_retrying() {
-        let (store, mut changes) = spawned(closing_later(serving(fine())));
+        let (store, mut changes) = spawned(closing_later(serving(fine())), &Asked::default());
         retrying(&mut changes).await;
         assert!(matches!(store.connection(), Connection::Retrying { .. }));
         assert_eq!(store.session(), Some(serde_json::from_str(WATCH).expect("the watch fixture")));

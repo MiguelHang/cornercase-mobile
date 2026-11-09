@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use futures_util::future;
+use futures_util::future::{self, Either};
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -16,7 +16,7 @@ use crate::cli::events::Event;
 use crate::cli::status::Snapshot;
 use crate::error::Error;
 use crate::machines::Machine;
-use crate::machines::pick::PickConfig;
+use crate::machines::pick::{PickConfig, Picked};
 use crate::machines::route::{Address, Route};
 use crate::transport::Transport;
 
@@ -192,40 +192,76 @@ where
     F: Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync,
 {
     async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>) {
-        future::select(pin!(self.cycle()), pin!(dropped(resumes))).await;
+        let mut resumes = Resumes(resumes);
+        while self.attempt(&mut resumes).await {}
     }
 
-    async fn cycle(&mut self) {
-        loop {
-            self.shared.set_connection(Connection::Connecting);
-            match self.connect().await {
-                Ok(picked) => {
-                    let error = streams::follow(&self.shared, &picked).await;
-                    self.retry(error).await;
-                }
-                Err(Failure::Retry(error)) => self.retry(error).await,
-                Err(Failure::Stop(connection)) => self.stop(connection).await,
-            }
+    async fn attempt(&mut self, resumes: &mut Resumes) -> bool {
+        resumes.forget();
+        self.shared.set_connection(Connection::Connecting);
+        let woken = match resumes.race(self.connect(), || false).await {
+            Woken::Done(Ok(picked)) => self.follow(&picked, resumes).await,
+            Woken::Done(Err(Failure::Retry(error))) => Woken::Done(error),
+            Woken::Done(Err(Failure::Stop(connection))) => return self.stop(connection, resumes).await,
+            Woken::Resumed | Woken::Dropped => return false,
+        };
+        match woken {
+            Woken::Done(error) => self.retry(error, resumes).await,
+            Woken::Resumed => true,
+            Woken::Dropped => false,
         }
     }
 
-    async fn stop(&self, connection: Connection) {
-        self.shared.set_connection(connection);
-        future::pending::<()>().await;
-    }
-
-    async fn retry(&mut self, error: Error) {
+    async fn follow(&mut self, picked: &Picked, resumes: &mut Resumes) -> Woken<Error> {
+        let shared = &self.shared;
+        let woken = resumes.race(streams::follow(shared, picked), || shared.connected()).await;
         if self.shared.connected() {
             self.backoff.reset();
         }
+        woken
+    }
+
+    async fn stop(&self, connection: Connection, resumes: &mut Resumes) -> bool {
+        self.shared.set_connection(connection);
+        resumes.asked(|| true).await
+    }
+
+    async fn retry(&mut self, error: Error, resumes: &mut Resumes) -> bool {
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
-        time::sleep(wait).await;
+        !matches!(resumes.race(time::sleep(wait), || true).await, Woken::Dropped)
     }
 }
 
-async fn dropped(mut resumes: mpsc::UnboundedReceiver<()>) {
-    while resumes.recv().await.is_some() {}
+enum Woken<T> {
+    Done(T),
+    Resumed,
+    Dropped,
+}
+
+struct Resumes(mpsc::UnboundedReceiver<()>);
+
+impl Resumes {
+    fn forget(&mut self) {
+        while self.0.try_recv().is_ok() {}
+    }
+
+    async fn asked(&mut self, now: impl Fn() -> bool) -> bool {
+        while self.0.recv().await.is_some() {
+            if now() {
+                return true;
+            }
+        }
+        false
+    }
+
+    async fn race<T>(&mut self, work: impl Future<Output = T>, now: impl Fn() -> bool) -> Woken<T> {
+        match future::select(pin!(work), pin!(self.asked(now))).await {
+            Either::Left((done, _)) => Woken::Done(done),
+            Either::Right((true, _)) => Woken::Resumed,
+            Either::Right((false, _)) => Woken::Dropped,
+        }
+    }
 }
 
 #[cfg(test)]

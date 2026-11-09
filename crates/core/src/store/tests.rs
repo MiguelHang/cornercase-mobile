@@ -13,6 +13,7 @@ use crate::transport::fake::FakeTransport;
 use crate::transport::{Exit, OutSink, Stdin};
 
 mod connect;
+mod resume;
 mod retry;
 mod streams;
 
@@ -97,6 +98,13 @@ fn unread(changes: &mut Changes) -> Vec<Change> {
     iter::from_fn(|| changes.next().now_or_never().flatten()).collect()
 }
 
+fn spawned(fake: FakeTransport, asked: &Asked) -> (Store, Changes) {
+    let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, fake)], asked);
+    let changes = store.changes();
+    tokio::spawn(driver);
+    (store, changes)
+}
+
 async fn next_connection(changes: &mut Changes) -> Connection {
     loop {
         if let Some(Change::Connection(connection)) = changes.next().await {
@@ -111,6 +119,10 @@ async fn retrying(changes: &mut Changes) -> (Duration, Error) {
             return (r#in, error);
         }
     }
+}
+
+async fn until_connected(changes: &mut Changes) {
+    while !matches!(next_connection(changes).await, Connection::Connected { .. }) {}
 }
 
 async fn next_wait(changes: &mut Changes) -> Duration {

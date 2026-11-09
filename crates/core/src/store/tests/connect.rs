@@ -8,11 +8,11 @@ use crate::cli::contract::{Descriptor, Kind};
 const OLD_CLI: &str = "error: unrecognized subcommand 'contract'";
 const OLD_SERVER: &str = "Error: this server has no `contract` command";
 
-fn contract(json: &str) -> FakeTransport {
+pub(super) fn contract(json: &str) -> FakeTransport {
     FakeTransport::default().answer(CONTRACT, &[json], &[], 0)
 }
 
-fn refusing(error: Error) -> FakeTransport {
+pub(super) fn refusing(error: Error) -> FakeTransport {
     FakeTransport::default().fail(CONTRACT, error)
 }
 
@@ -26,7 +26,7 @@ fn tokenless(host: &str) -> Route {
     route
 }
 
-fn without_notices() -> String {
+pub(super) fn without_notices() -> String {
     let mut contract: Value = serde_json::from_str(REAL).expect("the real contract parses");
     let features = contract["features"].as_array_mut().expect("the contract lists features");
     features.retain(|feature| feature != "notices");

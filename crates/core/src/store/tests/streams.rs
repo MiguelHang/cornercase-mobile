@@ -34,7 +34,7 @@ async fn started(lines: Lines) -> (Store, Vec<Change>) {
     (store, changes)
 }
 
-fn connections(changes: &[Change]) -> Vec<Connection> {
+pub(super) fn connections(changes: &[Change]) -> Vec<Connection> {
     changes
         .iter()
         .filter_map(|change| if let Change::Connection(it) = change { Some(it.clone()) } else { None })
