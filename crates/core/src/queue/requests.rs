@@ -54,7 +54,7 @@ impl Requests {
                     self.stop(&end);
                     Asked::Answered(answer(&line))
                 }
-                None => self.lost(&end),
+                None => self.unanswered(&end),
             },
         }
     }
@@ -74,6 +74,13 @@ impl Requests {
         if self.follow.answered() && self.follow.gone(end) == Gone::Lost {
             self.stopped = Some(stopped(end, ENDED));
         }
+    }
+
+    fn unanswered(&mut self, end: &End) -> Asked {
+        if self.follow.gone(end) == Gone::Lost {
+            self.stopped = Some(stopped(end, ENDED));
+        }
+        self.lost(end)
     }
 
     fn unsent(&self, end: &End) -> Asked {

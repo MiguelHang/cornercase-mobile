@@ -1,7 +1,7 @@
 use futures_util::FutureExt;
 use futures_util::future::BoxFuture;
 
-use super::input::{EACH, NO_FOLLOW_FLAG, key, typing, typing_once, unstarted};
+use super::input::{EACH, NO_FOLLOW_FLAG, SILENT, key, typing, typing_once, unstarted};
 use super::*;
 
 const CANCELLED: [&str; 2] = ["cancelled requests --follow -", "cancelled input --follow --json -"];
@@ -84,6 +84,22 @@ mod reconnecting {
         assert_eq!(said.taken(), [&["typed 5 a", "hang"][..], &CANCELLED].concat());
         assert_eq!(new_said.taken(), ["typed 5 c", "focus"]);
         assert_eq!((new_starts.count(), notices.taken()), (2, vec![]));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn skips_a_command_still_waiting_for_the_keys_before_it() {
+        let ((log, mut said), (new_log, mut new_said)) = (heard(), heard());
+        let old =
+            typing(answering(FakeTransport::default(), &log, &Starts::default()), &log, &Starts::default(), SILENT);
+        let Started { queue, mut notices, .. } = start(watched(old, &log));
+        queue.input(5, key("a"));
+        let waiting = queue.ask(words(&["status"]), None);
+        settled().await;
+        queue.reconnect(answering_and_typing(&new_log, &Starts::default()));
+        let focus = queue.ask(words(&["focus"]), None);
+        assert_eq!((waiting.await, focus.await), (Ok(Outcome::Skipped), Ok(done("focus"))));
+        assert_eq!(said.taken(), ["typed 5 a", "cancelled input --follow --json -"]);
+        assert_eq!((new_said.taken(), notices.taken()), (vec!["focus".to_owned()], vec![]));
     }
 
     #[tokio::test(start_paused = true)]

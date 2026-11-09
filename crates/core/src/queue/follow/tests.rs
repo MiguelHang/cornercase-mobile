@@ -21,12 +21,13 @@ mod absent {
     #[rstest]
     #[case::no_requests_command(exit(2, NO_REQUESTS_COMMAND))]
     #[case::no_follow(exit(2, NO_FOLLOW_FLAG))]
+    #[case::refused_by_the_bridge(exit(2, "`requests` is not allowed through the bridge"))]
     fn is_a_cli_that_does_not_know_the_command(#[case] exit: Exit) {
         assert!(absent(&exit));
     }
 
     #[rstest]
-    #[case::another_usage_error(exit(2, "the bridge does not allow `kill-server`"))]
+    #[case::another_usage_error(exit(2, "a line of output passed 16 MiB"))]
     #[case::another_code(exit(1, "error: unrecognized subcommand 'requests'"))]
     #[case::a_dropped_server(exit(1, "Error: the connection to cornercase dropped"))]
     #[case::a_clean_end(exit(0, ""))]

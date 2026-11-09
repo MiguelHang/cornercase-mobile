@@ -17,6 +17,7 @@ pub(super) struct Answers {
 }
 
 pub(super) const EACH: Answers = Answers { per: 1, answer: "{}", after: Duration::ZERO };
+pub(super) const SILENT: Answers = Answers { per: usize::MAX, ..EACH };
 
 pub(super) fn key(code: &str) -> Value {
     json!({ "key": code })
@@ -195,6 +196,25 @@ mod keys {
         assert_eq!(said.taken(), [&once[..], &["status", r#"once 5 < {"key":"e"}"#, "focus"]].concat());
         assert_eq!((starts.count(), notices.taken()), (tries, vec![]));
     }
+
+    #[rstest]
+    #[case::some_not_sent(3)]
+    #[case::all_sent(0)]
+    #[tokio::test]
+    async fn tells_a_key_typed_once_was_refused(#[case] code: i32) {
+        let (log, _said) = heard();
+        let fake = answering(FakeTransport::default(), &log, &Starts::default()).answer(
+            &["input", "--pane", "9", "--json", "-"],
+            &[REFUSED],
+            &[],
+            code,
+        );
+        let Started { queue, mut notices, .. } =
+            start(unstarted(fake, Ok(exit(2, NO_FOLLOW_FLAG)), false, &Starts::default()));
+        queue.input(9, key("a"));
+        assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
+        assert_eq!(notices.taken(), [refused()]);
+    }
 }
 
 mod settle {
@@ -216,8 +236,7 @@ mod settle {
     async fn gives_up_after_10_seconds_and_types_the_next_key_through_a_new_typist() {
         let (log, mut said) = heard();
         let starts = Starts::default();
-        let silent = Answers { per: usize::MAX, ..EACH };
-        let Started { queue, mut notices, .. } = started(&log, &starts, silent);
+        let Started { queue, mut notices, .. } = started(&log, &starts, SILENT);
         queue.input(5, key("a"));
         let started = Instant::now();
         assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
@@ -252,7 +271,7 @@ mod typist {
         assert_eq!((starts.count(), notices.taken()), (2, vec![]));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn tells_it_ended_while_idle_and_types_the_next_key_through_a_new_one() {
         let (log, mut said) = heard();
         let starts = Starts::default();
@@ -267,7 +286,7 @@ mod typist {
         assert_eq!((starts.count(), notices.taken()), (2, vec![]));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn types_once_the_keys_it_never_got_through_when_it_ends_while_idle() {
         let (log, mut said) = heard();
         let fake = typing_once(FakeTransport::default(), &log, &[5]);

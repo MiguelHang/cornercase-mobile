@@ -195,18 +195,37 @@ mod ask {
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
     }
 
+    fn crashed(code: i32, why: &str) -> Error {
+        Error::Failed { code, stderr: why.to_owned() }
+    }
+
     #[rstest]
-    #[case::an_exit(Ok(exit(1, "Error: the server stopped")))]
-    #[case::a_clean_exit(Ok(exit(0, "")))]
-    #[case::a_dropped_connection(Err(Error::Dropped))]
-    #[case::an_old_cli_message_after_an_answer(Ok(exit(2, NO_REQUESTS_COMMAND)))]
+    #[case::an_exit(Ok(exit(1, "Error: the server stopped")), crashed(1, "Error: the server stopped"))]
+    #[case::a_clean_exit(Ok(exit(0, "")), crashed(0, ENDED))]
+    #[case::a_dropped_connection(Err(Error::Dropped), Error::Dropped)]
+    #[case::an_old_cli_message_after_an_answer(
+        Ok(exit(2, NO_REQUESTS_COMMAND)),
+        crashed(2, "Usage: cornercase [OPTIONS]")
+    )]
     #[tokio::test]
-    async fn says_the_answer_was_lost_when_the_process_ends_with_a_line_written(#[case] end: End) {
+    async fn says_the_answer_was_lost_and_why_when_the_process_ends_with_a_line_written(
+        #[case] end: End,
+        #[case] why: Error,
+    ) {
         let mut requests = answering_once(end, Then::Reads);
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
         let unanswered = requests.ask(&line(&words(&["focus", "--pane", "5"]), None)).await;
         assert_eq!(unanswered, Asked::Answered(Err(Error::Unanswered)));
-        assert_eq!(requests.ended().await, None);
+        assert_eq!(requests.ended().await, Some(why));
+    }
+
+    #[tokio::test]
+    async fn says_why_the_process_ended_before_its_first_answer() {
+        let no_server = "Error: no cornercase server is running";
+        let mut requests = ending(Ok(exit(1, no_server)), true);
+        let unanswered = requests.ask(&line(&words(&["status"]), None)).await;
+        assert_eq!(unanswered, Asked::Answered(Err(Error::Unanswered)));
+        assert_eq!(requests.ended().await, Some(crashed(1, no_server)));
     }
 
     #[tokio::test]

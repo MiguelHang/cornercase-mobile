@@ -9,12 +9,14 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::batch;
 use super::requests::{self, Asked, Requests};
-use super::typist::{Event, Typed, Typist};
+use super::typist::{self, Event, Typed, Typist};
 use super::{OnError, Outcome};
 use crate::error::Error;
 use crate::transport::{self, Stdin, Transport};
 
 pub(crate) type Reply = oneshot::Sender<Result<Outcome, Error>>;
+
+const PARTIAL: i32 = 3;
 
 pub(crate) enum Job {
     Command(Command),
@@ -43,6 +45,7 @@ pub(crate) struct Worker {
     pending: VecDeque<Job>,
     requests: Option<Requests>,
     typist: Option<Typist>,
+    unwritten: Option<Reply>,
     no_requests: bool,
     no_typist: bool,
 }
@@ -56,6 +59,7 @@ impl Worker {
             pending: VecDeque::new(),
             requests: None,
             typist: None,
+            unwritten: None,
             no_requests: false,
             no_typist: false,
         }
@@ -91,6 +95,7 @@ impl Worker {
     }
 
     async fn reconnected(&mut self) -> bool {
+        batch::skip(self.unwritten.take());
         loop {
             let job = match self.pending.pop_front() {
                 Some(job) => Some(job),
@@ -98,7 +103,7 @@ impl Worker {
             };
             match job {
                 Some(Job::Reconnect(transport)) => return self.reconnect(transport),
-                Some(Job::Command(command)) => batch::skip(command),
+                Some(Job::Command(command)) => batch::skip(command.reply),
                 Some(Job::Input(_) | Job::Scroll(..)) => {}
                 None => return false,
             }
@@ -157,10 +162,12 @@ impl Worker {
         }
     }
 
-    async fn command(&mut self, command: Command) {
+    async fn command(&mut self, mut command: Command) {
+        self.unwritten = command.reply.take();
         self.settle().await;
+        let reply = self.unwritten.take();
         let result = self.run(&command.args, command.stdin).await;
-        self.reply(command.reply, result.map(Outcome::Done));
+        self.reply(reply, result.map(Outcome::Done));
     }
 
     async fn run(&mut self, args: &[String], stdin: Option<Stdin>) -> Result<String, Error> {
@@ -292,10 +299,25 @@ async fn type_once(transport: &dyn Transport, on_error: &OnError, events: Vec<Ev
     for run in events.chunk_by(|(one, _), (other, _)| one == other) {
         let args = ["input", "--pane", &run[0].0.to_string(), "--json", "-"].map(str::to_owned);
         let lines: String = run.iter().map(|(_, event)| event.to_string() + "\n").collect();
-        if let Err(error) = once(transport, &args, Some(Stdin::Text(lines))).await {
+        if let Err(error) = typed_once(transport, on_error, &args, lines).await {
             on_error(error);
         }
     }
+}
+
+async fn typed_once(
+    transport: &dyn Transport,
+    on_error: &OnError,
+    args: &[String],
+    lines: String,
+) -> Result<(), Error> {
+    let output = transport::fed(transport, args.to_vec(), stream::iter([Stdin::Text(lines)]).boxed()).await?;
+    let rejected: Vec<Error> = output.stdout.lines().filter_map(|line| typist::answer(line).1).collect();
+    let partial = output.code == PARTIAL && !rejected.is_empty();
+    for error in rejected {
+        on_error(error);
+    }
+    if partial { Ok(()) } else { transport::printed(output).map(drop) }
 }
 
 async fn once(transport: &dyn Transport, args: &[String], stdin: Option<Stdin>) -> Result<String, Error> {

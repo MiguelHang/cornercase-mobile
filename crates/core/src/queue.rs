@@ -62,8 +62,8 @@ impl Queue {
         self.asked(Command { args, stdin: None, key: Some(key), reply: None })
     }
 
-    pub fn scroll(&self, pane: u64, rows: i64) {
-        self.push(Job::Scroll(pane, rows));
+    pub fn scroll(&self, pane: u64, rows_up: i64) {
+        self.push(Job::Scroll(pane, rows_up));
     }
 
     pub fn input(&self, pane: u64, event: Value) {

@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::mem;
 
 use super::Outcome;
-use super::worker::{Command, Job};
+use super::worker::{Command, Job, Reply};
 
 pub(crate) fn coalesced(pending: &mut VecDeque<Job>, mut command: Command) -> Command {
     let Some(key) = command.key else {
@@ -11,7 +11,7 @@ pub(crate) fn coalesced(pending: &mut VecDeque<Job>, mut command: Command) -> Co
     while let Some(Job::Command(next)) =
         pending.pop_front_if(|job| matches!(job, Job::Command(next) if next.key == Some(key)))
     {
-        skip(mem::replace(&mut command, next));
+        skip(mem::replace(&mut command, next).reply);
     }
     command
 }
@@ -31,8 +31,8 @@ pub(crate) fn scroll(pane: u64, rows: i64) -> Command {
     Command { args: args.map(str::to_owned).into(), stdin: None, key: None, reply: None }
 }
 
-pub(crate) fn skip(command: Command) {
-    if let Some(reply) = command.reply {
+pub(crate) fn skip(reply: Option<Reply>) {
+    if let Some(reply) = reply {
         let _ = reply.send(Ok(Outcome::Skipped));
     }
 }
