@@ -1,11 +1,6 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use cornercase_core::cli::surface::{Modes, MouseMode, Style};
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
-use cornercase_core::transport::Transport;
-use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
 use tokio::sync::mpsc::UnboundedSender;
@@ -14,14 +9,10 @@ use super::*;
 use crate::commands::connection::start;
 use crate::commands::error::ErrorCode;
 use crate::commands::machines::remove;
-use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle};
+use crate::test_util::{BOOT, Ipc, Recorder, Streams, Studio, connected_to, launcher, serving, settle, spawned};
 
 const SURFACE: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
 const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 } };
-
-fn spawned(task: Task) -> JoinHandle<()> {
-    JoinHandle::Tokio(tokio::spawn(task))
-}
 
 fn line(text: &str) -> Line {
     let width = u16::try_from(text.len()).expect("a short text");
@@ -70,49 +61,16 @@ fn drawn() -> String {
     json!({ "boot": BOOT, "surface": 1, "revision": 1, "tab": 3, "panes": [pane] }).to_string()
 }
 
-#[derive(Clone, Default)]
-struct Surfaces(Arc<AtomicUsize>);
-
-struct Running(Arc<AtomicUsize>);
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-impl Surfaces {
-    fn running(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
-    }
-
-    fn on(&self, fake: FakeTransport) -> FakeTransport {
-        let drawing = Arc::new(FakeTransport::default().open(&SURFACE, &[&drawn()]));
-        let count = Arc::clone(&self.0);
-        fake.script(&SURFACE, move |stdin, out| {
-            count.fetch_add(1, Ordering::SeqCst);
-            let running = Running(Arc::clone(&count));
-            let drawing = Arc::clone(&drawing);
-            async move {
-                let _running = running;
-                drawing.run(SURFACE.map(str::to_owned).to_vec(), stdin, out).await
-            }
-        })
-    }
-}
-
 struct Opened {
     studio: Studio,
-    surfaces: Surfaces,
+    surfaces: Streams,
     recorder: Recorder,
 }
 
 impl Opened {
     async fn with_tabs(tabs: &[u64]) -> Self {
-        let studio = Studio::new();
-        let surfaces = Surfaces::default();
-        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(tabs)])));
-        start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connected");
+        let surfaces = Streams::default();
+        let studio = connected_to(surfaces.on(serving(&[with_tabs(tabs)]), &SURFACE, &[&drawn()]));
         let recorder = Recorder::default();
         open(&studio.state, recorder.clone(), spawned, TAB).expect("the terminal opens");
         settle().await;
@@ -294,8 +252,8 @@ mod over_ipc {
     async fn cuts_the_surface_it_showed_when_closing() {
         let studio = Studio::new();
         let state = studio.reloaded();
-        let surfaces = Surfaces::default();
-        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])])));
+        let surfaces = Streams::default();
+        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])]), &SURFACE, &[&drawn()]));
         start(&state, Recorder::default(), &launcher, studio.id).expect("connected");
         open(&state, Recorder::default(), spawned, TAB).expect("the terminal opens");
         settle().await;

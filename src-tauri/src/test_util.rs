@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
@@ -21,9 +22,11 @@ use tauri::{App, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuil
 use tokio::time;
 
 use crate::bindings;
-use crate::commands::connection::{Launcher, start};
+use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::CommandError;
-use crate::events::{AgentsChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast};
+use crate::events::{
+    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast,
+};
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
 use crate::view::ConnectionView;
@@ -79,6 +82,13 @@ impl Recorder {
         self.all()
             .into_iter()
             .filter_map(|event| if let Emitted::Terminal(it) = event { Some(it) } else { None })
+            .collect()
+    }
+
+    pub(crate) fn changes(&self) -> Vec<ChangesChanged> {
+        self.all()
+            .into_iter()
+            .filter_map(|event| if let Emitted::Changes(it) = event { Some(it) } else { None })
             .collect()
     }
 
@@ -200,11 +210,51 @@ pub(crate) async fn released<T>(held: &Arc<T>) {
 pub(crate) fn launcher(fake: FakeTransport) -> (Launcher, Arc<FakeTransport>) {
     let transport = Arc::new(fake);
     let held = Arc::clone(&transport);
-    let launcher = Launcher::new(
-        move |_: &Route| Ok(Arc::clone(&held) as Arc<dyn Transport>),
-        |task| JoinHandle::Tokio(tokio::spawn(task)),
-    );
+    let launcher = Launcher::new(move |_: &Route| Ok(Arc::clone(&held) as Arc<dyn Transport>), spawned);
     (launcher, transport)
+}
+
+pub(crate) fn spawned(task: Task) -> JoinHandle<()> {
+    JoinHandle::Tokio(tokio::spawn(task))
+}
+
+pub(crate) fn connected_to(fake: FakeTransport) -> Studio {
+    let studio = Studio::new();
+    let (launcher, _) = launcher(fake);
+    start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connected");
+    studio
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct Streams(Arc<AtomicUsize>);
+
+struct Running(Arc<AtomicUsize>);
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl Streams {
+    pub(crate) fn running(&self) -> usize {
+        self.0.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn on(&self, fake: FakeTransport, argv: &[&str], lines: &[&str]) -> FakeTransport {
+        let printing = Arc::new(FakeTransport::default().open(argv, lines));
+        let owned: Vec<String> = argv.iter().map(|word| (*word).to_owned()).collect();
+        let count = Arc::clone(&self.0);
+        fake.script(argv, move |stdin, out| {
+            count.fetch_add(1, Ordering::SeqCst);
+            let running = Running(Arc::clone(&count));
+            let (printing, argv) = (Arc::clone(&printing), owned.clone());
+            async move {
+                let _running = running;
+                printing.run(argv, stdin, out).await
+            }
+        })
+    }
 }
 
 pub(crate) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {

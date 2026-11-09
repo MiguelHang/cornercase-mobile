@@ -34,8 +34,12 @@ pub(crate) struct Active {
     store: Store,
     driver: JoinHandle<()>,
     forwarder: JoinHandle<()>,
-    terminal: Option<(u64, JoinHandle<()>)>,
+    terminal: Slot,
+    changes: Slot,
 }
+
+#[derive(Default)]
+struct Slot(Option<(u64, JoinHandle<()>)>);
 
 impl AppState {
     pub(crate) fn load(data_dir: Result<PathBuf, impl Display>, secrets: Arc<dyn Secrets>) -> Self {
@@ -108,7 +112,7 @@ impl SharedMachines {
 
 impl Active {
     pub(crate) fn new(machine: MachineId, store: Store, driver: JoinHandle<()>, forwarder: JoinHandle<()>) -> Self {
-        Self { machine, store, driver, forwarder, terminal: None }
+        Self { machine, store, driver, forwarder, terminal: Slot::default(), changes: Slot::default() }
     }
 
     pub(crate) fn machine(&self) -> MachineId {
@@ -120,20 +124,19 @@ impl Active {
     }
 
     pub(crate) fn show(&mut self, tab: u64, terminal: JoinHandle<()>) {
-        self.stop_terminal();
-        self.terminal = Some((tab, terminal));
+        self.terminal.fill(tab, terminal);
     }
 
     pub(crate) fn hide(&mut self, tab: u64) {
-        if self.terminal.as_ref().is_some_and(|(shown, _)| *shown == tab) {
-            self.stop_terminal();
-        }
+        self.terminal.empty(tab);
     }
 
-    fn stop_terminal(&mut self) {
-        if let Some((_, terminal)) = self.terminal.take() {
-            terminal.abort();
-        }
+    pub(crate) fn follow(&mut self, workspace: u64, changes: JoinHandle<()>) {
+        self.changes.fill(workspace, changes);
+    }
+
+    pub(crate) fn unfollow(&mut self, workspace: u64) {
+        self.changes.empty(workspace);
     }
 }
 
@@ -141,7 +144,31 @@ impl Drop for Active {
     fn drop(&mut self) {
         self.driver.abort();
         self.forwarder.abort();
-        self.stop_terminal();
+    }
+}
+
+impl Slot {
+    fn fill(&mut self, key: u64, task: JoinHandle<()>) {
+        self.stop();
+        self.0 = Some((key, task));
+    }
+
+    fn empty(&mut self, key: u64) {
+        if self.0.as_ref().is_some_and(|(held, _)| *held == key) {
+            self.stop();
+        }
+    }
+
+    fn stop(&mut self) {
+        if let Some((_, task)) = self.0.take() {
+            task.abort();
+        }
+    }
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 

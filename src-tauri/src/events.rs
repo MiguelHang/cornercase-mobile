@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use cornercase_core::board::AgentRow;
+use cornercase_core::cli::changes::{Mode, Summary};
 use cornercase_core::cli::events::{Event as CliEvent, What};
 use cornercase_core::cli::surface::{Colours, Cursor, Modes, Size};
 use cornercase_core::error::Error;
@@ -55,6 +56,17 @@ pub(crate) struct TerminalChanged {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct ChangesChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    #[specta(type = u32)]
+    pub(crate) workspace: u64,
+    pub(crate) mode: Mode,
+    pub(crate) summary: Option<Summary>,
+    pub(crate) closed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
 pub(crate) struct Toast {
     pub(crate) level: ToastLevel,
     pub(crate) message: String,
@@ -74,6 +86,7 @@ pub(crate) enum Emitted {
     Agents(AgentsChanged),
     PaneStatus(PaneStatusChanged),
     Terminal(TerminalChanged),
+    Changes(ChangesChanged),
     Toast(Toast),
 }
 
@@ -88,6 +101,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
             Emitted::Agents(changed) => changed.emit(self),
             Emitted::PaneStatus(changed) => changed.emit(self),
             Emitted::Terminal(changed) => changed.emit(self),
+            Emitted::Changes(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
         sent.ok();

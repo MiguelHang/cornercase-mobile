@@ -31,11 +31,14 @@ export const commands = {
 	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
 	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
+	changesFollow: (workspace: number, mode: Mode) => typedError<null, CommandError>(__TAURI_INVOKE("changes_follow", { workspace, mode })),
+	changesUnfollow: (workspace: number) => __TAURI_INVOKE<void>("changes_unfollow", { workspace }),
 };
 
 /** Events */
 export const events = {
 	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
+	changesChanged: makeEvent<ChangesChanged_Serialize, ChangesChanged_Deserialize>("changes-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
 	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
@@ -129,6 +132,44 @@ export type ChangedFile_Serialize = {
 	viewed: boolean,
 	staged: Staged_Serialize | null,
 	digest: string,
+};
+
+export type ChangedWorkspace = ChangedWorkspace_Serialize | ChangedWorkspace_Deserialize;
+
+export type ChangedWorkspace_Deserialize = {
+	project?: number,
+	workspace?: number,
+	base?: string | null,
+	added?: number,
+	removed?: number,
+	files?: ChangedFile_Deserialize[],
+};
+
+export type ChangedWorkspace_Serialize = {
+	project: number,
+	workspace: number,
+	base: string | null,
+	added: number,
+	removed: number,
+	files: ChangedFile_Serialize[],
+};
+
+export type ChangesChanged = ChangesChanged_Serialize | ChangesChanged_Deserialize;
+
+export type ChangesChanged_Deserialize = {
+	machine: number,
+	workspace: number,
+	mode: Mode,
+	summary?: Summary_Deserialize | null,
+	closed: boolean,
+};
+
+export type ChangesChanged_Serialize = {
+	machine: number,
+	workspace: number,
+	mode: Mode,
+	summary: Summary_Serialize | null,
+	closed: boolean,
 };
 
 export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
@@ -527,6 +568,12 @@ export type Started_Serialize = {
 	warning: string | null,
 };
 
+export type State = State_Serialize | State_Deserialize;
+
+export type State_Deserialize = "loading" | "ready" | "failed" | string;
+
+export type State_Serialize = "loading" | "ready" | "failed" | "other";
+
 export type Status = Status_Serialize | Status_Deserialize;
 
 export type Status_Deserialize = "modified" | "added" | "deleted" | "renamed" | "untracked" | string;
@@ -565,6 +612,30 @@ export type Style_Serialize = {
 	inverse: boolean,
 	invisible: boolean,
 	strikethrough: boolean,
+};
+
+export type Summary = Summary_Serialize | Summary_Deserialize;
+
+export type Summary_Deserialize = {
+	boot?: string,
+	stream?: number,
+	revision?: number,
+	scope?: string,
+	mode?: Mode,
+	state?: State_Deserialize,
+	error?: string | null,
+	workspaces?: ChangedWorkspace_Deserialize[],
+};
+
+export type Summary_Serialize = {
+	boot: string,
+	stream: number,
+	revision: number,
+	scope: string,
+	mode: Mode,
+	state: State_Serialize,
+	error: string | null,
+	workspaces: ChangedWorkspace_Serialize[],
 };
 
 export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;
