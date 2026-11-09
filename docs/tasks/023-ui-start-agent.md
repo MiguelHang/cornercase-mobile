@@ -1,6 +1,6 @@
 # 023 — Pantalla 4: arrancar un agente (`start --worktree`, `new-workspace`)
 
-- Estado: en curso (falta la comprobación en el simulador)
+- Estado: hecha
 - Depende de: 015
 - Riesgo: bajo
 - Rama: `feat/023-start-agent` · PR: `feat: start an agent in its own worktree from the phone`
@@ -51,3 +51,6 @@ Tomadas el 2026-11-09 con los valores por defecto propuestos (`design/starting-w
 
 ## Verificación
 En el simulador se arranca un agente en un worktree y aparece en el tablero trabajando.
+Comprobado el 2026-11-09 en el simulador iPhone 17e contra el puente y cornercase 0.13.19, con un prompt de 4 KB, el
+rechazo de `--worktree` en una carpeta que no es repositorio y un workspace nuevo (`design/starting-work.md` › Checked
+live).

@@ -47,7 +47,12 @@ New work on the Mac from the phone: an agent with a prompt, in its own worktree 
 
 ## Checked live
 
-- Not checked live yet (task 023's T12).
+- **On 2026-11-09** in the iPhone 17e simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), against the bridge on the Mac's loopback and cornercase 0.13.19, with Claude Code 2.1.319, the taps made by XCUITest, on two projects opened for it: a git repository and a folder that is not one. The screen had its agents (only claude installed) by the first screenshot after `Start`; on the Mac, `account list --check --json` took between 1.7 and 4 s with one account added, so the picker's reading line shows only briefly.
+- **An agent with a branch**: cornercase made the worktree and its workspace, and the app showed `Starting claude…` with the spinner, then the agent's screen within about 3 s, once the row came in. Claude Code was asking whether to trust the new folder, which cornercase reports as `idle`, so the row and the screen said idle, with `Terminal` to see the question (The trust question). Answered on the Mac (`cornercase keys`), the agent showed under Working on the board, with its title and `t023-repo › t023-wt`, then under Done.
+- **A prompt of 4,259 bytes**, typed in the field, without a branch: the agent started in a new tab of the project's workspace and Claude Code got the prompt unchanged (compared with its transcript, which wraps it in Claude Code's own paste markers, as any paste from cornercase), so the argv within `requests --follow` carries it.
+- **A refusal**: a branch on the folder that is not a repository left everything typed and showed cornercase's reason over the button, `project 689 is not the root of a git repository, so it has no worktrees`, and nothing was made on the Mac.
+- **A workspace** without a worktree: `Workspace t023-ws created` in a toast and the board, with the workspace on the Mac.
+- Not checked: a project whose setup takes long, an `Unanswered` start, a real iPhone.
 
 ## Left out
 
