@@ -24,6 +24,10 @@ pub enum Error {
     Secrets(String),
     #[error("the route has no saved token; scan the bridge's code again")]
     NoToken,
+    #[error("no saved machine has that id")]
+    UnknownMachine,
+    #[error("the machine has no route at that address")]
+    UnknownRoute,
 }
 
 #[cfg(test)]

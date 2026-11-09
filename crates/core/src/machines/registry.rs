@@ -16,6 +16,8 @@ pub struct Machines {
 impl Machines {
     pub fn load(store: Box<dyn MachineStore>, secrets: Arc<dyn Secrets>) -> Result<Self, Error> {
         let mut saved = store.load()?;
+        let after_last = saved.machines.iter().map(|machine| machine.id.0.saturating_add(1)).max().unwrap_or_default();
+        saved.next_id = saved.next_id.max(after_last);
         for machine in &mut saved.machines {
             fill_tokens(secrets.as_ref(), machine)?;
         }
@@ -41,7 +43,7 @@ impl Machines {
     }
 
     pub fn add_route(&mut self, id: MachineId, route: Route) -> Result<(), Error> {
-        self.machine(id).ok_or_else(unknown_machine)?;
+        self.machine(id).ok_or(Error::UnknownMachine)?;
         self.write_token(id, &route)?;
         let mut saved = self.saved.clone();
         let routes = &mut find(&mut saved, id)?.routes;
@@ -63,12 +65,12 @@ impl Machines {
     }
 
     pub fn remember(&mut self, id: MachineId, address: &Address) -> Result<(), Error> {
-        let machine = self.machine(id).ok_or_else(unknown_machine)?;
+        let machine = self.machine(id).ok_or(Error::UnknownMachine)?;
         if machine.last_route.as_ref() == Some(address) {
             return Ok(());
         }
         if !machine.routes.iter().any(|route| route.address() == address) {
-            return Err(Error::Store("the machine has no route at that address".to_owned()));
+            return Err(Error::UnknownRoute);
         }
         let mut saved = self.saved.clone();
         find(&mut saved, id)?.last_route = Some(address.clone());
@@ -102,11 +104,7 @@ fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error
 }
 
 fn find(saved: &mut Saved, id: MachineId) -> Result<&mut Machine, Error> {
-    saved.machines.iter_mut().find(|machine| machine.id == id).ok_or_else(unknown_machine)
-}
-
-fn unknown_machine() -> Error {
-    Error::Store("no saved machine has that id".to_owned())
+    saved.machines.iter_mut().find(|machine| machine.id == id).ok_or(Error::UnknownMachine)
 }
 
 fn key(id: MachineId, address: &Address) -> String {

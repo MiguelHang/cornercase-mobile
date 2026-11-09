@@ -21,6 +21,8 @@ pub enum RouteError {
     NotAUrl,
     #[error("only ws:// routes work")]
     Scheme,
+    #[error("the URL has a user name or a password")]
+    UserInfo,
     #[error("the URL has no host")]
     NoHost,
     #[error("the URL's port is not a number from 1 to 65535")]
@@ -72,8 +74,8 @@ impl Route {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BridgeUrl {
-    pub address: Address,
-    pub token: Option<Token>,
+    pub(crate) address: Address,
+    pub(crate) token: Option<Token>,
 }
 
 impl BridgeUrl {
@@ -134,6 +136,9 @@ fn address(uri: &Uri) -> Result<Address, RouteError> {
         return Err(RouteError::Scheme);
     }
     let authority = uri.authority().ok_or(RouteError::NotAUrl)?;
+    if authority.as_str().contains('@') {
+        return Err(RouteError::UserInfo);
+    }
     let address = Address { host: host(authority)?, port: port(authority)? };
     path(uri)?;
     Ok(address)
@@ -146,8 +151,7 @@ fn host(authority: &Authority) -> Result<String, RouteError> {
 
 fn port(authority: &Authority) -> Result<u16, RouteError> {
     let text = authority.as_str();
-    let host_and_port = text.rsplit_once('@').map_or(text, |(_, rest)| rest);
-    let after_host = host_and_port.rsplit_once(']').map_or(host_and_port, |(_, rest)| rest);
+    let after_host = text.rsplit_once(']').map_or(text, |(_, rest)| rest);
     let Some((_, digits)) = after_host.rsplit_once(':') else {
         return Ok(DEFAULT_PORT);
     };
@@ -184,7 +188,7 @@ fn base64url(text: &str) -> bool {
 pub struct Token(String);
 
 impl Token {
-    pub fn new(value: String) -> Self {
+    pub(crate) fn new(value: String) -> Self {
         Self(value)
     }
 

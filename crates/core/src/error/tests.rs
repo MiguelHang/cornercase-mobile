@@ -30,6 +30,8 @@ mod display {
     )]
     #[case::secrets(Error::Secrets("item not found".to_owned()), "the secret store failed: item not found")]
     #[case::no_token(Error::NoToken, "the route has no saved token; scan the bridge's code again")]
+    #[case::unknown_machine(Error::UnknownMachine, "no saved machine has that id")]
+    #[case::unknown_route(Error::UnknownRoute, "the machine has no route at that address")]
     fn says_what_failed(#[case] error: Error, #[case] message: &str) {
         assert_eq!(error.to_string(), message);
     }

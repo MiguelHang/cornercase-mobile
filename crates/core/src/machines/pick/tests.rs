@@ -82,6 +82,11 @@ fn hangs() -> FakeTransport {
     FakeTransport::default().script(CONTRACT, |_, _| future::pending())
 }
 
+fn all_failed_at_the_deadline(result: Result<Picked, PickError>, started: Instant, errors: Vec<(Address, Error)>) {
+    assert_eq!(result.map(|picked| picked.route), Err(PickError::AllFailed(errors)));
+    assert_eq!(started.elapsed(), PickConfig::default().deadline);
+}
+
 struct Flag(Arc<AtomicBool>);
 
 impl Drop for Flag {
@@ -153,8 +158,7 @@ mod pick_route {
             (address(PUBLIC), Error::Timeout),
             (address(GONE), Error::Connect("no route to host".to_owned())),
         ];
-        assert_eq!(result.map(|picked| picked.route), Err(PickError::AllFailed(errors)));
-        assert_eq!(started.elapsed(), PickConfig::default().deadline);
+        all_failed_at_the_deadline(result, started, errors);
     }
 
     #[tokio::test(start_paused = true)]
@@ -249,8 +253,7 @@ mod head_start {
         let started = Instant::now();
         let result = network.pick_from(saved(vec![route(LAN), route(TAILNET)], TAILNET), PickConfig::default()).await;
         let errors = vec![(address(LAN), Error::Timeout), (address(TAILNET), Error::Timeout)];
-        assert_eq!(result.map(|picked| picked.route), Err(PickError::AllFailed(errors)));
-        assert_eq!(started.elapsed(), PickConfig::default().deadline);
+        all_failed_at_the_deadline(result, started, errors);
     }
 
     #[tokio::test(start_paused = true)]

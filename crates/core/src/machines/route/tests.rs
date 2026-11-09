@@ -60,6 +60,9 @@ mod parse {
     #[case::wss("wss://mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
     #[case::http("http://mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
     #[case::no_scheme("/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
+    #[case::user("ws://user@mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::UserInfo)]
+    #[case::user_and_password("ws://user:pass@mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::UserInfo)]
+    #[case::user_before_ipv6("ws://user@[fd7a:115c:a1e0::1]:8765/?token=c2VjcmV0LXRva2Vu", RouteError::UserInfo)]
     #[case::empty_host("ws://:8765/?token=c2VjcmV0LXRva2Vu", RouteError::NoHost)]
     #[case::empty_brackets("ws://[]:8765/?token=c2VjcmV0LXRva2Vu", RouteError::NoHost)]
     #[case::port_text("ws://mac.local:port/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
@@ -100,6 +103,7 @@ mod route_error {
         let reasons = [
             RouteError::NotAUrl,
             RouteError::Scheme,
+            RouteError::UserInfo,
             RouteError::NoHost,
             RouteError::Port,
             RouteError::Path,

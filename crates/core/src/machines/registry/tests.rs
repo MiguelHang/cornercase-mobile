@@ -45,6 +45,23 @@ impl Phone {
         machines.add_route(id, route(TAILNET, TOKEN)).expect("add the tailnet route");
         (machines, id)
     }
+
+    fn block_the_file(&self) {
+        fs::remove_file(self.file()).ok();
+        fs::create_dir(self.file()).expect("put a folder in the file's place");
+        fs::write(self.file().join("inside"), "kept").expect("fill the folder");
+    }
+
+    fn unblock_the_file(&self) {
+        fs::remove_dir_all(self.file()).expect("take the folder away");
+    }
+
+    fn unchanged<T>(&self, machines: &mut Machines, change: impl FnOnce(&mut Machines) -> T) -> T {
+        let (text, before) = (self.text(), machines.machines().to_vec());
+        let result = change(machines);
+        assert_eq!((self.text(), machines.machines()), (text, before.as_slice()));
+        result
+    }
 }
 
 fn route(host: &str, token: &str) -> Route {
@@ -53,10 +70,6 @@ fn route(host: &str, token: &str) -> Route {
 
 fn address(host: &str) -> Address {
     Address { host: host.to_owned(), port: 8765 }
-}
-
-fn unknown_machine() -> Result<(), Error> {
-    Err(Error::Store("no saved machine has that id".to_owned()))
 }
 
 mod load {
@@ -85,6 +98,16 @@ mod load {
         let routes = phone.open().machine(id).expect("the studio").routes.clone();
         assert_eq!(routes, [bridge(LAN, 8765, None), route(TAILNET, TOKEN)]);
     }
+
+    #[test]
+    fn never_gives_a_saved_id_again_when_the_counter_is_behind() {
+        let phone = Phone::new();
+        let machine = r#"{"id": 3, "name": "studio", "routes": [], "last_route": null}"#;
+        fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 0, "machines": [{machine}]}}"#))
+            .expect("write the file by hand");
+        let id = phone.open().add("laptop".to_owned(), route(LAN, TOKEN)).expect("add the laptop");
+        assert_eq!(id, MachineId(4));
+    }
 }
 
 mod add {
@@ -111,12 +134,23 @@ mod add {
     fn leaves_the_file_as_it_was_when_the_token_cannot_be_saved() {
         let phone = Phone::new();
         let (mut machines, _) = phone.studio();
-        let before = phone.text();
         phone.secrets.fail_writes(true);
-        let result = machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN));
+        let result =
+            phone.unchanged(&mut machines, |machines| machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)));
         assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
-        assert_eq!(phone.text(), before);
-        assert_eq!(machines.machines().len(), 1);
+    }
+
+    #[test]
+    fn keeps_the_list_and_the_id_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, studio) = phone.studio();
+        phone.block_the_file();
+        let result =
+            phone.unchanged(&mut machines, |machines| machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)));
+        assert!(matches!(result, Err(Error::Store(_))), "{result:?}");
+        phone.unblock_the_file();
+        let laptop = machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)).expect("add the laptop");
+        assert_eq!(laptop, MachineId(studio.0 + 1));
     }
 
     #[test]
@@ -147,8 +181,27 @@ mod add_route {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
         let other = MachineId(id.0 + 1);
-        assert_eq!(machines.add_route(other, route(LAN, NEW_TOKEN)), unknown_machine());
+        assert_eq!(machines.add_route(other, route(LAN, NEW_TOKEN)), Err(Error::UnknownMachine));
         assert_eq!(phone.secret(other, LAN), None);
+    }
+
+    #[test]
+    fn leaves_the_file_as_it_was_when_the_token_cannot_be_saved() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.secrets.fail_writes(true);
+        let result = phone.unchanged(&mut machines, |machines| machines.add_route(id, route(LAN, NEW_TOKEN)));
+        assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
+        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
+    }
+
+    #[test]
+    fn refuses_a_route_without_a_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.add_route(id, bridge(LAN, 8765, None)));
+        assert_eq!(result, Err(Error::NoToken));
+        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
     }
 }
 
@@ -200,8 +253,7 @@ mod remember {
     fn refuses_an_address_the_machine_has_no_route_to() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
-        let message = "the machine has no route at that address".to_owned();
-        assert_eq!(machines.remember(id, &address("10.0.0.9")), Err(Error::Store(message)));
+        assert_eq!(machines.remember(id, &address("10.0.0.9")), Err(Error::UnknownRoute));
         assert_eq!(phone.open().machine(id).expect("the studio").last_route, None);
     }
 
@@ -209,7 +261,16 @@ mod remember {
     fn refuses_an_unknown_machine() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
-        assert_eq!(machines.remember(MachineId(id.0 + 1), &address(LAN)), unknown_machine());
+        assert_eq!(machines.remember(MachineId(id.0 + 1), &address(LAN)), Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn writes_nothing_when_the_route_is_already_the_last_winner() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.remember(id, &address(TAILNET)).expect("remember the tailnet route");
+        phone.block_the_file();
+        assert_eq!(machines.remember(id, &address(TAILNET)), Ok(()));
     }
 }
 
