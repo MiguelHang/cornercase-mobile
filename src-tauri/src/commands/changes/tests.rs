@@ -156,6 +156,15 @@ mod unfollowing {
         assert_eq!(followed.streams.running(), 1);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn the_command_cuts_the_list_of_its_workspace_over_ipc() {
+        let followed = Followed::of(&[2]).await;
+        let ipc = Ipc::new(followed.studio.state);
+        assert_eq!(ipc.invoke("changes_unfollow", json!({ "workspace": LISTED.workspace })), Ok(Value::Null));
+        settle().await;
+        assert_eq!(followed.streams.running(), 0);
+    }
+
     #[test]
     fn nothing_over_ipc_without_a_follow() {
         let ipc = Ipc::new(Studio::new().reloaded());
