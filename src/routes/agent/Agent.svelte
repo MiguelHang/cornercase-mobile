@@ -41,13 +41,6 @@
   const row = $derived(chat.row)
   const reading = $derived(chat.reading)
 
-  const send = async () => {
-    const failed = await chat.send()
-    if (failed !== null) {
-      onfailed(failed)
-    }
-  }
-
   const attach = async () => {
     const failed = await chat.attach()
     if (failed !== null) {
@@ -109,14 +102,14 @@
         {/if}
         <div class="fields">
           <div class="field">
-            <TextArea label="Answer" placeholder="Answer {row.agent}" disabled={chat.sending} bind:value={chat.draft} />
+            <TextArea label="Answer" placeholder="Answer {row.agent}" bind:value={chat.draft} />
           </div>
           <Button tone="plain" compact label="Attach image" busy={chat.attachments.attaching} onclick={attach}>
             {#if !chat.attachments.attaching}
               <Icon name="image-plus" size={20} />
             {/if}
           </Button>
-          <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={send}>Send</Button>
+          <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={() => void chat.send()}>Send</Button>
         </div>
       </div>
     {/if}

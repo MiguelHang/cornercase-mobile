@@ -145,17 +145,19 @@ describe('Agent, its field', () => {
     expect(send(body)?.[2]).toContain('disabled=""')
   })
 
-  it('shows the send under way, with the field held', () => {
+  it('shows the send under way, with the field emptied and open', () => {
     const chat = chatWith({ ...ROW, status: 'done' }, 'go on')
     void chat.send()
     const body = draw(chat)
     expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+ busy$/)
     expect(send(body)?.[2]).toContain('aria-busy="true"')
-    expect(body).toMatch(/<textarea[^>]* disabled=""/)
+    expect(body).not.toMatch(/<textarea[^>]* disabled=""/)
+    expect(body).toContain('></textarea>')
   })
 
-  it('hands the reason of a failed send over, to be told', () => {
-    expect(flat(agentSource)).toContain('const failed = await chat.send() if (failed !== null) { onfailed(failed) }')
+  it('leaves a failed send to its bubble, with no toast', () => {
+    expect(flat(agentSource)).toContain('onclick={() => void chat.send()}>Send</Button>')
+    expect(flat(agentSource)).not.toContain('await chat.send()')
   })
 
   it('stays at the bottom of the screen while the message scrolls', () => {
