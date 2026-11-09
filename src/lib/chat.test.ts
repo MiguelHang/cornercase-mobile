@@ -686,10 +686,10 @@ describe('timers', () => {
 })
 
 const followed = (status: string | null, readLast: ReadLast = vi.fn(noRead)) => {
-  const { clock, tick } = fakeClock()
+  const { clock, tick, pending } = fakeClock()
   const chat = seen({ readLast, clock }, status)
   const stop = chat.follow()
-  return { chat, stop, tick, readLast }
+  return { chat, stop, tick, pending, readLast }
 }
 
 describe('Chat, while it is followed', () => {
@@ -751,6 +751,13 @@ describe('Chat, while it is followed', () => {
     tick(FOLLOW_MS * 3)
     expect(chat.gone).toBe(true)
     expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('leaves no read waiting once the agent is gone', () => {
+    const { chat, pending } = followed('working')
+    expect(pending()).toBe(1)
+    chat.see(MACHINE, [row(3, 'working')])
+    expect(pending()).toBe(0)
   })
 
   it('reads once more, not once per beat, behind a slow read', async () => {

@@ -36,9 +36,16 @@ const ROW: AgentRow = {
 
 const unread: ReadLast = () => new Promise(() => {})
 
-const TERMINAL = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Terminal/
+const tool = (name: string, path: string) =>
+  new RegExp(`<button class="tool svelte-[\\w-]+" type="button" aria-label="${name}">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!</svg>)[^])*?<path d="${path}"></path>`)
 
-const CHANGES = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Changes/
+const BACK = tool('Back', 'm15 18-6-6 6-6')
+
+const TERMINAL = tool('Terminal', 'm7 11 2-2-2-2')
+
+const CHANGES = tool('Changes', 'M13 6h3a2 2 0 0 1 2 2v7')
+
+const BACK_WORD = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/
 
 const unsent: SendText = () => new Promise(() => {})
 
@@ -99,10 +106,11 @@ const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
 const bar = (row: AgentRow) => draw(chatWith(row)).match(BAR)?.[1] ?? ''
 
 describe('Agent, its sticky header', () => {
-  it('keeps Back and Terminal in a bar of their own, with the large header after it to scroll away', () => {
+  it('keeps Back, Terminal and Changes in a bar of their own, with the large header after it to scroll away', () => {
     const shown = bar(ROW)
-    expect(shown).toMatch(/^<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Back<!---->/)
+    expect(shown.search(BACK)).toBe(0)
     expect(shown).toMatch(TERMINAL)
+    expect(shown).toMatch(CHANGES)
     expect(shown).not.toContain('<h1')
   })
 
@@ -141,7 +149,14 @@ describe('Agent, its sticky header', () => {
     const source = flat(chatHeaderSource)
     expect(source).toContain('min-width: 0; min-height: 44px; visibility: hidden; opacity: 0;')
     expect(source).toContain('.compact .short { visibility: visible; opacity: 1; }')
-    expect(source.match(/<Button tone="plain" onclick=/g)).toHaveLength(3)
+  })
+
+  it('leaves the compact line the room its icon buttons of 44 by 44 px do not take', () => {
+    const source = flat(chatHeaderSource)
+    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(3)
+    expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
+    expect(source).toContain('padding: var(--gap) calc(var(--inset-wide) - var(--inset));')
+    expect(source).not.toContain('<Button')
   })
 
   it('changes without animation under Reduce Motion', () => {
@@ -290,16 +305,17 @@ describe('Agent, without its row', () => {
     expect(body).not.toContain('no longer running')
   })
 
-  it.each([ROW, null])('offers going back before it is gone', (row) => {
-    expect(draw(chatWith(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
+  it('offers going back before it is gone', () => {
+    expect(draw(chatWith(ROW))).toMatch(BACK)
+    expect(draw(chatWith(null))).toMatch(BACK_WORD)
   })
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} {onchanges} /> <Thread {chat} {now} />')
-    expect(flat(chatHeaderSource)).toContain(
-      '<Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button> <Button tone="plain" onclick={() => onchanges(row.workspace, row.workspace_name)}>Changes</Button> </div>',
-    )
+    const source = flat(chatHeaderSource)
+    expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
+    expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')
   })
 
   it("offers the changes of its agent's workspace, beside its terminal", () => {

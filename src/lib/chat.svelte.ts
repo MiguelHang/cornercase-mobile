@@ -330,5 +330,6 @@ export class Chat {
     this.attachments.clear()
     this.#asked += 1
     this.#again = false
+    this.#pace()
   }
 }

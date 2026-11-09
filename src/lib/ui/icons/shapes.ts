@@ -81,10 +81,21 @@ export const icons = {
     { kind: 'rect', x: 5, y: 2, width: 14, height: 20, rx: 2 },
     { kind: 'path', d: 'M12 18h.01' },
   ],
+  'git-compare': [
+    { kind: 'circle', cx: 18, cy: 18, r: 3 },
+    { kind: 'circle', cx: 6, cy: 6, r: 3 },
+    { kind: 'path', d: 'M13 6h3a2 2 0 0 1 2 2v7' },
+    { kind: 'path', d: 'M11 18H8a2 2 0 0 1-2-2V9' },
+  ],
   square: [{ kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 }],
   'square-check': [
     { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
     { kind: 'path', d: 'm9 12 2 2 4-4' },
+  ],
+  'square-terminal': [
+    { kind: 'path', d: 'm7 11 2-2-2-2' },
+    { kind: 'path', d: 'M11 13h4' },
+    { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
   ],
 } satisfies Record<string, Shape[]>
 

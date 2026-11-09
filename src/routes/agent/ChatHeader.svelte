@@ -2,7 +2,7 @@
   import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
   import { label, place, statusName } from '../../lib/board'
   import { compactHeader } from '../../lib/thread'
-  import Button from '../../lib/ui/Button.svelte'
+  import Icon from '../../lib/ui/Icon.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
   let {
@@ -33,14 +33,26 @@
 </script>
 
 <div class="bar" class:compact style:--below="{below}px">
-  <Button tone="plain" onclick={onback}>Back</Button>
+  <button class="tool" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
+    <Icon name="chevron-left" />
+  </button>
   <div class="short" aria-hidden="true">
     <StatusDot status={row.status} />
     <span class="called">{label(row)}</span>
     <span class="state">{statusName(row.status)}</span>
   </div>
-  <Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button>
-  <Button tone="plain" onclick={() => onchanges(row.workspace, row.workspace_name)}>Changes</Button>
+  <button class="tool" type="button" aria-label="Terminal" onclick={() => onterminal(row)} ontouchstart={() => {}}>
+    <Icon name="square-terminal" />
+  </button>
+  <button
+    class="tool"
+    type="button"
+    aria-label="Changes"
+    onclick={() => onchanges(row.workspace, row.workspace_name)}
+    ontouchstart={() => {}}
+  >
+    <Icon name="git-compare" />
+  </button>
 </div>
 <header class="head" bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
@@ -59,11 +71,29 @@
     align-items: center;
     gap: var(--gap);
     margin: calc(-1 * var(--gap)) calc(-1 * var(--inset-wide));
-    padding: var(--gap) var(--inset-wide);
+    padding: var(--gap) calc(var(--inset-wide) - var(--inset));
     border-bottom: 1px solid transparent;
     background: var(--veil);
     -webkit-backdrop-filter: blur(24px);
     backdrop-filter: blur(24px);
+  }
+
+  .tool {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--accent);
+  }
+
+  .tool:active {
+    background: var(--hover);
   }
 
   .short {

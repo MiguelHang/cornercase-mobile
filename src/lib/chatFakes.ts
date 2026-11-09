@@ -65,7 +65,8 @@ export const fakeClock = () => {
     now += ms
     waiting.filter((timer) => timer.live && timer.at <= now).forEach((timer) => ((timer.live = false), timer.then()))
   }
-  return { clock, tick }
+  const pending = () => waiting.filter((timer) => timer.live).length
+  return { clock, tick, pending }
 }
 
 export type Calls = {

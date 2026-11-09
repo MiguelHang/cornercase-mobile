@@ -64,4 +64,4 @@ export const threadOf = (reading: Reading, outgoing: { answered: LastMessage | n
 export const atEnd = (scrollY: number, viewport: number, height: number, margin = AT_END_MARGIN) =>
   scrollY + viewport >= height - margin
 
-export const compactHeader = (scrollY: number, headerBottom: number) => headerBottom > 0 && scrollY > headerBottom
+export const compactHeader = (scrollY: number, headerHeight: number) => headerHeight > 0 && scrollY > headerHeight
