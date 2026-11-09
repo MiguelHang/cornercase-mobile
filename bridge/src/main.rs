@@ -1,7 +1,7 @@
 use std::env;
 use std::fmt;
 use std::io::{self, Write};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -62,8 +62,10 @@ async fn run(args: Args) -> Result<(), Failure> {
     let listeners = network::listen(&ips, args.port).await.map_err(failing(FAILED))?;
     let count = listeners.len();
     eprintln!("cornercase-bridge: listening on {count} address{}", if count == 1 { "" } else { "es" });
-    print(name::read().as_deref(), &places, &listeners, &token)?;
-    Server::from_listeners(listeners, Config::new(token, binary)).run(shutdown).await;
+    let addresses = addresses(&listeners)?;
+    print(name::read().as_deref(), &places, &addresses, &token)?;
+    let config = Config::new(token, binary).with_addresses(addresses);
+    Server::from_listeners(listeners, config).run(shutdown).await;
     Ok(())
 }
 
@@ -96,16 +98,17 @@ fn places(targets: Option<&[Target]>) -> Vec<(Place<'_>, IpAddr)> {
     }
 }
 
+fn addresses(listeners: &[TcpListener]) -> Result<Vec<SocketAddr>, Failure> {
+    listeners.iter().map(|listener| listener.local_addr().map_err(failing(FAILED))).collect()
+}
+
 fn print(
     name: Option<&str>,
     places: &[(Place<'_>, IpAddr)],
-    listeners: &[TcpListener],
+    addresses: &[SocketAddr],
     token: &str,
 ) -> Result<(), Failure> {
-    let mut listening = Vec::with_capacity(places.len());
-    for (&(place, _), listener) in places.iter().zip(listeners) {
-        listening.push((place, listener.local_addr().map_err(failing(FAILED))?));
-    }
+    let listening: Vec<_> = places.iter().zip(addresses).map(|(&(place, _), &address)| (place, address)).collect();
     let block = qr::block(name, &listening, token).map_err(failing(FAILED))?;
     writeln!(io::stdout().lock(), "{}", block.join("\n")).map_err(failing(FAILED))
 }

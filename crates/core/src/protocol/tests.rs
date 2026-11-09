@@ -26,6 +26,40 @@ mod bridge_message {
     }
 }
 
+mod bridge_routes {
+    use super::*;
+
+    fn argv(args: &[&str]) -> Vec<String> {
+        args.iter().map(|&arg| arg.to_owned()).collect()
+    }
+
+    #[rstest]
+    #[case::none(&[], r#"{"routes":[]}"#)]
+    #[case::lan(&["192.168.1.20:8765"], r#"{"routes":[{"host":"192.168.1.20","port":8765}]}"#)]
+    #[case::lan_and_tailscale(
+        &["192.168.1.20:8765", "100.101.102.103:8765"],
+        r#"{"routes":[{"host":"192.168.1.20","port":8765},{"host":"100.101.102.103","port":8765}]}"#
+    )]
+    #[case::ipv6_without_brackets(&["[fd7a:115c:a1e0::1]:9000"], r#"{"routes":[{"host":"fd7a:115c:a1e0::1","port":9000}]}"#)]
+    fn lists_each_address_in_order_as_a_host_and_a_port(#[case] addresses: &[&str], #[case] json: &str) {
+        let addresses: Vec<SocketAddr> =
+            addresses.iter().map(|address| address.parse().expect("a socket address")).collect();
+        let routes = BridgeRoutes::new(&addresses);
+        assert_eq!(serde_json::to_string(&routes).expect("serialize the routes"), json);
+        assert_eq!(serde_json::from_str::<BridgeRoutes>(json).expect("parse the routes"), routes);
+    }
+
+    #[rstest]
+    #[case::alone(&["--bridge-routes"], true)]
+    #[case::with_an_argument(&["--bridge-routes", "status"], false)]
+    #[case::after_a_command(&["status", "--bridge-routes"], false)]
+    #[case::another_flag(&["--bridge-route"], false)]
+    #[case::nothing(&[], false)]
+    fn is_asked_only_by_its_flag_alone(#[case] args: &[&str], #[case] asked: bool) {
+        assert_eq!(BridgeRoutes::asked(&argv(args)), asked);
+    }
+}
+
 mod refusal {
     use super::*;
 

@@ -18,6 +18,14 @@ mod config {
             )
         );
     }
+
+    #[test]
+    fn listens_on_no_address_until_it_is_given_some() {
+        let config = Config::new("t".to_owned(), PathBuf::from("cornercase"));
+        assert_eq!(config.addresses, Vec::<SocketAddr>::new());
+        let addresses: Vec<SocketAddr> = vec!["192.168.1.20:8765".parse().expect("an address")];
+        assert_eq!(config.with_addresses(addresses.clone()).addresses, addresses);
+    }
 }
 
 mod local_addr {
