@@ -1,0 +1,7 @@
+{
+  "agent": "claude",
+  "pane": 543,
+  "text": "**Resultado: VERDE.** `hx check full` pasa (fmt, clippy, tests, jscpd 0,14 %). Mutation sale FAIL solo por 2 TIMEOUT.\n\n- **Mutation:** 55 mutantes, 39 caught, 14 unviable, 2 timeouts y 0 missed. La primera pasada abortó por un error de infraestructura de cargo-mutants y repetí una vez.\n- **Superviviente:** `terminal_close -> ()` (`terminal.rs:38`) no lo mataba ningún test. Añadí `over_ipc::cuts_the_surface_it_showed_when_closing` y lo mata. Está commiteado con `--no-verify` (`638e0ff`).\n- **Los 2 timeouts** están en `live.rs:89` y `live.rs:98`. El mutante cuelga el test, así que cuenta como detectado, pero `hx check` lo marca FAIL. No es un fallo de producción.",
+  "turn_over": true,
+  "written": "2026-11-09T14:26:47.027Z"
+}
