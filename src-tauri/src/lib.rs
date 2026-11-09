@@ -1,5 +1,9 @@
+#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the errors until the commands return them"))]
+mod commands;
 mod identity;
 mod secrets;
+#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the views until the commands return them"))]
+mod view;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
