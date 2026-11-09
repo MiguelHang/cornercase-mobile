@@ -34,9 +34,9 @@ describe('the terminal screen', () => {
     expect(source).toContain('if (shows(event.payload, machine, tab.tab)) { shown.apply(event.payload) }')
   })
 
-  it('opens once it listens, again only when the size that fits changes, and closes when it leaves', () => {
-    expect(source).toContain("if (key === opened) { return } opened = key await listening")
-    expect(source).toContain('const result = await commands.terminalOpen(tab.tab, tab.pane, size)')
-    expect(source).toContain('commands.terminalClose().catch(onfailed)')
+  it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
+    expect(source).toContain('new Opening(unlisten, { open, close: commands.terminalClose, failed: onfailed })')
+    expect(source).toContain('opening?.open(wanted)')
+    expect(source).toContain('opening?.leave()')
   })
 })

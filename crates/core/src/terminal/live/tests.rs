@@ -88,6 +88,28 @@ fn whole_frame() -> Step {
     changed(true, &[(13, &[0, 1, 2, 3, 4]), (14, &[0])])
 }
 
+#[derive(Clone)]
+enum Said {
+    Line(String),
+    After(u64),
+    Ends(End),
+}
+
+fn exits() -> Said {
+    Said::Ends(Ok(Exit { code: 0, stderr: String::new() }))
+}
+
+async fn played(mut out: OutSink, said: Vec<Said>) -> End {
+    for said in said {
+        match said {
+            Said::Line(line) => out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?,
+            Said::After(seconds) => time::sleep(Duration::from_secs(seconds)).await,
+            Said::Ends(end) => return end,
+        }
+    }
+    future::pending().await
+}
+
 mod open {
     use super::*;
 
@@ -173,28 +195,55 @@ mod next {
 mod a_patch_on_another_base {
     use super::*;
 
-    fn redrawn(redraws: &mpsc::UnboundedSender<String>) -> FakeTransport {
-        let redraws = redraws.clone();
-        let fake = FakeTransport::default().answer(&["status"], &[], &[], 0);
-        fake.script(&["redraw", "--surface", "2"], move |_, _| {
-            redraws.send("redraw --surface 2".to_owned()).expect("the test reads the redraws");
-            future::ready(Ok(Exit { code: 0, stderr: String::new() }))
-        })
+    struct Redraws {
+        queue: Queue,
+        asked: mpsc::UnboundedReceiver<String>,
+    }
+
+    impl Redraws {
+        fn answering(code: i32) -> Self {
+            let (sender, asked) = mpsc::unbounded_channel();
+            let fake = FakeTransport::default().answer(&["status"], &[], &[], 0);
+            let fake = fake.script(&["redraw", "--surface", "2"], move |_, _| {
+                sender.send("redraw --surface 2".to_owned()).expect("the test reads the redraws");
+                future::ready(Ok(Exit { code, stderr: String::new() }))
+            });
+            let (queue, worker) = Queue::new(Arc::new(fake), |_| {});
+            tokio::spawn(worker);
+            Self { queue, asked }
+        }
+
+        async fn asked(mut self) -> usize {
+            self.queue.ask(vec!["status".to_owned()], None).await.expect("the queue ran what came before");
+            let mut asked = 0;
+            while self.asked.try_recv().is_ok() {
+                asked += 1;
+            }
+            asked
+        }
     }
 
     #[tokio::test]
     async fn asks_once_for_a_redraw_and_hands_nothing_until_a_complete_frame() {
-        let (sender, mut redraws) = mpsc::unbounded_channel();
-        let (queue, worker) = Queue::new(Arc::new(redrawn(&sender)), |_| {});
-        tokio::spawn(worker);
+        let redraws = Redraws::answering(0);
         let lines = [one_line(FRAME), on_another_base(), on_another_base(), one_line(PATCH), one_line(FRAME)];
         let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
-        let live =
-            Live::open(Arc::new(FakeTransport::default().answer(&ARGV, &lines, &[], 0)), queue.clone(), 12, SIZE);
+        let fake = FakeTransport::default().answer(&ARGV, &lines, &[], 0);
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
         assert_eq!(steps(live).await, [whole_frame(), whole_frame(), Step::Ended(Ended::Exited)]);
-        queue.ask(vec!["status".to_owned()], None).await.expect("the queue ran what came before");
-        assert_eq!(redraws.try_recv().as_deref(), Ok("redraw --surface 2"));
-        assert!(redraws.try_recv().is_err());
+        assert_eq!(redraws.asked().await, 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn asks_again_when_patches_go_on_two_seconds_after_a_redraw_that_brought_nothing() {
+        let redraws = Redraws::answering(1);
+        let patch = || Said::Line(on_another_base());
+        let said =
+            vec![Said::Line(one_line(FRAME)), patch(), Said::After(1), patch(), Said::After(2), patch(), exits()];
+        let fake = FakeTransport::default().script(&ARGV, move |_, out| played(out, said.clone()));
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
+        assert_eq!(steps(live).await, [whole_frame(), Step::Ended(Ended::Exited)]);
+        assert_eq!(redraws.asked().await, 2);
     }
 }
 
@@ -215,17 +264,6 @@ mod a_terminal {
     const RESTARTED: &str = "4243-1760600100";
     const TAB: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
 
-    #[derive(Clone)]
-    enum Said {
-        Line(String),
-        After(u64),
-        Ends(End),
-    }
-
-    fn exits() -> Said {
-        Said::Ends(Ok(Exit { code: 0, stderr: String::new() }))
-    }
-
     fn contract(boot: &str) -> Vec<Said> {
         let mut contract: Value = serde_json::from_str(REAL).expect("the real contract");
         contract["boot"] = boot.into();
@@ -243,17 +281,6 @@ mod a_terminal {
 
     fn drawn() -> Said {
         Said::Line(one_line(FRAME))
-    }
-
-    async fn played(mut out: OutSink, said: Vec<Said>) -> End {
-        for said in said {
-            match said {
-                Said::Line(line) => out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?,
-                Said::After(seconds) => time::sleep(Duration::from_secs(seconds)).await,
-                Said::Ends(end) => return end,
-            }
-        }
-        future::pending().await
     }
 
     fn in_turn(fake: FakeTransport, argv: &[&str], turns: Vec<Vec<Said>>) -> FakeTransport {
@@ -313,6 +340,7 @@ mod a_terminal {
                 let what = match screen {
                     Screen::Update(update) if update.replaced => "replaced",
                     Screen::Update(_) => "patched",
+                    Screen::Failed(_) => "failed",
                     Screen::Closed => "closed",
                 };
                 seen.push((at.as_secs(), what));
@@ -353,12 +381,48 @@ mod a_terminal {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn opens_it_again_once_connected_after_the_transport_was_lost() {
+    async fn opens_it_again_once_connected_after_the_store_lost_the_transport_with_the_surface_still_open() {
         let sessions =
             vec![vec![session(BOOT, 7, true), Said::After(5), exits()], vec![Said::After(20), session(BOOT, 7, true)]];
-        let surfaces = vec![vec![drawn(), Said::After(5), Said::Ends(Err(Error::Dropped))], vec![drawn()]];
-        let mut watched = Watched::after_a_minute(Mac::of(sessions, surfaces)).await;
+        let mut watched = Watched::after_a_minute(Mac::of(sessions, vec![vec![drawn()]])).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
+        assert_eq!(watched.surfaces().len(), 2);
+    }
+
+    fn connected() -> Vec<Vec<Said>> {
+        vec![vec![session(BOOT, 7, true)]]
+    }
+
+    fn refused() -> Said {
+        Said::Ends(Ok(Exit { code: 1, stderr: "no tab 3".to_owned() }))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tells_once_of_a_surface_that_keeps_failing_with_the_tab_still_there() {
+        let mut watched = Watched::after_a_minute(Mac::of(connected(), vec![vec![refused()]])).await;
+        assert_eq!(watched.seen(), [(0, "failed")]);
+        assert!(watched.surfaces().len() > 50);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tells_again_of_a_failure_after_the_surface_showed() {
+        let surfaces = vec![vec![refused()], vec![drawn(), Said::After(5), refused()], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(connected(), surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "failed"), (1, "replaced"), (6, "failed"), (7, "replaced")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tells_of_a_surface_lost_while_the_store_kept_its_transport() {
+        let surfaces = vec![vec![drawn(), Said::After(5), Said::Ends(Err(Error::Dropped))], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(connected(), surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (5, "failed"), (6, "replaced")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tells_of_a_line_that_is_no_surface_and_goes_on() {
+        let surfaces = vec![vec![Said::Line("{\"boot\":".to_owned()), drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(connected(), surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "failed"), (0, "replaced")]);
     }
 
     #[tokio::test(start_paused = true)]

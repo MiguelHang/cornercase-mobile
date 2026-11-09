@@ -122,7 +122,7 @@ fn connection_changed(machine: MachineId, machines: &SharedMachines, connection:
     }
 }
 
-fn warned(error: &Error) -> Emitted {
+pub(crate) fn warned(error: &Error) -> Emitted {
     Emitted::Toast(Toast::error(error.to_string()))
 }
 

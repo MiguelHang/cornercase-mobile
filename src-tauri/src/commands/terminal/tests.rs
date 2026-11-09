@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cornercase_core::cli::surface::Style;
+use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
@@ -142,6 +143,18 @@ mod a_batch {
     fn closes_without_a_pane_when_it_showed_nothing() {
         let changed = batched(vec![Screen::Closed]);
         assert_eq!((changed.machine, changed.tab, changed.closed, changed.pane), (7, 3, true, None));
+    }
+
+    #[test]
+    fn tells_a_failure_as_a_toast_after_the_rows_it_held_and_only_once() {
+        let failed = Error::Failed { code: 1, stderr: "no tab 3".to_owned() };
+        let mut batch = Batch::new(MachineId(7), 3);
+        batch.add(update(1, false, &[(0, "a")]));
+        batch.add(Screen::Failed(failed.clone()));
+        let taken = batch.take();
+        assert!(matches!(&taken[..], [Emitted::Terminal(_), _]), "{taken:?}");
+        assert_eq!(taken[1], warned(&failed));
+        assert_eq!(batch.take(), []);
     }
 }
 

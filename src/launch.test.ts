@@ -7,7 +7,7 @@ import tauriConf from '../src-tauri/tauri.conf.json?raw'
 
 describe('launch', () => {
   it('lets the page draw under the notch and never zooms it', () => {
-    expect(html).toContain(
+    expect(html.replace(/\s+/g, ' ')).toContain(
       '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />',
     )
   })

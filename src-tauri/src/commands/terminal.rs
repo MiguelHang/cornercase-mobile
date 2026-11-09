@@ -13,7 +13,7 @@ use tokio::time;
 
 use crate::commands::connection::Task;
 use crate::commands::error::CommandError;
-use crate::events::{Emit, Emitted, TerminalChanged};
+use crate::events::{Emit, Emitted, TerminalChanged, warned};
 use crate::state::AppState;
 
 const FRAME: Duration = Duration::from_millis(16);
@@ -71,8 +71,8 @@ pub(crate) async fn by_frame(mut batch: Batch, mut heard: UnboundedReceiver<Scre
         while let Ok(screen) = heard.try_recv() {
             batch.add(screen);
         }
-        if let Some(changed) = batch.pending.take() {
-            emit.emit(Emitted::Terminal(changed));
+        for event in batch.take() {
+            emit.emit(event);
         }
         time::sleep(FRAME).await;
     }
@@ -82,18 +82,25 @@ pub(crate) struct Batch {
     machine: MachineId,
     tab: u64,
     pending: Option<TerminalChanged>,
+    told: Vec<Emitted>,
 }
 
 impl Batch {
     pub(crate) fn new(machine: MachineId, tab: u64) -> Self {
-        Self { machine, tab, pending: None }
+        Self { machine, tab, pending: None, told: Vec::new() }
     }
 
     pub(crate) fn add(&mut self, screen: Screen) {
         match screen {
             Screen::Update(update) => self.join(update),
+            Screen::Failed(error) => self.told.push(warned(&error)),
             Screen::Closed => self.held().closed = true,
         }
+    }
+
+    pub(crate) fn take(&mut self) -> Vec<Emitted> {
+        let changed = self.pending.take().map(Emitted::Terminal);
+        changed.into_iter().chain(self.told.drain(..)).collect()
     }
 
     fn join(&mut self, update: Update) {

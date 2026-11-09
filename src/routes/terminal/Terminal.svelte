@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { commands, events, type Size_Deserialize } from '../../lib/bindings'
   import type { AgentTab } from '../../lib/connection'
+  import { Opening } from '../../lib/terminal/opening'
   import { Pane, shows } from '../../lib/terminal/pane.svelte'
   import TerminalView from '../../lib/terminal/Terminal.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
@@ -24,21 +25,7 @@
 
   const shown = new Pane()
   let wanted = $state.raw<Size_Deserialize | null>(null)
-  let listening: Promise<unknown> = Promise.resolve()
-  let opened = ''
-
-  const open = async (size: Size_Deserialize) => {
-    const key = `${size.cols}x${size.rows}`
-    if (key === opened) {
-      return
-    }
-    opened = key
-    await listening
-    const result = await commands.terminalOpen(tab.tab, tab.pane, size)
-    if (result.status === 'error') {
-      onfailed(result.error)
-    }
-  }
+  let opening: Opening | null = null
 
   onMount(() => {
     const unlisten = events.terminalChanged.listen((event) => {
@@ -46,16 +33,17 @@
         shown.apply(event.payload)
       }
     })
-    listening = unlisten
+    const open = (size: Size_Deserialize) => commands.terminalOpen(tab.tab, tab.pane, size)
+    opening = new Opening(unlisten, { open, close: commands.terminalClose, failed: onfailed })
     return () => {
       unlisten.then((stop) => stop()).catch(onfailed)
-      commands.terminalClose().catch(onfailed)
+      opening?.leave()
     }
   })
 
   $effect(() => {
     if (wanted !== null) {
-      open(wanted).catch(onfailed)
+      opening?.open(wanted)
     }
   })
 </script>

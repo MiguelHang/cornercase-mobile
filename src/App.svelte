@@ -102,5 +102,9 @@
   {:else}
     <NoMachines onadded={added} />
   {/if}
-  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={route.name === 'no-machines' ? 0 : barHeight} />
+  <ToastStack
+    items={toasts.items}
+    ondismiss={(id) => toasts.dismiss(id)}
+    below={route.name === 'no-machines' ? 0 : barHeight}
+  />
 </main>
