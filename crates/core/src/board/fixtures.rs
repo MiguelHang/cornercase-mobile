@@ -8,6 +8,10 @@ pub(crate) fn agent(id: u64, status: &str) -> Pane {
     pane(id, Some("claude"), Some(status))
 }
 
+pub(crate) fn child(id: u64, parent: u64, status: &str) -> Pane {
+    Pane { parent: Some(parent), ..agent(id, status) }
+}
+
 pub(crate) fn tab(id: u64, panes: Vec<Pane>) -> Tab {
     Tab { id, name: format!("tab {id}"), panes, ..Tab::default() }
 }

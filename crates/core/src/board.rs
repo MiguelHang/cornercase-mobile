@@ -6,6 +6,8 @@ use crate::cli::status::{Pane, Project, Snapshot, Tab, Workspace};
 
 #[cfg(test)]
 pub(crate) mod fixtures;
+#[cfg_attr(not(test), expect(dead_code, reason = "agents() reads the tree once AgentRow carries it"))]
+mod tree;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
