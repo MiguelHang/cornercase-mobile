@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use cornercase_core::cli::surface::{Colours, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
@@ -57,6 +59,27 @@ fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Reco
     let recorder = forwarding(id, &store, store.changes(), machines);
     tokio::spawn(driver);
     recorder
+}
+
+fn closed_terminal() -> Emitted {
+    Emitted::Terminal(TerminalChanged {
+        machine: 7,
+        tab: 3,
+        pane: None,
+        size: Size::default(),
+        cursor: None,
+        colours: Colours::default(),
+        replaced: false,
+        rows: BTreeMap::new(),
+        closed: true,
+    })
+}
+
+fn closed_terminal_json() -> Value {
+    let colours = json!({ "fg": null, "bg": null, "cursor": null, "palette": {} });
+    let size = json!({ "cols": 0, "rows": 0 });
+    json!({ "machine": 7, "tab": 3, "pane": null, "size": size, "cursor": null, "colours": colours,
+        "replaced": false, "rows": {}, "closed": true })
 }
 
 fn versions(recorder: &Recorder) -> Vec<(u64, Option<String>)> {
@@ -148,6 +171,7 @@ mod an_event {
         Emitted::Session(SessionChanged { machine: 7, session: None }),
         json!({ "machine": 7, "session": null })
     )]
+    #[case::terminal_changed(closed_terminal(), closed_terminal_json())]
     #[case::error_toast(
         Emitted::Toast(Toast::error("it failed")),
         json!({ "level": "error", "message": "it failed" })
@@ -160,6 +184,7 @@ mod an_event {
         let json = match event {
             Emitted::Connection(changed) => serde_json::to_value(changed),
             Emitted::Session(changed) => serde_json::to_value(changed),
+            Emitted::Terminal(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
         assert_eq!(json.expect("an event serializes"), expected);
@@ -168,8 +193,8 @@ mod an_event {
     #[test]
     fn is_named_in_kebab_case() {
         assert_eq!(
-            [ConnectionChanged::NAME, SessionChanged::NAME, Toast::NAME],
-            ["connection-changed", "session-changed", "toast"]
+            [ConnectionChanged::NAME, SessionChanged::NAME, TerminalChanged::NAME, Toast::NAME],
+            ["connection-changed", "session-changed", "terminal-changed", "toast"]
         );
     }
 }
@@ -188,6 +213,7 @@ mod the_app {
         "session-changed",
         json!({ "machine": 7, "session": null })
     )]
+    #[case::terminal_changed(closed_terminal(), "terminal-changed", closed_terminal_json())]
     #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
     fn emits_each_event_under_its_name(#[case] event: Emitted, #[case] name: &str, #[case] expected: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
