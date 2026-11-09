@@ -1,4 +1,4 @@
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the errors until the commands return them"))]
+#[expect(dead_code, reason = "nothing registers the commands until the bindings collect them")]
 mod commands;
 #[cfg_attr(not(test), expect(dead_code, reason = "only the tests forward the changes until a command connects"))]
 mod events;
@@ -6,6 +6,8 @@ mod identity;
 mod secrets;
 #[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the state until the app mounts it"))]
 mod state;
+#[cfg(test)]
+mod test_util;
 #[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the views until the commands return them"))]
 mod view;
 

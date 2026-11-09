@@ -1,0 +1,61 @@
+use cornercase_core::machines::MachineId;
+use cornercase_core::machines::route::Route;
+use tauri::{AppHandle, State};
+
+use crate::commands::error::CommandError;
+use crate::events::{ConnectionChanged, Emit, Emitted};
+use crate::state::AppState;
+use crate::view::{ConnectionView, MachineView};
+
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineView>, CommandError> {
+    list(&state)
+}
+
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machine_add(state: State<'_, AppState>, url: String, name: String) -> Result<u64, CommandError> {
+    add(&state, &url, name).map(|id| id.0)
+}
+
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machine_remove(app: AppHandle, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
+    remove(&state, &app, MachineId(id))
+}
+
+pub(crate) fn list(state: &AppState) -> Result<Vec<MachineView>, CommandError> {
+    state.machines(|machines| Ok(machines.machines().iter().map(MachineView::from).collect()))
+}
+
+pub(crate) fn add(state: &AppState, url: &str, name: String) -> Result<MachineId, CommandError> {
+    let route = Route::parse(url)?;
+    state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
+}
+
+pub(crate) fn remove(state: &AppState, emit: &dyn Emit, id: MachineId) -> Result<(), CommandError> {
+    let (removed, gone) = state.machines(|machines| {
+        let removed = machines.remove(id).map_err(CommandError::from);
+        Ok((removed, machines.machine(id).is_none()))
+    })?;
+    if gone {
+        release(state, emit, id);
+    }
+    removed
+}
+
+fn release(state: &AppState, emit: &dyn Emit, id: MachineId) {
+    let mut active = state.active();
+    if active.as_ref().is_some_and(|active| active.machine() == id) {
+        *active = None;
+        drop(active);
+        emit.emit(Emitted::Connection(ConnectionChanged { machine: id.0, connection: ConnectionView::None }));
+    }
+}
+
+#[cfg(test)]
+mod tests;

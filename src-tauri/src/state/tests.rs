@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::future;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
@@ -10,19 +9,14 @@ use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
-use tokio::time;
 
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::secrets::{KeychainSecrets, mock_store, on_mock};
+use crate::test_util::{released, route};
 
-const BRIDGE: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
-
-fn route() -> Route {
-    Route::parse(BRIDGE).expect("a bridge url")
-}
 
 fn keychain() -> Arc<dyn Secrets> {
     Arc::new(on_mock(mock_store()))
@@ -179,16 +173,6 @@ mod an_active_store {
                 future::pending::<()>().await;
             }))
         }
-    }
-
-    async fn released<T>(held: &Arc<T>) {
-        time::timeout(Duration::from_secs(60), async {
-            while Arc::strong_count(held) > 1 {
-                time::sleep(Duration::from_millis(10)).await;
-            }
-        })
-        .await
-        .expect("the tasks let go within a minute");
     }
 
     #[tokio::test(start_paused = true)]

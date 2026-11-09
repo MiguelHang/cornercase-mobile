@@ -1,115 +1,25 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
-use cornercase_core::secrets::Secrets;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
-use tokio::time;
 
 use super::*;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
+use crate::test_util::{
+    APP, BOOT, CONTRACT, EVENTS, Recorder, STATUS, Studio, TOKEN, changed, connected, contracted, route, serving,
+    settle, snapshot,
+};
 
-const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
-const BRIDGE: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
-const ADDRESS: &str = "ws://studio.lan:9000/";
-const BOOT: &str = "5151-1770000000";
 const RESTARTED: &str = "5152-1770000100";
-const CONTRACT: &[&str] = &["contract", "--json"];
-const EVENTS: &[&str] = &["events", "--json", "--notices"];
-const STATUS: &[&str] = &["status", "--follow", "--json"];
-const APP: &[&str] = &["status", "--app", "--follow", "--json"];
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
-const REAL_CONTRACT: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/contract/0.13.19.json"));
-
-#[derive(Clone, Default)]
-struct Recorder(Arc<Mutex<Vec<Emitted>>>);
-
-impl Emit for Recorder {
-    fn emit(&self, event: Emitted) {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).push(event);
-    }
-}
-
-impl Recorder {
-    fn all(&self) -> Vec<Emitted> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner).clone()
-    }
-
-    fn connections(&self) -> Vec<ConnectionChanged> {
-        self.all()
-            .into_iter()
-            .filter_map(|event| if let Emitted::Connection(it) = event { Some(it) } else { None })
-            .collect()
-    }
-
-    fn sessions(&self) -> Vec<SessionChanged> {
-        self.all()
-            .into_iter()
-            .filter_map(|event| if let Emitted::Session(it) = event { Some(it) } else { None })
-            .collect()
-    }
-
-    fn toasts(&self) -> Vec<Toast> {
-        self.all()
-            .into_iter()
-            .filter_map(|event| if let Emitted::Toast(it) = event { Some(it) } else { None })
-            .collect()
-    }
-}
-
-struct Studio {
-    dir: TempDir,
-    secrets: Arc<dyn Secrets>,
-    state: AppState,
-    id: MachineId,
-}
-
-impl Studio {
-    fn new() -> Self {
-        let dir = TempDir::new();
-        let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
-        let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), Arc::clone(&secrets));
-        let added = state.machines(|machines| machines.add("studio".to_owned(), route()).map_err(CommandError::from));
-        Self { id: added.expect("the studio is added"), dir, secrets, state }
-    }
-
-    fn reloaded(&self) -> AppState {
-        AppState::load(Ok::<_, &str>(self.dir.path().to_path_buf()), Arc::clone(&self.secrets))
-    }
-}
-
-fn route() -> Route {
-    Route::parse(BRIDGE).expect("a bridge url")
-}
-
-fn contract(boot: &str) -> String {
-    let mut contract: Value = serde_json::from_str(REAL_CONTRACT).expect("the real contract parses");
-    contract["boot"] = boot.into();
-    contract.to_string()
-}
-
-fn snapshot(boot: &str, revision: u64, version: &str) -> String {
-    json!({ "boot": boot, "revision": revision, "version": version }).to_string()
-}
-
-fn contracted(boot: &str) -> FakeTransport {
-    FakeTransport::default().answer(CONTRACT, &[&contract(boot)], &[], 0)
-}
-
-fn serving(status: &[String]) -> FakeTransport {
-    let status: Vec<&str> = status.iter().map(String::as_str).collect();
-    contracted(BOOT).open(EVENTS, &[]).open(STATUS, &status).open(APP, &[&snapshot(BOOT, 1, "app")])
-}
 
 fn by_call(fake: FakeTransport, argv: &'static [&'static str], answers: Vec<FakeTransport>) -> FakeTransport {
     let answers: Vec<Arc<FakeTransport>> = answers.into_iter().map(Arc::new).collect();
@@ -147,18 +57,6 @@ fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Reco
     let recorder = forwarding(id, &store, store.changes(), machines);
     tokio::spawn(driver);
     recorder
-}
-
-async fn settle() {
-    time::sleep(Duration::from_secs(60)).await;
-}
-
-fn changed(id: MachineId, connection: ConnectionView) -> ConnectionChanged {
-    ConnectionChanged { machine: id.0, connection }
-}
-
-fn connected() -> ConnectionView {
-    ConnectionView::Connected { route: ADDRESS.to_owned() }
 }
 
 fn versions(recorder: &Recorder) -> Vec<(u64, Option<String>)> {
