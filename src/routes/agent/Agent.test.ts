@@ -6,6 +6,7 @@ import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, 
 import { fakeClock, message, ok } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
+import chatHeaderSource from './ChatHeader.svelte?raw'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import KeyRow from './KeyRow.svelte'
@@ -86,6 +87,63 @@ describe('Agent, its header', () => {
 
   it('sits below the connection bar', () => {
     expect(draw(chatWith(ROW), 52)).toContain('style="--below: 52px;"')
+  })
+})
+
+const BAR = /<div class="bar svelte-[\w-]+" style="--below: 0px;">(.*?)<\/div> <header class="head svelte-[\w-]+">/
+
+const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
+
+const bar = (row: AgentRow) => draw(chatWith(row)).match(BAR)?.[1] ?? ''
+
+describe('Agent, its sticky header', () => {
+  it('keeps Back and Terminal in a bar of their own, with the large header after it to scroll away', () => {
+    const shown = bar(ROW)
+    expect(shown).toMatch(/^<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Back<!---->/)
+    expect(shown).toMatch(TERMINAL)
+    expect(shown).not.toContain('<h1')
+  })
+
+  it('starts large at the top of the page, below the connection bar', () => {
+    expect(draw(chatWith(ROW), 52)).toMatch(/<div class="bar svelte-[\w-]+" style="--below: 52px;"><button/)
+  })
+
+  it('carries a compact line between them, with the dot, the title and the status, hidden from VoiceOver', () => {
+    const short = bar(ROW).match(SHORT)?.[1] ?? ''
+    expect(short).toContain('aria-label="Waiting"')
+    expect(short).toMatch(/<span class="called svelte-[\w-]+">Fix the login flow<\/span> <span class="state svelte-[\w-]+">Waiting<\/span>$/)
+    expect(bar(ROW).indexOf('class="short')).toBeLessThan(bar(ROW).indexOf('Terminal'))
+  })
+
+  it('names the agent in the compact line when it has no title', () => {
+    const short = bar({ ...ROW, title: null, status: 'working' }).match(SHORT)?.[1] ?? ''
+    expect(short).toMatch(/<span class="called svelte-[\w-]+">claude<\/span> <span class="state svelte-[\w-]+">Working<\/span>$/)
+  })
+
+  it('turns compact past the large header, measured, following the page with a passive listener', () => {
+    const source = flat(chatHeaderSource)
+    expect(source).toContain('const compact = $derived(compactHeader(scrolled, tall))')
+    expect(source).toContain('<div class="bar" class:compact style:--below="{below}px">')
+    expect(source).toContain('<header class="head" bind:clientHeight={tall}>')
+    expect(source).toContain("const seen = () => (scrolled = window.scrollY) seen() window.addEventListener('scroll', seen, { passive: true })")
+    expect(source).toContain("return () => window.removeEventListener('scroll', seen)")
+  })
+
+  it('sticks under the connection bar, over its veil and blur', () => {
+    const source = flat(chatHeaderSource)
+    expect(source).toContain('.bar { position: sticky; top: calc(env(safe-area-inset-top) + var(--below)); z-index: 4;')
+    expect(source).toContain('background: var(--veil); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }')
+  })
+
+  it('shows the compact line only while compact, as tall as its 44 px buttons', () => {
+    const source = flat(chatHeaderSource)
+    expect(source).toContain('min-width: 0; min-height: 44px; visibility: hidden; opacity: 0;')
+    expect(source).toContain('.compact .short { visibility: visible; opacity: 1; }')
+    expect(source.match(/<Button tone="plain" onclick=/g)).toHaveLength(2)
+  })
+
+  it('changes without animation under Reduce Motion', () => {
+    expect(flat(chatHeaderSource)).toContain('@media (prefers-reduced-motion: reduce) { .short { transition: none; } }')
   })
 })
 
@@ -236,9 +294,8 @@ describe('Agent, without its row', () => {
 
   it('offers opening the terminal of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain(
-      '<Button tone="plain" onclick={onback}>Back</Button> {#if row !== null} {@const opened = row} <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button> {/if} </div>',
-    )
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} /> <Thread {chat} {now} />')
+    expect(flat(chatHeaderSource)).toContain('<Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button>')
   })
 
   it('offers no terminal without its agent, nor once it is gone', () => {
