@@ -13,6 +13,7 @@
   import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
+  import { titleOf, type Lookups } from './lib/navigation'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
@@ -58,6 +59,11 @@
   const reviewed = $derived(router.reviewed)
   const reviewedMachine = $derived(reviewed?.machine ?? null)
   const reviewedWorkspace = $derived(reviewed?.workspace ?? null)
+  const lookups: Lookups = {
+    machineName: (id) => machines.find((machine) => machine.id === id)?.name,
+    agentRow: (opened) => (chat?.machine === opened.machine && chat.pane === opened.pane ? chat.row : undefined),
+  }
+  const backTo = $derived(titleOf(router.below, lookups))
   const changes = $derived(
     reviewedMachine === null || reviewedWorkspace === null
       ? null
@@ -266,6 +272,7 @@
   {:else if route.name === 'start'}
     <Start
       connection={current.connection}
+      {backTo}
       onback={() => router.back()}
       onstarted={started}
       oncreated={created}
@@ -275,6 +282,7 @@
       {machines}
       active={current.machine}
       connection={current.connection}
+      {backTo}
       onback={() => router.back()}
       onpick={(machine) => void join(machine)}
       onadded={added}
@@ -287,6 +295,7 @@
       machine={editing}
       {taken}
       connection={editing.id === current.machine ? current.connection : null}
+      {backTo}
       onback={() => router.back()}
       onchanged={reload}
       onremoved={removed}

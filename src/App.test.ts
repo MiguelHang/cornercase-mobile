@@ -82,7 +82,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
     )
   })
 
@@ -95,7 +95,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} onremoved={removed} adding={rescanning} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={() => router.back()} onchanged={reload} onremoved={removed} adding={rescanning} />',
     )
   })
 
@@ -160,13 +160,20 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
   })
 
+  it('names the route below for the back button, from the saved machines and the open chat', () => {
+    expect(source).toContain(
+      'const lookups: Lookups = { machineName: (id) => machines.find((machine) => machine.id === id)?.name, agentRow: (opened) => (chat?.machine === opened.machine && chat.pane === opened.pane ? chat.row : undefined), }',
+    )
+    expect(source).toContain('const backTo = $derived(titleOf(router.below, lookups))')
+  })
+
   it('opens Start from the board on the active machine, with its connection and without the bar', () => {
     expect(source).toContain(
       "const start = () => { if (current.machine !== null) { router.go({ name: 'start', machine: current.machine }) } }",
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} onback={() => router.back()} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} {backTo} onback={() => router.back()} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
     )
   })
 

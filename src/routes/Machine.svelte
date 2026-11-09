@@ -7,12 +7,14 @@
   import Field from '../lib/ui/Field.svelte'
   import Glass from '../lib/ui/Glass.svelte'
   import Icon from '../lib/ui/Icon.svelte'
+  import NavBar from '../lib/ui/NavBar.svelte'
   import UrlField from '../lib/ui/UrlField.svelte'
 
   let {
     machine,
     taken,
     connection,
+    backTo,
     onback,
     onchanged,
     onremoved,
@@ -27,6 +29,7 @@
     machine: MachineView_Serialize
     taken: string[]
     connection: ConnectionView_Serialize | null
+    backTo: string | null
     onback: () => void
     onchanged: () => Promise<unknown>
     onremoved: () => Promise<unknown>
@@ -54,12 +57,7 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title">{machine.name}</h1>
-  </header>
+  <NavBar {backTo} title={machine.name} {onback} />
   <Glass>
     <form class="form" onsubmit={rename}>
       <Field label="Name" bind:value={edit.name} error={edit.nameError} disabled={edit.busy} />
@@ -164,14 +162,6 @@
     padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
   }
 
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin-left: calc(-1 * var(--inset));
-  }
-
-  .back,
   .tool {
     display: flex;
     flex: none;
@@ -186,7 +176,6 @@
     color: var(--accent);
   }
 
-  .back:active,
   .tool:active {
     background: var(--hover);
   }
@@ -194,15 +183,6 @@
   .tool:disabled {
     color: var(--faint);
     background: none;
-  }
-
-  .title {
-    overflow: hidden;
-    margin: 0;
-    font-size: 22px;
-    font-weight: 600;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 
   .form {
