@@ -57,4 +57,12 @@ A workspace's git changes from the phone, usually an agent's worktree: the list 
 
 ## Checked live
 
-- Not yet: the simulator check with the bridge and cornercase 0.13.19 closes the task.
+- **On 2026-11-09** in the iPhone 17e simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), the app built with `tauri ios build --debug`, against the bridge on the LAN and cornercase 0.13.19, the taps made by XCUITest. A Claude Code 2.1.321 agent ran in a worktree of a small repository, with a modified file, a new one, a rename, a deletion and, later, an untracked one.
+- **The list**: the agent's `Changes` opened it on `Uncommitted`, with `+6 −2` and its four rows (`R README.md → GUIDE.md`, `D gone.txt −1`, `A lib.rs +3`, `M main.rs +3 −1`), as `changes list` printed them on the Mac.
+- **A diff**: `main.rs` showed its hunk with both columns of numbers, the removed line and three added ones, and the changed words of `println!("hello, café 🌍")` tinted exactly over `, café 🌍`, the emoji included. A line of `lib.rs` wider than the screen ran off its right edge unwrapped.
+- **Viewed**: the box in the diff's header marked `main.rs`, and `changes list` on the Mac said `viewed` within two seconds; the box of a row marked `lib.rs` the same way, the row dimmed. The Mac's changes panel draws the marks of that same list; the window itself was not looked at.
+- **Live**: a new file and a line added to `lib.rs` on the Mac showed in the list within five seconds, with `U answer.rs +1` and the totals, without a tap. A line added to `main.rs` cleared its mark on both sides, since its digest changed.
+- **Modes**: after a commit on the Mac, `Commits` listed the rename and the deletion (`+0 −1`) and `All` the five files (`+10 −2`), as `changes list --mode commits` and `--mode all` printed them. Marks follow each mode's digest: `lib.rs`, marked in `Uncommitted`, showed unmarked in `All`.
+- **Clearing**: the box of a marked row cleared it, and the Mac's list dropped `viewed`.
+- **Closed**: closing the workspace on the Mac while its list showed turned the screen into `This workspace was closed on the Mac.`
+- **Once**, the first diff read of the session answered `workspace 812 is not in a git repository` (the server's log says `refused … command=changes-file`), while the stream of the same workspace was `ready`. Opening it again a minute later worked, and neither the same command on the Mac, six at once, nor a new worktree read at once reproduced it; not reported upstream yet, since it was not reproduced.
