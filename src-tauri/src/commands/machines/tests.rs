@@ -108,6 +108,38 @@ mod listing_the_machines {
     }
 }
 
+mod renaming_a_machine {
+    use super::*;
+
+    #[test]
+    fn saves_the_trimmed_name() {
+        let studio = Studio::new();
+        rename(&studio.state, studio.id, "  Studio Mac ").expect("renamed");
+        assert_eq!(names(&studio.reloaded()), ["Studio Mac"]);
+    }
+
+    #[test]
+    fn keeps_its_own_name_in_other_case() {
+        let studio = Studio::new();
+        rename(&studio.state, studio.id, "STUDIO").expect("renamed");
+        assert_eq!(names(&studio.reloaded()), ["STUDIO"]);
+    }
+
+    #[rstest]
+    #[case::empty("   ", 0, ErrorCode::NameEmpty)]
+    #[case::too_long(&"m".repeat(65), 0, ErrorCode::NameTooLong)]
+    #[case::taken(" LAPTOP ", 0, ErrorCode::NameTaken)]
+    #[case::unknown("mini", 99, ErrorCode::UnknownMachine)]
+    fn says_why_it_did_not(#[case] name: &str, #[case] id: u64, #[case] code: ErrorCode) {
+        let studio = Studio::new();
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let id = if id == 0 { studio.id } else { MachineId(id) };
+        let error = rename(&studio.state, id, name).expect_err("refused");
+        assert_eq!(error.code, code);
+        assert_eq!(names(&studio.reloaded()), ["studio", "laptop"]);
+    }
+}
+
 mod removing_a_machine {
     use super::*;
 
@@ -192,6 +224,16 @@ mod over_ipc {
         let id = ipc.invoke("machine_add", json!({ "url": LAPTOP, "name": "laptop" })).expect("the machine is added");
         assert_eq!(names(&ipc.state()), ["studio", "laptop"]);
         assert_eq!(list(&ipc.state()).expect("the machines load").machines[1].id, id.as_u64().expect("an id"));
+    }
+
+    #[test]
+    fn renames_a_machine() {
+        let studio = Studio::new();
+        let ipc = Ipc::new(studio.reloaded());
+        assert_eq!(ipc.invoke("machine_rename", json!({ "id": studio.id.0, "name": "mini" })), Ok(Value::Null));
+        assert_eq!(names(&ipc.state()), ["mini"]);
+        let refused = ipc.invoke("machine_rename", json!({ "id": studio.id.0, "name": "" }));
+        assert_eq!(refused.expect_err("the name is refused")["code"], "name_empty");
     }
 
     #[test]

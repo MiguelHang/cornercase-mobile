@@ -8,6 +8,10 @@ export const commands = {
 	machinesList: () => typedError<MachineList_Serialize, CommandError>(__TAURI_INVOKE("machines_list")),
 	machineAdd: (url: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { url, name })),
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
+	machineRename: (id: number, name: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_rename", { id, name })),
+	machineRouteAdd: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_add", { id, url })),
+	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
+	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
@@ -56,6 +60,8 @@ export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deseriali
 export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+
+export type Direction = "up" | "down";
 
 export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity";
 

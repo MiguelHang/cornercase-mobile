@@ -34,7 +34,7 @@ impl Launcher {
         Self { transports: Arc::new(transports), spawn }
     }
 
-    fn bridge() -> Self {
+    pub(crate) fn bridge() -> Self {
         Self::new(bridge_transports(BridgeConfig::default()), async_runtime::spawn)
     }
 }

@@ -32,6 +32,13 @@ pub(crate) fn machine_remove<R: Runtime>(
     remove(&state, &app, MachineId(id))
 }
 
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machine_rename(state: State<'_, AppState>, id: u64, name: String) -> Result<(), CommandError> {
+    rename(&state, MachineId(id), &name)
+}
+
 pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
     state.machines(|machines| Ok(MachineList::from(&*machines)))
 }
@@ -39,6 +46,10 @@ pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
 pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {
     let route = Route::parse(url)?;
     state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
+}
+
+pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {
+    state.machines(|machines| machines.rename(id, name).map_err(CommandError::from))
 }
 
 pub(crate) fn remove(state: &AppState, emit: &dyn Emit, id: MachineId) -> Result<(), CommandError> {
