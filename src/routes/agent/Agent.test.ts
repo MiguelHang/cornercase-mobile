@@ -305,6 +305,20 @@ describe('Agent, its attachments', () => {
     expect(flat(agentSource)).toContain('.size { flex: none; color: var(--faint); }')
   })
 
+  it('rests Send and Enter while an image is being attached, and leaves the other keys', () => {
+    const chat = withChips('what is wrong here?')
+    void chat.attach()
+    const body = draw(chat)
+    const button = (name: string) =>
+      body.match(new RegExp(`<button class="([^"]*)" type="button"([^>]*) aria-label="${name}"`))
+    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+ resting$/)
+    expect(send(body)?.[2]).toContain('disabled=""')
+    expect(button('Enter')?.[1]).toMatch(/^button plain svelte-[\w-]+ compact resting$/)
+    expect(button('Enter')?.[2]).toBe(' disabled="" aria-disabled="true"')
+    expect(button('Escape')?.[2]).toBe('')
+    expect(flat(keyRowSource)).toContain('resting={!chat.canPressKey(button.key)}')
+  })
+
   it('offers no attaching without its agent, nor once it is gone', () => {
     const gone = withChips()
     gone.see(1, [{ ...ROW, pane: 30 }])

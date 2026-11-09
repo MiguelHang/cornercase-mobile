@@ -112,11 +112,15 @@ export class Chat {
 
   get canSend() {
     const something = this.draft.trim() !== '' || this.attachments.chips.length > 0
-    return something && !this.sending && this.row !== null && !this.asking
+    return something && !this.sending && !this.attachments.attaching && this.row !== null && !this.asking
   }
 
   get canPress() {
     return this.row !== null
+  }
+
+  canPressKey(key: KeyName) {
+    return this.canPress && !(key === 'enter' && this.attachments.attaching)
   }
 
   see(machine: number | null, agents: AgentRow[] | null, starting = false) {
@@ -177,7 +181,7 @@ export class Chat {
   }
 
   async press(key: KeyName): Promise<string | null> {
-    if (!this.canPress) {
+    if (!this.canPressKey(key)) {
       return null
     }
     void tap(this.#haptics)
