@@ -19,6 +19,7 @@ mod view;
 pub fn run() {
     let specta = bindings::specta();
     tauri::Builder::default()
+        .plugin(tauri_plugin_network::init(|network| eprintln!("cornercase-mobile: network {network:?}")))
         .invoke_handler(specta.invoke_handler())
         .setup(move |app| {
             specta.mount_events(app);
