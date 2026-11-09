@@ -1,4 +1,5 @@
 pub mod board;
+pub mod changes;
 pub mod cli;
 pub mod error;
 pub mod follow;

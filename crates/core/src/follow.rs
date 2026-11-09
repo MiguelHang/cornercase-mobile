@@ -211,3 +211,6 @@ fn failed(exit: Exit) -> Error {
     let output = Output { stdout: String::new(), stderr: exit.stderr, code: exit.code };
     printed(output).err().unwrap_or(Error::StreamEnded)
 }
+
+#[cfg(test)]
+pub(crate) mod fake;
