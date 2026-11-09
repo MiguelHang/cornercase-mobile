@@ -6,7 +6,7 @@ The active machine's screen, under the connection bar: every agent of its projec
 
 - **One row per pane with an agent** (`crates/core/src/board.rs`, `AgentRow`), from every project of the session; a pane without one gives none. The rows are built in the core, beside the session and the record of since when (below), and only they reach the WebView, over `agents` and `agents-changed` (`design/architecture.md` › Commands and events). Rejected: grouping and sorting the session in TypeScript after a `session-changed`, which sent the whole snapshot over IPC about every 500 ms while an agent worked and left the order untested against upstream's fixtures.
 - **Flat, one agent per pane.** gpui's tree of agents and the agents they started (`agent_rows`) was left out: a flow with subagents is one row per pane, without virtualisation, until a real list is too long.
-- **Names as the Mac shows them**: a project's, workspace's and tab's `custom_name`, else its `name`. The row carries `workspace_count` rather than a place already written, so the UI writes the line as gpui's `place` does: the project alone when it has one workspace, else `project › workspace`. `tab_name` goes out too, but no screen shows it yet; it belongs to the chat's header (016).
+- **Names as the Mac shows them**: a project's, workspace's and tab's `custom_name`, else its `name`. The row carries `workspace_count` rather than a place already written, so the UI writes the line as gpui's `place` does: the project alone when it has one workspace, else `project › workspace`. `tab_name` goes out too, for the chat's header (Chat › The screen).
 - **The title is gpui's `agent_title`**: the pane's `title` without the characters before its first letter or digit (a spinner frame, `✳`), trimmed; an empty or missing one is `null`, and the UI shows the agent's name (`claude`) instead.
 
 ## Order
@@ -37,7 +37,7 @@ The active machine's screen, under the connection bar: every agent of its projec
 ## A row
 
 - **A button of at least 44 px** with an empty `ontouchstart` (Look › Touch and motion): the `StatusDot` (Look › Components), the title, the place under it in `--muted`, and the time on the right in tabular figures, so the digits do not jump as it counts; no time when `since` is `null`.
-- **A tap opens the agent's screen** (`router.go({ name: 'agent', pane })`, Look › Navigation): here a skeleton of 016's chat with its dot, title and place, read by pane from the latest rows, and `Back`. While the agent works its dot keeps changing there too. A pane no longer among the rows says `This agent is no longer running.`; 016 decides the final text. Before the first list (`agents` is `null`: connecting, a new `Store`, a restart) the screen does not know yet, so it shows the board's mark, pulsing while it connects, rather than saying the agent is gone.
+- **A tap opens the agent's screen** (`router.go({ name: 'agent', pane })`, Look › Navigation): the chat (`design/chat.md`), whose header is read by pane from the latest rows, so while the agent works its dot keeps changing there too, and `Back`. A pane no longer among the rows says `This agent is no longer running.` with `Back to the board` (Chat › Gone). Before the first list (`agents` is `null`: connecting, a new `Store`, a restart) the screen does not know yet, so it shows the board's mark, pulsing while it connects, rather than saying the agent is gone.
 - **The board's `h1` is `Agents`, for screen readers only** (Look › Components): the connection bar already names the machine, and a visible title would repeat what the screen shows.
 
 ## Checked live
@@ -48,4 +48,4 @@ The active machine's screen, under the connection bar: every agent of its projec
 ## Left out
 
 - The agents of the other servers a Mac links (`status`'s `machines`, gpui's `machine_agents.rs`): their ids belong to another server, and the app's `Snapshot` does not read them.
-- Notifications, folding the sections, filters, search, and the chat itself (016).
+- Notifications, folding the sections, filters and search.
