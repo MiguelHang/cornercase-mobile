@@ -43,7 +43,7 @@ fn rebooting(fake: FakeTransport) -> FakeTransport {
     rebooting_after(fake, Duration::ZERO)
 }
 
-fn answering_only(fake: FakeTransport, first: bool) -> FakeTransport {
+pub(super) fn answering_only(fake: FakeTransport, first: bool) -> FakeTransport {
     by_call(fake, CONTRACT, move |call, out| answered(out, ((call == 0) == first).then(served)))
 }
 
