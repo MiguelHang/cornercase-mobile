@@ -169,7 +169,7 @@ describe('TextArea', () => {
 
   it.each([
     '.grow { display: grid;',
-    "content: attr(data-value) ' '; visibility: hidden; white-space: pre-wrap;",
+    "content: attr(data-value) ' '; visibility: hidden; overflow: hidden; white-space: pre-wrap;",
     'grid-area: 1 / 1;',
     'min-height: 44px; max-height: 152px;',
     'overflow-y: auto; resize: none;',

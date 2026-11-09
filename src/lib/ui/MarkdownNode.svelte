@@ -42,7 +42,7 @@
 {:else if node.type === 'blockquote'}
   <blockquote class="block quote">{@render all(node.children)}</blockquote>
 {:else if node.type === 'heading'}
-  <svelte:element this={`h${node.depth}`} class="block heading">
+  <svelte:element this={`h${Math.min(node.depth + 1, 6)}`} class="block heading">
     {@render all(node.children)}
   </svelte:element>
 {:else if node.type === 'list'}

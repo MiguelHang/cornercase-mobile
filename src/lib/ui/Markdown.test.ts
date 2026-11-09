@@ -18,7 +18,9 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 describe('Markdown', () => {
   it.each<[string, string, string]>([
     ['a paragraph', 'Hello there', '<p class="block">Hello there</p>'],
-    ['a heading at its depth', '## Plan', '<h2 class="block heading">Plan</h2>'],
+    ['a heading below the screen\'s own', '# Plan', '<h2 class="block heading">Plan</h2>'],
+    ['a heading one level below its depth', '## Plan', '<h3 class="block heading">Plan</h3>'],
+    ['the deepest heading at the deepest level', '###### Plan', '<h6 class="block heading">Plan</h6>'],
     ['emphasis', '*soft*', '<p class="block"><em>soft</em></p>'],
     ['strong', '**loud**', '<p class="block"><strong>loud</strong></p>'],
     ['a deletion', '~~gone~~', '<p class="block"><del>gone</del></p>'],

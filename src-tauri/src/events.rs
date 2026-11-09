@@ -119,7 +119,7 @@ fn touches_agents(change: &Change) -> bool {
     match change {
         Change::Session => true,
         Change::Event(event) => matches!(event.what, What::Status { .. } | What::Dropped { .. }),
-        Change::Connection(_) | Change::App | Change::Warning(_) => false,
+        Change::Connection(_) | Change::App | Change::Reopened | Change::Warning(_) => false,
     }
 }
 
@@ -137,6 +137,7 @@ fn translated(machine: MachineId, machines: &SharedMachines, change: Change) -> 
         Change::Connection(connection) => connection_changed(machine, machines, &connection),
         Change::Warning(error) => vec![warned(&error)],
         Change::Event(event) => pane_status_changed(machine, &event).into_iter().collect(),
+        Change::Reopened => vec![Emitted::PaneStatus(PaneStatusChanged { machine: machine.0, pane: None })],
         Change::Session | Change::App => Vec::new(),
     }
 }

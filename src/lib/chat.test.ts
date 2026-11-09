@@ -24,7 +24,10 @@ const message = (text: string): LastMessage => ({ pane: PANE, agent: 'claude', t
 
 const ok = <T>(data: T) => ({ status: 'ok' as const, data })
 
-const refused = (message: string) => ({ status: 'error' as const, error: { code: 'failed', message } as CommandError })
+const refused = (message: string, code: CommandError['code'] = 'failed') => ({
+  status: 'error' as const,
+  error: { code, message },
+})
 
 const gate = <T>() => {
   let open: (value: T) => void = () => {}
@@ -52,11 +55,19 @@ describe('read', () => {
     })
   })
 
+  it("tells cornercase's refusal as unreadable, with its reason", async () => {
+    expect(await read(() => Promise.resolve(refused('no message yet')), PANE)).toEqual({
+      kind: 'unreadable',
+      reason: 'no message yet',
+    })
+  })
+
   it.each<[string, ReadLast, string]>([
-    ['a refusal', () => Promise.resolve(refused('no message yet')), 'no message yet'],
+    ['a dropped connection', () => Promise.resolve(refused('the connection dropped', 'dropped')), 'the connection dropped'],
+    ['no machine', () => Promise.resolve(refused('no machine is connected', 'not_connected')), 'no machine is connected'],
     ['a rejected call', () => Promise.reject(new Error('IPC is gone')), 'IPC is gone'],
-  ])('tells %s as unreadable, with its reason', async (_, readLast, reason) => {
-    expect(await read(readLast, PANE)).toEqual({ kind: 'unreadable', reason })
+  ])('tells %s as lost on the way, with its reason', async (_, readLast, reason) => {
+    expect(await read(readLast, PANE)).toEqual({ kind: 'lost', reason })
   })
 
   it('asks for the pane given', async () => {
@@ -95,13 +106,7 @@ describe('touches', () => {
 describe('Chat, its field', () => {
   it('starts empty, loading, and unable to send', () => {
     const chat = ready()
-    expect([chat.draft, chat.sending, chat.error, chat.reading, chat.canSend]).toEqual([
-      '',
-      false,
-      null,
-      { kind: 'loading' },
-      false,
-    ])
+    expect([chat.draft, chat.sending, chat.reading, chat.canSend]).toEqual(['', false, { kind: 'loading' }, false])
   })
 
   it.each([
@@ -131,7 +136,7 @@ describe('Chat, its field', () => {
     chat.draft = '- not a flag\n'
     await chat.send()
     expect(sendText.mock.calls).toEqual([[PANE, '- not a flag\n']])
-    expect([chat.draft, chat.sending, chat.error]).toEqual(['', false, null])
+    expect([chat.draft, chat.sending]).toEqual(['', false])
   })
 
   it('is sending, and cannot send again, until the answer', async () => {
@@ -147,11 +152,11 @@ describe('Chat, its field', () => {
     expect(sendText).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the text and the reason when the send fails, and gives the reason', async () => {
+  it('keeps the text when the send fails, and gives the reason', async () => {
     const chat = ready(() => Promise.resolve(refused('nothing was sent')))
     chat.draft = 'go on'
     expect(await chat.send()).toBe('nothing was sent')
-    expect([chat.draft, chat.sending, chat.error]).toEqual(['go on', false, 'nothing was sent'])
+    expect([chat.draft, chat.sending]).toEqual(['go on', false])
   })
 
   it('gives no reason once sent', async () => {
@@ -160,14 +165,16 @@ describe('Chat, its field', () => {
     expect(await chat.send()).toBeNull()
   })
 
-  it('forgets the last reason on the next send', async () => {
+  it('sends the text kept after a failed send', async () => {
     const sendText = vi.fn<SendText>().mockResolvedValueOnce(refused('nothing was sent')).mockResolvedValue(ok(null))
     const chat = ready(sendText)
     chat.draft = 'go on'
     await chat.send()
-    const again = chat.send()
-    expect(chat.error).toBeNull()
-    await again
+    expect(await chat.send()).toBeNull()
+    expect(sendText.mock.calls).toEqual([
+      [PANE, 'go on'],
+      [PANE, 'go on'],
+    ])
     expect(chat.draft).toBe('')
   })
 
@@ -195,6 +202,32 @@ describe('Chat, its reading', () => {
     expect(chat.reading).toEqual({ kind: 'message', message: message('All done.') })
     await chat.refresh()
     expect(chat.reading).toEqual({ kind: 'unreadable', reason: 'this agent keeps no record' })
+  })
+
+  it('keeps the message shown when a read fails on the way', async () => {
+    const readLast = vi
+      .fn<ReadLast>()
+      .mockResolvedValueOnce(ok(message('All done.')))
+      .mockResolvedValueOnce(refused('the connection dropped', 'dropped'))
+      .mockRejectedValue(new Error('IPC is gone'))
+    const chat = ready(sentOk, 'done', readLast)
+    await chat.refresh()
+    await chat.refresh()
+    await chat.refresh()
+    expect(chat.reading).toEqual({ kind: 'message', message: message('All done.') })
+  })
+
+  it('shows why a read failed on the way while no message was shown', async () => {
+    const chat = ready(sentOk, 'done', () => Promise.resolve(refused('the connection dropped', 'dropped')))
+    await chat.refresh()
+    expect(chat.reading).toEqual({ kind: 'unreadable', reason: 'the connection dropped' })
+  })
+
+  it('reads nothing before its row is seen', async () => {
+    const readLast = vi.fn(noRead)
+    const chat = new Chat(PANE, readLast, sentOk)
+    await chat.refresh()
+    expect([readLast.mock.calls.length, chat.reading]).toEqual([0, { kind: 'loading' }])
   })
 
   it('reads once more, not twice, for two events during a read', async () => {

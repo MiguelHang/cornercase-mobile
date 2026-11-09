@@ -24,6 +24,7 @@
   .grow::after {
     content: attr(data-value) ' ';
     visibility: hidden;
+    overflow: hidden;
     white-space: pre-wrap;
     overflow-wrap: break-word;
   }

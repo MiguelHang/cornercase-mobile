@@ -15,15 +15,26 @@ export type Reading =
   | { kind: 'message'; message: LastMessage }
   | { kind: 'unreadable'; reason: string }
 
-export const read = async (readLast: ReadLast, pane: number): Promise<Reading> => {
+type Answer = Reading | { kind: 'lost'; reason: string }
+
+export const read = async (readLast: ReadLast, pane: number): Promise<Answer> => {
   try {
     const answer = await readLast(pane)
-    return answer.status === 'ok'
-      ? { kind: 'message', message: answer.data }
-      : { kind: 'unreadable', reason: answer.error.message }
+    if (answer.status === 'ok') {
+      return { kind: 'message', message: answer.data }
+    }
+    const kind = answer.error.code === 'failed' ? 'unreadable' : 'lost'
+    return { kind, reason: answer.error.message }
   } catch (error) {
-    return { kind: 'unreadable', reason: messageOf(error) }
+    return { kind: 'lost', reason: messageOf(error) }
   }
+}
+
+const kept = (shown: Reading, answer: Answer): Reading => {
+  if (answer.kind !== 'lost') {
+    return answer
+  }
+  return shown.kind === 'message' ? shown : { kind: 'unreadable', reason: answer.reason }
 }
 
 export const deliver = async (sendText: SendText, pane: number, text: string): Promise<string | null> => {
@@ -42,7 +53,6 @@ export class Chat {
   readonly pane: number
   draft = $state('')
   sending = $state(false)
-  error = $state<string | null>(null)
   reading = $state<Reading>({ kind: 'loading' })
   row = $state<AgentRow | null>(null)
   gone = $state(false)
@@ -79,7 +89,7 @@ export class Chat {
   }
 
   async refresh() {
-    if (this.gone) {
+    if (this.gone || this.row === null) {
       return
     }
     if (this.#busy) {
@@ -90,26 +100,23 @@ export class Chat {
     while (this.#busy) {
       this.#again = false
       const number = ++this.#asked
-      const reading = await read(this.#readLast, this.pane)
+      const answer = await read(this.#readLast, this.pane)
       if (number === this.#asked) {
-        this.reading = reading
+        this.reading = kept(this.reading, answer)
       }
       this.#busy = this.#again
     }
   }
 
-  async send() {
+  async send(): Promise<string | null> {
     if (!this.canSend) {
       return null
     }
     this.sending = true
-    this.error = null
     const failed = await deliver(this.#sendText, this.pane, this.draft)
     this.sending = false
     if (failed === null) {
       this.draft = ''
-    } else {
-      this.error = failed
     }
     return failed
   }

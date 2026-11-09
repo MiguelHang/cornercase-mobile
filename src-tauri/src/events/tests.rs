@@ -301,6 +301,18 @@ mod a_pane_status {
         assert_eq!(panes_heard_after(dropped.to_string()).await, [None]);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn is_sent_for_no_pane_when_the_events_are_opened_again() {
+        let studio = Studio::new();
+        let fake = serving(&[with_claude(7, "waiting")]);
+        let (store, recorder) = watching(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(recorder.pane_statuses(), []);
+        store.resume_now();
+        settle().await;
+        assert_eq!(recorder.pane_statuses(), [PaneStatusChanged { machine: studio.id.0, pane: None }]);
+    }
+
     #[rstest]
     #[case::opened(json!({ "time": HEARD, "event": "opened", "kind": "tab", "project": 1, "workspace": 2, "tab": 3 }))]
     #[case::notice(json!({
@@ -411,6 +423,7 @@ mod a_change {
     #[case::dropped(event(What::Dropped { count: 3 }), true)]
     #[case::exited(event(What::Exited { program: "sh".into() }), false)]
     #[case::app(Change::App, false)]
+    #[case::reopened(Change::Reopened, false)]
     fn touches_the_agents_only_when_a_row_may_change(#[case] change: Change, #[case] touches: bool) {
         assert_eq!(touches_agents(&change), touches);
     }
