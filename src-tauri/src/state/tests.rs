@@ -87,6 +87,15 @@ mod loading_the_machines {
     }
 
     #[test]
+    fn are_the_same_through_a_shared_handle() {
+        let dir = TempDir::new();
+        let state = loaded(&dir, keychain());
+        let shared = state.shared_machines();
+        shared.with(|machines| machines.add("studio".to_owned(), route()).map_err(CommandError::from)).expect("added");
+        assert_eq!(state.machines(|machines| Ok(machines.machines().len())), Ok(1));
+    }
+
+    #[test]
     fn says_there_is_no_data_folder() {
         let state = AppState::load(NO_FOLDER, keychain());
         let error = add_studio(&state).expect_err("there is no folder for the machines");

@@ -17,10 +17,13 @@ use crate::identity;
 const MACHINES_FILE: &str = "machines.json";
 
 pub(crate) struct AppState {
-    machines: Mutex<Result<Machines, CommandError>>,
+    machines: SharedMachines,
     identity: Result<Identity, Error>,
     active: Mutex<Option<Active>>,
 }
+
+#[derive(Clone)]
+pub(crate) struct SharedMachines(Arc<Mutex<Result<Machines, CommandError>>>);
 
 pub(crate) struct Active {
     machine: MachineId,
@@ -37,18 +40,18 @@ impl AppState {
                 .map_err(|error| CommandError::machines_not_loaded(&error)),
             Err(reason) => Err(CommandError::no_data_dir(reason)),
         };
-        Self { machines: Mutex::new(machines), identity, active: Mutex::new(None) }
+        Self { machines: SharedMachines(Arc::new(Mutex::new(machines))), identity, active: Mutex::new(None) }
     }
 
     pub(crate) fn machines<T>(
         &self,
         work: impl FnOnce(&mut Machines) -> Result<T, CommandError>,
     ) -> Result<T, CommandError> {
-        let mut machines = self.machines.lock().unwrap_or_else(PoisonError::into_inner);
-        match machines.as_mut() {
-            Ok(machines) => work(machines),
-            Err(error) => Err(error.clone()),
-        }
+        self.machines.with(work)
+    }
+
+    pub(crate) fn shared_machines(&self) -> SharedMachines {
+        self.machines.clone()
     }
 
     pub(crate) fn identity(&self) -> Result<&Identity, CommandError> {
@@ -57,6 +60,19 @@ impl AppState {
 
     pub(crate) fn active(&self) -> MutexGuard<'_, Option<Active>> {
         self.active.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl SharedMachines {
+    pub(crate) fn with<T>(
+        &self,
+        work: impl FnOnce(&mut Machines) -> Result<T, CommandError>,
+    ) -> Result<T, CommandError> {
+        let mut machines = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        match machines.as_mut() {
+            Ok(machines) => work(machines),
+            Err(error) => Err(error.clone()),
+        }
     }
 }
 
