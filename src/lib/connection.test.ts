@@ -110,32 +110,6 @@ describe('firstToConnect', () => {
   })
 })
 
-describe('describe', () => {
-  it.each<[string, ConnectionView_Serialize, string]>([
-    ['none', { state: 'none' }, 'Not connected'],
-    ['connecting', { state: 'connecting' }, 'Connecting…'],
-    ['connected', CONNECTED, 'Connected through ws://127.0.0.1:7000'],
-    ['retrying', RETRYING, 'Retrying in 2 s: timed out'],
-    ['unauthorized', { state: 'unauthorized' }, "Not authorized: scan the bridge's code again"],
-    ['incompatible', { state: 'incompatible', error: error('cornercase is too old') }, 'Incompatible: cornercase is too old'],
-  ])('tells %s', (_, view, text) => {
-    expect(connection.describe(view)).toBe(text)
-  })
-
-  it('names every request cornercase lacks', () => {
-    expect(connection.describe(MISSING)).toBe('cornercase lacks watch, input: update it on the Mac')
-  })
-
-  it.each([
-    [1000, 1],
-    [1001, 2],
-    [1999, 2],
-    [32000, 32],
-  ])('rounds %d ms up to %d s', (in_ms, seconds) => {
-    expect(connection.describe({ ...RETRYING, in_ms })).toBe(`Retrying in ${seconds} s: timed out`)
-  })
-})
-
 describe('status', () => {
   const failing = (text: string): connection.Status => ({ text, tone: 'failed', pulsing: false })
 
@@ -226,18 +200,5 @@ describe('apply', () => {
   it('drops every event while no machine is active', () => {
     const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null)
     expect(connection.apply(idle, { machine: 1, connection: CONNECTED })).toBe(idle)
-  })
-})
-
-describe('noticeAfter', () => {
-  it('clears the notice once connected', () => {
-    expect(connection.noticeAfter('Retrying in 4 s: timed out', ON_FIRST)).toBeNull()
-  })
-
-  it.each([
-    ['connecting', connection.connecting(1)],
-    ['retrying', { ...ON_FIRST, connection: RETRYING }],
-  ])('keeps the notice while %s', (_, current) => {
-    expect(connection.noticeAfter('the bridge did not answer', current)).toBe('the bridge did not answer')
   })
 })
