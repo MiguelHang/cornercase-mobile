@@ -134,6 +134,26 @@ describe('Router', () => {
   })
 })
 
+describe('Router.below', () => {
+  it.each<[string, Route[], Route | null]>([
+    ['nothing under the only route', [], null],
+    ['the base under one route', [AGENT], HOME],
+    ['the route just under the top one', [AGENT, CHANGES], AGENT],
+  ])('is %s', (_, routes, below) => {
+    const router = new Router(HOME)
+    routes.forEach((route) => router.go(route))
+    expect(router.below).toEqual(below)
+  })
+
+  it('follows the stack going back', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(CHANGES)
+    router.back()
+    expect(router.below).toEqual(HOME)
+  })
+})
+
 describe('Router.replace', () => {
   it('puts the started agent in place of the start screen', () => {
     const router = new Router(HOME)
