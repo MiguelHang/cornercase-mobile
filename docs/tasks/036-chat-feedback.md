@@ -32,9 +32,15 @@ está pensando Claude o se ha quedado pillado ni tampoco sabes si el mensaje se 
   enviado y su estado mientras el `Chat` viva; al reabrir el agente desde el tablero puede empezar limpio (decidir y
   anotar).
 - [ ] CA7 — VoiceOver: el estado del envío y del agente se anuncian (región viva), sin repetir cada segundo.
-- [ ] CA8 — Comprobado en el simulador con un agente real (enviar, ver "enviando → enviado", "working" y la respuesta);
+- [ ] CA8 — Cabecera fija al hacer scroll, como en Mail de iOS: la cabecera del chat (agente, estado y dónde está:
+  `project › workspace › tab`) se queda arriba mientras el mensaje se desplaza, para no perder el contexto de a quién
+  se escribe. Puede encogerse a una versión compacta al bajar (título y estado en una línea, sobre `--veil` con el
+  desenfoque del vidrio, como la barra de conexión) y volver a la grande arriba del todo. `Back` y `Terminal` siguen a
+  mano. Valorar aplicarlo igual en las demás pantallas con cabecera (Machines, una máquina, Start) y anotarlo en
+  `design/look.md`. Pedido por el usuario el 2026-11-09.
+- [ ] CA9 — Comprobado en el simulador con un agente real (enviar, ver "enviando → enviado", "working" y la respuesta);
   pendiente para el usuario en su iPhone.
-- [ ] CA9 — `hx check full` y mutation en verde; tests de los estados del envío y de la línea del agente.
+- [ ] CA10 — `hx check full` y mutation en verde; tests de los estados del envío y de la línea del agente.
 
 ## Referencias
 - `design/chat.md` (016–018): What comes back, No optimistic state, Reading the message, Header.
@@ -43,7 +49,7 @@ está pensando Claude o se ha quedado pillado ni tampoco sabes si el mensaje se 
 
 ## design/ que actualiza
 - `design/chat.md`: el hilo corto, los estados del envío, la línea del agente, "atascado".
-- `design/look.md`: el mensaje propio y la línea de estado.
+- `design/look.md`: el mensaje propio, la línea de estado y la cabecera fija.
 
 ## Verificación
 En el iPhone, al enviar se ve el mensaje propio con su estado y se nota en todo momento si el agente trabaja, espera o
