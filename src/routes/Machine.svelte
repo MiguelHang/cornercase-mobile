@@ -71,7 +71,7 @@
   <h2 class="heading">Routes</h2>
   <Glass>
     <ul class="routes">
-      {#each machine.routes as route, index (route.url)}
+      {#each machine.routes as route (route.url)}
         <li class="route">
           <span class="about">
             <span class="address">{routeAddress(route.url)}</span>
@@ -82,40 +82,59 @@
               <span class="mark failed">No token</span>
             {/if}
           </span>
-          <button
-            class="tool"
-            type="button"
-            aria-label="Move up"
-            disabled={edit.busy || index === 0}
-            onclick={() => void edit.move(route.url, 'up')}
-            ontouchstart={() => {}}
-          >
-            <Icon name="chevron-up" size={20} />
-          </button>
-          <button
-            class="tool"
-            type="button"
-            aria-label="Move down"
-            disabled={edit.busy || index === machine.routes.length - 1}
-            onclick={() => void edit.move(route.url, 'down')}
-            ontouchstart={() => {}}
-          >
-            <Icon name="chevron-down" size={20} />
-          </button>
-          <button
-            class="tool"
-            type="button"
-            aria-label="Remove route"
-            disabled={edit.busy || machine.routes.length === 1}
-            onclick={() => void edit.remove(route.url)}
-            ontouchstart={() => {}}
-          >
-            <Icon name="trash-2" size={20} />
-          </button>
         </li>
       {/each}
     </ul>
   </Glass>
+  <details class="edit">
+    <summary class="summary">Edit routes</summary>
+    <div class="editing">
+      <Glass>
+        <ul class="routes">
+          {#each machine.routes as route, index (route.url)}
+            <li class="change">
+              <span class="address">{routeAddress(route.url)}</span>
+              <button
+                class="tool"
+                type="button"
+                aria-label="Move up"
+                disabled={edit.busy || index === 0}
+                onclick={() => void edit.move(route.url, 'up')}
+                ontouchstart={() => {}}
+              >
+                <Icon name="chevron-up" size={20} />
+              </button>
+              <button
+                class="tool"
+                type="button"
+                aria-label="Move down"
+                disabled={edit.busy || index === machine.routes.length - 1}
+                onclick={() => void edit.move(route.url, 'down')}
+                ontouchstart={() => {}}
+              >
+                <Icon name="chevron-down" size={20} />
+              </button>
+              <button
+                class="tool"
+                type="button"
+                aria-label="Remove route"
+                disabled={edit.busy || machine.routes.length === 1}
+                onclick={() => void edit.remove(route.url)}
+                ontouchstart={() => {}}
+              >
+                <Icon name="trash-2" size={20} />
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </Glass>
+      {#if !edit.adding && !edit.deleting}
+        <div class="actions">
+          <Button tone="plain" resting={edit.busy} onclick={() => edit.open()}>Add route</Button>
+        </div>
+      {/if}
+    </div>
+  </details>
   {#if edit.formError !== null}
     <p class="problem" role="alert">{edit.formError}</p>
   {/if}
@@ -133,7 +152,7 @@
   {:else if edit.adding}
     <Glass>
       <form class="form" onsubmit={addRoute}>
-        <h2 class="heading">Add route</h2>
+        <h2 class="heading">Scan or paste its code</h2>
         <UrlField
           bind:value={edit.url}
           error={edit.urlError}
@@ -148,7 +167,6 @@
     </Glass>
   {:else}
     <div class="actions">
-      <Button resting={edit.busy} onclick={() => edit.open()}>Add route</Button>
       <Button tone="danger" resting={edit.busy} onclick={() => edit.askToDelete()}>Delete machine</Button>
     </div>
   {/if}
@@ -236,16 +254,45 @@
     list-style: none;
   }
 
-  .route {
+  .route,
+  .change {
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: var(--gap) var(--inset) var(--gap) var(--inset-wide);
     border-top: 1px solid var(--border);
   }
 
-  .route:first-child {
+  .route {
+    min-height: 44px;
+    padding: var(--gap) var(--inset-wide);
+  }
+
+  .change {
+    padding: var(--gap) var(--inset) var(--gap) var(--inset-wide);
+  }
+
+  .route:first-child,
+  .change:first-child {
     border-top: 0;
+  }
+
+  .summary {
+    min-height: 44px;
+    padding: 0 var(--inset);
+    color: var(--accent);
+    font-size: 14px;
+    line-height: 44px;
+  }
+
+  .change .address {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .editing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
   }
 
   .about {
