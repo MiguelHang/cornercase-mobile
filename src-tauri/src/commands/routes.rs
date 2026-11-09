@@ -67,14 +67,7 @@ pub(crate) fn add_route(
     id: MachineId,
     code: &str,
 ) -> Result<(), CommandError> {
-    let routes = MachineCode::parse(code)?.routes();
-    state.machines(|machines| {
-        routes.into_iter().try_for_each(|route| machines.add_route(id, route)).map_err(CommandError::from)
-    })?;
-    if connected_to(state, id).is_some() {
-        start(state, emit, launcher, id)?;
-    }
-    Ok(())
+    merge(state, emit, launcher, id, code).map(drop)
 }
 
 pub(crate) fn merge(

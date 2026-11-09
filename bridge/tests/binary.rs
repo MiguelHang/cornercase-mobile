@@ -182,7 +182,8 @@ mod printing {
         let (url, code, token, address) =
             (bridge.url().to_owned(), bridge.code().to_owned(), bridge.token(), bridge.address());
         let stopped = bridge.stop(Signal::TERM).await;
-        let block = qr::block(name::read().as_deref(), &[(Place::Loopback, address)], &token).expect("the block");
+        let places = [(Place::Loopback, address.ip())];
+        let block = qr::block(name::read().as_deref(), &places, address.port(), &token).expect("the block");
         assert_eq!(stopped.stdout, format!("{}\n", block.join("\n")));
         assert!(url.starts_with("ws://127.0.0.1:"), "{url}");
         assert!(code.starts_with(&format!("{url}&name=")), "{code}");

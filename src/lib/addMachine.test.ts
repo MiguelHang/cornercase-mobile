@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AddMachine, send, type MachineCalls } from './addMachine.svelte'
 import type { CommandError, MatchFound, MergeView, SameWhy } from './bindings'
-import { ALREADY_SAVED, EMPTY, NAME_TAKEN, NAME_TOO_LONG, NO_TOKEN } from './machineForm'
+import { EMPTY, NAME_TAKEN, NAME_TOO_LONG, NO_TOKEN } from './machineForm'
 
 const URL_TEXT = 'ws://studio.lan:9000/?token=abc'
 
@@ -188,16 +188,34 @@ describe('AddMachine with a machine code', () => {
     ])
   })
 
-  it('names it after the host when another machine has the name of the code', async () => {
+  it('names it after the host when another machine has the name of the code, compared by that name', async () => {
     const { draft, commands } = form({}, CODE)
     await draft.submit(['Desk', 'mac studio'])
-    expect(commands.machineAdd.mock.calls).toEqual([[CODE, '192.168.1.20']])
+    expect([commands.machineMatch.mock.calls, commands.machineAdd.mock.calls]).toEqual([
+      [[CODE, 'Mac Studio']],
+      [[CODE, '192.168.1.20']],
+    ])
   })
 
   it('checks the names taken on a scan too', async () => {
     const { draft, commands } = form({}, '')
     await draft.fill(CODE, ['Mac Studio'])
-    expect(commands.machineMatch.mock.calls).toEqual([[CODE, '192.168.1.20']])
+    expect([commands.machineMatch.mock.calls, commands.machineAdd.mock.calls]).toEqual([
+      [[CODE, 'Mac Studio']],
+      [[CODE, '192.168.1.20']],
+    ])
+  })
+
+  it('offers the machine of the same name and keeps the host for a new one', async () => {
+    const { draft } = form({ machineMatch: () => same('name') }, CODE)
+    await draft.submit(['Mac Studio'])
+    expect([draft.offer?.why, draft.offer?.name]).toEqual(['name', '192.168.1.20'])
+  })
+
+  it('compares by the name typed when there is one', async () => {
+    const { draft, commands } = form({}, CODE, 'Desk')
+    await draft.submit(['Mac Studio'])
+    expect(commands.machineMatch.mock.calls).toEqual([[CODE, 'Desk']])
   })
 })
 
@@ -238,17 +256,6 @@ describe('AddMachine with a machine it can merge into', () => {
     await draft.submit()
     expect([draft.formError, draft.busy, draft.offer]).toEqual([failing.message, false, null])
     expect([onrouted, tell].map((mock) => mock.mock.calls.length)).toEqual([0, 0])
-  })
-})
-
-describe('AddMachine with a route already saved', () => {
-  it('says so and adds nothing', async () => {
-    const { draft, onadded, commands } = form({ machineMatch: () => matched({ kind: 'already_saved', machine: 3 }) })
-    await draft.submit()
-    expect([draft.formError, draft.offer, draft.busy]).toEqual([ALREADY_SAVED, null, false])
-    expect([commands.machineAdd, commands.machineRouteAdd, onadded].map((mock) => mock.mock.calls.length)).toEqual([
-      0, 0, 0,
-    ])
   })
 })
 

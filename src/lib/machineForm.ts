@@ -18,7 +18,6 @@ export const NAME_EMPTY = 'the name is empty'
 export const NAME_TOO_LONG = `the name is longer than ${LONGEST_NAME} characters`
 export const NAME_TAKEN = 'another machine already has that name'
 
-export const ALREADY_SAVED = 'This machine is already saved: there is nothing to add.'
 export const UNCHECKED = 'The bridge did not answer, so it could not be asked which machine it is.'
 export const NEW_MACHINE = 'Add as a new machine'
 

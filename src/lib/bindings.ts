@@ -371,7 +371,7 @@ export type MachineView_Serialize = {
 	last_route: string | null,
 };
 
-export type MatchFound = { kind: "none" } | { kind: "already_saved"; machine: number } | { kind: "same"; machine: number; name: string; why: SameWhy } | { kind: "merge"; machine: number; name: string };
+export type MatchFound = { kind: "none" } | { kind: "same"; machine: number; name: string; why: SameWhy } | { kind: "merge"; machine: number; name: string };
 
 export type MatchView = {
 	found: MatchFound,

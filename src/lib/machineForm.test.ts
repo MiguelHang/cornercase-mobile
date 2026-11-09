@@ -188,7 +188,7 @@ describe('mergedText', () => {
 
 describe('the texts of adding a machine', () => {
   it('speak of the machine and its code, never of routes or URLs', () => {
-    const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.ALREADY_SAVED, form.UNCHECKED]
+    const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.UNCHECKED]
     const offers = (['address', 'boot', 'name'] as const).map((why) => form.offerText({ saved: 'Studio', why }))
     const all = [...texts, form.NEW_MACHINE, ...offers.flatMap(({ reason, keep }) => [reason, keep])]
     expect(all.filter((text) => /route|url/i.test(text))).toEqual([])

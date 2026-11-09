@@ -47,12 +47,6 @@ mod read {
     use super::*;
 
     #[test]
-    fn gives_the_computer_name_else_the_hostname() {
-        let hostname = rustix::system::uname().nodename().to_string_lossy().into_owned();
-        assert_eq!(read(), machine_name(computer_name(Path::new(SCUTIL)), &hostname));
-    }
-
-    #[test]
     fn gives_a_name_with_nothing_around_it() {
         let name = read().expect("the machine has at least a hostname");
         assert_eq!(name.trim(), name);

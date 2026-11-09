@@ -83,12 +83,6 @@ impl Machines {
         Ok(id)
     }
 
-    pub fn add_route(&mut self, id: MachineId, route: Route) -> Result<(), Error> {
-        self.machine(id).ok_or(Error::UnknownMachine)?;
-        self.write_tokens(id, std::slice::from_ref(&route))?;
-        self.save_routes(id, vec![route])
-    }
-
     pub fn merge(&mut self, id: MachineId, code: &MachineCode) -> Result<Merged, Error> {
         let Sorted { new, changed, skipped } = self.sorted(id, code.routes())?;
         let merged = Merged { added: addresses(&new), token_updated: !changed.is_empty(), skipped };

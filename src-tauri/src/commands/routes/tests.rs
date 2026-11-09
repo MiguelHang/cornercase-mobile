@@ -127,6 +127,15 @@ mod adding_a_route {
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS, LAPTOP_ADDRESS, TAILSCALE_ADDRESS]);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn leaves_an_address_of_the_code_to_the_machine_that_has_it() {
+        let studio = Studio::new();
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let code = "ws://100.101.102.103:9000/?token=c3R1ZGlvLXNlY3JldA&also=laptop.lan";
+        add_route(&studio.state, Recorder::default(), &recording().0, studio.id, code).expect("added");
+        assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS, TAILSCALE_ADDRESS]);
+    }
+
     #[rstest]
     #[case::without_a_token("ws://laptop.lan:9000/", 0, ErrorCode::RouteNoToken)]
     #[case::to_an_unknown_machine(LAPTOP, 99, ErrorCode::UnknownMachine)]

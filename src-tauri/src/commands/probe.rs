@@ -73,8 +73,9 @@ fn found(machines: &Machines, same: Same) -> MatchFound {
     let machine = same.machine.0;
     let name = machines.machine(same.machine).map(|saved| saved.name.clone()).unwrap_or_default();
     let why = match same.why {
-        Why::AlreadySaved => return MatchFound::AlreadySaved { machine },
-        Why::Token | Why::Tailscale | Why::AllAddresses => return MatchFound::Merge { machine, name },
+        Why::AlreadySaved | Why::Token | Why::Tailscale | Why::AllAddresses => {
+            return MatchFound::Merge { machine, name };
+        }
         Why::Address => SameWhy::Address,
         Why::Boot => SameWhy::Boot,
         Why::Name => SameWhy::Name,

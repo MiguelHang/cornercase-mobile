@@ -63,7 +63,8 @@ async fn run(args: Args) -> Result<(), Failure> {
     let count = listeners.len();
     eprintln!("cornercase-bridge: listening on {count} address{}", if count == 1 { "" } else { "es" });
     let addresses = addresses(&listeners)?;
-    print(name::read().as_deref(), &places, &addresses, &token)?;
+    let port = addresses.first().map_or(args.port, SocketAddr::port);
+    print(name::read().as_deref(), &places, port, &token)?;
     let config = Config::new(token, binary).with_addresses(addresses);
     Server::from_listeners(listeners, config).run(shutdown).await;
     Ok(())
@@ -102,14 +103,8 @@ fn addresses(listeners: &[TcpListener]) -> Result<Vec<SocketAddr>, Failure> {
     listeners.iter().map(|listener| listener.local_addr().map_err(failing(FAILED))).collect()
 }
 
-fn print(
-    name: Option<&str>,
-    places: &[(Place<'_>, IpAddr)],
-    addresses: &[SocketAddr],
-    token: &str,
-) -> Result<(), Failure> {
-    let listening: Vec<_> = places.iter().zip(addresses).map(|(&(place, _), &address)| (place, address)).collect();
-    let block = qr::block(name, &listening, token).map_err(failing(FAILED))?;
+fn print(name: Option<&str>, places: &[(Place<'_>, IpAddr)], port: u16, token: &str) -> Result<(), Failure> {
+    let block = qr::block(name, places, port, token).map_err(failing(FAILED))?;
     writeln!(io::stdout().lock(), "{}", block.join("\n")).map_err(failing(FAILED))
 }
 

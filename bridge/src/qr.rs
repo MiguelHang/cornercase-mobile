@@ -31,33 +31,37 @@ impl fmt::Display for Place<'_> {
     }
 }
 
-pub fn block(name: Option<&str>, places: &[(Place<'_>, SocketAddr)], token: &str) -> Result<Vec<String>, RouteError> {
-    let Some(code) = machine_code(name, places, token)? else { return Ok(Vec::new()) };
+pub fn block(
+    name: Option<&str>,
+    places: &[(Place<'_>, IpAddr)],
+    port: u16,
+    token: &str,
+) -> Result<Vec<String>, RouteError> {
+    let Some(code) = machine_code(name, places, port, token)? else { return Ok(Vec::new()) };
     let text = code.to_string();
     let mut block = vec![heading(code.name(), places), text.clone()];
     block.extend(lines(&text));
     block.push(String::new());
-    block.extend(
-        places.iter().map(|&(place, address)| format!("{place}{GAP}{}", url(address.ip(), address.port(), token))),
-    );
+    block.extend(places.iter().map(|&(place, ip)| format!("{place}{GAP}{}", url(ip, port, token))));
     Ok(block)
 }
 
 fn machine_code(
     name: Option<&str>,
-    places: &[(Place<'_>, SocketAddr)],
+    places: &[(Place<'_>, IpAddr)],
+    port: u16,
     token: &str,
 ) -> Result<Option<MachineCode>, RouteError> {
     let Some((&(_, first), others)) = places.split_first() else { return Ok(None) };
-    let code = MachineCode::new(first.ip(), first.port(), token)?;
-    let code = others.iter().fold(code, |code, &(_, address)| code.with_also(address.ip()));
+    let code = MachineCode::new(first, port, token)?;
+    let code = others.iter().fold(code, |code, &(_, ip)| code.with_also(ip));
     Ok(Some(match name {
         Some(name) => code.with_name(name),
         None => code,
     }))
 }
 
-fn heading(name: Option<&str>, places: &[(Place<'_>, SocketAddr)]) -> String {
+fn heading(name: Option<&str>, places: &[(Place<'_>, IpAddr)]) -> String {
     let mut labels: Vec<String> = Vec::with_capacity(places.len());
     for label in places.iter().map(|(place, _)| place.to_string()) {
         if !labels.contains(&label) {

@@ -130,14 +130,9 @@ mod block {
         Target { kind, interface: interface.to_owned(), ip: ip(address) }
     }
 
-    fn at(address: &str, port: u16) -> SocketAddr {
-        SocketAddr::new(ip(address), port)
-    }
-
     fn printed(name: Option<&str>, targets: &[Target], port: u16) -> Vec<String> {
-        let places: Vec<_> =
-            targets.iter().map(|target| (Place::Network(target), at(&target.ip.to_string(), port))).collect();
-        block(name, &places, TOKEN).expect("a valid token")
+        let places: Vec<_> = targets.iter().map(|target| (Place::Network(target), target.ip)).collect();
+        block(name, &places, port, TOKEN).expect("a valid token")
     }
 
     fn assert_block(block: &[String], heading: &str, code: &str, urls: &[&str]) {
@@ -178,12 +173,12 @@ mod block {
     }
 
     #[test]
-    fn gives_each_line_its_own_listener_port() {
-        let places = [(Place::Loopback, at("127.0.0.1", 40123)), (Place::Loopback, at("::1", 40124))];
-        let block = block(None, &places, TOKEN).expect("a valid token");
+    fn gives_every_line_the_listeners_port() {
+        let places = [(Place::Loopback, ip("127.0.0.1")), (Place::Loopback, ip("::1"))];
+        let block = block(None, &places, 40123, TOKEN).expect("a valid token");
         let wanted = [
             format!("loopback  ws://127.0.0.1:40123/?token={TOKEN}"),
-            format!("loopback  ws://[::1]:40124/?token={TOKEN}"),
+            format!("loopback  ws://[::1]:40123/?token={TOKEN}"),
         ];
         assert_eq!(block[block.len() - 2..], wanted);
     }
@@ -198,27 +193,27 @@ mod block {
         #[case] suffix: &str,
     ) {
         let url = format!("ws://127.0.0.1:40123/?token={TOKEN}");
-        let block = block(name, &[(Place::Loopback, at("127.0.0.1", 40123))], TOKEN).expect("a valid token");
+        let block = block(name, &[(Place::Loopback, ip("127.0.0.1"))], 40123, TOKEN).expect("a valid token");
         assert_block(&block, heading, &format!("{url}{suffix}"), &[&format!("loopback  {url}")]);
     }
 
     #[test]
     fn heads_the_block_with_the_name_the_code_keeps() {
         let block =
-            block(Some(&"m".repeat(70)), &[(Place::Loopback, at("127.0.0.1", 1))], TOKEN).expect("a valid token");
+            block(Some(&"m".repeat(70)), &[(Place::Loopback, ip("127.0.0.1"))], 1, TOKEN).expect("a valid token");
         assert_eq!(block[0], format!("{} — loopback", "m".repeat(64)));
     }
 
     #[test]
     fn is_empty_without_an_address() {
-        assert_eq!(block(Some("studio"), &[], TOKEN), Ok(Vec::new()));
+        assert_eq!(block(Some("studio"), &[], 8765, TOKEN), Ok(Vec::new()));
     }
 
     #[rstest]
     #[case::empty("", RouteError::EmptyToken)]
     #[case::not_base64url("a+b/c=", RouteError::TokenCharacters)]
     fn refuses_a_token_the_app_would_refuse(#[case] token: &str, #[case] error: RouteError) {
-        assert_eq!(block(None, &[(Place::Loopback, at("127.0.0.1", 1))], token), Err(error));
+        assert_eq!(block(None, &[(Place::Loopback, ip("127.0.0.1"))], 1, token), Err(error));
     }
 
     #[test]

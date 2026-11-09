@@ -80,10 +80,6 @@ pub(crate) struct MatchView {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum MatchFound {
     None,
-    AlreadySaved {
-        #[specta(type = u32)]
-        machine: u64,
-    },
     Same {
         #[specta(type = u32)]
         machine: u64,

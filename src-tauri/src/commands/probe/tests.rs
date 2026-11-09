@@ -201,24 +201,15 @@ mod matching_a_url {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_the_route_is_already_saved() {
+    async fn answers_an_address_without_asking_the_url() {
         let studio = Studio::new();
-        let view = matched(&studio, &answering(contracted(BOOT), Err(asleep())), BRIDGE, "desk").await;
-        assert_eq!(view, MatchView { found: MatchFound::AlreadySaved { machine: studio.id.0 }, checked: true });
-    }
-
-    #[rstest]
-    #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", Some(SameWhy::Address))]
-    #[case::already_saved(BRIDGE, None)]
-    #[tokio::test(start_paused = true)]
-    async fn answers_an_address_without_asking_the_url(#[case] url: &str, #[case] why: Option<SameWhy>) {
-        let studio = Studio::new();
+        let url = "ws://studio.lan:9000/?token=bmV3LXNlY3JldA";
         let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), url, "desk").await;
-        let found = why.map_or(MatchFound::AlreadySaved { machine: studio.id.0 }, |why| same(&studio, why));
-        assert_eq!(view, MatchView { found, checked: true });
+        assert_eq!(view, MatchView { found: same(&studio, SameWhy::Address), checked: true });
     }
 
     #[rstest]
+    #[case::already_saved(BRIDGE)]
     #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA")]
     #[case::by_a_tailscale_address("ws://100.101.102.103:9000/?token=bmV3LXNlY3JldA")]
     #[case::by_every_address_of_the_code("ws://studio.lan:9000/?token=bmV3LXNlY3JldA&also=laptop.lan")]

@@ -1,5 +1,5 @@
 import type { CommandError, MatchView, Toast, commands } from './bindings'
-import { ALREADY_SAVED, checkName, checkUrl, fieldOf, mergedText, nameFor, type Field, type Offer } from './machineForm'
+import { checkName, checkUrl, fieldOf, mergedText, nameFor, type Field, type Offer } from './machineForm'
 import { messageOf } from './toasts'
 
 export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineRouteAdd' | 'machineMerge'>
@@ -63,7 +63,8 @@ export class AddMachine {
     this.formError = null
     if (url.ok && name.ok) {
       this.busy = true
-      await this.#matched(url.url, name.name, await send(() => this.#calls.machineMatch(url.url, name.name)))
+      const compared = nameFor(this.name, this.url)
+      await this.#matched(url.url, name.name, await send(() => this.#calls.machineMatch(url.url, compared)))
     }
   }
 
@@ -120,11 +121,7 @@ export class AddMachine {
       return
     }
     this.busy = false
-    if (found.kind === 'already_saved') {
-      this.formError = ALREADY_SAVED
-    } else if (found.kind === 'same') {
-      this.offer = { url, name, machine: found.machine, saved: found.name, why: found.why, checked }
-    }
+    this.offer = { url, name, machine: found.machine, saved: found.name, why: found.why, checked }
   }
 
   async #add(url: string, name: string) {

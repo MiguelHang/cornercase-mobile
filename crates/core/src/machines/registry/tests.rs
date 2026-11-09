@@ -268,49 +268,6 @@ mod rename {
     }
 }
 
-mod add_route {
-    use super::*;
-
-    #[test]
-    fn replaces_the_token_of_the_route_at_the_same_address() {
-        let phone = Phone::new();
-        let (mut machines, id) = phone.studio();
-        machines.add_route(id, route(LAN, NEW_TOKEN)).expect("scan the code again");
-        let expected = [route(LAN, NEW_TOKEN), route(TAILNET, TOKEN)];
-        assert_eq!(machines.machine(id).expect("the studio").routes, expected);
-        assert_eq!(phone.open().machine(id).expect("the studio").routes, expected);
-        assert_eq!(phone.secret(id, LAN).as_deref(), Some(NEW_TOKEN));
-    }
-
-    #[test]
-    fn refuses_an_unknown_machine_without_saving_its_token() {
-        let phone = Phone::new();
-        let (mut machines, id) = phone.studio();
-        let other = MachineId(id.0 + 1);
-        assert_eq!(machines.add_route(other, route(LAN, NEW_TOKEN)), Err(Error::UnknownMachine));
-        assert_eq!(phone.secret(other, LAN), None);
-    }
-
-    #[test]
-    fn leaves_the_file_as_it_was_when_the_token_cannot_be_saved() {
-        let phone = Phone::new();
-        let (mut machines, id) = phone.studio();
-        phone.secrets.fail_writes(true);
-        let result = phone.unchanged(&mut machines, |machines| machines.add_route(id, route(LAN, NEW_TOKEN)));
-        assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
-        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
-    }
-
-    #[test]
-    fn refuses_a_route_without_a_token() {
-        let phone = Phone::new();
-        let (mut machines, id) = phone.studio();
-        let result = phone.unchanged(&mut machines, |machines| machines.add_route(id, bridge(LAN, 8765, None)));
-        assert_eq!(result, Err(Error::NoToken));
-        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
-    }
-}
-
 mod merge {
     use super::*;
 
@@ -578,7 +535,7 @@ mod move_route {
 
     fn three_routes(phone: &Phone) -> (Machines, MachineId) {
         let (mut machines, id) = phone.studio();
-        machines.add_route(id, route(GONE, TOKEN)).expect("add a third route");
+        machines.merge(id, &code(&[GONE], TOKEN)).expect("add a third route");
         (machines, id)
     }
 

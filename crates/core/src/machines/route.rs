@@ -17,25 +17,25 @@ pub enum Route {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum RouteError {
-    #[error("the text is not a URL")]
+    #[error("the text is not a machine code")]
     NotAUrl,
-    #[error("only ws:// routes work")]
+    #[error("the code does not start with ws://")]
     Scheme,
-    #[error("the URL has a user name or a password")]
+    #[error("the code has a user name or a password")]
     UserInfo,
-    #[error("the URL has no host")]
+    #[error("the code has no host")]
     NoHost,
-    #[error("the URL's port is not a number from 1 to 65535")]
+    #[error("the code's port is not a number from 1 to 65535")]
     Port,
-    #[error("the URL's path is not /")]
+    #[error("the code's path is not /")]
     Path,
-    #[error("the URL has no token")]
+    #[error("the code has no token")]
     NoToken,
-    #[error("the URL's token is empty")]
+    #[error("the code's token is empty")]
     EmptyToken,
-    #[error("the URL has more than one token")]
+    #[error("the code has more than one token")]
     TokenTwice,
-    #[error("the URL's token has characters other than letters, digits, - and _")]
+    #[error("the code's token has characters other than letters, digits, - and _")]
     TokenCharacters,
     #[error("the code has an empty also= address")]
     AlsoEmpty,
