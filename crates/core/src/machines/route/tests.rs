@@ -40,6 +40,15 @@ mod parse {
         assert_eq!(Route::parse(url), Ok(bridge(host, port, Some(TOKEN))));
     }
 
+    #[rstest]
+    #[case::dash("a-b-c")]
+    #[case::underscore("a_b_c")]
+    #[case::only_symbols("-_-_")]
+    fn accepts_the_base64url_symbols_in_the_token(#[case] token: &str) {
+        let route = Route::parse(&format!("ws://mac.local:8765/?token={token}")).expect("read the url");
+        assert_eq!(route, bridge("mac.local", 8765, Some(token)));
+    }
+
     #[test]
     fn gives_back_the_url_the_bridge_printed() {
         let url = "ws://[fd7a:115c:a1e0::1]:8765/?token=c2VjcmV0LXRva2Vu";
@@ -133,6 +142,13 @@ mod debug {
     fn leaves_the_token_out() {
         let text = format!("{:?}", bridge("mac.local", 8765, Some(TOKEN)));
         assert!(text.contains("mac.local"), "{text}");
+        assert!(!text.contains(TOKEN), "{text}");
+    }
+
+    #[test]
+    fn names_the_token_type_without_its_value() {
+        let text = format!("{:?}", Token::new(TOKEN.to_owned()));
+        assert!(text.starts_with("Token"), "{text}");
         assert!(!text.contains(TOKEN), "{text}");
     }
 }
