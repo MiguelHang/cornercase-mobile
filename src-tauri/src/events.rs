@@ -1,12 +1,20 @@
 use std::collections::BTreeMap;
+use std::future::{self, Future};
+use std::pin::Pin;
+use std::sync::Arc;
 
 use cornercase_core::board::AgentRow;
 use cornercase_core::cli::events::{Event as CliEvent, What};
 use cornercase_core::cli::surface::{Colours, Cursor, Modes, Size};
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
+use cornercase_core::machines::learned::learned_routes;
+use cornercase_core::machines::registry::Machines;
+use cornercase_core::machines::route::{Address, Route};
+use cornercase_core::protocol::{BRIDGE_ROUTES, BridgeRoutes};
 use cornercase_core::store::{Change, Changes, Connection, Store};
 use cornercase_core::terminal::grid::Line;
+use cornercase_core::transport::{self, Transport};
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
@@ -108,11 +116,65 @@ pub(crate) async fn forward(
     emit: impl Emit,
 ) {
     let mut sent = None;
-    while let Some(change) = changes.next().await {
+    let mut learning = None;
+    loop {
+        let change = tokio::select! {
+            change = changes.next() => change,
+            () = learned(&mut learning) => {
+                learning = None;
+                continue;
+            }
+        };
+        let Some(change) = change else {
+            return;
+        };
+        learning = asking_routes(machine, &store, &machines, &change).or(learning);
         let agents = if touches_agents(&change) { agents_changed(machine, &store, &mut sent) } else { None };
         for event in translated(machine, &machines, change).into_iter().chain(agents) {
             emit.emit(event);
         }
+    }
+}
+
+type Learning = Pin<Box<dyn Future<Output = ()> + Send>>;
+
+async fn learned(learning: &mut Option<Learning>) {
+    match learning {
+        Some(learning) => learning.await,
+        None => future::pending().await,
+    }
+}
+
+fn asking_routes(machine: MachineId, store: &Store, machines: &SharedMachines, change: &Change) -> Option<Learning> {
+    let Change::Connection(Connection::Connected { route }) = change else {
+        return None;
+    };
+    let winner = machines.with(|all| Ok(saved_route(all, machine, route))).ok().flatten()?;
+    let transport = store.transport()?;
+    Some(Box::pin(learn(machine, transport, winner, store.clone(), machines.clone())))
+}
+
+fn saved_route(machines: &Machines, id: MachineId, address: &Address) -> Option<Route> {
+    machines.machine(id)?.routes.iter().find(|route| route.address() == address).cloned()
+}
+
+async fn learn(
+    machine: MachineId,
+    transport: Arc<dyn Transport>,
+    winner: Route,
+    store: Store,
+    machines: SharedMachines,
+) {
+    let routes = match transport::json::<BridgeRoutes>(transport.as_ref(), vec![BRIDGE_ROUTES.to_owned()]).await {
+        Ok(answer) => learned_routes(&answer, &winner),
+        Err(error) => {
+            eprintln!("cornercase-mobile: the bridge did not tell its routes: {error}");
+            return;
+        }
+    };
+    match machines.with(|all| all.learn(machine, &routes).map_err(CommandError::from)) {
+        Ok(new) => store.learn(&new),
+        Err(error) => eprintln!("cornercase-mobile: the routes the bridge told were not saved: {}", error.message),
     }
 }
 
