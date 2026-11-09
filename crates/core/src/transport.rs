@@ -83,7 +83,7 @@ pub(crate) fn listen<T: Send + 'static>(keep: fn(Out) -> Option<T>) -> (OutSink,
     (Box::pin(sink), receiver)
 }
 
-fn only_stdout(out: Out) -> Option<String> {
+pub(crate) fn only_stdout(out: Out) -> Option<String> {
     match out {
         Out::Stdout(line) => Some(line),
         Out::Stderr(_) => None,

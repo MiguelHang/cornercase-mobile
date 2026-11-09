@@ -1,9 +1,16 @@
+use std::future::Future;
+
+use futures_util::SinkExt;
+use futures_util::stream::BoxStream;
 use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
 use crate::transport::fake::FakeTransport;
-use crate::transport::output;
+use crate::transport::{Closed, Out, OutSink, output};
+
+const NO_REQUESTS_COMMAND: &str = "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]";
+const NO_FOLLOW_FLAG: &str = "error: unexpected argument '--follow' found\n\nUsage: cornercase requests";
 
 fn words(words: &[&str]) -> Vec<String> {
     words.iter().map(|&word| word.to_owned()).collect()
@@ -11,6 +18,79 @@ fn words(words: &[&str]) -> Vec<String> {
 
 fn sent(line: &str) -> Value {
     serde_json::from_str(line).expect("the line is JSON")
+}
+
+fn exit(code: i32, stderr: &str) -> Exit {
+    Exit { code, stderr: stderr.to_owned() }
+}
+
+fn follow<S, F>(script: S) -> Requests
+where
+    S: Fn(BoxStream<'static, Stdin>, OutSink) -> F + Send + Sync + 'static,
+    F: Future<Output = End> + Send + 'static,
+{
+    Requests::start(Arc::new(FakeTransport::default().script(&FOLLOW, script)))
+}
+
+fn echoing(seen: mpsc::UnboundedSender<String>) -> Requests {
+    follow(move |mut stdin, mut out| {
+        let seen = seen.clone();
+        async move {
+            while let Some(Stdin::Text(line)) = stdin.next().await {
+                seen.send(line.clone()).expect("the test reads what was written");
+                say(&mut out, &line).await?;
+            }
+            Ok(exit(0, ""))
+        }
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Then {
+    Ends,
+    EndsLater,
+    Reads,
+}
+
+fn answering_once(end: End, then: Then) -> Requests {
+    follow(move |mut stdin, mut out| {
+        let end = end.clone();
+        async move {
+            let Some(Stdin::Text(line)) = stdin.next().await else { return end };
+            say(&mut out, &line).await?;
+            match then {
+                Then::Ends => {}
+                Then::EndsLater => tokio::task::yield_now().await,
+                Then::Reads => drop(stdin.next().await),
+            }
+            end
+        }
+    })
+}
+
+fn ending(end: End, reads: bool) -> Requests {
+    follow(move |mut stdin, _| {
+        let end = end.clone();
+        async move {
+            if reads {
+                stdin.next().await;
+            }
+            end
+        }
+    })
+}
+
+async fn say(out: &mut OutSink, line: &str) -> Result<(), Error> {
+    let args = serde_json::from_str::<Value>(line).map_or(Value::Null, |line| line["args"].clone());
+    let answer = match args[0].as_str() {
+        Some("fail") => json!({ "status": 1, "error": "it failed" }),
+        _ => json!({ "status": 0, "json": args }),
+    };
+    out.send(Out::Stdout(answer.to_string())).await.map_err(|Closed| Error::OutputClosed)
+}
+
+fn answered(json: &str) -> Asked {
+    Asked::Answered(Ok(json.to_owned()))
 }
 
 mod line {
@@ -92,13 +172,9 @@ mod answer {
 mod absent {
     use super::*;
 
-    fn exit(code: i32, stderr: &str) -> Exit {
-        Exit { code, stderr: stderr.to_owned() }
-    }
-
     #[rstest]
-    #[case::no_requests_command(exit(2, "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]"))]
-    #[case::no_follow(exit(2, "error: unexpected argument '--follow' found\n\nUsage: cornercase requests"))]
+    #[case::no_requests_command(exit(2, NO_REQUESTS_COMMAND))]
+    #[case::no_follow(exit(2, NO_FOLLOW_FLAG))]
     fn is_a_cli_that_does_not_know_the_command(#[case] exit: Exit) {
         assert!(absent(&exit));
     }
@@ -110,5 +186,106 @@ mod absent {
     #[case::a_clean_end(exit(0, ""))]
     fn is_not_any_other_end(#[case] exit: Exit) {
         assert!(!absent(&exit));
+    }
+}
+
+mod ask {
+    use super::*;
+
+    #[tokio::test]
+    async fn writes_each_line_once_the_one_before_is_answered() {
+        let (seen, mut written) = mpsc::unbounded_channel();
+        let mut requests = echoing(seen);
+        let focus = line(&words(&["focus", "--tab", "6"]), None);
+        let send = line(&words(&["send", "--pane", "5", "-"]), Some("ls"));
+        assert_eq!(requests.ask(&focus).await, answered(r#"["focus","--tab","6"]"#));
+        assert_eq!(written.try_recv(), Ok(format!("{focus}\n")));
+        assert!(written.try_recv().is_err());
+        assert_eq!(requests.ask(&send).await, answered(r#"["send","--pane","5","-"]"#));
+        assert_eq!(written.try_recv(), Ok(format!("{send}\n")));
+    }
+
+    #[tokio::test]
+    async fn goes_on_after_a_command_that_failed() {
+        let (seen, _written) = mpsc::unbounded_channel();
+        let mut requests = echoing(seen);
+        let failed = Asked::Answered(Err(Error::Failed { code: 1, stderr: "it failed".to_owned() }));
+        assert_eq!(requests.ask(&line(&words(&["fail"]), None)).await, failed);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+    }
+
+    #[rstest]
+    #[case::an_exit(Ok(exit(1, "Error: the server stopped")))]
+    #[case::a_clean_exit(Ok(exit(0, "")))]
+    #[case::a_dropped_connection(Err(Error::Dropped))]
+    #[case::an_old_cli_message_after_an_answer(Ok(exit(2, NO_REQUESTS_COMMAND)))]
+    #[tokio::test]
+    async fn says_the_answer_was_lost_when_the_process_ends_with_a_line_written(#[case] end: End) {
+        let mut requests = answering_once(end, Then::Reads);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+        let unanswered = requests.ask(&line(&words(&["focus", "--pane", "5"]), None)).await;
+        assert_eq!(unanswered, Asked::Answered(Err(Error::Unanswered)));
+    }
+
+    #[rstest]
+    #[case::before_the_line_without_the_command(NO_REQUESTS_COMMAND, false)]
+    #[case::before_the_line_without_follow(NO_FOLLOW_FLAG, false)]
+    #[case::after_the_line_without_the_command(NO_REQUESTS_COMMAND, true)]
+    #[case::after_the_line_without_follow(NO_FOLLOW_FLAG, true)]
+    #[tokio::test]
+    async fn finds_a_cli_that_does_not_know_the_command(#[case] stderr: &str, #[case] reads: bool) {
+        let mut requests = ending(Ok(exit(2, stderr)), reads);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Absent);
+    }
+
+    #[rstest]
+    #[case::unauthorized(Error::Unauthorized)]
+    #[case::rejected(Error::Rejected { status: 503 })]
+    #[case::timeout(Error::Timeout)]
+    #[case::unreachable(Error::Connect("connection refused".to_owned()))]
+    #[tokio::test]
+    async fn leaves_the_line_unsent_when_the_bridge_cannot_be_reached(#[case] error: Error) {
+        let mut requests = ending(Err(error), true);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Unsent);
+    }
+
+    #[tokio::test]
+    async fn leaves_the_line_unsent_when_the_process_does_not_start() {
+        let mut requests = Requests::start(Arc::new(FakeTransport::default()));
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Unsent);
+    }
+
+    #[tokio::test]
+    async fn leaves_the_line_unsent_when_the_process_stopped_reading() {
+        let mut requests = follow(async |stdin, _| {
+            drop(stdin);
+            tokio::task::yield_now().await;
+            Ok(exit(0, ""))
+        });
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Unsent);
+    }
+}
+
+mod ended {
+    use super::*;
+
+    #[tokio::test]
+    async fn waits_while_the_process_runs() {
+        let (seen, _written) = mpsc::unbounded_channel();
+        let mut requests = echoing(seen);
+        assert_eq!(requests.ended().now_or_never(), None);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+    }
+
+    #[rstest]
+    #[case::while_idle(Then::EndsLater)]
+    #[case::with_its_last_answer(Then::Ends)]
+    #[tokio::test]
+    async fn comes_once_the_process_is_over_and_nothing_is_written_after(#[case] then: Then) {
+        let mut requests = answering_once(Ok(exit(1, "Error: the server stopped")), then);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+        requests.ended().await;
+        assert_eq!(requests.ask(&line(&words(&["focus"]), None)).await, Asked::Unsent);
+        assert_eq!(requests.ended().now_or_never(), Some(()));
     }
 }
