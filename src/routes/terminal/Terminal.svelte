@@ -61,7 +61,11 @@
     </span>
   </header>
   <div class="view">
-    <TerminalView pane={shown.current} place={{ machine, boot: row.boot, tab: row.tab }} onfit={(size) => (wanted = size)} />
+    <TerminalView
+      pane={shown.current}
+      place={{ machine, boot: row.boot, tab: row.tab }}
+      onfit={(size) => (wanted = size)}
+    />
   </div>
   {#if shown.current.closed}
     <p class="closed" role="status">This tab was closed on the Mac</p>

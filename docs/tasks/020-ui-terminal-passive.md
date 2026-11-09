@@ -23,7 +23,8 @@ enseña con zoom y desplazamiento horizontal.
 - [x] CA4 — Pellizcar para zoom (mín. el ancho de la pantalla, máx. 2×) y desplazamiento horizontal; se recuerda el
   zoom por pestaña. Máx. 2× la fuente base (13 px), recordado en memoria por máquina, `boot` y pestaña.
 - [x] CA5 — La ventana del Mac no cambia de tamaño mientras se mira (comprobado a mano). En el simulador iPhone Air,
-  iOS 27.2, contra cornercase 0.13.19 por el puente, el 2026-11-09.
+  iOS 27.2, contra cornercase 0.13.19 por el puente, el 2026-11-09: primero entrando por Home y, tras el merge de 015,
+  otra vez por tablero → agente → `Terminal` (el PTY siguió en 127×48 con la terminal abierta).
 - [x] CA6 — vitest del mapeo de estilos a clases/estilos CSS y de la aplicación de filas cambiadas.
 
 ## Notas técnicas
@@ -41,3 +42,15 @@ enseña con zoom y desplazamiento horizontal.
 
 ## Verificación
 En el simulador se ve la terminal de Claude Code en vivo al ancho del Mac, con zoom y scroll (criterio 3, parte "ver").
+
+Se entra por el tablero: tocar la fila del agente abre su pantalla, y su botón `Terminal` abre la terminal encima
+(Home, por donde se entraba antes, desapareció con 015). Comprobado el 2026-11-09 en el simulador iPhone Air, iOS 27.2,
+contra cornercase 0.13.19 por el puente, con un `claude` de mentira que pasaba de working a done cada pocos segundos:
+- la terminal siguió abierta y en vivo mientras cambiaban las filas, con un solo proceso `surface` todo el rato;
+- `Back` volvió a la pantalla del agente y cortó el `surface`; un segundo `Back` volvió al tablero;
+- el PTY no cambió de tamaño (127×48);
+- con la terminal abierta, `kill-server` y `start-server`: reabrió `surface --tab` en el nuevo `boot`, sobre la misma
+  pestaña restaurada con su id (ya como shell), y la pantalla del agente pasó a "This agent is no longer running."
+  sin botón `Terminal`.
+
+Falta probarlo con Claude Code de verdad trabajando y en un iPhone.
