@@ -186,7 +186,12 @@ export class Chat {
       return null
     }
     this.#disarm()
-    return deliver(() => this.#pressKey(this.pane, key))
+    const pasted = key === 'enter' ? this.attachments.chips.length : 0
+    const failed = await deliver(() => this.#pressKey(this.pane, key))
+    if (failed === null && pasted > 0) {
+      this.attachments.clear(pasted)
+    }
+    return failed
   }
 
   #arm() {

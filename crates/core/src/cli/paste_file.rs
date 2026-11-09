@@ -8,6 +8,8 @@ pub const MAX_IMAGE_BYTES: usize = 32 << 20;
 
 const FALLBACK_STEM: &str = "pasted";
 
+const IMAGE_EXTENSIONS: [&str; 9] = ["png", "jpg", "jpeg", "heic", "heif", "gif", "webp", "tif", "tiff"];
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default)]
@@ -75,11 +77,19 @@ pub fn checked(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
 
 pub fn output_name(original: Option<&str>, kind: Kind) -> String {
     let stem = original
-        .and_then(|name| Path::new(name.trim()).file_stem())
-        .and_then(|stem| stem.to_str())
+        .and_then(|name| Path::new(name.trim()).file_name())
+        .and_then(|name| name.to_str())
+        .map(without_image_extension)
         .filter(|stem| !stem.is_empty())
         .unwrap_or(FALLBACK_STEM);
     format!("{stem}.{}", kind.extension())
+}
+
+fn without_image_extension(name: &str) -> &str {
+    match name.rsplit_once('.') {
+        Some((stem, extension)) if IMAGE_EXTENSIONS.iter().any(|known| known.eq_ignore_ascii_case(extension)) => stem,
+        _ => name,
+    }
 }
 
 #[cfg(test)]

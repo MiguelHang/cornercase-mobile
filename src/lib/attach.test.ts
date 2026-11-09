@@ -26,12 +26,12 @@ describe('formatBytes', () => {
   it.each([
     ['nothing', 0, '0 B'],
     ['bytes', 512, '512 B'],
-    ['a kilobyte', 1024, '1.0 KB'],
-    ['a few kilobytes', 1536, '1.5 KB'],
-    ['tens of kilobytes', 48213, '47 KB'],
-    ['megabytes', 2.5 * 1024 * 1024, '2.5 MB'],
-    ['the most cornercase pastes', 32 * 1024 * 1024, '32 MB'],
-    ['more than any unit', 3 * 1024 ** 4, '3072 GB'],
+    ['a kibibyte', 1024, '1.0 KiB'],
+    ['a few kibibytes', 1536, '1.5 KiB'],
+    ['tens of kibibytes', 48213, '47 KiB'],
+    ['mebibytes', 2.5 * 1024 * 1024, '2.5 MiB'],
+    ['the most cornercase pastes', 32 * 1024 * 1024, '32 MiB'],
+    ['more than any unit', 3 * 1024 ** 4, '3072 GiB'],
   ])('reads %s', (_, bytes, shown) => {
     expect(formatBytes(bytes)).toBe(shown)
   })
@@ -57,7 +57,7 @@ describe('Attachments, attaching', () => {
     const attachments = new Attachments(PANE, attachImage)
     expect(await attachments.attach()).toBeNull()
     expect(attachImage.mock.calls).toEqual([[PANE]])
-    expect(attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KB' }])
+    expect(attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KiB' }])
   })
 
   it('keeps every image attached, in order', async () => {

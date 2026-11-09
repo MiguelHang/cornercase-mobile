@@ -5,7 +5,7 @@ export type AttachImage = typeof commands.attach
 
 export type Chip = { name: string; size: string }
 
-const UNITS = ['B', 'KB', 'MB', 'GB']
+const UNITS = ['B', 'KiB', 'MiB', 'GiB']
 
 const STEP = 1024
 

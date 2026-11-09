@@ -234,7 +234,7 @@ describe('Agent, without its row', () => {
 })
 
 const ATTACHED = [
-  { name: 'IMG_0042.jpg', size: '47 KB' },
+  { name: 'IMG_0042.jpg', size: '47 KiB' },
   { name: 'pasted.png', size: '900 B' },
 ]
 
@@ -282,7 +282,7 @@ describe('Agent, its attachments', () => {
     const body = draw(withChips())
     const chips = [...body.matchAll(/<li class="chip svelte-[\w-]+"><span class="name svelte-[\w-]+">([^<]*)<\/span><span class="size svelte-[\w-]+">([^<]*)<\/span><\/li>/g)]
     expect(chips.map((chip) => [chip[1], chip[2]])).toEqual([
-      ['IMG_0042.jpg', '47 KB'],
+      ['IMG_0042.jpg', '47 KiB'],
       ['pasted.png', '900 B'],
     ])
     expect(body).toMatch(/<ul class="chips svelte-[\w-]+" aria-label="Attached images">/)

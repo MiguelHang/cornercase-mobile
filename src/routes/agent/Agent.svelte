@@ -102,7 +102,7 @@
         <KeyRow {chat} {onfailed} />
         {#if chat.attachments.chips.length > 0}
           <ul class="chips" aria-label="Attached images">
-            {#each chat.attachments.chips as chip, index (index)}
+            {#each chat.attachments.chips as chip (chip)}
               <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
             {/each}
           </ul>

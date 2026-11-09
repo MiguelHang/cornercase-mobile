@@ -264,7 +264,7 @@ describe('Chat, its attachments', () => {
     const chat = seen({ attachImage })
     expect(await chat.attach()).toBeNull()
     expect(attachImage.mock.calls).toEqual([[PANE]])
-    expect(chat.attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KB' }])
+    expect(chat.attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KiB' }])
   })
 
   it('gives the reason the image was not attached', async () => {
@@ -325,6 +325,46 @@ describe('Chat, its attachments', () => {
     const chat = await attached()
     chat.see(MACHINE, null)
     expect(chat.attachments.chips).toEqual([])
+  })
+})
+
+const pastedThenPressing = async (pressKey: PressKey, sendText: SendText = sentOk) => {
+  const chat = seen({ pressKey, sendText })
+  await chat.attach()
+  return chat
+}
+
+describe('Chat, its attachments under the keys', () => {
+  it('drops the chips once Enter submits them, and sends plain again', async () => {
+    const sendText = vi.fn(sentOk)
+    const chat = await pastedThenPressing(pressedOk, sendText)
+    expect(await chat.press('enter')).toBeNull()
+    expect(chat.attachments.chips).toEqual([])
+    chat.draft = 'and now?'
+    await chat.send()
+    expect(sendText.mock.calls).toEqual([[PANE, 'and now?', false]])
+  })
+
+  it('keeps the chips when Enter fails', async () => {
+    const chat = await pastedThenPressing(() => Promise.resolve(refused('nothing was sent', 'not_sent')))
+    expect(await chat.press('enter')).toBe('nothing was sent')
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it.each<KeyName>(['esc', 'down', 'tab', '1'])('keeps the chips after %s', async (key) => {
+    const chat = await pastedThenPressing(pressedOk)
+    expect(await chat.press(key)).toBeNull()
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it('keeps an image attached while Enter was on its way', async () => {
+    const pressed = gate<{ status: 'ok'; data: null }>()
+    const chat = await pastedThenPressing(() => pressed.promise)
+    const entered = chat.press('enter')
+    await chat.attach()
+    pressed.open(ok(null))
+    expect(await entered).toBeNull()
+    expect(chat.attachments.chips.length).toBe(1)
   })
 })
 

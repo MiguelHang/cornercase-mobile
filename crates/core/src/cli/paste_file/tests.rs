@@ -107,6 +107,20 @@ mod naming {
     #[case::an_empty_name(Some(""), Kind::Png, "pasted.png")]
     #[case::only_spaces(Some("   "), Kind::Jpeg, "pasted.jpg")]
     #[case::only_a_folder(Some("/"), Kind::Jpeg, "pasted.jpg")]
+    #[case::only_an_extension(Some(".heic"), Kind::Jpeg, "pasted.jpg")]
+    #[case::dots_without_an_extension(Some("v1.2"), Kind::Jpeg, "v1.2.jpg")]
+    #[case::a_time_without_an_extension(
+        Some("Screenshot 2026-11-09 at 10.42.13"),
+        Kind::Png,
+        "Screenshot 2026-11-09 at 10.42.13.png"
+    )]
+    #[case::an_extension_of_no_image(Some("notes.txt"), Kind::Png, "notes.txt.png")]
+    #[case::a_heif_photo(Some("IMG_0042.heif"), Kind::Jpeg, "IMG_0042.jpg")]
+    #[case::a_webp_image(Some("sticker.WebP"), Kind::Png, "sticker.png")]
+    #[case::a_gif_image(Some("loop.gif"), Kind::Png, "loop.png")]
+    #[case::a_tiff_scan(Some("scan.tiff"), Kind::Jpeg, "scan.jpg")]
+    #[case::a_tif_scan(Some("scan.TIF"), Kind::Jpeg, "scan.jpg")]
+    #[case::a_jpeg_spelt_out(Some("photo.jpeg"), Kind::Jpeg, "photo.jpg")]
     fn takes_the_extension_of_the_output_format(
         #[case] original: Option<&str>,
         #[case] kind: Kind,
