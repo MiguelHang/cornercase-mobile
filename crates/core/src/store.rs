@@ -15,6 +15,7 @@ use self::backoff::Backoff;
 use self::connect::Failure;
 use self::resume::{Resume, Resumes, Woken};
 use self::streams::Ended;
+use crate::board::{self, AgentRow, Since};
 use crate::cli::contract::Missing;
 use crate::cli::contract::boot::{Boot, BootWatch, Observed};
 use crate::cli::events::Event;
@@ -84,6 +85,11 @@ impl Store {
 
     pub fn session(&self) -> Option<Snapshot> {
         self.shared.state().session.clone()
+    }
+
+    pub fn agents(&self) -> Option<Vec<AgentRow>> {
+        let state = self.shared.state();
+        state.session.as_ref().map(|session| board::agents(session, &state.since))
     }
 
     pub fn app(&self) -> Option<Value> {
@@ -181,6 +187,7 @@ struct Shared {
 struct State {
     connection: Connection,
     session: Option<Snapshot>,
+    since: Since,
     app: Option<Value>,
     queue: Option<Queue>,
     subscribers: Vec<Subscriber>,
@@ -219,6 +226,7 @@ impl Shared {
     fn forget(&self) {
         let mut state = self.state();
         state.session = None;
+        state.since.clear();
         state.app = None;
         drop(state);
         self.publish(&Change::Session);

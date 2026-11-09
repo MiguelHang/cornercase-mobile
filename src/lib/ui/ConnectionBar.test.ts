@@ -5,7 +5,7 @@ import type { Tone } from '../connection'
 import clockSource from '../retryClock.svelte.ts?raw'
 import ConnectionBar from './ConnectionBar.svelte'
 import barSource from './ConnectionBar.svelte?raw'
-import dotSource from './StatusDot.svelte?raw'
+import dotSource from './ToneDot.svelte?raw'
 
 const RETRYING: ConnectionView_Serialize = {
   state: 'retrying',
@@ -58,7 +58,7 @@ describe('ConnectionBar', () => {
 
   it('keeps the countdown out of what readers announce, which says only that it retries and why', () => {
     expect(bar(RETRYING)).toMatch(
-      /<span class="line text svelte-[\w-]+" aria-hidden="true">Retrying in 2 s<\/span> <!--\[0--><span class="spoken svelte-[\w-]+">Retrying<\/span>/,
+      /<span class="line text svelte-[\w-]+" aria-hidden="true">Retrying in 2 s<\/span> <!--\[0--><span class="spoken">Retrying<\/span>/,
     )
     expect(bar(RETRYING)).toMatch(/<span class="line detail svelte-[\w-]+">timed out<\/span>/)
   })
@@ -99,7 +99,6 @@ describe('ConnectionBar', () => {
     'min-height: 44px;',
     'width: 44px; height: 44px;',
     'overflow: hidden; white-space: nowrap; text-overflow: ellipsis;',
-    '.spoken { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
   ])('holds %s', (text) => {
     expect(flat(barSource)).toContain(text)
   })

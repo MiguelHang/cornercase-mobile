@@ -7,7 +7,7 @@ use rstest::rstest;
 use super::boot::late;
 use super::connect::{contract, refusing, without_notices};
 use super::retry::{exit, held};
-use super::streams::{connections, fine, line, served, serving};
+use super::streams::{connected, connections, fine, line, served, serving, status_event, watched};
 use super::*;
 use crate::cli::contract::Kind;
 use crate::cli::status::fixtures::WATCH;
@@ -26,10 +26,12 @@ fn slow_contract() -> FakeTransport {
     })
 }
 
-pub(super) fn once(fake: FakeTransport, argv: &[&str], json: &'static str) -> FakeTransport {
+pub(super) fn once(fake: FakeTransport, argv: &[&str], json: &str) -> FakeTransport {
     let calls = AtomicUsize::new(0);
+    let first = line(json);
     fake.script(argv, move |_, mut out| {
-        let lines: Vec<String> = (calls.fetch_add(1, Ordering::SeqCst) == 0).then(|| line(json)).into_iter().collect();
+        let lines: Vec<String> =
+            (calls.fetch_add(1, Ordering::SeqCst) == 0).then(|| first.clone()).into_iter().collect();
         async move {
             for line in lines {
                 out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?;
@@ -37,6 +39,10 @@ pub(super) fn once(fake: FakeTransport, argv: &[&str], json: &'static str) -> Fa
             future::pending().await
         }
     })
+}
+
+fn since_of_the_first(store: &Store) -> Option<String> {
+    store.agents().expect("the agents once connected")[0].since.clone()
 }
 
 fn notices() -> Connection {
@@ -85,6 +91,26 @@ mod resuming {
         assert_eq!(connections(&unread(&mut changes)), [Connection::Connecting]);
         assert_eq!(store.session(), Some(serde_json::from_str(WATCH).expect("the watch fixture")));
         assert!(store.app().is_some());
+    }
+
+    #[rstest]
+    #[tokio::test(start_paused = true)]
+    async fn forgets_since_when_each_agent_is_in_its_status(
+        #[values(Resume::Foreground, Resume::Network)] resume: Resume,
+    ) {
+        let lines = [Vec::new(), vec![watched(7, "waiting")], fine()[2].clone()];
+        let fake = once(serving(lines), EVENTS, &status_event("waiting"));
+        let (store, mut changes) = spawned(fake, &Asked::default());
+        until_connected(&mut changes).await;
+        time::sleep(Duration::from_secs(1)).await;
+        assert!(since_of_the_first(&store).is_some());
+        unread(&mut changes);
+        poke(&store, resume);
+        time::sleep(Duration::from_secs(60)).await;
+        let changes = unread(&mut changes);
+        assert_eq!(connections(&changes), connected());
+        assert_eq!(since_of_the_first(&store), None);
+        assert!(changes.contains(&Change::Session));
     }
 
     #[rstest]

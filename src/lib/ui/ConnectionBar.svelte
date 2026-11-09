@@ -3,7 +3,7 @@
   import { status } from '../connection'
   import { retryClock } from '../retryClock.svelte'
   import Icon from './Icon.svelte'
-  import StatusDot from './StatusDot.svelte'
+  import ToneDot from './ToneDot.svelte'
 
   let {
     connection,
@@ -25,7 +25,7 @@
 
 <div class="connection" role="status">
   <div class="row" bind:clientHeight={height}>
-    <StatusDot tone={shown.tone} pulsing={shown.pulsing} />
+    <ToneDot tone={shown.tone} pulsing={shown.pulsing} />
     <span class="lines">
       <span class="line text" aria-hidden={counting ? 'true' : undefined}>{shown.text}</span>
       {#if counting}
@@ -80,15 +80,6 @@
   .text {
     color: var(--text);
     font-size: 14px;
-  }
-
-  .spoken {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 
   .detail {

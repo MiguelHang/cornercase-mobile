@@ -2,7 +2,7 @@
   import type { RowStatus } from '../machineRows'
   import Button from './Button.svelte'
   import Spinner from './Spinner.svelte'
-  import StatusDot from './StatusDot.svelte'
+  import ToneDot from './ToneDot.svelte'
 
   let {
     name,
@@ -33,7 +33,7 @@
     {#if checking}
       <Spinner />
     {:else}
-      <StatusDot tone={shown.tone} pulsing={shown.pulsing} />
+      <ToneDot tone={shown.tone} pulsing={shown.pulsing} />
     {/if}
     <span class="text">{shown.text}</span>
   </span>

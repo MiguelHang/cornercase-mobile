@@ -8,7 +8,8 @@
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
-  import Home from './routes/Home.svelte'
+  import Agent from './routes/agent/Agent.svelte'
+  import Board from './routes/board/Board.svelte'
   import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
@@ -23,7 +24,13 @@
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
 
-  const home = $derived(router.current.name === 'home')
+  const route = $derived(router.current)
+  const barred = $derived(route.name === 'home' || route.name === 'agent')
+  const opened = $derived(
+    route.name === 'agent' && current.agents !== null
+      ? current.agents.find((agent) => agent.pane === route.pane)
+      : null,
+  )
   const editing = $derived.by(() => {
     const route = router.current
     return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined
@@ -68,12 +75,12 @@
   }
 
   const load = async () => {
-    const [listed, state, session] = await Promise.all([
+    const [listed, state, agents] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
-      commands.session(),
+      commands.agents(),
     ])
-    show(screen(state, session))
+    show(screen(state, agents))
     const first = firstToConnect(remember(listed), state)
     if (first !== null) {
       await join(first)
@@ -86,7 +93,7 @@
     }
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
-      events.sessionChanged.listen((event) => show(apply(current, event.payload))),
+      events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
     Promise.all(listening).then(load).catch(toasts.failed)
@@ -95,14 +102,23 @@
 </script>
 
 <main>
-  {#if home}
+  {#if barred}
     <ConnectionBar
       connection={current.connection}
       {machineName}
       bind:height={barHeight}
       onmachines={() => router.go({ name: 'machines' })}
     />
-    <Home screen={current} below={barHeight} />
+    {#if route.name === 'agent'}
+      <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />
+    {:else}
+      <Board
+        agents={current.agents}
+        connection={current.connection}
+        below={barHeight}
+        onopen={(pane) => router.go({ name: 'agent', pane })}
+      />
+    {/if}
   {:else if router.current.name === 'machines'}
     <Machines
       {machines}
@@ -127,5 +143,5 @@
   {:else}
     <NoMachines onadded={added} />
   {/if}
-  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={home ? barHeight : 0} />
+  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />
 </main>
