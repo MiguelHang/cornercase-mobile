@@ -5,4 +5,5 @@ pub mod machines;
 pub mod protocol;
 pub mod queue;
 pub mod secrets;
+pub mod store;
 pub mod transport;

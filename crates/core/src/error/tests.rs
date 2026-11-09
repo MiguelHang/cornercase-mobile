@@ -24,6 +24,7 @@ mod display {
         Error::StaleBoot("error: the server restarted".to_owned()),
         "the cornercase server restarted since the command was prepared: error: the server restarted"
     )]
+    #[case::stream_ended(Error::StreamEnded, "cornercase ended a stream the app was following")]
     #[case::outdated(
         Error::Outdated,
         "cornercase on the Mac is too old for this app; update cornercase on the Mac and restart its server"
