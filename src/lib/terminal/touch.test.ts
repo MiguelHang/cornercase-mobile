@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { anchor, roomIn, slide, Tap } from './touch'
+import { anchor, ended, followed, roomIn, slide, Tap } from './touch'
 
 const box = (scrollTop: number, scrollHeight = 1000, clientHeight = 600) => ({ scrollTop, scrollHeight, clientHeight })
 
@@ -86,6 +86,34 @@ describe('Tap', () => {
   it('forgets an earlier tap once a swipe lifts', () => {
     const tap = lifted(true)
     tap.lifted(false)
+    expect(tap.clicked()).toBe(false)
+  })
+})
+
+describe('the edge of the screen', () => {
+  it.each([
+    ['follows a finger with the edge idle', 'idle', true],
+    ['leaves a finger waiting at the edge', 'pending', false],
+    ['leaves a finger the swipe back claimed', 'claimed', false],
+  ] as const)('%s', (_, edge, follows) => {
+    expect(followed(edge)).toBe(follows)
+  })
+
+  it.each([
+    ['a still finger with the edge idle is a tap', 'idle', true, true],
+    ['a finger that slid with the edge idle is no tap', 'idle', false, false],
+    ['a still finger waiting at the edge is a tap', 'pending', true, true],
+    ['a finger the swipe back claimed is no tap', 'claimed', true, false],
+  ] as const)('%s', (_, edge, still, tapped) => {
+    const tap = new Tap()
+    ended(tap, edge, still)
+    expect(tap.clicked()).toBe(tapped)
+  })
+
+  it('forgets an earlier tap once the swipe back lifts', () => {
+    const tap = new Tap()
+    tap.lifted(true)
+    ended(tap, 'claimed', true)
     expect(tap.clicked()).toBe(false)
   })
 })
