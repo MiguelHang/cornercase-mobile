@@ -1,6 +1,6 @@
 # 038 — Tablero: los subagentes, bajo su agente y plegados
 
-- Estado: en curso (falta la comprobación en vivo, CA6, y los checks, CA7)
+- Estado: en curso (faltan los checks, CA7)
 - Depende de: 015
 - Riesgo: medio — cambia el orden del tablero (015), que decidió una lista plana; depende de que el contrato dé el padre
   de cada panel.
@@ -32,7 +32,7 @@ Propuesta: hacer lo mismo que cornercase-gpui en su sección de agentes (cornerc
   snapshot lo da; si no, por su título.
 - [x] CA5 — Abrir un hijo desde el árbol abre su chat como cualquier agente; en el chat del padre, una línea con sus
   subagentes (n trabajando, n esperando) que lleva a ellos.
-- [ ] CA6 — Comprobado en el simulador con un agente que lanza subagentes (o un flow) contra cornercase real; tests del
+- [x] CA6 — Comprobado en el simulador con un agente que lanza subagentes (o un flow) contra cornercase real; tests del
   árbol sin DOM (orden, padre ausente, ciclos, plegado, atención de los ocultos).
 - [ ] CA7 — `hx check full` y mutation en verde.
 

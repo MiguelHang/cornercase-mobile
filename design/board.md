@@ -45,7 +45,7 @@ The active machine's screen, under the connection bar: every agent of its projec
 ## Live, without flicker
 
 - **The rows go out only when they change** (Connection › Store › In the app), so a snapshot every 500 ms with the same rows redraws nothing.
-- **The tree is still one flat list**, each row with its depth, so a branch that changes section slides as its rows, each by itself, keyed by pane as before.
+- **The tree is still one flat list**, each row with its depth, so a branch that changes section slides as its rows, each by itself, keyed by pane as before. They go the same distance in the same `ENTER_MS`, so the branch moves as one block (Checked live).
 - **One flat list of headers and rows**, keyed `section:<name>` and `pane:<id>`, with `animate:flip`. Svelte's `flip` moves an element only within its `{#each}`, so with one list per section a row going from Working to Waiting would vanish from one and appear in the other; in one list it slides to its new place, and the headers slide with it. Rejected: one list per section with `crossfade`, two transitions to keep in step for the same effect. The slide lasts `ENTER_MS`, 0 with Reduce Motion.
 - **Before the first snapshot** (`agents` is `null`: connecting, or after a restart) the screen shows the mark, pulsing while it connects; with no agents, `No agents running.`
 
@@ -60,6 +60,12 @@ The active machine's screen, under the connection bar: every agent of its projec
 
 - **On 2026-11-09** in the iPhone 17 simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), against the bridge on the LAN and cornercase 0.13.19, with Claude Code 2.1.319. A Claude started with `cornercase start` showed under Working, then under Done with `now` once it finished, below the agents that were already done when the app connected, which show no time. Asked to put a question to the user (`AskUserQuestion`, which cornercase reports as `waiting`), its row went on its own to a new Waiting section at the top, in the first screenshot after the Mac's `status` said `waiting`, less than a second later. The screenshots, about two a second, show each state but not the slide, which is shorter.
 - **A real tap** (an XCUITest press) on that row opened the agent's screen with the waiting dot. Answering the question on the Mac turned the dot to working and then done while the screen stayed put, and `Back` returned to the board.
+- **The tree, on 2026-11-10** in the iPhone 17e simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), the app built with `tauri ios build --debug`, against the bridge on loopback and an installed cornercase 0.13.19 on a server of its own (`CORNERCASE_SOCKET`), with Claude Code 2.1.321 (Haiku 5.5), the taps made by XCUITest. A Claude started three others with `cornercase start` from its pane; one of them asked a question with `AskUserQuestion`.
+  - **Folded at first**: the parent's row came alone, in Waiting with its own done dot, the orange attention dot and `+3`. Its arrow unfolded the three children, indented one level, the waiting one first, and the attention and `+3` went; a second tap folded them again.
+  - **Kept and lost as decided**: a child opened from the board showed its own chat, `Waiting · repo › kid-a`, and `Back` returned to the board with the branch still unfolded. After `xcrun simctl terminate` and a new launch the branch came folded again.
+  - **The waiting child decides the branch**: answered from the phone's `Enter`, it went done and the branch went down to Done; asked again from the Mac, the branch went back to Waiting within a second, its child first under the parent.
+  - **One block**: with the branch unfolded in Done and an agent without a parent working below it, that agent turned waiting and rose to the top. In a recording of the screen (`simctl io recordVideo`), the frame halfway through shows the four rows of the branch moved down by the same distance, the parent's row overlapping the rising one.
+  - **The chat's line**: the parent's chat read `3 subagents · 3 done`, then `3 subagents · 1 waiting, 2 done` without leaving the screen when a child turned waiting. A tap listed the three children; one of them opened its chat, `Back` returned to the parent's chat, with the line folded again, and a second `Back` to the board.
 
 ## Left out
 
