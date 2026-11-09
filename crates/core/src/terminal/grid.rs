@@ -39,6 +39,7 @@ pub struct Grid {
     pub rows: u16,
     pub layout: Option<Node>,
     pub panes: Vec<PaneGrid>,
+    known: Option<u64>,
     changes: Changes,
 }
 
@@ -177,6 +178,7 @@ impl Grid {
         if frame.base != Some(self.revision) || frame.surface != self.surface || frame.boot != self.boot {
             return Applied::NeedRedraw;
         }
+        let was_current = self.is_current();
         let tables = Tables::new(frame.styles, frame.hyperlinks);
         for wire in frame.panes {
             let Some(grid) = self.panes.iter_mut().find(|grid| grid.pane == wire.pane) else {
@@ -187,6 +189,9 @@ impl Grid {
         }
         self.revision = frame.revision;
         self.projection = frame.projection.or(self.projection);
+        if !was_current && self.is_current() {
+            self.replace_all();
+        }
         Applied::Applied
     }
 
@@ -201,14 +206,27 @@ impl Grid {
         self.rows = frame.rows;
         self.layout = frame.layout;
         self.panes = frame.panes.into_iter().map(|pane| PaneGrid::from_wire(pane, &tables)).collect();
+        self.replace_all();
+    }
+
+    pub fn saw_projection(&mut self, projection: u64) {
+        self.known = self.known.max(Some(projection));
+    }
+
+    pub fn is_current(&self) -> bool {
+        self.projection.zip(self.known).is_none_or(|(own, known)| own >= known)
+    }
+
+    pub fn changed_rows(&mut self) -> Changes {
+        let changes = std::mem::take(&mut self.changes);
+        if self.is_current() { changes } else { Changes::default() }
+    }
+
+    fn replace_all(&mut self) {
         self.changes = Changes { replaced: true, ..Changes::default() };
         for pane in &self.panes {
             self.changes.mark(pane.pane, pane.all_rows());
         }
-    }
-
-    pub fn changed_rows(&mut self) -> Changes {
-        std::mem::take(&mut self.changes)
     }
 }
 

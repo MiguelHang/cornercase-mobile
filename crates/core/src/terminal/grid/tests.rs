@@ -21,8 +21,12 @@ fn line(text: &str) -> Value {
 }
 
 fn lettered() -> Grid {
+    lettered_at(Some(2))
+}
+
+fn lettered_at(projection: Option<u64>) -> Grid {
     applied(&json!({
-        "boot": "b", "surface": 1, "revision": 5, "projection": 2,
+        "boot": "b", "surface": 1, "revision": 5, "projection": projection,
         "panes": [
             { "pane": 1, "size": { "rows": 4 }, "lines": [line("a"), line("b"), line("c"), line("d")] },
             { "pane": 2, "size": { "rows": 3 } }
@@ -45,6 +49,16 @@ fn pane(grid: &Grid, id: u64) -> &PaneGrid {
 
 fn run(text: &str, width: u16, style: Style, link: Option<&str>) -> Run {
     Run { text: text.to_owned(), width, style, link: link.map(Arc::from) }
+}
+
+fn changes(replaced: bool, panes: &[(u64, &[u16])]) -> Changes {
+    let rows = panes.iter().map(|(pane, rows)| (*pane, rows.iter().copied().collect())).collect();
+    Changes { replaced, rows }
+}
+
+fn read(mut grid: Grid) -> Grid {
+    grid.changed_rows();
+    grid
 }
 
 const DOCS: &str = "https://example.com/docs/a-long-page";
@@ -387,16 +401,6 @@ mod a_line_of_the_stream {
 mod what_changed {
     use super::*;
 
-    fn changes(replaced: bool, panes: &[(u64, &[u16])]) -> Changes {
-        let rows = panes.iter().map(|(pane, rows)| (*pane, rows.iter().copied().collect())).collect();
-        Changes { replaced, rows }
-    }
-
-    fn read(mut grid: Grid) -> Grid {
-        grid.changed_rows();
-        grid
-    }
-
     #[test]
     fn after_a_frame_is_every_row_of_every_pane() {
         let mut grid = lettered();
@@ -455,5 +459,76 @@ mod what_changed {
         let next = json!({ "boot": "b", "surface": 1, "revision": 8, "panes": [{ "pane": 1, "size": { "rows": 2 } }] });
         grid.apply(Frame::deserialize(&next).expect("a surface line"));
         assert_eq!(grid.changed_rows(), changes(true, &[(1, &[0, 1])]));
+    }
+}
+
+mod a_projection_the_view_has_left_behind {
+    use super::*;
+
+    const EVERY_ROW: &[(u64, &[u16])] = &[(1, &[0, 1, 2, 3]), (2, &[0, 1, 2])];
+
+    #[rstest]
+    #[case::older(Some(2), 3, false)]
+    #[case::equal(Some(2), 2, true)]
+    #[case::newer(Some(2), 1, true)]
+    #[case::none(None, 5, true)]
+    fn is_applied_but_shown_only_when_current(
+        #[case] projection: Option<u64>,
+        #[case] known: u64,
+        #[case] shown: bool,
+    ) {
+        let mut grid = lettered_at(projection);
+        grid.saw_projection(known);
+        assert_eq!(rows(&grid, 1), vec!["a", "b", "c", "d"]);
+        assert_eq!(grid.is_current(), shown);
+        let expected = if shown { changes(true, EVERY_ROW) } else { Changes::default() };
+        assert_eq!(grid.changed_rows(), expected);
+    }
+
+    #[test]
+    fn is_not_forgotten_when_the_view_reports_a_lower_one() {
+        let mut grid = lettered();
+        grid.saw_projection(3);
+        grid.saw_projection(1);
+        assert!(!grid.is_current());
+    }
+
+    #[test]
+    fn still_takes_patches_without_showing_them() {
+        let mut grid = lettered();
+        grid.saw_projection(3);
+        assert_eq!(
+            grid.apply_patch(on_lettered(&json!([{ "pane": 1, "lines": { "0": line("z") } }]))),
+            Applied::Applied
+        );
+        assert_eq!(rows(&grid, 1), vec!["z", "b", "c", "d"]);
+        assert_eq!(grid.changed_rows(), Changes::default());
+    }
+
+    #[rstest]
+    #[case::without_a_projection(None, false, Changes::default())]
+    #[case::with_the_current_one(Some(3), true, changes(true, EVERY_ROW))]
+    fn becomes_every_row_once_a_patch_brings_the_current_one(
+        #[case] projection: Option<u64>,
+        #[case] current: bool,
+        #[case] expected: Changes,
+    ) {
+        let mut grid = lettered();
+        grid.saw_projection(3);
+        let mut grid = read(grid);
+        let wire = json!({ "boot": "b", "surface": 1, "revision": 6, "base": 5, "projection": projection,
+            "panes": [{ "pane": 1, "lines": { "0": line("z") } }] });
+        grid.apply_patch(Frame::deserialize(&wire).expect("a surface line"));
+        assert_eq!(grid.is_current(), current);
+        assert_eq!(grid.changed_rows(), expected);
+    }
+
+    #[test]
+    fn is_shown_when_a_new_frame_arrives_before_the_line_of_the_view() {
+        let mut grid = lettered_at(Some(3));
+        grid.saw_projection(2);
+        assert_eq!(grid.changed_rows(), changes(true, EVERY_ROW));
+        grid.saw_projection(3);
+        assert!(grid.is_current());
     }
 }
