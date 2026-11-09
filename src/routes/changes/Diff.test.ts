@@ -28,7 +28,7 @@ const stateWith = (shown: Reading | null, path = PATH) => {
   return state
 }
 
-const draw = (changes: ChangesState) => render(Diff, { props: { path: PATH, changes, onback: () => {} } }).body
+const draw = (changes: ChangesState) => render(Diff, { props: { path: PATH, changes, backTo: 'login', onback: () => {} } }).body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -83,8 +83,12 @@ describe('Diff', () => {
     expect(draw(stateWith(reading({ hunks: [wide] })))).toContain('style="--digits: 4ch;"')
   })
 
-  it("titles the screen with the file's path, a rename with both", () => {
-    expect(draw(stateWith(reading()))).toMatch(/<h1 class="title svelte-[\w-]+"><span dir="ltr">src\/a.rs<\/span>/)
+  it("goes back to the list from a bar titled with the file's path, a rename with both", () => {
+    const body = draw(stateWith(reading()))
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed"[^]*?aria-label="Back to login"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->| )*<h1 class="path svelte-[\w-]+"><span dir="ltr">src\/a.rs<\/span>/)
+    expect(body.match(/<h1/g)).toHaveLength(1)
+    expect(body).not.toContain('class="top')
     expect(draw(stateWith(reading({ old_path: 'src/b.rs' })))).toContain('<span dir="ltr">src/b.rs → src/a.rs</span>')
   })
 
@@ -122,13 +126,18 @@ describe('Diff', () => {
     expect(viewedButton(body)).toBeNull()
   })
 
-  it('leaves only the notice and Back once the workspace is closed on the Mac', () => {
+  it('leaves only the notice and the way back once the workspace is closed on the Mac', () => {
     const state = stateWith(null)
     state.gone = true
     const body = draw(state)
     expect(note(body)).toBe(`${CLOSED}.`)
     expect(viewedButton(body)).toBeNull()
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toContain('aria-label="Back to login"')
+  })
+
+  it('cuts a long path at its start and puts the viewed button at the right of the bar', () => {
+    expect(flat(diffSource)).toContain('.path { margin: 0; overflow: hidden; direction: rtl;')
+    expect(draw(stateWith(reading()))).toMatch(/<div class="end svelte-[\w-]+">(<!--[^>]*-->)*<button class="check/)
   })
 
   it("presses the viewed button by the state's mark of the file", () => {

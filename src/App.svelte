@@ -131,8 +131,10 @@
     }
   }
 
-  const leaveDiff = () => {
-    changes?.closeDiff()
+  const goBack = () => {
+    if (router.current.name === 'change') {
+      changes?.closeDiff()
+    }
     router.back()
   }
 
@@ -230,7 +232,7 @@
     <Terminal
       machine={viewed.machine}
       row={viewed.row}
-      onback={() => router.back()}
+      onback={goBack}
       onfailed={toasts.failed}
       bind:height={barHeight}
     />
@@ -255,7 +257,7 @@
         connection={current.connection}
         below={barHeight}
         {starting}
-        onback={() => router.back()}
+        onback={goBack}
         onfailed={(message) => toasts.push({ level: 'error', message })}
         onterminal={terminal}
         onchanges={review}
@@ -263,17 +265,17 @@
     {/if}
   {:else if route.name === 'changes'}
     {#if changes !== null}
-      <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} />
+      <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} />
     {/if}
   {:else if route.name === 'change'}
     {#if changes !== null}
-      <Diff path={route.path} {changes} onback={leaveDiff} />
+      <Diff path={route.path} {changes} {backTo} onback={goBack} />
     {/if}
   {:else if route.name === 'start'}
     <Start
       connection={current.connection}
       {backTo}
-      onback={() => router.back()}
+      onback={goBack}
       onstarted={started}
       oncreated={created}
     />
@@ -283,7 +285,7 @@
       active={current.machine}
       connection={current.connection}
       {backTo}
-      onback={() => router.back()}
+      onback={goBack}
       onpick={(machine) => void join(machine)}
       onadded={added}
       onrouted={reload}
@@ -296,7 +298,7 @@
       {taken}
       connection={editing.id === current.machine ? current.connection : null}
       {backTo}
-      onback={() => router.back()}
+      onback={goBack}
       onchanged={reload}
       onremoved={removed}
       adding={rescanning}

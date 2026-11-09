@@ -47,7 +47,7 @@ const FILE: ChangedFile = {
 }
 
 const draw = (changes: ChangesState, title = 'login') =>
-  render(Changes, { props: { title, changes, onback: () => {}, onopen: () => {} } }).body
+  render(Changes, { props: { title, changes, backTo: 'tests', onback: () => {}, onopen: () => {} } }).body
 
 const row = (file: ChangedFile) => render(FileRow, { props: { file, onopen: () => {}, onviewed: () => {} } }).body
 
@@ -61,11 +61,14 @@ const pressed = (body: string) =>
   [...body.matchAll(/<button class="mode svelte-[\w-]+" type="button" aria-pressed="true"[^>]*>\s*(\w+)/g)].map((m) => m[1])
 
 describe('Changes', () => {
-  it("heads the list with the workspace's name, its totals and a Back button", () => {
+  it("goes back to the agent from a bar with the workspace's name and its totals at the right", () => {
     const body = draw(stateWith(FIXTURE))
-    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">login<\/h1>/)
-    expect(body).toMatch(/<span class="plus svelte-[\w-]+">\+12<\/span> <span class="minus svelte-[\w-]+">−9<\/span>/)
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed"[^]*?aria-label="Back to tests"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">login<\/h1>/)
+    expect(body).toMatch(
+      /<div class="end svelte-[\w-]+">(<!--[^>]*-->)*<p class="totals svelte-[\w-]+"><span class="plus svelte-[\w-]+">\+12<\/span> <span class="minus svelte-[\w-]+">−9<\/span>/,
+    )
+    expect(body).not.toContain('class="top')
   })
 
   it('draws a row per file of the summary, a rename as its old and new paths', () => {
@@ -119,14 +122,14 @@ describe('Changes', () => {
     )
   })
 
-  it('leaves only the notice and Back once the workspace is closed on the Mac', () => {
+  it('leaves only the notice and the way back once the workspace is closed on the Mac', () => {
     const state = stateWith(FIXTURE)
     state.gone = true
     const body = draw(state)
     expect(note(body)).toBe(`${CLOSED}.`)
     expect(body).not.toContain('class="mode')
     expect(body).not.toContain('<ul')
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toContain('aria-label="Back to tests"')
   })
 
   it('changes the mode through the state, opens a file and marks it viewed through it', () => {
@@ -135,6 +138,12 @@ describe('Changes', () => {
     expect(source).toContain('const viewed = (path: string, seen: boolean) => void changes.mark(path, seen)')
     expect(source).toContain('<FileRow {file} {onopen} onviewed={viewed} />')
     expect(source).toContain('{#each files as file (file.path)}')
+  })
+
+  it('keeps the totals on one line and goes back through the bar', () => {
+    const source = flat(changesSource)
+    expect(source).toContain('<NavBar {backTo} {title} {onback}> {#snippet right()}')
+    expect(source).toContain('.totals { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }')
   })
 })
 

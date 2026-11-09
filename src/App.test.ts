@@ -82,7 +82,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
     )
   })
 
@@ -95,7 +95,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={() => router.back()} onchanged={reload} onremoved={removed} adding={rescanning} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={goBack} onchanged={reload} onremoved={removed} adding={rescanning} />',
     )
   })
 
@@ -148,7 +148,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
     )
   })
 
@@ -173,7 +173,7 @@ describe('App wiring', () => {
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} {backTo} onback={() => router.back()} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} {backTo} onback={goBack} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
     )
   })
 
@@ -207,7 +207,7 @@ describe('App wiring', () => {
   it('shows the terminal on top of everything only on its own machine, going back from it and putting the toasts below its bar', () => {
     expect(source).toContain('const viewed = $derived(openedTerminal(route, current))')
     expect(source).toContain(
-      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} onback={() => router.back()} onfailed={toasts.failed} bind:height={barHeight} />',
+      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} onback={goBack} onfailed={toasts.failed} bind:height={barHeight} />',
     )
   })
 
@@ -216,7 +216,7 @@ describe('App wiring', () => {
       "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} onback={leaveDiff} /> {/if} {:else if route.name === 'start'}",
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} {backTo} onback={goBack} /> {/if} {:else if route.name === 'start'}",
     )
   })
 
@@ -226,8 +226,13 @@ describe('App wiring', () => {
     )
   })
 
-  it('drops the open diff before going back from it to the list', () => {
-    expect(source).toContain('const leaveDiff = () => { changes?.closeDiff() router.back() }')
+  it('goes back through one action that drops the open diff only when leaving it', () => {
+    expect(source).toContain(
+      "const goBack = () => { if (router.current.name === 'change') { changes?.closeDiff() } router.back() }",
+    )
+    expect(source.match(/onback=\{goBack\}/g)).toHaveLength(7)
+    expect(source).not.toContain('onback={() =>')
+    expect(source).not.toContain('leaveDiff')
   })
 
   it('keeps one state of the reviewed workspace under its list and its diff, following it once it listens and leaving it after', () => {
@@ -243,7 +248,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
     )
   })
 })
