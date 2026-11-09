@@ -21,19 +21,19 @@ describe('Opening', () => {
   it('opens only once it listens', async () => {
     const listening = gate<void>()
     const made = calls()
-    new Opening(listening.promise, made).open({ cols: 80, rows: 24 })
+    new Opening(listening.promise, made).open({ cols: 80, rows: 24 }, false)
     await settled()
     expect(made.open).not.toHaveBeenCalled()
     listening.open()
     await settled()
-    expect(made.open.mock.calls).toEqual([[{ cols: 80, rows: 24 }]])
+    expect(made.open.mock.calls).toEqual([[{ cols: 80, rows: 24 }, false]])
   })
 
   it('opens nothing when it left before it listened', async () => {
     const listening = gate<void>()
     const made = calls()
     const opening = new Opening(listening.promise, made)
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, false)
     opening.leave()
     listening.open()
     await settled()
@@ -45,7 +45,7 @@ describe('Opening', () => {
     const answer = gate<Opened>()
     const made = calls(() => answer.promise)
     const opening = new Opening(Promise.resolve(), made)
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, false)
     await settled()
     opening.leave()
     expect(made.close).toHaveBeenCalledTimes(1)
@@ -58,33 +58,63 @@ describe('Opening', () => {
     const answer = gate<Opened>()
     const made = calls(() => answer.promise)
     const opening = new Opening(Promise.resolve(), made)
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, false)
     await settled()
-    opening.open({ cols: 40, rows: 60 })
-    opening.open({ cols: 60, rows: 40 })
+    opening.open({ cols: 40, rows: 60 }, false)
+    opening.open({ cols: 60, rows: 40 }, false)
     await settled()
     expect(made.open).toHaveBeenCalledTimes(1)
     made.open.mockResolvedValue(OK)
     answer.open(OK)
     await settled()
-    expect(made.open.mock.calls).toEqual([[{ cols: 80, rows: 24 }], [{ cols: 60, rows: 40 }]])
+    expect(made.open.mock.calls).toEqual([[{ cols: 80, rows: 24 }, false], [{ cols: 60, rows: 40 }, false]])
   })
 
-  it('opens again only when the size changes', async () => {
+  it.each([false, true])('opens nothing new for the same size and the same fit (fit %s)', async (fit) => {
     const made = calls()
     const opening = new Opening(Promise.resolve(), made)
-    opening.open({ cols: 80, rows: 24 })
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, fit)
     await settled()
-    expect(made.open).toHaveBeenCalledTimes(1)
+    opening.open({ cols: 80, rows: 24 }, fit)
+    await settled()
+    expect(made.open.mock.calls).toEqual([[{ cols: 80, rows: 24 }, fit]])
+  })
+
+  it('opens again when the fit is turned on and off with the same size', async () => {
+    const made = calls()
+    const opening = new Opening(Promise.resolve(), made)
+    opening.open({ cols: 80, rows: 24 }, false)
+    await settled()
+    opening.open({ cols: 80, rows: 24 }, true)
+    await settled()
+    opening.open({ cols: 80, rows: 24 }, false)
+    await settled()
+    expect(made.open.mock.calls).toEqual([
+      [{ cols: 80, rows: 24 }, false],
+      [{ cols: 80, rows: 24 }, true],
+      [{ cols: 80, rows: 24 }, false],
+    ])
+  })
+
+  it('opens the new size still fitted when the screen changes while fitted', async () => {
+    const made = calls()
+    const opening = new Opening(Promise.resolve(), made)
+    opening.open({ cols: 80, rows: 24 }, true)
+    await settled()
+    opening.open({ cols: 40, rows: 60 }, true)
+    await settled()
+    expect(made.open.mock.calls).toEqual([
+      [{ cols: 80, rows: 24 }, true],
+      [{ cols: 40, rows: 60 }, true],
+    ])
   })
 
   it('tells why the terminal did not open and still opens the next size', async () => {
     const made = calls(() => Promise.resolve({ status: 'error', error: 'not_connected' }))
     const opening = new Opening(Promise.resolve(), made)
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, false)
     await settled()
-    opening.open({ cols: 40, rows: 60 })
+    opening.open({ cols: 40, rows: 60 }, false)
     await settled()
     expect(made.failed.mock.calls).toEqual([['not_connected'], ['not_connected']])
   })
@@ -92,10 +122,10 @@ describe('Opening', () => {
   it('tells a call that threw and goes on', async () => {
     const made = calls(() => Promise.reject(new Error('gone')))
     const opening = new Opening(Promise.resolve(), made)
-    opening.open({ cols: 80, rows: 24 })
+    opening.open({ cols: 80, rows: 24 }, false)
     await settled()
     made.open.mockResolvedValue(OK)
-    opening.open({ cols: 40, rows: 60 })
+    opening.open({ cols: 40, rows: 60 }, false)
     await settled()
     expect(made.failed.mock.calls).toEqual([[new Error('gone')]])
     expect(made.open).toHaveBeenCalledTimes(2)

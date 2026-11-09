@@ -52,7 +52,7 @@
         shown.apply(event.payload)
       }
     })
-    const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, { size, fit: false })
+    const open = (size: Size_Deserialize, fit: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit })
     const close = () => commands.terminalClose(row.tab)
     opening = new Opening(unlisten, { open, close, failed: onfailed })
     const unwatch = keyboard.watch()
@@ -65,7 +65,7 @@
 
   $effect(() => {
     if (wanted !== null) {
-      opening?.open(wanted)
+      opening?.open(wanted, false)
     }
   })
 </script>

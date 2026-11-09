@@ -54,14 +54,14 @@ describe('the terminal screen', () => {
   })
 
   it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
-    expect(source).toContain('const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, { size, fit: false })')
+    expect(source).toContain('const open = (size: Size_Deserialize, fit: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit })')
     expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab }}')
   })
 
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
     expect(source).toContain('const close = () => commands.terminalClose(row.tab)')
     expect(source).toContain('new Opening(unlisten, { open, close, failed: onfailed })')
-    expect(source).toContain('opening?.open(wanted)')
+    expect(source).toContain('opening?.open(wanted, false)')
     expect(source).toContain('opening?.leave()')
   })
 })
@@ -122,14 +122,14 @@ describe('a keyboard opening and closing', () => {
     keyboard.watch()
     const open = vi.fn(() => Promise.resolve<Sent>({ status: 'ok' }))
     const opening = new Opening(Promise.resolve(), { open, close: () => Promise.resolve(), failed: () => {} })
-    const fitted = whileClosed(keyboard, (size: Size_Deserialize) => opening.open(size))
+    const fitted = whileClosed(keyboard, (size: Size_Deserialize) => opening.open(size, false))
     fitted({ cols: 40, rows: 50 })
     resize(FULL - 340)
     fitted({ cols: 40, rows: 31 })
     resize(FULL)
     fitted({ cols: 40, rows: 50 })
     await settled()
-    expect(open.mock.calls).toEqual([[{ cols: 40, rows: 50 }]])
+    expect(open.mock.calls).toEqual([[{ cols: 40, rows: 50 }, false]])
   })
 })
 
