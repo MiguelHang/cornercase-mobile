@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use self::route::{Address, Route};
 
+pub(crate) mod name;
 pub mod pick;
 pub mod registry;
 pub mod route;

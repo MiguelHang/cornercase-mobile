@@ -46,7 +46,7 @@ mod adding_a_machine {
     #[case::no_token("ws://studio.lan:9000/", ErrorCode::RouteNoToken)]
     fn says_what_is_wrong_with_the_url_without_repeating_it(#[case] url: &str, #[case] code: ErrorCode) {
         let studio = Studio::new();
-        let error = add(&studio.state, url, "laptop".to_owned()).expect_err("the url is refused");
+        let error = add(&studio.state, url, "laptop").expect_err("the url is refused");
         assert_eq!(error.code, code);
         assert!(!error.message.contains(TOKEN) && !error.message.contains("studio.lan"), "{}", error.message);
         assert_eq!(names(&studio.state), ["studio"]);
@@ -58,7 +58,7 @@ mod adding_a_machine {
         fs::write(dir.path().join("machines.json"), "{ not json").expect("write the machines file");
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets);
-        let error = add(&state, BRIDGE, "studio".to_owned()).expect_err("the machines are not loaded");
+        let error = add(&state, BRIDGE, "studio").expect_err("the machines are not loaded");
         assert_eq!(error.code, ErrorCode::MachinesNotLoaded);
     }
 
@@ -99,7 +99,7 @@ mod removing_a_machine {
     #[tokio::test(start_paused = true)]
     async fn keeps_the_store_of_another_machine() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop".to_owned()).expect("the laptop is added");
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
         let recorder = Recorder::default();
         let (launcher, _) = launcher(serving(&[snapshot(BOOT, 7, "first")]));
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connected");

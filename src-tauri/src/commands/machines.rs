@@ -18,7 +18,7 @@ pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineVie
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn machine_add(state: State<'_, AppState>, url: String, name: String) -> Result<u64, CommandError> {
-    add(&state, &url, name).map(|id| id.0)
+    add(&state, &url, &name).map(|id| id.0)
 }
 
 #[tauri::command(async)]
@@ -36,7 +36,7 @@ pub(crate) fn list(state: &AppState) -> Result<Vec<MachineView>, CommandError> {
     state.machines(|machines| Ok(machines.machines().iter().map(MachineView::from).collect()))
 }
 
-pub(crate) fn add(state: &AppState, url: &str, name: String) -> Result<MachineId, CommandError> {
+pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {
     let route = Route::parse(url)?;
     state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
 }

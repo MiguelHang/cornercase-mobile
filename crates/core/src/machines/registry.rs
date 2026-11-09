@@ -1,6 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
+use super::name::checked_name;
 use super::route::{Address, Route, Token};
 use super::store::{MachineStore, Saved};
 use super::{Machine, MachineId};
@@ -32,7 +33,8 @@ impl Machines {
         self.saved.machines.iter().find(|machine| machine.id == id)
     }
 
-    pub fn add(&mut self, name: String, route: Route) -> Result<MachineId, Error> {
+    pub fn add(&mut self, name: &str, route: Route) -> Result<MachineId, Error> {
+        let name = checked_name(name, self.machines(), None)?;
         let id = MachineId(self.saved.next_id);
         self.write_token(id, &route)?;
         let mut saved = self.saved.clone();
@@ -51,6 +53,17 @@ impl Machines {
             Some(existing) => *existing = route,
             None => routes.push(route),
         }
+        self.commit(saved)
+    }
+
+    pub fn rename(&mut self, id: MachineId, name: &str) -> Result<(), Error> {
+        let current = self.machine(id).ok_or(Error::UnknownMachine)?;
+        let name = checked_name(name, self.machines(), Some(id))?;
+        if current.name == name {
+            return Ok(());
+        }
+        let mut saved = self.saved.clone();
+        find(&mut saved, id)?.name = name;
         self.commit(saved)
     }
 

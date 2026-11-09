@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use cornercase_bridge::test_util::TempDir;
+use rstest::rstest;
 
 use super::*;
 use crate::machines::store::JsonFileStore;
@@ -11,6 +12,7 @@ use crate::secrets::memory::MemorySecrets;
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const LAN: &str = "192.168.1.20";
 const TAILNET: &str = "fd7a:115c:a1e0::1";
+const GONE: &str = "10.0.0.9";
 
 struct Phone {
     dir: TempDir,
@@ -41,7 +43,7 @@ impl Phone {
 
     fn studio(&self) -> (Machines, MachineId) {
         let mut machines = self.open();
-        let id = machines.add("studio".to_owned(), route(LAN, TOKEN)).expect("add the studio");
+        let id = machines.add("studio", route(LAN, TOKEN)).expect("add the studio");
         machines.add_route(id, route(TAILNET, TOKEN)).expect("add the tailnet route");
         (machines, id)
     }
@@ -105,7 +107,7 @@ mod load {
         let machine = r#"{"id": 3, "name": "studio", "routes": [], "last_route": null}"#;
         fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 0, "machines": [{machine}]}}"#))
             .expect("write the file by hand");
-        let id = phone.open().add("laptop".to_owned(), route(LAN, TOKEN)).expect("add the laptop");
+        let id = phone.open().add("laptop", route(LAN, TOKEN)).expect("add the laptop");
         assert_eq!(id, MachineId(4));
     }
 }
@@ -116,7 +118,7 @@ mod add {
     #[test]
     fn keeps_the_token_under_the_machine_id_and_the_address() {
         let phone = Phone::new();
-        let id = phone.open().add("studio".to_owned(), route(LAN, TOKEN)).expect("add");
+        let id = phone.open().add("studio", route(LAN, TOKEN)).expect("add");
         let key = format!("route/{}/ws://{LAN}:8765/", id.0);
         assert_eq!(phone.secrets.get(&key).expect("read the secret"), Some(TOKEN.as_bytes().to_vec()));
     }
@@ -126,7 +128,7 @@ mod add {
         let phone = Phone::new();
         let (mut machines, first) = phone.studio();
         machines.remove(first).expect("remove the studio");
-        let second = phone.open().add("laptop".to_owned(), route(LAN, NEW_TOKEN)).expect("add the laptop");
+        let second = phone.open().add("laptop", route(LAN, NEW_TOKEN)).expect("add the laptop");
         assert_eq!((first, second), (MachineId(0), MachineId(1)));
     }
 
@@ -135,8 +137,7 @@ mod add {
         let phone = Phone::new();
         let (mut machines, _) = phone.studio();
         phone.secrets.fail_writes(true);
-        let result =
-            phone.unchanged(&mut machines, |machines| machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)));
+        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", route(LAN, NEW_TOKEN)));
         assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
     }
 
@@ -145,11 +146,10 @@ mod add {
         let phone = Phone::new();
         let (mut machines, studio) = phone.studio();
         phone.block_the_file();
-        let result =
-            phone.unchanged(&mut machines, |machines| machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)));
+        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", route(LAN, NEW_TOKEN)));
         assert!(matches!(result, Err(Error::Store(_))), "{result:?}");
         phone.unblock_the_file();
-        let laptop = machines.add("laptop".to_owned(), route(LAN, NEW_TOKEN)).expect("add the laptop");
+        let laptop = machines.add("laptop", route(LAN, NEW_TOKEN)).expect("add the laptop");
         assert_eq!(laptop, MachineId(studio.0 + 1));
     }
 
@@ -157,8 +157,82 @@ mod add {
     fn refuses_a_route_without_a_token() {
         let phone = Phone::new();
         let mut machines = phone.open();
-        assert_eq!(machines.add("studio".to_owned(), bridge(LAN, 8765, None)), Err(Error::NoToken));
+        assert_eq!(machines.add("studio", bridge(LAN, 8765, None)), Err(Error::NoToken));
         assert!(!phone.file().exists());
+    }
+
+    #[test]
+    fn keeps_the_name_trimmed() {
+        let phone = Phone::new();
+        let id = phone.open().add("  studio ", route(LAN, TOKEN)).expect("add");
+        assert_eq!(phone.open().machine(id).expect("the studio").name, "studio");
+    }
+
+    #[test]
+    fn refuses_a_name_another_machine_has_without_saving_its_token() {
+        let phone = Phone::new();
+        let (mut machines, studio) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.add(" Studio", route(LAN, NEW_TOKEN)));
+        assert_eq!(result, Err(Error::NameTaken));
+        assert_eq!(phone.secret(MachineId(studio.0 + 1), LAN), None);
+    }
+}
+
+mod rename {
+    use super::*;
+
+    #[test]
+    fn keeps_the_new_name_trimmed_after_loading_again() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.rename(id, "  Mac mini ").expect("rename the studio");
+        assert_eq!(machines.machine(id).expect("the studio").name, "Mac mini");
+        assert_eq!(phone.open().machine(id).expect("the studio").name, "Mac mini");
+    }
+
+    #[test]
+    fn lets_the_machine_change_the_case_of_its_own_name() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.rename(id, "Studio").expect("rename the studio");
+        assert_eq!(phone.open().machine(id).expect("the studio").name, "Studio");
+    }
+
+    #[test]
+    fn writes_nothing_when_the_name_does_not_change() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.block_the_file();
+        assert_eq!(machines.rename(id, " studio "), Ok(()));
+    }
+
+    #[rstest]
+    #[case::empty("  ", Error::NameEmpty)]
+    #[case::too_long(&"m".repeat(65), Error::NameTooLong)]
+    #[case::taken_in_other_case_and_with_spaces(" LAPTOP  ", Error::NameTaken)]
+    fn refuses_a_name_and_keeps_the_old_one(#[case] name: &str, #[case] error: Error) {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.add("laptop", route(GONE, NEW_TOKEN)).expect("add the laptop");
+        let result = phone.unchanged(&mut machines, |machines| machines.rename(id, name));
+        assert_eq!(result, Err(error));
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.rename(MachineId(id.0 + 1), "laptop"));
+        assert_eq!(result, Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn keeps_the_list_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.block_the_file();
+        assert!(matches!(machines.rename(id, "Mac mini"), Err(Error::Store(_))));
+        assert_eq!(machines.machine(id).expect("the studio").name, "studio");
     }
 }
 
@@ -253,7 +327,7 @@ mod remember {
     fn refuses_an_address_the_machine_has_no_route_to() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
-        assert_eq!(machines.remember(id, &address("10.0.0.9")), Err(Error::UnknownRoute));
+        assert_eq!(machines.remember(id, &address(GONE)), Err(Error::UnknownRoute));
         assert_eq!(phone.open().machine(id).expect("the studio").last_route, None);
     }
 
