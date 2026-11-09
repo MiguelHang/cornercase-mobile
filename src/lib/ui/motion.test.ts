@@ -1,7 +1,19 @@
 import { cubicOut, quadIn } from 'svelte/easing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import tokens from '../theme/tokens.css?raw'
-import { ENTER_MS, LEAVE_MS, POP_MS, RISE_PX, enter, fadeOut, leave, prefersReducedMotion, riseIn } from './motion'
+import {
+  ENTER_MS,
+  LEAVE_MS,
+  POP_MS,
+  PULSE_MS,
+  RISE_PX,
+  dropIn,
+  enter,
+  fadeOut,
+  leave,
+  prefersReducedMotion,
+  riseIn,
+} from './motion'
 
 const token = (name: string) => tokens.match(new RegExp(`${name}:\\s*(\\d+)ms;`))?.[1]
 
@@ -50,6 +62,7 @@ describe('motion', () => {
     stubMotion(reduced)
     const node = {} as Element
     expect(riseIn(node)).toMatchObject({ duration: entering, easing: cubicOut })
+    expect(dropIn(node)).toMatchObject({ duration: entering, easing: cubicOut })
     expect(fadeOut(node)).toMatchObject({ duration: leaving, easing: quadIn })
   })
 
@@ -58,10 +71,16 @@ describe('motion', () => {
     expect(riseIn({} as Element).css?.(0, 1)).toContain(`translate(0px, ${RISE_PX}px)`)
   })
 
+  it('drops from 14 px above', () => {
+    stubMotion(false)
+    expect(dropIn({} as Element).css?.(0, 1)).toContain(`translate(0px, -${RISE_PX}px)`)
+  })
+
   it.each([
     ['--enter', ENTER_MS],
     ['--leave', LEAVE_MS],
     ['--pop', POP_MS],
+    ['--pulse', PULSE_MS],
   ])('matches %s in tokens.css', (name, ms) => {
     expect(token(name)).toBe(String(ms))
   })

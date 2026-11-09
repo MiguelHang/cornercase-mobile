@@ -31,8 +31,22 @@ describe('Mark', () => {
     expect(rule('corner')).toContain('box-shadow: 0 0 calc(3 * var(--unit)) rgb(0 95 255 / 0.55);')
   })
 
-  it('has no animation', () => {
-    expect(markSource).not.toMatch(/animation|transition|@keyframes/)
+  it('stays still unless it pulses', () => {
+    expect(render(Mark, { props: {} }).body).not.toContain('pulsing')
+  })
+
+  it('pulses only its cursor', () => {
+    const html = render(Mark, { props: { pulsing: true } }).body
+    expect(html).toMatch(/<span class="cell cursor svelte-[\w-]+ pulsing"><\/span>/)
+    expect(html.match(/pulsing/g)).toHaveLength(1)
+  })
+
+  it('fades the cursor to 0.3 and back over the pulse, and not with reduced motion', () => {
+    const style = markSource.replace(/\s+/g, ' ')
+    expect(style).toContain('.pulsing { animation: pulse var(--pulse) ease-in-out infinite; }')
+    expect(style).toContain('@keyframes pulse { 50% { opacity: 0.3; } }')
+    expect(style).toContain('@media (prefers-reduced-motion: reduce) { .pulsing { animation: none; } }')
+    expect(style.match(/animation:/g)).toHaveLength(2)
   })
 })
 
@@ -55,5 +69,11 @@ describe('Icon', () => {
     expect(html).toContain('<rect x="2" y="14" width="20" height="8" rx="2"></rect>')
     expect(html).toContain('<line x1="6" y1="6" x2="6.01" y2="6"></line>')
     expect(html).toContain('<line x1="6" y1="18" x2="6.01" y2="18"></line>')
+  })
+
+  it('draws the path of the loader circle', () => {
+    expect(render(Icon, { props: { name: 'loader-circle' } }).body).toContain(
+      '<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>',
+    )
   })
 })

@@ -5,6 +5,7 @@ export const ENTER_MS = 180
 export const LEAVE_MS = 120
 export const POP_MS = 110
 export const RISE_PX = 14
+export const PULSE_MS = 1400
 
 export const enter = (reduced: boolean) => ({ duration: reduced ? 0 : ENTER_MS, y: RISE_PX, easing: cubicOut })
 
@@ -18,3 +19,5 @@ export const prefersReducedMotion = () =>
 export const riseIn = (node: Element) => fly(node, enter(prefersReducedMotion()))
 
 export const fadeOut = (node: Element) => fade(node, leave(prefersReducedMotion()))
+
+export const dropIn = (node: Element) => fly(node, { ...enter(prefersReducedMotion()), y: -RISE_PX })

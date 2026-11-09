@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest'
 import Button from './Button.svelte'
 import Emblem from './Emblem.svelte'
 import Glass from './Glass.svelte'
+import Spinner from './Spinner.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import glassSource from './Glass.svelte?raw'
+import spinnerSource from './Spinner.svelte?raw'
 
 const html = (markup: string) => createRawSnippet(() => ({ render: () => markup }))
 
@@ -99,5 +101,21 @@ describe('Emblem', () => {
     'color: var(--muted);',
   ])('holds %s', (text) => {
     expect(flat(emblemSource)).toContain(text)
+  })
+})
+
+describe('Spinner', () => {
+  it('draws the loader circle at 12 px, hidden from readers', () => {
+    const body = render(Spinner).body
+    expect(body).toMatch(/<span class="spinner svelte-[\w-]+" aria-hidden="true"><svg [^>]*width="12" height="12"/)
+    expect(body).toContain('<path d="M21 12a9 9 0 1 1-6.219-8.56"></path>')
+  })
+
+  it.each([
+    'animation: turn 900ms linear infinite;',
+    '@keyframes turn { to { transform: rotate(360deg); } }',
+    '@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }',
+  ])('holds %s', (text) => {
+    expect(flat(spinnerSource)).toContain(text)
   })
 })
