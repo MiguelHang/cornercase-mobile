@@ -120,7 +120,9 @@
       ></span>
     {/if}
   </div>
-  <span class="probe" style:font-size="{BASE}px" aria-hidden="true" {@attach measure}>{PROBE}</span>
+  <span class="probe" aria-hidden="true"
+    ><span style:font-size="{BASE}px" {@attach measure}>{PROBE}</span></span
+  >
 </div>
 
 <style>
@@ -148,6 +150,9 @@
     position: absolute;
     top: 0;
     left: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
     visibility: hidden;
     pointer-events: none;
   }
