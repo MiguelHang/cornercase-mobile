@@ -1,6 +1,7 @@
 import type {
   Colours_Serialize,
   Cursor_Serialize,
+  Modes_Serialize,
   Run_Serialize,
   Size_Serialize,
   TerminalChanged_Serialize,
@@ -13,6 +14,7 @@ export type PaneState = {
   size: Size_Serialize
   cursor: Cursor_Serialize | null
   colours: Colours_Serialize
+  modes: Modes_Serialize
   rows: Row[]
   closed: boolean
 }
@@ -22,6 +24,16 @@ export const empty: PaneState = {
   size: { cols: 0, rows: 0 },
   cursor: null,
   colours: { fg: null, bg: null, cursor: null, palette: {} },
+  modes: {
+    mouse: 'none',
+    mouse_encoding: 'default',
+    alternate_screen: false,
+    alternate_scroll: false,
+    bracketed_paste: false,
+    application_cursor: false,
+    focus_events: false,
+    kitty_keyboard: 0,
+  },
   rows: [],
   closed: false,
 }
@@ -54,8 +66,8 @@ export const apply = (state: PaneState, changed: TerminalChanged_Serialize): Pan
   if (changed.pane === null) {
     return { ...state, closed: changed.closed }
   }
-  const { pane, size, cursor, colours, closed } = changed
-  return { pane, size, cursor, colours: steady(state.colours, colours), rows: drawn(state, changed), closed }
+  const { pane, size, cursor, colours, modes, closed } = changed
+  return { pane, size, cursor, colours: steady(state.colours, colours), modes, rows: drawn(state, changed), closed }
 }
 
 export const shows = (changed: TerminalChanged_Serialize, machine: number, tab: number) =>

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use cornercase_core::board::AgentRow;
 use cornercase_core::cli::events::{Event as CliEvent, What};
-use cornercase_core::cli::surface::{Colours, Cursor, Size};
+use cornercase_core::cli::surface::{Colours, Cursor, Modes, Size};
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::{Change, Changes, Connection, Store};
@@ -48,6 +48,7 @@ pub(crate) struct TerminalChanged {
     pub(crate) size: Size,
     pub(crate) cursor: Option<Cursor>,
     pub(crate) colours: Colours,
+    pub(crate) modes: Modes,
     pub(crate) replaced: bool,
     pub(crate) rows: BTreeMap<u16, Line>,
     pub(crate) closed: bool,

@@ -1,5 +1,6 @@
 pub mod contract;
 pub mod events;
+pub mod input;
 pub mod keys;
 pub mod last_message;
 pub mod status;

@@ -23,6 +23,8 @@ export const commands = {
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
+	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
+	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
 };
 
 /** Events */
@@ -80,6 +82,8 @@ export type AgentsChanged_Serialize = {
 	machine: number,
 	agents: AgentRow_Serialize[] | null,
 };
+
+export type Button = "left" | "middle" | "right";
 
 export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
 
@@ -160,6 +164,28 @@ export type Direction = "up" | "down";
 
 export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
 
+export type InputEvent = InputEvent_Serialize | InputEvent_Deserialize;
+
+export type InputEvent_Deserialize = ({ key: Key_Deserialize }) & { mouse?: never; paste?: never; text?: never } | ({ text: string }) & { key?: never; mouse?: never; paste?: never } | ({ paste: string }) & { key?: never; mouse?: never; text?: never } | ({ mouse: Mouse_Deserialize }) & { key?: never; paste?: never; text?: never };
+
+export type InputEvent_Serialize = ({ key: Key_Serialize }) & { mouse?: never; paste?: never; text?: never } | ({ text: string }) & { key?: never; mouse?: never; paste?: never } | ({ paste: string }) & { key?: never; mouse?: never; text?: never } | ({ mouse: Mouse_Serialize }) & { key?: never; paste?: never; text?: never };
+
+export type Key = Key_Serialize | Key_Deserialize;
+
+export type KeyKind = "press" | "repeat" | "release";
+
+export type Key_Deserialize = {
+	code?: string,
+	mods?: Modifier[],
+	kind?: KeyKind,
+};
+
+export type Key_Serialize = {
+	code: string,
+	mods?: Modifier[],
+	kind?: KeyKind,
+};
+
 export type Kind = "operation" | "feature" | "stream";
 
 export type LastMessage = LastMessage_Serialize | LastMessage_Deserialize;
@@ -227,6 +253,64 @@ export type Missing_Serialize = {
 	name: string,
 	kind: Kind,
 	reason: string | null,
+};
+
+export type Modes = Modes_Serialize | Modes_Deserialize;
+
+export type Modes_Deserialize = {
+	mouse?: MouseMode_Deserialize,
+	mouse_encoding?: MouseEncoding_Deserialize,
+	alternate_screen?: boolean,
+	alternate_scroll?: boolean,
+	bracketed_paste?: boolean,
+	application_cursor?: boolean,
+	focus_events?: boolean,
+	kitty_keyboard?: number,
+};
+
+export type Modes_Serialize = {
+	mouse: MouseMode_Serialize,
+	mouse_encoding: MouseEncoding_Serialize,
+	alternate_screen: boolean,
+	alternate_scroll: boolean,
+	bracketed_paste: boolean,
+	application_cursor: boolean,
+	focus_events: boolean,
+	kitty_keyboard: number,
+};
+
+export type Modifier = "ctrl" | "alt" | "shift" | "super";
+
+export type Mouse = Mouse_Serialize | Mouse_Deserialize;
+
+export type MouseEncoding = MouseEncoding_Serialize | MouseEncoding_Deserialize;
+
+export type MouseEncoding_Deserialize = "utf8" | "sgr" | string;
+
+export type MouseEncoding_Serialize = "utf8" | "sgr" | "default";
+
+export type MouseKind = "down" | "up" | "drag" | "moved" | "scroll-up" | "scroll-down" | "scroll-left" | "scroll-right";
+
+export type MouseMode = MouseMode_Serialize | MouseMode_Deserialize;
+
+export type MouseMode_Deserialize = "press" | "press_release" | "button_motion" | "any_motion" | string;
+
+export type MouseMode_Serialize = "press" | "press_release" | "button_motion" | "any_motion" | "none";
+
+export type Mouse_Deserialize = {
+	kind?: MouseKind,
+	button?: Button,
+	x?: number,
+	y?: number,
+	mods?: Modifier[],
+};
+
+export type Mouse_Serialize = {
+	kind: MouseKind,
+	button?: Button,
+	x: number,
+	y: number,
+	mods?: Modifier[],
 };
 
 export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;
@@ -321,6 +405,7 @@ export type TerminalChanged_Deserialize = {
 	size: Size_Deserialize,
 	cursor?: Cursor_Deserialize | null,
 	colours: Colours_Deserialize,
+	modes: Modes_Deserialize,
 	replaced: boolean,
 	rows: { [key in number]: Run_Deserialize[] },
 	closed: boolean,
@@ -333,6 +418,7 @@ export type TerminalChanged_Serialize = {
 	size: Size_Serialize,
 	cursor: Cursor_Serialize | null,
 	colours: Colours_Serialize,
+	modes: Modes_Serialize,
 	replaced: boolean,
 	rows: { [key in number]: Run_Serialize[] },
 	closed: boolean,

@@ -10,4 +10,36 @@ describe('the terminal view', () => {
     )
     expect(source).toContain('.probe { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden;')
   })
+
+  it('scrolls only sideways by itself and leaves the vertical slide to the swipe', () => {
+    expect(source).toContain('touch-action: pan-x;')
+    expect(source).toContain('if (scroll !== null) slide(box, scroll, { send: onsend, scroll: onscroll })')
+  })
+
+  it('measures the grid only once a finger swipes, not on every move of a pinch', () => {
+    expect(source).toContain('swipe.move(event.pointerId, pointOf(event), () => gridIn(box))')
+  })
+
+  it('takes a tap on the click that follows it, so the focus outlives the tap and the keyboard opens', () => {
+    expect(source).toContain('pinch.lift(event.pointerId) tap.lifted(swipe.lift(event.pointerId))')
+    expect(source).toContain('const clicked = () => { if (tap.clicked()) ontap() }')
+    expect(source).toContain('click: clicked,')
+  })
+
+  it('never takes a cancelled touch as a tap', () => {
+    expect(source).toContain(
+      'const cancelled = (event: PointerEvent) => { pinch.lift(event.pointerId) swipe.lift(event.pointerId) tap.cancelled() }',
+    )
+    expect(source).toContain('pointercancel: (event) => event instanceof PointerEvent && cancelled(event),')
+  })
+
+  it('points the wheel at the cell under the finger at the zoom it shows', () => {
+    expect(source).toContain('const { left, top } = (drawn ?? box).getBoundingClientRect()')
+    expect(source).toContain('cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room: roomIn(box)')
+  })
+
+  it('keeps its last row in view as its height changes', () => {
+    expect(source).toContain('const anchored = (box: HTMLElement) => { if (height > 0) anchor(box) }')
+    expect(source).toContain('{@attach anchored}')
+  })
 })

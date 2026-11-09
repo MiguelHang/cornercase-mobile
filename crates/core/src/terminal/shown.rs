@@ -1,5 +1,5 @@
 use super::grid::{Changes, Grid, Line, PaneGrid};
-use crate::cli::surface::{Colours, Cursor, Size};
+use crate::cli::surface::{Colours, Cursor, Modes, Size};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Update {
@@ -7,6 +7,7 @@ pub struct Update {
     pub size: Size,
     pub cursor: Option<Cursor>,
     pub colours: Colours,
+    pub modes: Modes,
     pub replaced: bool,
     pub rows: Vec<(u16, Line)>,
 }
@@ -36,6 +37,7 @@ impl Shown {
             size: pane.size,
             cursor: pane.cursor,
             colours: pane.colours.clone(),
+            modes: pane.modes,
             replaced: switched || changes.replaced,
             rows,
         })
