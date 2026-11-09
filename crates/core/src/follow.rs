@@ -36,13 +36,14 @@ pub(crate) struct Lines {
     stdout: mpsc::UnboundedReceiver<String>,
     run: Fuse<BoxFuture<'static, End>>,
     ended: Option<Ended>,
+    told: bool,
 }
 
 impl Lines {
     pub(crate) fn open(transport: Arc<dyn Transport>, argv: Vec<String>) -> Self {
         let (out, stdout) = listen(only_stdout);
         let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
-        Self { stdout, run, ended: None }
+        Self { stdout, run, ended: None, told: false }
     }
 
     pub(crate) async fn next<T>(&mut self, mut applied: impl FnMut(&str) -> Option<Step<T>>) -> Step<T> {
@@ -57,7 +58,7 @@ impl Lines {
         }
     }
 
-    async fn heard(&mut self) -> Either<String, Ended> {
+    pub(crate) async fn heard(&mut self) -> Either<String, Ended> {
         if self.ended.is_none() {
             let end = match future::select(pin!(self.stdout.recv()), &mut self.run).await {
                 Either::Left((Some(line), _)) => return Either::Left(line),
@@ -66,10 +67,14 @@ impl Lines {
             };
             self.ended = Some(ended(end));
         }
-        match self.stdout.try_recv() {
-            Ok(line) => Either::Left(line),
-            Err(_) => Either::Right(self.ended.clone().unwrap_or(Ended::Exited)),
+        if let Ok(line) = self.stdout.try_recv() {
+            return Either::Left(line);
         }
+        if self.told {
+            return future::pending().await;
+        }
+        self.told = true;
+        Either::Right(self.ended.clone().unwrap_or(Ended::Exited))
     }
 }
 
@@ -82,6 +87,40 @@ pub(crate) trait Opened {
     type Said: Notice;
 
     fn next(&mut self) -> impl Future<Output = Step<Option<Self::Said>>> + Send;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum After {
+    Settling,
+    AtOnce,
+}
+
+pub(crate) trait Visit {
+    type Said: Notice;
+
+    fn visit<S: FnMut(Self::Said) + Send>(
+        &mut self,
+        store: &Store,
+        reached: Reached,
+        told: &mut Told<Self::Said, S>,
+    ) -> impl Future<Output = After> + Send;
+}
+
+struct Opening<F>(F);
+
+impl<O: Opened + Send, F: FnMut(Reached) -> O + Send> Visit for Opening<F> {
+    type Said = O::Said;
+
+    async fn visit<S: FnMut(O::Said) + Send>(
+        &mut self,
+        store: &Store,
+        reached: Reached,
+        told: &mut Told<O::Said, S>,
+    ) -> After {
+        let used = reached.transport.clone();
+        follow(store, &used, (self.0)(reached), told).await;
+        After::Settling
+    }
 }
 
 pub(crate) struct Reached {
@@ -100,11 +139,20 @@ impl Reached {
     }
 }
 
-pub(crate) async fn reopen<O: Opened>(
+pub(crate) async fn reopen<O: Opened + Send>(
     store: &Store,
     holds: impl Fn(&Snapshot) -> bool,
-    mut open: impl FnMut(Reached) -> O,
-    sink: impl FnMut(O::Said),
+    open: impl FnMut(Reached) -> O + Send,
+    sink: impl FnMut(O::Said) + Send,
+) {
+    revisit(store, holds, Opening(open), sink).await;
+}
+
+pub(crate) async fn revisit<V: Visit>(
+    store: &Store,
+    holds: impl Fn(&Snapshot) -> bool,
+    mut visits: V,
+    sink: impl FnMut(V::Said) + Send,
 ) {
     let mut told = Told { sink, failing: false, said: PhantomData };
     while let Some(reached) = reached(store, &holds).await {
@@ -112,13 +160,13 @@ pub(crate) async fn reopen<O: Opened>(
             told.closed();
             return;
         }
-        let used = reached.transport.clone();
-        follow(store, &used, open(reached), &mut told).await;
-        time::sleep(SETTLE).await;
+        if visits.visit(store, reached, &mut told).await == After::Settling {
+            time::sleep(SETTLE).await;
+        }
     }
 }
 
-async fn follow<O: Opened>(
+pub(crate) async fn follow<O: Opened>(
     store: &Store,
     used: &Arc<dyn Transport>,
     mut opened: O,
@@ -141,32 +189,36 @@ async fn follow<O: Opened>(
     }
 }
 
-struct Told<T, S> {
+pub(crate) struct Told<T, S> {
     sink: S,
     failing: bool,
     said: PhantomData<fn(T)>,
 }
 
 impl<T: Notice, S: FnMut(T)> Told<T, S> {
-    fn said(&mut self, said: Option<T>) {
+    pub(crate) fn said(&mut self, said: Option<T>) {
         self.failing = false;
         if let Some(said) = said {
             (self.sink)(said);
         }
     }
 
-    fn closed(&mut self) {
-        (self.sink)(T::closed());
+    pub(crate) fn say(&mut self, said: T) {
+        (self.sink)(said);
     }
 
-    fn failed(&mut self, error: Error) {
+    fn closed(&mut self) {
+        self.say(T::closed());
+    }
+
+    pub(crate) fn failed(&mut self, error: Error) {
         if !self.failing {
             self.failing = true;
             (self.sink)(T::failed(error));
         }
     }
 
-    fn ended(&mut self, ended: Ended, store_still_on_it: bool) {
+    pub(crate) fn ended(&mut self, ended: Ended, store_still_on_it: bool) {
         match ended {
             Ended::Failed(error) => self.failed(error),
             Ended::Lost(error) if store_still_on_it => self.failed(error),
@@ -175,12 +227,12 @@ impl<T: Notice, S: FnMut(T)> Told<T, S> {
     }
 }
 
-fn still_on(store: &Store, used: &Arc<dyn Transport>) -> bool {
+pub(crate) fn still_on(store: &Store, used: &Arc<dyn Transport>) -> bool {
     let connected = matches!(store.connection(), Connection::Connected { .. });
     connected && store.transport().is_some_and(|now| Arc::ptr_eq(&now, used))
 }
 
-async fn moved_on(store: &Store, used: &Arc<dyn Transport>) {
+pub(crate) async fn moved_on(store: &Store, used: &Arc<dyn Transport>) {
     let mut changes = store.changes();
     while still_on(store, used) {
         if changes.next().await.is_none() {

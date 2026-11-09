@@ -16,13 +16,17 @@ pub(crate) fn queue(state: &AppState) -> Result<Queue, CommandError> {
 }
 
 pub(crate) async fn ask(state: &AppState, args: Vec<String>, stdin: Option<Stdin>) -> Result<(), CommandError> {
-    let queue = queue(state)?;
-    sent(queue.ask(args, stdin).await)
+    asked(state, args, stdin).await.map(drop)
 }
 
-pub(crate) fn sent(outcome: Result<Outcome, Error>) -> Result<(), CommandError> {
+pub(crate) async fn asked(state: &AppState, args: Vec<String>, stdin: Option<Stdin>) -> Result<String, CommandError> {
+    let queue = queue(state)?;
+    answered(queue.ask(args, stdin).await)
+}
+
+pub(crate) fn answered(outcome: Result<Outcome, Error>) -> Result<String, CommandError> {
     match outcome {
-        Ok(Outcome::Done(_)) => Ok(()),
+        Ok(Outcome::Done(output)) => Ok(output),
         Ok(Outcome::Skipped) => Err(CommandError::not_sent()),
         Err(Error::Unanswered) => Err(CommandError::maybe_sent()),
         Err(error) => Err(CommandError::reason(&error)),

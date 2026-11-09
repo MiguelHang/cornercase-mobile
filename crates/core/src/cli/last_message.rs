@@ -20,5 +20,9 @@ pub fn send_args(pane: u64) -> Vec<String> {
     ["send", "--pane", &pane.to_string(), "--enter", "--timeout", "30", "-"].map(str::to_owned).into()
 }
 
+pub fn forced_send_args(pane: u64) -> Vec<String> {
+    ["send", "--pane", &pane.to_string(), "--force", "--enter", "--timeout", "30", "-"].map(str::to_owned).into()
+}
+
 #[cfg(test)]
 mod tests;

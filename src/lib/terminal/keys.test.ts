@@ -22,10 +22,10 @@ describe('ROW', () => {
       'Esc',
       'Tab',
       'Ctrl',
-      '↑',
-      '↓',
-      '←',
-      '→',
+      'Up',
+      'Down',
+      'Left',
+      'Right',
       '|',
       '~',
       '/',
@@ -37,16 +37,26 @@ describe('ROW', () => {
   it.each([
     ['Esc', { key: { code: 'esc' } }],
     ['Tab', { key: { code: 'tab' } }],
-    ['↑', { key: { code: 'up' } }],
-    ['↓', { key: { code: 'down' } }],
-    ['←', { key: { code: 'left' } }],
-    ['→', { key: { code: 'right' } }],
+    ['Up', { key: { code: 'up' } }],
+    ['Down', { key: { code: 'down' } }],
+    ['Left', { key: { code: 'left' } }],
+    ['Right', { key: { code: 'right' } }],
     ['|', { text: '|' }],
     ['~', { text: '~' }],
     ['/', { text: '/' }],
     ['-', { text: '-' }],
   ])('sends %s as its event', (label, event) => {
-    expect(ROW.find((button) => button.label === label)).toEqual({ kind: 'key', label, event })
+    expect(ROW.find((button) => button.label === label)).toMatchObject({ kind: 'key', label, event })
+  })
+
+  it('draws the arrows and Paste as icons named for screen readers, so the row fits a narrow phone', () => {
+    expect(ROW.filter((button) => button.icon !== undefined).map(({ label, icon }) => [label, icon])).toEqual([
+      ['Up', 'arrow-up'],
+      ['Down', 'arrow-down'],
+      ['Left', 'arrow-left'],
+      ['Right', 'arrow-right'],
+      ['Paste', 'clipboard-paste'],
+    ])
   })
 
   it('leaves Ctrl to its own handling', () => {

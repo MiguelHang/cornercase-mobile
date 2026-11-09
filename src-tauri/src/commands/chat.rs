@@ -7,6 +7,10 @@ use crate::commands::error::CommandError;
 use crate::commands::reach::{ask, connected};
 use crate::state::AppState;
 
+pub(crate) mod attach;
+
+const ENTER: &str = "enter";
+
 #[tauri::command(async)]
 #[specta::specta]
 pub(crate) async fn last_message(state: State<'_, AppState>, pane: u64) -> Result<LastMessage, CommandError> {
@@ -15,8 +19,8 @@ pub(crate) async fn last_message(state: State<'_, AppState>, pane: u64) -> Resul
 
 #[tauri::command(async)]
 #[specta::specta]
-pub(crate) async fn send(state: State<'_, AppState>, pane: u64, text: String) -> Result<(), CommandError> {
-    send_message(&state, pane, text).await
+pub(crate) async fn send(state: State<'_, AppState>, pane: u64, text: String, force: bool) -> Result<(), CommandError> {
+    send_message(&state, pane, text, force).await
 }
 
 #[tauri::command(async)]
@@ -30,8 +34,12 @@ pub(crate) async fn read_last_message(state: &AppState, pane: u64) -> Result<Las
     transport::json(transport.as_ref(), last_message::args(pane)).await.map_err(|error| CommandError::reason(&error))
 }
 
-pub(crate) async fn send_message(state: &AppState, pane: u64, text: String) -> Result<(), CommandError> {
-    ask(state, last_message::send_args(pane), Some(Stdin::Text(text))).await
+pub(crate) async fn send_message(state: &AppState, pane: u64, text: String, force: bool) -> Result<(), CommandError> {
+    match (force, text.is_empty()) {
+        (false, _) => ask(state, last_message::send_args(pane), Some(Stdin::Text(text))).await,
+        (true, false) => ask(state, last_message::forced_send_args(pane), Some(Stdin::Text(text))).await,
+        (true, true) => press_key(state, pane, ENTER).await,
+    }
 }
 
 pub(crate) async fn press_key(state: &AppState, pane: u64, key: &str) -> Result<(), CommandError> {

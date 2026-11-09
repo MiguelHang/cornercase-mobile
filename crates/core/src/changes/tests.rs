@@ -48,7 +48,7 @@ impl Followed {
     }
 
     fn follows(&mut self) -> usize {
-        self.0.launched("changes").len()
+        self.0.launched(&["changes"]).len()
     }
 }
 
@@ -62,7 +62,7 @@ mod summaries {
     #[tokio::test(start_paused = true)]
     async fn follows_the_list_of_the_workspace_in_its_mode() {
         let mut followed = Followed::of(vec![vec![ready(2)]]).await;
-        assert_eq!(followed.0.launched("changes"), [FOLLOWED.join(" ")]);
+        assert_eq!(followed.0.launched(&["changes"]), [FOLLOWED.join(" ")]);
     }
 
     #[tokio::test(start_paused = true)]

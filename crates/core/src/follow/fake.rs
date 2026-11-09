@@ -1,11 +1,8 @@
 use std::future::{self, Future};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use futures_util::SinkExt;
-use futures_util::future::BoxFuture;
-use futures_util::stream::BoxStream;
 use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -20,7 +17,7 @@ use crate::machines::route::Route;
 use crate::machines::{Machine, MachineId};
 use crate::store::Store;
 use crate::transport::fake::FakeTransport;
-use crate::transport::{Exit, Out, OutSink, Stdin, Transport};
+use crate::transport::{Exit, Out, OutSink};
 
 pub(crate) const BOOT: &str = "4242-1760600000";
 pub(crate) const RESTARTED: &str = "4243-1760600100";
@@ -45,28 +42,6 @@ pub(crate) async fn played(mut out: OutSink, said: Vec<Said>) -> End {
         }
     }
     future::pending().await
-}
-
-struct Launched {
-    fake: FakeTransport,
-    argv: mpsc::UnboundedSender<String>,
-}
-
-impl Transport for Launched {
-    fn run(
-        &self,
-        argv: Vec<String>,
-        stdin: BoxStream<'static, Stdin>,
-        out: OutSink,
-    ) -> BoxFuture<'_, Result<Exit, Error>> {
-        self.argv.send(argv.join(" ")).expect("the test reads what was launched");
-        self.fake.run(argv, stdin, out)
-    }
-}
-
-pub(crate) fn launched(fake: FakeTransport) -> (Arc<dyn Transport>, mpsc::UnboundedReceiver<String>) {
-    let (argv, heard) = mpsc::unbounded_channel();
-    (Arc::new(Launched { fake, argv }), heard)
 }
 
 pub(crate) fn contract(boot: &str) -> Vec<Said> {
@@ -113,11 +88,17 @@ pub(crate) struct Mac {
     pub(crate) sessions: Vec<Vec<Said>>,
     pub(crate) streams: Vec<Vec<Said>>,
     pub(crate) followed: &'static [&'static str],
+    pub(crate) also: Vec<(&'static [&'static str], Vec<Vec<Said>>)>,
 }
 
 impl Mac {
     pub(crate) fn of(followed: &'static [&'static str], sessions: Vec<Vec<Said>>, streams: Vec<Vec<Said>>) -> Self {
-        Self { contracts: vec![contract(BOOT)], sessions, streams, followed }
+        Self { contracts: vec![contract(BOOT)], sessions, streams, followed, also: Vec::new() }
+    }
+
+    pub(crate) fn also(mut self, argv: &'static [&'static str], turns: Vec<Vec<Said>>) -> Self {
+        self.also.push((argv, turns));
+        self
     }
 
     pub(crate) fn restarting(followed: &'static [&'static str], streams: Vec<Vec<Said>>) -> Self {
@@ -129,6 +110,7 @@ impl Mac {
     fn fake(self) -> FakeTransport {
         let fake = FakeTransport::default().open(&["events", "--json", "--notices"], &[]);
         let fake = in_turn(fake.open(&["status", "--app", "--follow", "--json"], &[]), self.followed, self.streams);
+        let fake = self.also.into_iter().fold(fake, |fake, (argv, turns)| in_turn(fake, argv, turns));
         let fake = in_turn(fake, &["contract", "--json"], self.contracts);
         in_turn(fake, &["status", "--follow", "--json"], self.sessions)
     }
@@ -147,7 +129,7 @@ impl<T: Send + 'static> Watched<T> {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        let (transport, launched) = launched(mac.fake());
+        let (transport, launched) = mac.fake().launched();
         let studio = Route::parse("ws://studio.local:8765/?token=c2VjcmV0").expect("a bridge url");
         let machine = Machine { id: MachineId(1), name: "studio".to_owned(), routes: vec![studio], last_route: None };
         let (store, driver) = Store::new(machine, move |_: &Route| Ok(transport.clone()), PickConfig::default());
@@ -170,10 +152,10 @@ impl<T: Send + 'static> Watched<T> {
         seen
     }
 
-    pub(crate) fn launched(&mut self, command: &str) -> Vec<String> {
+    pub(crate) fn launched(&mut self, commands: &[&str]) -> Vec<String> {
         let mut launched = Vec::new();
         while let Ok(argv) = self.launched.try_recv() {
-            launched.extend(argv.starts_with(command).then_some(argv));
+            launched.extend(commands.iter().any(|command| argv.starts_with(command)).then_some(argv));
         }
         launched
     }

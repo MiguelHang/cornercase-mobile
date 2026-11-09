@@ -59,3 +59,13 @@ mod missing_and_unknown_keys {
         assert_eq!(line, ViewLine { snapshot: Snapshot::default(), view });
     }
 }
+
+mod the_argv {
+    use super::*;
+
+    #[test]
+    fn claims_the_tab_at_the_size_without_hiding_or_deactivating_the_view() {
+        let claim = ["view", "--tab", "3", "--cols", "42", "--rows", "30"];
+        assert_eq!(argv(3, Size { cols: 42, rows: 30 }), claim);
+    }
+}

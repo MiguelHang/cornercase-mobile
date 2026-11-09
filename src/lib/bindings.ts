@@ -19,9 +19,10 @@ export const commands = {
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
-	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
+	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
-	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
+	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
+	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
 	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
@@ -249,7 +250,7 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
 
 export type Fold = Fold_Serialize | Fold_Deserialize;
 
@@ -468,6 +469,20 @@ export type PaneStatusChanged_Serialize = {
 	pane: number | null,
 };
 
+export type Pasted = Pasted_Serialize | Pasted_Deserialize;
+
+export type Pasted_Deserialize = {
+	pane?: number,
+	path?: string,
+	bytes?: number,
+};
+
+export type Pasted_Serialize = {
+	pane: number,
+	path: string,
+	bytes: number,
+};
+
 export type Patch = Patch_Serialize | Patch_Deserialize;
 
 export type Patch_Deserialize = {
@@ -511,6 +526,18 @@ export type Run_Serialize = {
 };
 
 export type SameWhy = "address" | "token" | "boot" | "name";
+
+export type Shape = Shape_Serialize | Shape_Deserialize;
+
+export type Shape_Deserialize = {
+	size: Size_Deserialize,
+	fit: boolean,
+};
+
+export type Shape_Serialize = {
+	size: Size_Serialize,
+	fit: boolean,
+};
 
 export type Size = Size_Serialize | Size_Deserialize;
 
@@ -651,6 +678,7 @@ export type TerminalChanged_Deserialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Deserialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type TerminalChanged_Serialize = {
@@ -664,6 +692,7 @@ export type TerminalChanged_Serialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Serialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type Toast = {

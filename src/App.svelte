@@ -46,7 +46,7 @@
   const chat = $derived(
     pane === null
       ? null
-      : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, haptics, timers),
+      : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers),
   )
   const seen = $derived(chat?.row != null)
   const viewed = $derived(openedTerminal(route, current))
