@@ -1,12 +1,12 @@
 use std::future;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::time::{self, Instant};
 
 const QUIET: Duration = Duration::from_secs(1);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     Wifi,
@@ -15,7 +15,7 @@ pub enum Kind {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub struct Network {
     pub kind: Kind,
     pub expensive: bool,
@@ -68,20 +68,15 @@ impl Debounce {
         }
     }
 
-    pub fn is_down(&self) -> bool {
-        self.applied.is_some_and(Network::is_down)
-    }
-
     fn settle(&mut self) -> Option<Decision> {
         let (network, _) = self.pending.take()?;
         let previous = self.applied.replace(network);
-        if previous == Some(network) {
-            return None;
+        match previous {
+            Some(previous) if previous.is_down() && network.is_down() => None,
+            _ if network.is_down() => Some(Decision::Offline),
+            None => Some(Decision::Baseline(network)),
+            Some(_) => Some(Decision::Changed(network)),
         }
-        if network.is_down() {
-            return Some(Decision::Offline);
-        }
-        Some(previous.map_or(Decision::Baseline(network), |_| Decision::Changed(network)))
     }
 }
 

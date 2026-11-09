@@ -38,7 +38,7 @@
 
 ## CI
 
-- **One job** in `.github/workflows/ci.yml`, on `ubuntu-24.04`, for every pull request, every push to `main` and by hand. A new push to the same branch cancels the run in progress. No iOS or Android builds in CI (macOS runners are expensive); those are checked locally, the Swift of the plugins and their `mobile.rs` included (`design/connection/network.md`).
+- **One job** in `.github/workflows/ci.yml`, on `ubuntu-24.04`, for every pull request, every push to `main` and by hand. A new push to the same branch cancels the run in progress. No iOS or Android builds in CI (macOS runners are expensive); those are checked locally, the Swift of the plugins and their `ios.rs` included (`design/connection/network.md`).
 - **Steps, in order**:
   1. `rustup toolchain install`, which reads `rust-toolchain.toml`.
   2. `apt-get install` of `libwebkit2gtk-4.1-dev`, `libsoup-3.0-dev`, `libjavascriptcoregtk-4.1-dev`, `libssl-dev`, `libxdo-dev`, `libayatana-appindicator3-dev` and `librsvg2-dev`: Tauri 2's prerequisites for Debian and Ubuntu.

@@ -12,14 +12,14 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - **`expensive`** is the path's `isExpensive`.
   - **Only Rust talks to it**: the crate is laid out like `tauri plugin new --ios`, but with no JavaScript API, no commands and no permissions.
   - **Generated files stay out of git**: `build.rs` declares no commands, so the permissions `tauri-plugin` writes are ignored (`.gitignore`). So are `.tauri/`, where the build copies Tauri's Swift package, and `ios/.build`.
-- **A channel made in Rust**: `mobile.rs` registers the plugin in its `setup`. It builds a `tauri::ipc::Channel` with `Channel::new`, whose handler reads the path and calls the app's callback, and hands it to Swift's `watch` with `run_mobile_plugin`.
+- **A channel made in Rust**: `ios.rs` registers the plugin in its `setup`. It builds a `tauri::ipc::Channel` with `Channel::new`, whose handler reads the path and calls the app's callback, and hands it to Swift's `watch` with `run_mobile_plugin`.
   - Rejected: Swift's `trigger`. Its events reach only listeners that the WebView registers with `addPluginListener`, so every network change would go through the WebView and back.
 - **The callback holds no logic**: `init(on_path)` takes an `Fn(Network)`. The app's callback (`network::listen`) puts each path on an unbounded channel, read by a task on Tauri's runtime that `setup` starts once `AppState` is managed. Swift calls the callback on the monitor's queue, so nothing slow runs there.
-- **Other platforms build a stub**, which registers the plugin and sends nothing.
+- **Other platforms build a stub** (`other.rs`), which registers the plugin and sends nothing.
   - Linux CI therefore compiles and tests the crate and the app.
   - With no paths, the app never thinks the network is down.
-  - Android's `ConnectivityManager` (032) becomes another `mobile.rs` behind the same callback, and reuses the debounce and the decisions.
-- **Swift is checked only on a Mac**: CI runs on Linux and never compiles it. Two local checks cover `mobile.rs` and the package:
+  - Android's `ConnectivityManager` (032) becomes an `android.rs` behind the same callback, and reuses the debounce and the decisions.
+- **Swift is checked only on a Mac**: CI runs on Linux and never compiles it. Two local checks cover `ios.rs` and the package:
   - `cargo clippy -p tauri-plugin-network --target aarch64-apple-ios-sim --all-targets`, and the same command for `cornercase-mobile`;
   - a build for the simulator.
   - Neither `scripts/check-rules.mjs` nor jscpd reads Swift, so its rule against comments is kept by hand (`design/code-layout.md`).
@@ -35,9 +35,11 @@ A topic of [Connection](../connection.md). The app notices when the phone change
 - **The baseline**: the first value that settles is not a change, since the `Store` is already connecting. It is `Decision::Baseline`, which the app only logs and keeps. A baseline of `none`, when the app starts without a network, is `Offline`.
 - **After the baseline**:
   - A settled `none` is `Offline`.
-  - Any other value that differs from the one last applied is `Changed`, even when the burst went through `none`. So wifi → `none` → cellular within a second is one reconnection, and "No network" never shows.
+  - Any other settled value is `Changed`, even when the burst went through `none`. So wifi → `none` → cellular within a second is one reconnection, and "No network" never shows.
+  - That includes a value equal to the one applied, since `{kind, expensive}` is not the whole path: Swift sends only paths that differ, so each one that settles is a new network (see Tailscale, below). Wifi → `none` → wifi within a second, from one wifi to another, is one reconnection too.
   - A change of `expensive` on the same interface counts as a change.
-  - A settled value equal to the one applied gives nothing (see Tailscale, below, for what that costs).
+  - Only a `none` after a `none` gives nothing.
+  - Rejected: comparing with the value applied and giving nothing when it is equal. Entering Tailscale on cellular while `Retrying` waited for the backoff, up to 15 s, and moving from one wifi to another kept the old streams until the 45 s of silence.
 - **Applying a decision** (`src-tauri/src/network.rs`):
   - The network is kept in `AppState`, not in the `Store`, so a `Store` made later knows it too.
   - `Offline` calls `Store::offline()`.
@@ -45,7 +47,7 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - `Baseline` changes nothing in the `Store`.
   - Without an active `Store`, only `AppState` changes.
 - **One line per decision** on stderr, `cornercase-mobile: network <kind>[ expensive]`. On iOS it goes to the unified log, next to the connection's changes, so the time from a change to `connected` can be measured on an iPhone.
-- **Tests**: `network::follow` and `apply` run on Tauri's `MockRuntime` with `FakeTransport`, on a paused clock. Only the simulator check below covers what CI cannot run: `follow_in_background`, the wiring in `run`, the plugin's `mobile.rs` and the Swift.
+- **Tests**: `network::follow` and `apply` run on Tauri's `MockRuntime` with `FakeTransport`, on a paused clock. Only the simulator check below covers what CI cannot run: `follow_in_background`, the wiring in `run`, the plugin's `ios.rs` and the Swift.
 
 ## Offline
 
@@ -77,14 +79,10 @@ A topic of [Connection](../connection.md). The app notices when the phone change
 
 - **Tailscale and the whole `NWPath`**: entering or leaving Tailscale adds or removes a `utun` interface without changing `kind`, which stays `wifi`.
   - Swift compares the whole `NWPath` (`Equatable`), not `{kind, expensive}`, so it does send that path.
-  - The debounce, though, compares only `{kind, expensive}` with the value applied, so today such a path brings no decision.
-- **Known limit**, found while writing this note, from the debounce comparing only `{kind, expensive}`:
-  - Entering Tailscale on cellular while `Retrying` waits for the backoff, up to 15 s.
-  - Moving from one wifi to another, through `none` for less than a second, keeps the old streams until the 45 s of silence.
-  - The fix is for the debounce to count every settled path after the baseline as a change; Swift's comparison already makes each path it sends a new one.
+  - The debounce counts every settled path after the baseline as a change, so that path reconnects like any other.
   - With Tailscale as the only network, `kind` is `other`, and the same holds.
 - **False `none`**: `NWPathMonitor` sometimes reports `unsatisfied` for an instant, and in the simulator after the Mac sleeps.
-  - The debounce filters one that lasts less than a second.
+  - The debounce keeps one that lasts less than a second from showing "No network". The path that follows it still settles as a change, so it costs a reconnection of about a second: the debounce cannot tell a false `none` from a move to another wifi, which looks the same.
   - A longer one shows "No network" until the next path, or until the return to the foreground (Offline, above).
 
 ## Checked live

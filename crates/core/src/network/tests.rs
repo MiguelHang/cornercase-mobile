@@ -35,7 +35,6 @@ mod baseline {
         assert_eq!(debounce.decided().await, Decision::Baseline(WIFI));
         assert_eq!(started.elapsed(), Duration::from_secs(1));
         assert_eq!(within(&mut debounce, Duration::from_secs(60)).await, None);
-        assert!(!debounce.is_down());
     }
 
     #[tokio::test(start_paused = true)]
@@ -45,14 +44,12 @@ mod baseline {
         let started = Instant::now();
         assert_eq!(debounce.decided().await, Decision::Offline);
         assert_eq!(started.elapsed(), Duration::from_secs(1));
-        assert!(debounce.is_down());
     }
 
     #[tokio::test(start_paused = true)]
-    async fn waits_for_a_first_value_without_being_down() {
+    async fn gives_nothing_before_a_first_value() {
         let mut debounce = Debounce::default();
         assert_eq!(within(&mut debounce, Duration::from_secs(60)).await, None);
-        assert!(!debounce.is_down());
     }
 }
 
@@ -76,10 +73,8 @@ mod changes {
         let mut debounce = settled(WIFI).await;
         debounce.observe(NONE);
         assert_eq!(debounce.decided().await, Decision::Offline);
-        assert!(debounce.is_down());
         debounce.observe(WIFI);
         assert_eq!(debounce.decided().await, Decision::Changed(WIFI));
-        assert!(!debounce.is_down());
     }
 
     #[tokio::test(start_paused = true)]
@@ -96,15 +91,22 @@ mod changes {
         debounce.observe(CELLULAR);
         assert_eq!(debounce.decided().await, Decision::Changed(CELLULAR));
         assert_eq!(within(&mut debounce, Duration::from_secs(60)).await, None);
-        assert!(!debounce.is_down());
     }
 
     #[tokio::test(start_paused = true)]
-    async fn give_nothing_for_the_value_already_applied() {
+    async fn count_a_burst_back_to_the_value_already_applied() {
         let mut debounce = settled(WIFI).await;
         burst(&mut debounce, &[NONE, CELLULAR]).await;
         debounce.observe(WIFI);
+        assert_eq!(debounce.decided().await, Decision::Changed(WIFI));
         assert_eq!(within(&mut debounce, Duration::from_secs(60)).await, None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn count_the_same_kind_and_cost_after_the_baseline() {
+        let mut debounce = settled(WIFI).await;
+        debounce.observe(WIFI);
+        assert_eq!(debounce.decided().await, Decision::Changed(WIFI));
     }
 
     #[tokio::test(start_paused = true)]

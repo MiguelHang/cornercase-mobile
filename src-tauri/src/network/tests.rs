@@ -110,6 +110,18 @@ mod a_change {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn to_the_same_kind_and_cost_reconnects() {
+        let following = Following::new();
+        following.heard(&[WIFI]).await;
+        settle().await;
+        following.heard(&[WIFI]).await;
+        settle().await;
+        let connections = following.connections();
+        assert_eq!(connecting_count(&connections), 2, "{connections:?}");
+        assert_eq!(connections.last().map(|it| &it.connection), Some(&connected()), "{connections:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn while_connecting_abandons_the_attempt_for_another() {
         let hanging = contracted(BOOT).open(EVENTS, &[]).open(STATUS, &[]).open(APP, &[]);
         let following = Following::on(hanging);
