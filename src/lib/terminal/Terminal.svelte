@@ -39,6 +39,7 @@
   let measured = $state(0)
   let start = BASE
   let byGesture = false
+  let tapped = false
   const pinch = new Pinch()
   const swipe = new Swipe()
   let drawn: HTMLElement | undefined
@@ -109,12 +110,18 @@
 
   const lifted = (event: PointerEvent) => {
     pinch.lift(event.pointerId)
-    if (swipe.lift(event.pointerId)) ontap()
+    tapped = swipe.lift(event.pointerId)
   }
 
   const cancelled = (event: PointerEvent) => {
     pinch.lift(event.pointerId)
     swipe.lift(event.pointerId)
+    tapped = false
+  }
+
+  const clicked = () => {
+    if (tapped) ontap()
+    tapped = false
   }
 
   const pointers = (element: HTMLElement) =>
@@ -123,6 +130,7 @@
       pointermove: (event) => event instanceof PointerEvent && moved(element, event),
       pointerup: (event) => event instanceof PointerEvent && lifted(event),
       pointercancel: (event) => event instanceof PointerEvent && cancelled(event),
+      click: clicked,
     })
 
   const anchored = (box: HTMLElement) => {

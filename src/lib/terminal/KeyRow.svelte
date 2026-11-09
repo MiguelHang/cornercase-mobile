@@ -14,8 +14,7 @@
     disabled?: boolean
   } = $props()
 
-  const pressed = (event: PointerEvent, key: RowKey) => {
-    event.preventDefault()
+  const pressed = (key: RowKey) => {
     press(key, { ctrl, disabled, send, failed: onfailed, clipboard: navigator.clipboard })
   }
 </script>
@@ -28,8 +27,9 @@
       type="button"
       aria-pressed={key.kind === 'ctrl' ? ctrl.armed : undefined}
       {disabled}
-      onpointerdown={(event) => pressed(event, key)}
-      ontouchstart={() => {}}>{key.label}</button
+      onpointerup={() => pressed(key)}
+      ontouchstart={() => {}}
+      ontouchend={(event) => event.preventDefault()}>{key.label}</button
     >
   {/each}
 </div>

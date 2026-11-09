@@ -34,11 +34,13 @@ describe('KeyRow', () => {
     expect(row()).not.toContain('disabled')
   })
 
-  it('acts on the press and keeps the focus in the field, so the keyboard stays open', () => {
-    expect(keyRowSource).toContain('onpointerdown={(event) => pressed(event, key)}')
-    expect(flat(keyRowSource)).toContain(
-      'event.preventDefault() press(key, { ctrl, disabled, send, failed: onfailed, clipboard: navigator.clipboard })',
-    )
+  it('acts as the finger lifts, which lets Paste read the clipboard', () => {
+    expect(keyRowSource).toContain('onpointerup={() => pressed(key)}')
+    expect(keyRowSource).not.toContain('onpointerdown')
+  })
+
+  it('cancels the click of a touch, so the field keeps the focus and the keyboard stays open', () => {
+    expect(keyRowSource).toContain('ontouchend={(event) => event.preventDefault()}')
   })
 
   it.each(['.key { flex: 1 1 0; min-width: 0; min-height: 44px;', '.armed { border-color: var(--accent);'])(
