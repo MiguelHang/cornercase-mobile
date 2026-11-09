@@ -20,6 +20,8 @@ export const commands = {
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
+	startProjects: () => typedError<ProjectChoice[], CommandError>(__TAURI_INVOKE("start_projects")),
+	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 };
 
 /** Events */
@@ -31,6 +33,20 @@ export const events = {
 };
 
 /* Types */
+export type AgentChoice = AgentChoice_Serialize | AgentChoice_Deserialize;
+
+export type AgentChoice_Deserialize = {
+	agent?: string,
+	command?: string,
+	installed?: boolean,
+};
+
+export type AgentChoice_Serialize = {
+	agent: string,
+	command: string,
+	installed: boolean,
+};
+
 export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
 
 export type AgentRow_Deserialize = {
@@ -208,6 +224,11 @@ export type Missing_Serialize = {
 };
 
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+
+export type ProjectChoice = {
+	id: number,
+	name: string,
+};
 
 export type RouteFailure = {
 	route: string,
