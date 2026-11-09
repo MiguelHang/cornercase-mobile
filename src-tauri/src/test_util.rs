@@ -20,7 +20,7 @@ use tokio::time;
 use crate::bindings;
 use crate::commands::connection::Launcher;
 use crate::commands::error::CommandError;
-use crate::events::{AgentsChanged, ConnectionChanged, Emit, Emitted, Toast};
+use crate::events::{AgentsChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, Toast};
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
 use crate::view::ConnectionView;
@@ -61,6 +61,13 @@ impl Recorder {
         self.all()
             .into_iter()
             .filter_map(|event| if let Emitted::Agents(it) = event { Some(it) } else { None })
+            .collect()
+    }
+
+    pub(crate) fn pane_statuses(&self) -> Vec<PaneStatusChanged> {
+        self.all()
+            .into_iter()
+            .filter_map(|event| if let Emitted::PaneStatus(it) = event { Some(it) } else { None })
             .collect()
     }
 

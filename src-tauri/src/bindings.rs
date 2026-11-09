@@ -2,7 +2,7 @@ use tauri::{Runtime, Wry};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
 use crate::commands::{chat, connection, identity, machines};
-use crate::events::{AgentsChanged, ConnectionChanged, Toast};
+use crate::events::{AgentsChanged, ConnectionChanged, PaneStatusChanged, Toast};
 
 pub(crate) fn specta<R: Runtime>() -> Builder<R> {
     Builder::<R>::new()
@@ -17,7 +17,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             chat::last_message,
             chat::send,
         ])
-        .events(collect_events![ConnectionChanged, AgentsChanged, Toast])
+        .events(collect_events![ConnectionChanged, AgentsChanged, PaneStatusChanged, Toast])
 }
 
 #[cfg(test)]

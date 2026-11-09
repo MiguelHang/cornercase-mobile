@@ -20,6 +20,7 @@ export const commands = {
 export const events = {
 	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
+	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
 
@@ -153,6 +154,18 @@ export type Missing_Serialize = {
 	name: string,
 	kind: Kind,
 	reason: string | null,
+};
+
+export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;
+
+export type PaneStatusChanged_Deserialize = {
+	machine: number,
+	pane?: number | null,
+};
+
+export type PaneStatusChanged_Serialize = {
+	machine: number,
+	pane: number | null,
 };
 
 export type RouteView = { kind: "bridge"; url: string };

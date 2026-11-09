@@ -251,6 +251,47 @@ mod the_agents {
     }
 }
 
+mod a_pane_status {
+    use super::*;
+
+    async fn panes_heard_after(event: String) -> Vec<Option<u64>> {
+        let studio = Studio::new();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[event]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        recorder.pane_statuses().into_iter().map(|changed| changed.pane).collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_sent_for_the_pane_of_a_status_event_along_with_the_agents() {
+        let studio = Studio::new();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[status_event("waiting")]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(recorder.pane_statuses(), [PaneStatusChanged { machine: studio.id.0, pane: Some(4) }]);
+        assert_eq!(rows(&recorder), [Some(claude("waiting", None)), Some(claude("waiting", Some(HEARD)))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_sent_for_no_pane_once_some_events_were_dropped() {
+        let dropped = json!({ "time": HEARD, "event": "dropped", "count": 3 });
+        assert_eq!(panes_heard_after(dropped.to_string()).await, [None]);
+    }
+
+    #[rstest]
+    #[case::opened(json!({ "time": HEARD, "event": "opened", "kind": "tab", "project": 1, "workspace": 2, "tab": 3 }))]
+    #[case::notice(json!({
+        "time": HEARD, "event": "notice", "token": "cc-ab12cd-3", "agent": "claude", "status": "waiting",
+        "place": "shop › default", "message": "claude needs you in shop › default", "panes": [4],
+        "project": 1, "workspace": 2,
+    }))]
+    #[case::status_without_a_pane(json!({ "time": HEARD, "event": "status", "agent": "claude", "to": "waiting" }))]
+    #[tokio::test(start_paused = true)]
+    async fn is_not_sent_for_an_event_about_no_agent_pane(#[case] event: Value) {
+        assert_eq!(panes_heard_after(event.to_string()).await, []);
+    }
+}
+
 mod an_event {
     use super::*;
 
@@ -262,6 +303,10 @@ mod an_event {
     #[case::agents_changed_after_a_restart(
         Emitted::Agents(AgentsChanged { machine: 7, agents: None }),
         json!({ "machine": 7, "agents": null })
+    )]
+    #[case::pane_status_changed_after_a_drop(
+        Emitted::PaneStatus(PaneStatusChanged { machine: 7, pane: None }),
+        json!({ "machine": 7, "pane": null })
     )]
     #[case::error_toast(
         Emitted::Toast(Toast::error("it failed")),
@@ -275,6 +320,7 @@ mod an_event {
         let json = match event {
             Emitted::Connection(changed) => serde_json::to_value(changed),
             Emitted::Agents(changed) => serde_json::to_value(changed),
+            Emitted::PaneStatus(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
         assert_eq!(json.expect("an event serializes"), expected);
@@ -283,8 +329,8 @@ mod an_event {
     #[test]
     fn is_named_in_kebab_case() {
         assert_eq!(
-            [ConnectionChanged::NAME, AgentsChanged::NAME, Toast::NAME],
-            ["connection-changed", "agents-changed", "toast"]
+            [ConnectionChanged::NAME, AgentsChanged::NAME, PaneStatusChanged::NAME, Toast::NAME],
+            ["connection-changed", "agents-changed", "pane-status-changed", "toast"]
         );
     }
 }
@@ -302,6 +348,11 @@ mod the_app {
         Emitted::Agents(AgentsChanged { machine: 7, agents: Some(Vec::new()) }),
         "agents-changed",
         json!({ "machine": 7, "agents": [] })
+    )]
+    #[case::pane_status_changed(
+        Emitted::PaneStatus(PaneStatusChanged { machine: 7, pane: Some(4) }),
+        "pane-status-changed",
+        json!({ "machine": 7, "pane": 4 })
     )]
     #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
     fn emits_each_event_under_its_name(#[case] event: Emitted, #[case] name: &str, #[case] expected: Value) {
