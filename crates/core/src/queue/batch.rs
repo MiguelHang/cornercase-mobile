@@ -31,7 +31,7 @@ pub(crate) fn scroll(pane: u64, rows: i64) -> Command {
     Command { args: args.map(str::to_owned).into(), stdin: None, key: None, reply: None }
 }
 
-fn skip(command: Command) {
+pub(crate) fn skip(command: Command) {
     if let Some(reply) = command.reply {
         let _ = reply.send(Ok(Outcome::Skipped));
     }

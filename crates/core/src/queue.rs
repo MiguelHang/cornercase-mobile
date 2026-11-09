@@ -25,6 +25,7 @@ pub enum Outcome {
 #[derive(Clone)]
 pub struct Queue {
     jobs: mpsc::UnboundedSender<Job>,
+    control: mpsc::UnboundedSender<()>,
 }
 
 impl Queue {
@@ -33,7 +34,8 @@ impl Queue {
         on_error: impl Fn(Error) + Send + Sync + 'static,
     ) -> (Self, impl Future<Output = ()> + Send + 'static) {
         let (jobs, waiting) = mpsc::unbounded_channel();
-        (Self { jobs }, Worker::new(transport, Arc::new(on_error), waiting).work())
+        let (control, signals) = mpsc::unbounded_channel();
+        (Self { jobs, control }, Worker::new(transport, Arc::new(on_error), waiting).work(signals))
     }
 
     pub fn run(&self, args: Vec<String>, stdin: Option<Stdin>) {
@@ -66,6 +68,11 @@ impl Queue {
 
     pub fn input(&self, pane: u64, event: Value) {
         self.push(Job::Input((pane, event)));
+    }
+
+    pub fn reconnect(&self, transport: Arc<dyn Transport>) {
+        let _ = self.control.send(());
+        self.push(Job::Reconnect(transport));
     }
 
     fn asked(&self, command: Command) -> impl Future<Output = Result<Outcome, Error>> + Send + 'static {

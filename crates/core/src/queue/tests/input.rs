@@ -3,7 +3,8 @@ use tokio::time::Instant;
 use super::*;
 
 const TYPIST: [&str; 4] = ["input", "--follow", "--json", "-"];
-const NO_FOLLOW_FLAG: &str = "error: unexpected argument '--follow' found\n\nUsage: cornercase input [OPTIONS]";
+pub(super) const NO_FOLLOW_FLAG: &str =
+    "error: unexpected argument '--follow' found\n\nUsage: cornercase input [OPTIONS]";
 const REFUSED: &str = r#"{"error":"there is no pane 9","events":1,"pane":9}"#;
 const STOPPED: &str = "Error: the server stopped";
 const SETTLE: Duration = Duration::from_secs(10);
@@ -50,7 +51,7 @@ fn crashing(fake: FakeTransport, log: &mpsc::UnboundedSender<String>, starts: &S
     })
 }
 
-fn unstarted(fake: FakeTransport, end: End, reads: bool, starts: &Starts) -> FakeTransport {
+pub(super) fn unstarted(fake: FakeTransport, end: End, reads: bool, starts: &Starts) -> FakeTransport {
     let starts = starts.clone();
     fake.script(&TYPIST, move |stdin, _| {
         starts.add();
@@ -58,7 +59,7 @@ fn unstarted(fake: FakeTransport, end: End, reads: bool, starts: &Starts) -> Fak
     })
 }
 
-fn typing_once(fake: FakeTransport, log: &mpsc::UnboundedSender<String>, panes: &[u64]) -> FakeTransport {
+pub(super) fn typing_once(fake: FakeTransport, log: &mpsc::UnboundedSender<String>, panes: &[u64]) -> FakeTransport {
     panes.iter().fold(fake, |fake, &pane| {
         let log = log.clone();
         let argv = ["input", "--pane", &pane.to_string(), "--json", "-"];

@@ -20,6 +20,7 @@ pub(crate) enum Job {
     Command(Command),
     Input(Event),
     Scroll(u64, i64),
+    Reconnect(Arc<dyn Transport>),
 }
 
 pub(crate) struct Command {
@@ -60,15 +61,57 @@ impl Worker {
         }
     }
 
-    pub(crate) async fn work(mut self) {
-        while let Some(job) = self.next().await {
-            match job {
-                Job::Command(command) => self.coalesced(command).await,
-                Job::Input(event) => self.input(event).await,
-                Job::Scroll(pane, rows) => self.scroll(pane, rows).await,
+    pub(crate) async fn work(mut self, mut signals: mpsc::UnboundedReceiver<()>) {
+        loop {
+            let going = match raced(&mut signals, self.step()).await {
+                Some(going) => going,
+                None => self.reconnected().await,
+            };
+            if !going {
+                break;
             }
         }
         self.settle().await;
+    }
+
+    async fn step(&mut self) -> bool {
+        let Some(job) = self.next().await else {
+            return false;
+        };
+        match job {
+            Job::Command(command) => self.coalesced(command).await,
+            Job::Input(event) => self.input(event).await,
+            Job::Scroll(pane, rows) => self.scroll(pane, rows).await,
+            fence @ Job::Reconnect(_) => {
+                self.pending.push_front(fence);
+                future::pending::<()>().await;
+            }
+        }
+        true
+    }
+
+    async fn reconnected(&mut self) -> bool {
+        loop {
+            let job = match self.pending.pop_front() {
+                Some(job) => Some(job),
+                None => self.jobs.recv().await,
+            };
+            match job {
+                Some(Job::Reconnect(transport)) => return self.reconnect(transport),
+                Some(Job::Command(command)) => batch::skip(command),
+                Some(Job::Input(_) | Job::Scroll(..)) => {}
+                None => return false,
+            }
+        }
+    }
+
+    fn reconnect(&mut self, transport: Arc<dyn Transport>) -> bool {
+        self.transport = transport;
+        self.requests = None;
+        self.typist = None;
+        self.no_requests = false;
+        self.no_typist = false;
+        true
     }
 
     async fn next(&mut self) -> Option<Job> {
@@ -207,6 +250,19 @@ impl Worker {
         if let Some(Err(error)) = unheard {
             (self.on_error)(error);
         }
+    }
+}
+
+async fn raced(signals: &mut mpsc::UnboundedReceiver<()>, step: impl Future<Output = bool>) -> Option<bool> {
+    match future::select(pin!(signalled(signals)), pin!(step)).await {
+        Either::Left(((), _)) => None,
+        Either::Right((step, _)) => Some(step),
+    }
+}
+
+async fn signalled(signals: &mut mpsc::UnboundedReceiver<()>) {
+    if signals.recv().await.is_none() {
+        future::pending::<()>().await;
     }
 }
 

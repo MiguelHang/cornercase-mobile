@@ -18,6 +18,7 @@ mod batch;
 mod commands;
 mod drops;
 mod input;
+mod reconnect;
 
 const REQUESTS: [&str; 3] = ["requests", "--follow", "-"];
 const NO_REQUESTS_COMMAND: &str = "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]";
@@ -56,10 +57,10 @@ struct Started {
     worker: JoinHandle<()>,
 }
 
-fn start(fake: FakeTransport) -> Started {
+fn start(transport: impl Transport + 'static) -> Started {
     let (notice, notices) = heard();
     let on_error = move |error| notice.send(error).expect("the test reads the notices");
-    let (queue, worker) = Queue::new(Arc::new(fake), on_error);
+    let (queue, worker) = Queue::new(Arc::new(transport), on_error);
     Started { queue, notices, worker: tokio::spawn(worker) }
 }
 
