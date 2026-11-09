@@ -11,6 +11,7 @@
     checking,
     onpick,
     oncheck,
+    onedit,
   }: {
     name: string
     shown: RowStatus
@@ -18,6 +19,7 @@
     checking: boolean
     onpick: () => void
     oncheck: () => void
+    onedit: () => void
   } = $props()
 </script>
 
@@ -44,6 +46,7 @@
       <button class="pick" type="button" onclick={onpick} ontouchstart={() => {}}>{@render about()}</button>
       <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>
     {/if}
+    <Button tone="plain" onclick={onedit}>Edit</Button>
   </div>
   {#if shown.failures.length > 0}
     <details class="failures">

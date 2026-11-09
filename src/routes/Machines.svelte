@@ -18,6 +18,7 @@
     onback,
     onpick,
     onadded,
+    onedit,
     probes = new Probes(commands),
     device = new ThisDevice(commands),
   }: {
@@ -27,6 +28,7 @@
     onback: () => void
     onpick: (machine: number) => void
     onadded: (machine: number) => void
+    onedit: (machine: number) => void
     probes?: Probes
     device?: ThisDevice
   } = $props()
@@ -74,6 +76,7 @@
           checking={machine.id !== active && probes.of(machine.id).state === 'checking'}
           onpick={() => onpick(machine.id)}
           oncheck={() => void probes.check([machine.id])}
+          onedit={() => onedit(machine.id)}
         />
       {/each}
     </ul>

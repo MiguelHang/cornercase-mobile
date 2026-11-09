@@ -4,13 +4,13 @@ import { messageOf } from './toasts'
 
 export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineRouteAdd'>
 
-type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
+export type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
 export type Refusal = { kind: Field; error: string }
 
 export type Outcome<T> = { kind: 'done'; data: T } | Refusal
 
-const ERRORS = { url: 'urlError', name: 'nameError', form: 'formError' } as const
+export const ERRORS = { url: 'urlError', name: 'nameError', form: 'formError' } as const
 
 export const send = async <T>(call: () => Promise<Answer<T>>): Promise<Outcome<T>> => {
   try {

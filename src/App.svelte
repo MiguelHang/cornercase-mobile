@@ -9,6 +9,7 @@
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
   import Home from './routes/Home.svelte'
+  import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
 
@@ -23,6 +24,11 @@
   const toasts = new Toasts()
 
   const home = $derived(router.current.name === 'home')
+  const editing = $derived.by(() => {
+    const route = router.current
+    return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined
+  })
+  const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
   const show = (next: Screen) => {
@@ -38,6 +44,8 @@
     machines = listed.data.machines
     return listed.data
   }
+
+  const reload = () => commands.machinesList().then(remember).catch(toasts.failed)
 
   const join = latestWins(async (machine: number) => {
     show(connecting(machine))
@@ -96,6 +104,15 @@
       onback={() => router.back()}
       onpick={(machine) => void join(machine)}
       onadded={added}
+      onedit={(machine) => router.go({ name: 'machine', id: machine })}
+    />
+  {:else if editing !== undefined}
+    <Machine
+      machine={editing}
+      {taken}
+      connection={editing.id === current.machine ? current.connection : null}
+      onback={() => router.back()}
+      onchanged={reload}
     />
   {:else}
     <NoMachines onadded={added} />

@@ -55,6 +55,7 @@ const screen = async (device = loaded(FINGERPRINT)) =>
       onback: () => {},
       onpick: () => {},
       onadded: () => {},
+      onedit: () => {},
       probes: await probed(),
       device: await device,
     },
@@ -128,6 +129,12 @@ describe('Machines', () => {
     expect(body).not.toContain('<code')
   })
 
+  it('offers Edit on every row, the active one too', async () => {
+    for (const row of rows(await screen())) {
+      expect(row).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Edit/)
+    }
+  })
+
   it('offers adding a machine and shows no form yet', async () => {
     const body = await screen()
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
@@ -149,6 +156,11 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain(
       '<button class="pick" type="button" onclick={onpick} ontouchstart={() => {}}>{@render about()}</button> <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>',
     )
+  })
+
+  it('opens the machine edited', () => {
+    expect(script).toContain('onedit={() => onedit(machine.id)}')
+    expect(flat(rowSource)).toContain('{/if} <Button tone="plain" onclick={onedit}>Edit</Button>')
   })
 
   it('counts down a retry of the active one like the bar', () => {

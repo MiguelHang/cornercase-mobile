@@ -75,7 +75,20 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} />",
+      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onedit={(machine) => router.go({ name: 'machine', id: machine })} />",
+    )
+  })
+
+  it('edits the machine asked for, against the names of the others, and reloads the machines after each change', () => {
+    expect(source).toContain(
+      "const editing = $derived.by(() => { const route = router.current return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined })",
+    )
+    expect(source).toContain(
+      'const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))',
+    )
+    expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
+    expect(source).toContain(
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} />',
     )
   })
 
