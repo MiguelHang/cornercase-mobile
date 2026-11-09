@@ -70,4 +70,14 @@ fn secrets_error(error: &keyring_core::Error) -> Error {
 }
 
 #[cfg(test)]
+pub(crate) fn mock_store() -> Arc<CredentialStore> {
+    keyring_core::mock::Store::new().expect("a mock store")
+}
+
+#[cfg(test)]
+pub(crate) fn on_mock(store: Arc<CredentialStore>) -> KeychainSecrets {
+    KeychainSecrets::new(Ok(store), Modifiers::new())
+}
+
+#[cfg(test)]
 mod tests;

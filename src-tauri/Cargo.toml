@@ -19,7 +19,7 @@ keyring-core = "1.0.1"
 tauri = { version = "2.12", features = [] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
-apple-native-keyring-store = { version = "1", features = ["protected"] }
+apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 
 [dev-dependencies]
 rstest = "0.27.0"

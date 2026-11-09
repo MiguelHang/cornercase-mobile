@@ -1,23 +1,17 @@
-use std::collections::HashMap;
 use std::fmt::Write as _;
 
 use cornercase_core::secrets::Secrets;
-use keyring_core::mock;
 use rstest::rstest;
 
 use super::*;
-use crate::secrets::KeychainSecrets;
-
-fn on_mock() -> KeychainSecrets {
-    KeychainSecrets::new(Ok(mock::Store::new().expect("a mock store")), HashMap::new())
-}
+use crate::secrets::{mock_store, on_mock};
 
 mod line {
     use super::*;
 
     #[test]
     fn names_the_fingerprint_of_a_new_identity() {
-        let secrets = on_mock();
+        let secrets = on_mock(mock_store());
         let identity = Identity::load_or_create(&secrets).expect("a new identity");
         let fingerprint = identity.fingerprint();
         assert_eq!(line(Ok(identity)), format!("cornercase-mobile: identity {fingerprint}"));
@@ -25,7 +19,7 @@ mod line {
 
     #[test]
     fn holds_neither_the_seed_nor_the_whole_key() {
-        let secrets = on_mock();
+        let secrets = on_mock(mock_store());
         let identity = Identity::load_or_create(&secrets).expect("a new identity");
         let public_key = identity.public_key();
         let seed = secrets.get("identity/ed25519").expect("the mock reads").expect("the saved seed");

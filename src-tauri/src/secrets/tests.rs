@@ -10,23 +10,16 @@ const KEY: &str = "a/key";
 const SECRET: &[u8] = &[0xff, 0xfe, 0x9d, 0x61, 0xb1];
 const SECRET_IN_DEBUG: &str = "255, 254, 157, 97, 177";
 
-fn mock_store() -> Arc<CredentialStore> {
-    mock::Store::new().expect("a mock store")
-}
-
-fn on_mock(store: Arc<CredentialStore>) -> KeychainSecrets {
-    KeychainSecrets::new(Ok(store), Modifiers::new())
-}
-
 fn secrets() -> (Arc<CredentialStore>, KeychainSecrets) {
     let store = mock_store();
     (Arc::clone(&store), on_mock(store))
 }
 
-fn fail_next_call(store: &Arc<CredentialStore>, error: keyring_core::Error) {
-    let entry = store.build(SERVICE, KEY, None).expect("a mock entry");
+fn fail_next_call(store: &Arc<CredentialStore>, key: &str, error: keyring_core::Error) -> Entry {
+    let entry = store.build(SERVICE, key, None).expect("a mock entry");
     let credential: &mock::Cred = entry.as_any().downcast_ref().expect("a mock credential");
     credential.set_error(error);
+    entry
 }
 
 mod get {
@@ -75,7 +68,7 @@ mod failure {
     #[case::delete(|secrets: &KeychainSecrets| secrets.delete(KEY))]
     fn becomes_a_secrets_error(#[case] operation: fn(&KeychainSecrets) -> Result<(), Error>) {
         let (store, secrets) = secrets();
-        fail_next_call(&store, keyring_core::Error::NoStorageAccess("locked".into()));
+        fail_next_call(&store, KEY, keyring_core::Error::NoStorageAccess("locked".into()));
         assert_eq!(operation(&secrets), Err(Error::Secrets("Couldn't access platform storage: locked".to_owned())));
     }
 
@@ -85,7 +78,7 @@ mod failure {
     #[case::ambiguous(ambiguous)]
     fn keeps_the_secret_out_of_the_message(#[case] error: fn(&CredentialStore) -> keyring_core::Error) {
         let (store, secrets) = secrets();
-        fail_next_call(&store, error(&*store));
+        fail_next_call(&store, KEY, error(&*store));
         let Err(Error::Secrets(message)) = secrets.get(KEY) else {
             panic!("the mock's error should become a secrets error");
         };
@@ -144,9 +137,7 @@ mod identity {
     #[test]
     fn is_not_created_when_the_store_cannot_be_read() {
         let store = mock_store();
-        let entry = store.build(SERVICE, "identity/ed25519", None).expect("a mock entry");
-        let credential: &mock::Cred = entry.as_any().downcast_ref().expect("a mock credential");
-        credential.set_error(keyring_core::Error::NoStorageAccess("locked".into()));
+        let entry = fail_next_call(&store, "identity/ed25519", keyring_core::Error::NoStorageAccess("locked".into()));
         let error = Identity::load_or_create(&on_mock(Arc::clone(&store))).expect_err("an unreadable store");
         assert_eq!(error, Error::Secrets("Couldn't access platform storage: locked".to_owned()));
         assert!(entry.get_secret().is_err_and(|e| matches!(e, keyring_core::Error::NoEntry)));
