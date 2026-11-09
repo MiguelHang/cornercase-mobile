@@ -30,6 +30,8 @@ pub enum Error {
     UnknownRoute,
     #[error("the saved identity is not a 32-byte Ed25519 seed")]
     Identity,
+    #[error("the system gave no random bytes for the identity")]
+    Random,
 }
 
 #[cfg(test)]

@@ -33,6 +33,7 @@ mod display {
     #[case::unknown_machine(Error::UnknownMachine, "no saved machine has that id")]
     #[case::unknown_route(Error::UnknownRoute, "the machine has no route at that address")]
     #[case::identity(Error::Identity, "the saved identity is not a 32-byte Ed25519 seed")]
+    #[case::random(Error::Random, "the system gave no random bytes for the identity")]
     fn says_what_failed(#[case] error: Error, #[case] message: &str) {
         assert_eq!(error.to_string(), message);
     }
