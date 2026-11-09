@@ -140,4 +140,15 @@ mod identity {
         let second = Identity::load_or_create(&on_mock(store)).expect("the saved identity");
         assert_eq!(first.fingerprint(), second.fingerprint());
     }
+
+    #[test]
+    fn is_not_created_when_the_store_cannot_be_read() {
+        let store = mock_store();
+        let entry = store.build(SERVICE, "identity/ed25519", None).expect("a mock entry");
+        let credential: &mock::Cred = entry.as_any().downcast_ref().expect("a mock credential");
+        credential.set_error(keyring_core::Error::NoStorageAccess("locked".into()));
+        let error = Identity::load_or_create(&on_mock(Arc::clone(&store))).expect_err("an unreadable store");
+        assert_eq!(error, Error::Secrets("Couldn't access platform storage: locked".to_owned()));
+        assert!(entry.get_secret().is_err_and(|e| matches!(e, keyring_core::Error::NoEntry)));
+    }
 }
