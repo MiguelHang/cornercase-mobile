@@ -62,6 +62,7 @@ export class Chat {
   #asked = 0
   #busy = false
   #again = false
+  #starting = false
 
   constructor(machine: number | null, pane: number, readLast: ReadLast, sendText: SendText) {
     this.machine = machine
@@ -78,13 +79,14 @@ export class Chat {
     return this.draft.trim() !== '' && !this.sending && this.row !== null && !this.asking
   }
 
-  see(machine: number | null, agents: AgentRow[] | null) {
+  see(machine: number | null, agents: AgentRow[] | null, starting = false) {
     if (this.gone) {
       return
     }
+    this.#starting ||= starting
     const elsewhere = machine !== this.machine
     const row = agents === null || elsewhere ? null : (agents.find((agent) => agent.pane === this.pane) ?? null)
-    if (row === null && (elsewhere || agents !== null || this.row !== null)) {
+    if (row === null && (elsewhere || this.#lost(agents))) {
       this.#leave()
       return
     }
@@ -122,6 +124,10 @@ export class Chat {
       this.draft = ''
     }
     return failed
+  }
+
+  #lost(agents: AgentRow[] | null) {
+    return (agents !== null && !this.#starting) || this.row !== null
   }
 
   #leave() {

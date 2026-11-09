@@ -6,6 +6,7 @@
     events,
     type AgentRow_Serialize as AgentRow,
     type MachineView_Serialize,
+    type Started_Serialize as Started,
   } from './lib/bindings'
   import { Chat, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
@@ -19,6 +20,7 @@
   import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
+  import Start from './routes/start/Start.svelte'
   import Terminal from './routes/terminal/Terminal.svelte'
 
   type Listed = Awaited<ReturnType<typeof commands.machinesList>>
@@ -28,6 +30,7 @@
   let current = $state(idle)
   let machines = $state<MachineView_Serialize[]>([])
   let barHeight = $state(0)
+  let launched = $state('')
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
 
@@ -43,11 +46,14 @@
   const rescanning = $derived(route.name === 'machine' && route.adding === true)
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
+  const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)
+  const boot = $derived(current.agents?.[0]?.boot ?? null)
 
   $effect(() => {
     const { machine, agents } = current
     if (chat !== null) {
-      untrack(() => chat.see(machine, agents))
+      const waiting = starting !== null
+      untrack(() => chat.see(machine, agents, waiting))
     }
   })
 
@@ -66,6 +72,25 @@
     if (current.machine !== null) {
       router.go({ name: 'terminal', machine: current.machine, row })
     }
+  }
+
+  const start = () => {
+    if (current.machine !== null) {
+      router.go({ name: 'start', machine: current.machine })
+    }
+  }
+
+  const started = (placed: Started, agent: string) => {
+    launched = agent
+    router.replace({ name: 'agent', machine: current.machine, pane: placed.pane, starting: true })
+    if (placed.warning !== null) {
+      toasts.push({ level: 'info', message: placed.warning })
+    }
+  }
+
+  const created = (name: string) => {
+    toasts.push({ level: 'info', message: `Workspace ${name} created` })
+    router.back()
   }
 
   const remember = (listed: Listed) => {
@@ -153,17 +178,27 @@
         connection={current.connection}
         below={barHeight}
         onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })}
+        onstart={start}
       />
     {:else if chat !== null}
       <Agent
         {chat}
         connection={current.connection}
         below={barHeight}
+        {starting}
         onback={() => router.back()}
         onfailed={(message) => toasts.push({ level: 'error', message })}
         onterminal={terminal}
       />
     {/if}
+  {:else if route.name === 'start'}
+    <Start
+      connection={current.connection}
+      {boot}
+      onback={() => router.back()}
+      onstarted={started}
+      oncreated={(_, name) => created(name)}
+    />
   {:else if route.name === 'machines'}
     <Machines
       {machines}
