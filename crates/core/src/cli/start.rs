@@ -1,4 +1,10 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+use crate::error::Error;
+use crate::transport::json_error;
+
+#[cfg(test)]
+pub(crate) mod fixtures;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -20,6 +26,21 @@ pub struct NewWorkspace {
     pub worktree: bool,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(default)]
+pub struct Started {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub project: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub workspace: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub tab: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub pane: u64,
+    pub warning: Option<String>,
+}
+
 impl StartAgent {
     pub fn argv(&self) -> Vec<String> {
         let mut argv = words(&["start", self.agent.trim(), "--project", &self.project.to_string()]);
@@ -38,6 +59,10 @@ impl NewWorkspace {
         argv.extend(words(&["--json", "--", self.name.trim()]));
         argv
     }
+}
+
+pub fn started(text: &str) -> Result<Started, Error> {
+    serde_json::from_str(text).map_err(|error| json_error(&error))
 }
 
 fn words(words: &[&str]) -> Vec<String> {
