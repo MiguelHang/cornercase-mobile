@@ -48,6 +48,12 @@ impl Phone {
         (machines, id)
     }
 
+    fn studio_and_laptop(&self) -> (Machines, MachineId, MachineId) {
+        let (mut machines, studio) = self.studio();
+        let laptop = machines.add("laptop", route(GONE, NEW_TOKEN)).expect("add the laptop");
+        (machines, studio, laptop)
+    }
+
     fn block_the_file(&self) {
         fs::remove_file(self.file()).ok();
         fs::create_dir(self.file()).expect("put a folder in the file's place");
@@ -485,6 +491,89 @@ mod remember {
         machines.remember(id, &address(TAILNET)).expect("remember the tailnet route");
         phone.block_the_file();
         assert_eq!(machines.remember(id, &address(TAILNET)), Ok(()));
+    }
+}
+
+mod activate {
+    use super::*;
+
+    #[test]
+    fn keeps_the_active_machine_after_loading_again() {
+        let phone = Phone::new();
+        let (mut machines, _, laptop) = phone.studio_and_laptop();
+        machines.activate(laptop).expect("activate the laptop");
+        assert_eq!((machines.active(), phone.open().active()), (Some(laptop), Some(laptop)));
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine() {
+        let phone = Phone::new();
+        let (mut machines, _, laptop) = phone.studio_and_laptop();
+        let result = phone.unchanged(&mut machines, |machines| machines.activate(MachineId(laptop.0 + 1)));
+        assert_eq!(result, Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn writes_nothing_when_the_machine_is_already_active() {
+        let phone = Phone::new();
+        let (mut machines, _, laptop) = phone.studio_and_laptop();
+        machines.activate(laptop).expect("activate the laptop");
+        phone.block_the_file();
+        assert_eq!(machines.activate(laptop), Ok(()));
+    }
+
+    #[test]
+    fn keeps_the_previous_one_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, studio, laptop) = phone.studio_and_laptop();
+        phone.block_the_file();
+        assert!(matches!(machines.activate(laptop), Err(Error::Store(_))));
+        assert_eq!(machines.active(), Some(studio));
+    }
+}
+
+mod active {
+    use super::*;
+
+    #[test]
+    fn is_the_first_machine_until_one_is_activated() {
+        let phone = Phone::new();
+        let (machines, studio, _) = phone.studio_and_laptop();
+        assert_eq!(machines.active(), Some(studio));
+    }
+
+    #[test]
+    fn is_none_without_machines() {
+        assert_eq!(Phone::new().open().active(), None);
+    }
+
+    #[test]
+    fn falls_back_to_the_first_and_is_forgotten_when_the_active_one_is_removed() {
+        let phone = Phone::new();
+        let (mut machines, studio, laptop) = phone.studio_and_laptop();
+        machines.activate(laptop).expect("activate the laptop");
+        machines.remove(laptop).expect("remove the laptop");
+        assert_eq!((machines.active(), phone.open().active()), (Some(studio), Some(studio)));
+        let written: serde_json::Value = serde_json::from_str(&phone.text()).expect("the file is JSON");
+        assert_eq!(written["active"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn stays_when_another_machine_is_removed() {
+        let phone = Phone::new();
+        let (mut machines, studio, laptop) = phone.studio_and_laptop();
+        machines.activate(laptop).expect("activate the laptop");
+        machines.remove(studio).expect("remove the studio");
+        assert_eq!(phone.open().active(), Some(laptop));
+    }
+
+    #[test]
+    fn falls_back_to_the_first_when_the_saved_one_is_not_in_the_list() {
+        let phone = Phone::new();
+        let machine = r#"{"id": 3, "name": "studio", "routes": [], "last_route": null}"#;
+        fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 4, "machines": [{machine}], "active": 7}}"#))
+            .expect("write the file by hand");
+        assert_eq!(phone.open().active(), Some(MachineId(3)));
     }
 }
 

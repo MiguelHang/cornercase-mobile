@@ -83,6 +83,9 @@ impl Machines {
             return Ok(());
         };
         let removed = saved.machines.remove(index);
+        if saved.active == Some(id) {
+            saved.active = None;
+        }
         self.commit(saved)?;
         removed.routes.iter().map(|route| self.secrets.delete(&key(id, route.address()))).fold(Ok(()), Result::and)
     }
@@ -127,6 +130,21 @@ impl Machines {
         }
         let mut saved = self.saved.clone();
         find(&mut saved, id)?.last_route = Some(address.clone());
+        self.commit(saved)
+    }
+
+    pub fn active(&self) -> Option<MachineId> {
+        let saved = self.saved.active.filter(|id| self.machine(*id).is_some());
+        saved.or_else(|| self.saved.machines.first().map(|machine| machine.id))
+    }
+
+    pub fn activate(&mut self, id: MachineId) -> Result<(), Error> {
+        self.machine(id).ok_or(Error::UnknownMachine)?;
+        if self.saved.active == Some(id) {
+            return Ok(());
+        }
+        let mut saved = self.saved.clone();
+        saved.active = Some(id);
         self.commit(saved)
     }
 
