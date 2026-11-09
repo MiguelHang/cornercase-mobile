@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::cli::surface::{
-    Area, Colours, Cursor, Frame, Hyperlink, Modes, Node, Scroll, Size, Style, WireLines, WirePane, WireRun,
+    Area, Colours, Copy, Cursor, Frame, Hyperlink, Modes, Node, Scroll, Size, Style, WireLines, WirePane, WireRun,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,9 +93,74 @@ impl PaneGrid {
             },
         }
     }
+
+    fn patch(&mut self, wire: WirePane, tables: &Tables) {
+        self.cursor = wire.cursor;
+        self.active = wire.active.unwrap_or(self.active);
+        self.modes = wire.modes.unwrap_or(self.modes);
+        self.scroll = wire.scroll.unwrap_or(self.scroll);
+        if let Some(colours) = wire.colours {
+            self.colours = colours;
+        }
+        if let Some(copy) = wire.copy {
+            self.copy_lines(copy);
+        }
+        match wire.lines {
+            Some(WireLines::Changed(changed)) => self.replace_rows(&changed, tables),
+            Some(WireLines::All(all)) => self.lines = tables.lines(&all, self.size.rows),
+            None => {}
+        }
+    }
+
+    fn copy_lines(&mut self, copy: Copy) {
+        let held = self.lines.clone();
+        for i in 0..usize::from(copy.count) {
+            let (from, to) = (usize::from(copy.from) + i, usize::from(copy.to) + i);
+            if let (Some(source), Some(target)) = (held.get(from), self.lines.get_mut(to)) {
+                target.clone_from(source);
+            }
+        }
+    }
+
+    fn replace_rows(&mut self, changed: &HashMap<String, Vec<WireRun>>, tables: &Tables) {
+        for (row, runs) in changed {
+            let Ok(row) = row.parse::<usize>() else { continue };
+            if row >= usize::from(self.size.rows) {
+                continue;
+            }
+            if row >= self.lines.len() {
+                self.lines.resize(row + 1, Line::new());
+            }
+            self.lines[row] = tables.line(runs);
+        }
+    }
 }
 
 impl Grid {
+    pub fn apply(&mut self, frame: Frame) -> Applied {
+        if frame.base.is_some() {
+            return self.apply_patch(frame);
+        }
+        self.apply_frame(frame);
+        Applied::Applied
+    }
+
+    pub fn apply_patch(&mut self, frame: Frame) -> Applied {
+        if frame.base != Some(self.revision) || frame.surface != self.surface || frame.boot != self.boot {
+            return Applied::NeedRedraw;
+        }
+        let tables = Tables::new(frame.styles, frame.hyperlinks);
+        for wire in frame.panes {
+            let Some(grid) = self.panes.iter_mut().find(|grid| grid.pane == wire.pane) else {
+                return Applied::NeedRedraw;
+            };
+            grid.patch(wire, &tables);
+        }
+        self.revision = frame.revision;
+        self.projection = frame.projection.or(self.projection);
+        Applied::Applied
+    }
+
     pub fn apply_frame(&mut self, frame: Frame) {
         let tables = Tables::new(frame.styles, frame.hyperlinks);
         self.boot = frame.boot;
