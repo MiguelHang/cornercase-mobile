@@ -50,8 +50,8 @@ describe('App', () => {
 describe('App wiring', () => {
   const source = appSource.replace(/\s+/g, ' ')
 
-  it('takes the route from the screen on every change', () => {
-    expect(source).toContain('const show = (next: Screen) => { current = next router.replace(routeFor(next)) }')
+  it('takes the base route from the screen on every change', () => {
+    expect(source).toContain('const show = (next: Screen) => { current = next router.setBase(routeFor(next)) }')
     expect(source.match(/ current = (?!\$state)/g)).toHaveLength(1)
   })
 

@@ -26,7 +26,7 @@
 
   const show = (next: Screen) => {
     current = next
-    router.replace(routeFor(next))
+    router.setBase(routeFor(next))
   }
 
   const remember = (listed: Listed) => {
