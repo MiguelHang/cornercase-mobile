@@ -1,4 +1,6 @@
-#[expect(dead_code, reason = "nothing registers the commands until the bindings collect them")]
+#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the bindings until the app registers them"))]
+mod bindings;
+#[cfg_attr(not(test), expect(dead_code, reason = "nothing registers the commands until the app mounts the bindings"))]
 mod commands;
 #[cfg_attr(not(test), expect(dead_code, reason = "only the tests forward the changes until a command connects"))]
 mod events;
