@@ -7,6 +7,7 @@ import Changes from './Changes.svelte'
 import changesSource from './Changes.svelte?raw'
 import FileRow from './FileRow.svelte'
 import rowSource from './FileRow.svelte?raw'
+import viewedSource from './Viewed.svelte?raw'
 
 const WORKSPACE = 2
 
@@ -180,13 +181,13 @@ describe('FileRow', () => {
     expect(source).toContain(
       '<button class="open" type="button" onclick={() => onopen(file.path)} ontouchstart={() => {}}>',
     )
-    expect(source).toContain('onclick={() => onviewed(file.path, !file.viewed)} ontouchstart={() => {}}')
+    expect(source).toContain('<Viewed viewed={file.viewed} onflip={() => onviewed(file.path, !file.viewed)} />')
   })
 
   it('gives the row and its viewed button the 44 px touch target', () => {
-    const source = flat(rowSource)
-    expect(source).toContain('min-height: 44px;')
-    expect(source).toContain('width: 44px; height: 44px;')
+    expect(flat(rowSource)).toContain('min-height: 44px;')
+    expect(flat(viewedSource)).toContain('width: 44px; height: 44px;')
+    expect(flat(viewedSource)).toContain('onclick={onflip} ontouchstart={() => {}}')
   })
 
   it('cuts a long path at its start', () => {

@@ -125,6 +125,11 @@
     }
   }
 
+  const leaveDiff = () => {
+    changes?.closeDiff()
+    router.back()
+  }
+
   const start = () => {
     if (current.machine !== null) {
       router.go({ name: 'start', machine: current.machine })
@@ -255,7 +260,9 @@
       <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} />
     {/if}
   {:else if route.name === 'change'}
-    <Diff path={route.path} onback={() => router.back()} />
+    {#if changes !== null}
+      <Diff path={route.path} {changes} onback={leaveDiff} />
+    {/if}
   {:else if route.name === 'start'}
     <Start
       connection={current.connection}

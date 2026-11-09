@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ChangedFile_Serialize as ChangedFile } from '../../lib/bindings'
   import { shownPath, statusLetter } from '../../lib/diff'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import Viewed from './Viewed.svelte'
 
   const TAGS: Partial<Record<ChangedFile['fold'], string>> = {
     lockfile: 'lockfile',
@@ -36,16 +36,7 @@
       <span class="minus">−{file.removed}</span>
     {/if}
   </button>
-  <button
-    class="check"
-    type="button"
-    aria-label="Viewed"
-    aria-pressed={file.viewed}
-    onclick={() => onviewed(file.path, !file.viewed)}
-    ontouchstart={() => {}}
-  >
-    <Icon name={file.viewed ? 'square-check' : 'square'} size={22} />
-  </button>
+  <Viewed viewed={file.viewed} onflip={() => onviewed(file.path, !file.viewed)} />
 </div>
 
 <style>
@@ -73,8 +64,7 @@
     text-align: left;
   }
 
-  .open:active,
-  .check:active {
+  .open:active {
     background: var(--hover);
   }
 
@@ -142,23 +132,5 @@
   .viewed .plus,
   .viewed .minus {
     color: var(--faint);
-  }
-
-  .check {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--muted);
-  }
-
-  .check[aria-pressed='true'] {
-    color: var(--accent);
   }
 </style>

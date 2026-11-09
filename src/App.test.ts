@@ -209,7 +209,7 @@ describe('App wiring', () => {
       "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} <Diff path={route.path} onback={() => router.back()} /> {:else if route.name === 'start'}",
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} onback={leaveDiff} /> {/if} {:else if route.name === 'start'}",
     )
   })
 
@@ -217,6 +217,10 @@ describe('App wiring', () => {
     expect(source).toContain(
       "const change = (path: string) => { if (changes !== null) { void changes.open(path) router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path, mode: changes.mode }) } }",
     )
+  })
+
+  it('drops the open diff before going back from it to the list', () => {
+    expect(source).toContain('const leaveDiff = () => { changes?.closeDiff() router.back() }')
   })
 
   it('keeps one state of the reviewed workspace under its list and its diff, following it once it listens and leaving it after', () => {
