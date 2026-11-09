@@ -133,7 +133,10 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board machine={current.machine} agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} onstart={start} />",
+      "<Board machine={current.machine} agents={current.agents} connection={current.connection} below={barHeight} onopen={open} onstart={start} />",
+    )
+    expect(source).toContain(
+      "const open = (pane: number) => router.go({ name: 'agent', machine: current.machine, pane })",
     )
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
@@ -148,7 +151,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
     )
   })
 
@@ -236,7 +239,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
     )
   })
 })

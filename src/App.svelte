@@ -106,6 +106,8 @@
     router.setBase(routeFor(next, machines.length))
   }
 
+  const open = (pane: number) => router.go({ name: 'agent', machine: current.machine, pane })
+
   const terminal = (row: AgentRow) => {
     if (current.machine !== null) {
       router.go({ name: 'terminal', machine: current.machine, row })
@@ -241,16 +243,18 @@
         agents={current.agents}
         connection={current.connection}
         below={barHeight}
-        onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })}
+        onopen={open}
         onstart={start}
       />
     {:else if chat !== null}
       <Agent
         {chat}
+        agents={current.agents}
         connection={current.connection}
         below={barHeight}
         {starting}
         onback={() => router.back()}
+        onopen={open}
         onfailed={(message) => toasts.push({ level: 'error', message })}
         onterminal={terminal}
         onchanges={review}

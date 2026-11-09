@@ -10,24 +10,29 @@
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
   import KeyRow from './KeyRow.svelte'
+  import Subagents from './Subagents.svelte'
 
   const TICK_MS = 30_000
 
   let {
     chat,
+    agents,
     connection,
     below = 0,
     starting = null,
     onback,
+    onopen,
     onfailed,
     onterminal,
     onchanges,
   }: {
     chat: Chat
+    agents: AgentRow[] | null
     connection: ConnectionView_Serialize
     below?: number
     starting?: string | null
     onback: () => void
+    onopen: (pane: number) => void
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
@@ -87,6 +92,9 @@
           <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
         </div>
       </header>
+      {#key row.pane}
+        <Subagents {row} agents={agents ?? []} {onopen} />
+      {/key}
       <article class="message">
         {#if reading.kind === 'message'}
           {@const written = elapsed(reading.message.written, now)}

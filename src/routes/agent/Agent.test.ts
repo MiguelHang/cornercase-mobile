@@ -7,6 +7,8 @@ import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
+import Subagents from './Subagents.svelte'
+import subagentsSource from './Subagents.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
@@ -55,9 +57,26 @@ const chatWith = (row: AgentRow | null, draft = '') => {
   return chat
 }
 
-const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED, starting: string | null = null) =>
+const draw = (
+  chat: Chat,
+  below = 0,
+  connection: ConnectionView_Serialize = CONNECTED,
+  starting: string | null = null,
+  agents: AgentRow[] | null = null,
+) =>
   render(Agent, {
-    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {}, onchanges: () => {} },
+    props: {
+      chat,
+      agents,
+      connection,
+      below,
+      starting,
+      onback: () => {},
+      onopen: () => {},
+      onfailed: () => {},
+      onterminal: () => {},
+      onchanges: () => {},
+    },
   }).body
 
 const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
@@ -85,6 +104,73 @@ describe('Agent, its header', () => {
 
   it('sits below the connection bar', () => {
     expect(draw(chatWith(ROW), 52)).toContain('style="--below: 52px;"')
+  })
+})
+
+const LEAD: AgentRow = { ...ROW, status: 'working', role: 'orchestrator', rank_status: 'waiting' }
+
+const CODER: AgentRow = { ...ROW, pane: 13, parent: 12, depth: 1, role: 'coder', title: 'Write the form', status: 'working' }
+
+const DIG: AgentRow = { ...ROW, pane: 14, parent: 13, depth: 2, role: null, title: 'Dig', status: 'waiting' }
+
+const REVIEWER: AgentRow = { ...ROW, pane: 15, parent: 12, depth: 1, role: 'reviewer', title: 'Review', status: 'working' }
+
+const TEAM = [LEAD, CODER, DIG, REVIEWER]
+
+const COUNT = /<span class="count svelte-[\w-]+">([^<]*)<\/span>/
+
+const unfolded = (agents: AgentRow[]) =>
+  render(Subagents, { props: { row: LEAD, agents, onopen: () => {}, open: true } }).body
+
+const names = (body: string) => [...body.matchAll(/<span class="name svelte-[\w-]+">([^<]*)<\/span>/g)].map(([, name]) => name)
+
+describe('Agent, its subagents', () => {
+  it('counts the subagents of every level on a folded line under the header', () => {
+    const body = draw(chatWith(LEAD), 0, CONNECTED, null, TEAM)
+    expect(body.match(COUNT)?.[1]).toBe('3 subagents · 1 waiting, 2 working')
+    expect(body).toMatch(/<\/header>(?:<!--[^>]*-->|\s)*<div class="subagents[^]*?<article/)
+    expect(body).toContain('aria-expanded="false"')
+    expect(body).toContain('▸')
+    expect(body).not.toContain('class="children')
+  })
+
+  it.each<[string, AgentRow[] | null]>([
+    ['an agent without children', [LEAD, DIG]],
+    ['no list of agents', null],
+  ])('has no line for %s', (_, agents) => {
+    const body = draw(chatWith(LEAD), 0, CONNECTED, null, agents)
+    expect(body).toContain('</header>')
+    expect(body).not.toContain('class="subagents')
+  })
+
+  it('unfolds into its direct children, named by their role, with the attention and count below each', () => {
+    const body = unfolded(TEAM)
+    expect(body).toContain('aria-expanded="true"')
+    expect(body).toContain('▾')
+    expect(names(body)).toEqual(['coder', 'reviewer'])
+    expect(body).toMatch(/<span class="where svelte-[\w-]+">Write the form<\/span>/)
+    expect(body).toMatch(/aria-label="Waiting" width="10"[^]*?<span class="hidden svelte-[\w-]+">\+1<\/span>/)
+    expect(body).not.toContain('>Dig<')
+  })
+
+  it("opens a child's chat from its row and folds the list from the line", () => {
+    expect(flat(subagentsSource)).toContain(
+      '<button class="child" type="button" onclick={() => onopen(child.row.pane)} ontouchstart={() => {}}>',
+    )
+    expect(flat(subagentsSource)).toContain('aria-expanded={open} onclick={() => (open = !open)}')
+    expect(flat(subagentsSource)).toContain('min-height: 44px;')
+  })
+
+  it('starts folded again for each agent opened, and opens its children like the board', () => {
+    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key}')
+  })
+
+  it('follows the rows as they change', () => {
+    const chat = chatWith(LEAD)
+    const changed = [LEAD, CODER, { ...DIG, status: 'done' }]
+    chat.see(1, changed)
+    expect(draw(chat, 0, CONNECTED, null, changed).match(COUNT)?.[1]).toBe('2 subagents · 1 done, 1 working')
+    expect(names(unfolded(changed))).toEqual(['coder'])
   })
 })
 
