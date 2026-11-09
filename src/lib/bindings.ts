@@ -22,6 +22,8 @@ export const commands = {
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	startProjects: () => typedError<ProjectChoice[], CommandError>(__TAURI_INVOKE("start_projects")),
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
+	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
+	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 };
 
 /** Events */
@@ -223,6 +225,12 @@ export type Missing_Serialize = {
 	reason: string | null,
 };
 
+export type NewWorkspace = {
+	project: number,
+	name: string,
+	worktree: boolean,
+};
+
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
@@ -263,6 +271,32 @@ export type Size_Deserialize = {
 export type Size_Serialize = {
 	cols: number,
 	rows: number,
+};
+
+export type StartAgent = {
+	project: number,
+	agent: string,
+	model: string,
+	prompt: string,
+	worktree: string,
+};
+
+export type Started = Started_Serialize | Started_Deserialize;
+
+export type Started_Deserialize = {
+	project?: number,
+	workspace?: number,
+	tab?: number,
+	pane?: number,
+	warning?: string | null,
+};
+
+export type Started_Serialize = {
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	warning: string | null,
 };
 
 export type Style = Style_Serialize | Style_Deserialize;

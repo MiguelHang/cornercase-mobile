@@ -24,6 +24,8 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             terminal::terminal_close,
             start::start_projects,
             start::installed_agents,
+            start::start_agent,
+            start::new_workspace,
         ])
         .events(collect_events![ConnectionChanged, AgentsChanged, TerminalChanged, Toast])
 }
