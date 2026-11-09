@@ -17,7 +17,7 @@ backoff ni a que falle un stream.
   conexión en "sin red" sin gastar reintentos.
 - [x] CA3 — Los streams en curso por una ruta que ya no existe se cierran a propósito (no se espera a los 45 s de
   silencio).
-- [ ] CA4 — Probado en iPhone: wifi → datos (con Tailscale) y datos → wifi, con el tablero y la terminal abiertos;
+- [x] CA4 — Probado en iPhone: wifi → datos (con Tailscale) y datos → wifi, con el tablero y la terminal abiertos;
   tiempo hasta volver a estar conectado anotado. Pendiente del usuario: el simulador no puede pasar a datos. En el
   simulador iPhone 17e se comprobó la línea base y que nada de la 013 se rompió; lo que falta y cómo medirlo está en
   `design/connection/network.md` › Checked live.
