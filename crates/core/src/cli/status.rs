@@ -81,6 +81,8 @@ pub struct Pane {
     pub path: Option<String>,
     #[cfg_attr(feature = "specta", specta(type = Option<u32>))]
     pub parent: Option<u64>,
+    pub role: Option<String>,
+    pub collapsed: bool,
     pub active: bool,
     pub dialog: bool,
     pub at_prompt: Option<bool>,

@@ -1,0 +1,404 @@
+{
+  "boot": "45375-1794260990750792000",
+  "caller": null,
+  "config": {
+    "revision": 1
+  },
+  "groups": [],
+  "home": "/home/me",
+  "projects": [
+    {
+      "active": true,
+      "collapsed": false,
+      "custom_name": null,
+      "group": null,
+      "id": 4,
+      "name": "web-shop",
+      "path": "/home/me/src/web-shop",
+      "workspaces": [
+        {
+          "active": true,
+          "behind": 0,
+          "branch": "main",
+          "changes": {
+            "added": 0,
+            "files": 0,
+            "mode": "uncommitted",
+            "removed": 0
+          },
+          "collapsed": false,
+          "custom_name": null,
+          "id": 3,
+          "name": "main",
+          "path": "/home/me/src/web-shop",
+          "pull_request": null,
+          "run_dir": null,
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": null,
+              "id": 2,
+              "layout": {
+                "leaf": 1
+              },
+              "name": "bash",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 1,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/src/web-shop",
+                  "pid": 45376,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": null
+            },
+            {
+              "active": false,
+              "custom_name": "lead",
+              "id": 6,
+              "layout": {
+                "leaf": 5
+              },
+              "name": "lead",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "collapsed": true,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 5,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/src/web-shop",
+                  "pid": 46157,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": "working",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "working"
+            },
+            {
+              "active": false,
+              "custom_name": "tests",
+              "id": 8,
+              "layout": {
+                "leaf": 7
+              },
+              "name": "tests",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 7,
+                  "model": null,
+                  "parent": 5,
+                  "path": "/home/me/src/web-shop",
+                  "pid": 46507,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": "waiting",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "waiting"
+            },
+            {
+              "active": false,
+              "custom_name": "fixtures",
+              "id": 10,
+              "layout": {
+                "leaf": 9
+              },
+              "name": "fixtures",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 9,
+                  "model": null,
+                  "parent": 7,
+                  "path": "/home/me/src/web-shop",
+                  "pid": 46563,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": "working",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "working"
+            }
+          ],
+          "worktree": false
+        },
+        {
+          "active": false,
+          "behind": 0,
+          "branch": "feat/dark-mode",
+          "collapsed": false,
+          "custom_name": null,
+          "id": 11,
+          "name": "feat/dark-mode",
+          "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+          "pull_request": null,
+          "run_dir": null,
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": "styles",
+              "id": 13,
+              "layout": {
+                "leaf": 12
+              },
+              "name": "styles",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 12,
+                  "model": null,
+                  "parent": 5,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+                  "pid": 46866,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": "idle",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "idle"
+            }
+          ],
+          "worktree": true
+        },
+        {
+          "active": false,
+          "behind": 0,
+          "branch": "feat/checkout",
+          "collapsed": false,
+          "custom_name": null,
+          "id": 14,
+          "name": "feat/checkout",
+          "path": "/home/me/.cornercase/worktrees/web-shop/feat-checkout",
+          "pull_request": null,
+          "run": {
+            "end": "commits",
+            "reached": false
+          },
+          "run_dir": "/home/me/.local/state/cornercase/runs/2026-11-09-feat-checkout",
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": "orchestrator",
+              "id": 19,
+              "layout": {
+                "leaf": 16
+              },
+              "name": "orchestrator",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 16,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-checkout",
+                  "pid": 47767,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": "orchestrator",
+                  "status": "idle",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "idle"
+            },
+            {
+              "active": false,
+              "custom_name": "coder",
+              "id": 20,
+              "layout": {
+                "leaf": 17
+              },
+              "name": "coder",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 17,
+                  "model": null,
+                  "parent": 16,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-checkout",
+                  "pid": 47769,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": "coder",
+                  "status": "working",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "working"
+            },
+            {
+              "active": false,
+              "custom_name": "reviewer",
+              "id": 21,
+              "layout": {
+                "leaf": 18
+              },
+              "name": "reviewer",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": "claude",
+                  "at_prompt": false,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 18,
+                  "model": null,
+                  "parent": 16,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-checkout",
+                  "pid": 47770,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": "reviewer",
+                  "status": "idle",
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": "idle"
+            }
+          ],
+          "worktree": true
+        }
+      ]
+    }
+  ],
+  "shown": {
+    "pane": 1,
+    "project": 4,
+    "tab": 2,
+    "workspace": 3
+  },
+  "theme": {
+    "from": "default",
+    "scheme": null
+  },
+  "version": "0.13.19"
+}
