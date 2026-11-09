@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 
-use serde::Deserialize;
+use serde::de::value::{MapAccessDeserializer, SeqAccessDeserializer};
+use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 
 #[cfg(test)]
 pub(crate) mod fixtures;
@@ -39,6 +42,8 @@ pub enum UnderlineKind {
     Curly,
     Dotted,
     Dashed,
+    #[serde(other)]
+    Other,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
@@ -72,6 +77,7 @@ pub enum Node {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct Branch {
+    #[serde(default)]
     pub dir: String,
     pub first: Node,
     pub second: Node,
@@ -80,11 +86,12 @@ pub struct Branch {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CursorShape {
-    #[default]
-    Block,
     Bar,
     Underline,
     BlockHollow,
+    #[default]
+    #[serde(other)]
+    Block,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
@@ -99,21 +106,23 @@ pub struct Cursor {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MouseMode {
-    #[default]
-    None,
     Press,
     PressRelease,
     ButtonMotion,
     AnyMotion,
+    #[default]
+    #[serde(other)]
+    None,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MouseEncoding {
-    #[default]
-    Default,
     Utf8,
     Sgr,
+    #[default]
+    #[serde(other)]
+    Default,
 }
 
 #[expect(clippy::struct_excessive_bools, reason = "mirrors the terminal modes cornercase reports")]
@@ -155,16 +164,39 @@ pub struct WireRun {
     pub cells: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WireLines {
     All(Vec<Vec<WireRun>>),
     Changed(HashMap<String, Vec<WireRun>>),
 }
 
+impl<'de> Deserialize<'de> for WireLines {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(LinesVisitor)
+    }
+}
+
+struct LinesVisitor;
+
+impl<'de> Visitor<'de> for LinesVisitor {
+    type Value = WireLines;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a list of every line or a map of the changed rows")
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<WireLines, A::Error> {
+        Vec::deserialize(SeqAccessDeserializer::new(seq)).map(WireLines::All)
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<WireLines, A::Error> {
+        HashMap::deserialize(MapAccessDeserializer::new(map)).map(WireLines::Changed)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
-pub struct Copy {
+pub struct Copied {
     pub from: u16,
     pub to: u16,
     pub count: u16,
@@ -181,7 +213,7 @@ pub struct WirePane {
     pub modes: Option<Modes>,
     pub scroll: Option<Scroll>,
     pub colours: Option<Colours>,
-    pub copy: Option<Copy>,
+    pub copy: Option<Copied>,
     pub lines: Option<WireLines>,
 }
 

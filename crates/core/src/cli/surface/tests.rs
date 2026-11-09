@@ -148,7 +148,7 @@ mod a_patch {
     fn reads_the_copy_and_the_changed_lines() {
         let frame = parsed(PATCH);
         let scrolled = pane(&frame, 13);
-        assert_eq!(scrolled.copy, Some(Copy { from: 1, to: 0, count: 3 }));
+        assert_eq!(scrolled.copy, Some(Copied { from: 1, to: 0, count: 3 }));
         let lines = changed_lines(scrolled);
         let mut rows: Vec<_> = lines.keys().map(String::as_str).collect();
         rows.sort_unstable();
@@ -196,7 +196,7 @@ mod missing_and_unknown_keys {
     )]
     #[case::a_copy_without_a_count(
         json!({ "pane": 9, "copy": { "from": 2 } }),
-        WirePane { pane: 9, copy: Some(Copy { from: 2, ..Copy::default() }), ..WirePane::default() }
+        WirePane { pane: 9, copy: Some(Copied { from: 2, ..Copied::default() }), ..WirePane::default() }
     )]
     #[case::a_run_without_cells(
         json!({ "pane": 9, "lines": [[{ "hyperlink": 1 }]] }),
@@ -217,5 +217,37 @@ mod missing_and_unknown_keys {
         let frame = read(&json!({ "styles": [{ "bold": true, "sparkle": true }, { "fg": { "index": 7 } }] }));
         assert_eq!(frame.styles[0], Style { bold: true, ..Style::default() });
         assert_eq!(frame.styles[1].fg, Some(Colour::Index(7)));
+    }
+
+    #[test]
+    fn read_a_split_without_its_direction() {
+        let frame = read(&json!({ "layout": { "split": { "first": { "leaf": 1 }, "second": { "leaf": 2 } } } }));
+        let branch = Branch { dir: String::new(), first: Node::Leaf(1), second: Node::Leaf(2) };
+        assert_eq!(frame.layout, Some(Node::Split(Box::new(branch))));
+    }
+
+    #[test]
+    fn read_later_values_of_the_closed_lists() {
+        let pane = json!({
+            "pane": 9,
+            "cursor": { "x": 1, "shape": "later" },
+            "modes": { "mouse": "later", "mouse_encoding": "later", "bracketed_paste": true }
+        });
+        let frame = read(&json!({ "styles": [{ "underline": true, "underline_style": "later" }], "panes": [pane] }));
+        assert_eq!(frame.styles[0].underline_kind, Some(UnderlineKind::Other));
+        let read_pane = &frame.panes[0];
+        assert_eq!(read_pane.cursor, Some(Cursor { x: 1, ..Cursor::default() }));
+        let modes = read_pane.modes.expect("the pane's modes");
+        assert_eq!(
+            (modes.mouse, modes.mouse_encoding, modes.bracketed_paste),
+            (MouseMode::None, MouseEncoding::Default, true)
+        );
+    }
+
+    #[test]
+    fn refuse_lines_that_are_neither_a_list_nor_a_map() {
+        let error =
+            Frame::deserialize(&json!({ "panes": [{ "pane": 9, "lines": 3 }] })).expect_err("lines as a number");
+        assert!(error.to_string().contains("a list of every line or a map of the changed rows"), "{error}");
     }
 }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use crate::cli::surface::{
-    Area, Colours, Copy, Cursor, Frame, Hyperlink, Modes, Node, Scroll, Size, Style, WireLines, WirePane, WireRun,
+    Area, Colours, Copied, Cursor, Frame, Hyperlink, Modes, Node, Scroll, Size, Style, WireLines, WirePane, WireRun,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,13 +134,15 @@ impl PaneGrid {
         rows
     }
 
-    fn copy_lines(&mut self, copy: Copy) -> BTreeSet<u16> {
-        let held = self.lines.clone();
+    fn copy_lines(&mut self, copy: Copied) -> BTreeSet<u16> {
+        let from = usize::from(copy.from);
+        let end = from.saturating_add(usize::from(copy.count)).min(self.lines.len());
+        let held = self.lines.get(from..end).unwrap_or_default().to_vec();
         let mut copied = BTreeSet::new();
-        for i in 0..usize::from(copy.count) {
-            let (from, to) = (usize::from(copy.from) + i, usize::from(copy.to) + i);
-            if let (Some(source), Some(target)) = (held.get(from), self.lines.get_mut(to)) {
-                target.clone_from(source);
+        for (i, source) in held.into_iter().enumerate() {
+            let to = usize::from(copy.to) + i;
+            if let Some(target) = self.lines.get_mut(to) {
+                *target = source;
                 copied.extend(u16::try_from(to).ok());
             }
         }
