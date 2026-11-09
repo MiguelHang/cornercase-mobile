@@ -3,6 +3,8 @@ import { render } from 'svelte/server'
 import { describe, expect, it, vi } from 'vitest'
 import { AddMachine } from '../lib/addMachine.svelte'
 import { Scanner, type ScannerApi } from '../lib/scanner.svelte'
+import type { Offer } from '../lib/machineForm'
+import SameOffer from '../lib/ui/SameOffer.svelte'
 import ScanOverlay from '../lib/ui/ScanOverlay.svelte'
 import overlaySource from '../lib/ui/ScanOverlay.svelte?raw'
 import urlFieldSource from '../lib/ui/UrlField.svelte?raw'
@@ -102,16 +104,16 @@ describe('MachineForm', () => {
   const script = flat(formSource)
 
   it('submits through AddMachine, with the commands and the handover', () => {
-    expect(script).toContain('const form = new AddMachine(commands.machineAdd, (machine) => onadded(machine))')
+    expect(script).toContain('const form = new AddMachine(commands, (machine) => onadded(machine))')
     expect(script).toContain('event.preventDefault() void form.submit()')
   })
 
   it('holds still while adding: fields and Cancel off, the spinner and Adding… on Add', () => {
     expect(script).toContain(
-      '<UrlField bind:value={form.url} error={form.urlError} disabled={form.busy} onscanned={(url) => void form.fill(url)} />',
+      '<UrlField bind:value={form.url} error={form.urlError} disabled={form.held} onscanned={(url) => void form.fill(url)} />',
     )
     expect(script).toContain(
-      '<Field label="Name" bind:value={form.name} placeholder={placeholderName(form.url)} disabled={form.busy} />',
+      '<Field label="Name" bind:value={form.name} error={form.nameError} placeholder={placeholderName(form.url)} disabled={form.held} />',
     )
     expect(script).toContain('<Button tone="plain" resting={form.busy} onclick={oncancel}>Cancel</Button>')
     expect(script).toContain("<Button type=\"submit\" busy={form.busy}>{form.busy ? 'Adding…' : 'Add'}</Button>")
@@ -130,11 +132,65 @@ describe('MachineForm', () => {
   })
 })
 
+describe('the same machine offer', () => {
+  const offer = (why: Offer['why'], checked = true): Offer => ({
+    url: SCANNED,
+    name: 'studio.lan',
+    machine: 3,
+    saved: 'Studio',
+    why,
+    checked,
+  })
+
+  const shown = (made: Offer, busy = false) =>
+    render(SameOffer, { props: { offer: made, busy, onroute: () => {}, onnew: () => {}, onback: () => {} } }).body
+
+  it('says why, then offers the route first as the primary, a new machine and Back', () => {
+    const body = shown(offer('token'))
+    expect(body).toMatch(/<div class="offer svelte-[\w-]+" role="group" aria-label="Same machine">/)
+    expect(body).toContain('Studio uses the same bridge token.')
+    expect(button(body, 'Add as a route of Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
+    expect(button(body, 'Add as a new machine')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
+    expect(button(body, 'Back')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
+    expect(body.indexOf('Add as a route')).toBeLessThan(body.indexOf('Add as a new machine'))
+    expect(body).not.toContain('did not answer')
+  })
+
+  it('offers updating the token for the same address', () => {
+    expect(shown(offer('address'))).toContain('Update the token of Studio')
+  })
+
+  it('warns when the bridge could not be asked', () => {
+    expect(shown(offer('name', false))).toMatch(
+      /<p class="note svelte-[\w-]+">The bridge did not answer at this URL, so it could not be asked which machine it is.<\/p>/,
+    )
+  })
+
+  it('holds every choice while one runs', () => {
+    expect(shown(offer('boot'), true).match(/<button[^>]* disabled=""/g)).toHaveLength(3)
+  })
+
+  it('takes the place of Cancel and Add, with the choices through AddMachine', () => {
+    const script = flat(formSource)
+    expect(script).toContain('{#if form.offer === null} <div class="buttons">')
+    expect(script).toContain(
+      '{:else} <SameOffer offer={form.offer} busy={form.busy} onroute={() => void form.addRoute()} onnew={() => void form.addNew()} onback={() => form.back()} /> {/if}',
+    )
+  })
+})
+
 describe('scanning a QR code', () => {
   it('fills the URL with the code read and sends it like a pasted one', async () => {
     const add = vi.fn(() => Promise.resolve({ status: 'ok' as const, data: 5 }))
     const onadded = vi.fn()
-    const form = new AddMachine(add, onadded)
+    const form = new AddMachine(
+      {
+        machineAdd: add,
+        machineMatch: () => Promise.resolve({ status: 'ok', data: { found: { kind: 'none' }, checked: true } }),
+        machineRouteAdd: () => Promise.resolve({ status: 'ok', data: null }),
+      },
+      onadded,
+    )
     const url = await camera('granted', qrCode).scan()
     await form.fill(url ?? '')
     expect([form.url, add.mock.calls, onadded.mock.calls]).toEqual([SCANNED, [[SCANNED, 'studio.lan']], [[5]]])
