@@ -2,7 +2,6 @@ use std::future;
 use std::time::Duration;
 
 use futures_util::SinkExt;
-use futures_util::stream::BoxStream;
 use rstest::rstest;
 use serde_json::Value;
 use tokio::time;
@@ -10,35 +9,13 @@ use tokio::time;
 use super::*;
 use crate::cli::surface::fixtures::{FRAME, PATCH};
 use crate::transport::fake::FakeTransport;
-use crate::transport::{Out, OutSink, Stdin};
+use crate::transport::{Out, OutSink};
 
 const ARGV: [&str; 8] = ["surface", "--tab", "12", "--cols", "80", "--rows", "24", "--patches"];
 const SIZE: Size = Size { cols: 80, rows: 24 };
 const TAB_12: Source = Source::Tab { tab: 12, size: SIZE };
 const VIEW_ARGV: [&str; 4] = ["surface", "--view", "41", "--patches"];
 const VIEW_41: Source = Source::View { view: 41, tab: 12 };
-
-struct Launched {
-    fake: FakeTransport,
-    argv: mpsc::UnboundedSender<String>,
-}
-
-impl Transport for Launched {
-    fn run(
-        &self,
-        argv: Vec<String>,
-        stdin: BoxStream<'static, Stdin>,
-        out: OutSink,
-    ) -> BoxFuture<'_, Result<Exit, Error>> {
-        self.argv.send(argv.join(" ")).expect("the test reads what was launched");
-        self.fake.run(argv, stdin, out)
-    }
-}
-
-fn launched(fake: FakeTransport) -> (Arc<dyn Transport>, mpsc::UnboundedReceiver<String>) {
-    let (argv, heard) = mpsc::unbounded_channel();
-    (Arc::new(Launched { fake, argv }), heard)
-}
 
 fn idle_queue() -> Queue {
     Queue::new(Arc::new(FakeTransport::default()), |_| {}).0
@@ -118,7 +95,7 @@ mod open {
 
     #[tokio::test]
     async fn launches_only_the_surface_of_the_tab_at_its_size_with_patches() {
-        let (transport, mut argv) = launched(FakeTransport::default().answer(&ARGV, &[], &[], 0));
+        let (transport, mut argv) = FakeTransport::default().answer(&ARGV, &[], &[], 0).launched();
         let live = Live::open(transport, idle_queue(), TAB_12);
         assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
         assert_eq!(argv.recv().await, Some(ARGV.join(" ")));
@@ -127,7 +104,7 @@ mod open {
 
     #[tokio::test]
     async fn launches_the_surface_of_a_view_with_patches() {
-        let (transport, mut launched) = launched(FakeTransport::default().answer(&VIEW_ARGV, &[], &[], 0));
+        let (transport, mut launched) = FakeTransport::default().answer(&VIEW_ARGV, &[], &[], 0).launched();
         let live = Live::open(transport, idle_queue(), VIEW_41);
         assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
         assert_eq!(launched.recv().await, Some(VIEW_ARGV.join(" ")));
@@ -389,7 +366,7 @@ mod a_terminal {
 
     impl Watched {
         async fn after_a_minute(mac: Mac) -> Self {
-            let (transport, launched) = launched(mac.fake());
+            let (transport, launched) = mac.fake().launched();
             let studio = Route::parse("ws://studio.local:8765/?token=c2VjcmV0").expect("a bridge url");
             let machine =
                 Machine { id: MachineId(1), name: "studio".to_owned(), routes: vec![studio], last_route: None };

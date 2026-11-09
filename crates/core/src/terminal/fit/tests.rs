@@ -30,6 +30,10 @@ fn on_no_tab(line: &mut Value) {
     line["view"]["shown"]["tab"] = Value::Null;
 }
 
+fn raised(line: &mut Value) {
+    line["view"]["projection"] = Value::from(4);
+}
+
 fn on_another_tab_without_control(line: &mut Value) {
     on_another_tab(line);
     without_control(line);
@@ -72,9 +76,8 @@ mod a_claim {
 
     #[tokio::test]
     async fn hands_the_projection_of_each_later_line() {
-        let raised = line(|line| line["view"]["projection"] = Value::from(4));
         assert_eq!(
-            verdicts(printing(&[line(unchanged), raised, line(unchanged)]), 3).await,
+            verdicts(printing(&[line(unchanged), line(raised), line(unchanged)]), 3).await,
             [GRANTED, Verdict::Projection(4), Verdict::Projection(3)]
         );
     }
@@ -139,5 +142,189 @@ mod a_refusal {
         let fake = FakeTransport::default().answer(&ARGV, &[&fixture], &[REFUSAL], 1);
         let refused = Verdict::Refused(Error::Failed { code: 1, stderr: REFUSAL.to_owned() });
         assert_eq!(verdicts(claim(fake), 3).await, [GRANTED, refused.clone(), refused]);
+    }
+}
+
+mod a_fit {
+    use std::iter;
+
+    use futures_util::SinkExt;
+    use tokio::sync::{mpsc, oneshot};
+    use tokio::task::JoinHandle;
+
+    use super::*;
+    use crate::cli::surface::fixtures::FRAME;
+    use crate::transport::{Out, OutSink};
+
+    const SURFACE: [&str; 4] = ["surface", "--view", "41", "--patches"];
+
+    type Painted = Result<(u64, Option<u64>), Error>;
+
+    fn frame(tab: u64, projection: u64) -> String {
+        let mut frame: Value = serde_json::from_str(FRAME).expect("the frame fixture");
+        (frame["view"], frame["tab"], frame["projection"]) = (41.into(), tab.into(), projection.into());
+        frame.to_string()
+    }
+
+    fn idle_queue() -> Queue {
+        Queue::new(Arc::new(FakeTransport::default()), |_| {}).0
+    }
+
+    fn handing(fake: FakeTransport, argv: &[&str], outputs: &mpsc::UnboundedSender<OutSink>) -> FakeTransport {
+        let outputs = outputs.clone();
+        fake.script(argv, move |_, out| {
+            outputs.send(out).expect("the test reads each output");
+            future::pending()
+        })
+    }
+
+    fn painting(painted: mpsc::UnboundedSender<Painted>) -> impl FnMut(&Grid, Result<Changes, Error>) {
+        move |grid, changes| {
+            let seen = changes.map(|_| (grid.tab, grid.projection));
+            painted.send(seen).expect("the test reads what was painted");
+        }
+    }
+
+    struct Mac {
+        launched: mpsc::UnboundedReceiver<String>,
+        outputs: mpsc::UnboundedReceiver<OutSink>,
+        painted: mpsc::UnboundedReceiver<Painted>,
+        moved_on: oneshot::Sender<()>,
+        following: JoinHandle<Fitted>,
+    }
+
+    impl Mac {
+        fn fitting() -> Self {
+            let (outputs, handed) = mpsc::unbounded_channel();
+            let fake = handing(handing(FakeTransport::default(), &ARGV, &outputs), &SURFACE, &outputs);
+            let (transport, launched) = fake.launched();
+            let (moved_on, moved) = oneshot::channel();
+            let moved = async move { moved.await.ok().unwrap_or_default() };
+            let (painted, seen) = mpsc::unbounded_channel();
+            let claim = Claim::open(transport.clone(), 3, SIZE);
+            let following = tokio::spawn(follow_fitted(claim, transport, idle_queue(), moved, painting(painted)));
+            Self { launched, outputs: handed, painted: seen, moved_on, following }
+        }
+
+        async fn granted() -> (Self, OutSink, OutSink) {
+            let mut mac = Self::fitting();
+            let mut view = mac.output().await;
+            say(&mut view, line(unchanged)).await;
+            let surface = mac.output().await;
+            (mac, view, surface)
+        }
+
+        async fn output(&mut self) -> OutSink {
+            self.outputs.recv().await.expect("a process was launched")
+        }
+
+        fn launched(&mut self) -> Vec<String> {
+            iter::from_fn(|| self.launched.try_recv().ok()).collect()
+        }
+    }
+
+    async fn say(out: &mut OutSink, line: String) {
+        out.send(Out::Stdout(line)).await.expect("the process is still followed");
+    }
+
+    async fn released(out: &mut OutSink) -> bool {
+        out.send(Out::Stdout(line(unchanged))).await.is_err()
+    }
+
+    async fn fitted(fake: FakeTransport, moved_on: impl Future<Output = ()>) -> (Fitted, Vec<String>) {
+        let (transport, mut launched) = fake.launched();
+        let claim = Claim::open(transport.clone(), 3, SIZE);
+        let fitted = follow_fitted(claim, transport, idle_queue(), moved_on, |_, _| {}).await;
+        (fitted, iter::from_fn(|| launched.try_recv().ok()).collect())
+    }
+
+    #[tokio::test]
+    async fn launches_the_surface_of_the_view_only_after_its_first_line() {
+        let mut mac = Mac::fitting();
+        let mut view = mac.output().await;
+        assert_eq!(mac.launched(), [ARGV.join(" ")]);
+        say(&mut view, line(unchanged)).await;
+        let mut surface = mac.output().await;
+        assert_eq!(mac.launched(), [SURFACE.join(" ")]);
+        say(&mut surface, frame(3, 3)).await;
+        assert_eq!(mac.painted.recv().await, Some(Ok((3, Some(3)))));
+    }
+
+    #[tokio::test]
+    async fn paints_no_frame_behind_the_projection_the_view_last_told() {
+        let (mut mac, mut view, mut surface) = Mac::granted().await;
+        say(&mut surface, frame(3, 2)).await;
+        say(&mut surface, frame(3, 3)).await;
+        assert_eq!(mac.painted.recv().await, Some(Ok((3, Some(3)))));
+        say(&mut view, line(raised)).await;
+        say(&mut surface, frame(3, 3)).await;
+        say(&mut surface, frame(3, 4)).await;
+        assert_eq!(mac.painted.recv().await, Some(Ok((3, Some(4)))));
+    }
+
+    #[tokio::test]
+    async fn paints_no_frame_of_another_tab() {
+        let (mut mac, _view, mut surface) = Mac::granted().await;
+        say(&mut surface, frame(9, 3)).await;
+        say(&mut surface, frame(3, 3)).await;
+        assert_eq!(mac.painted.recv().await, Some(Ok((3, Some(3)))));
+    }
+
+    #[tokio::test]
+    async fn tells_of_a_line_that_is_no_surface_and_goes_on() {
+        let (mut mac, _view, mut surface) = Mac::granted().await;
+        say(&mut surface, "{\"boot\":".to_owned()).await;
+        say(&mut surface, frame(3, 3)).await;
+        let warned = Err(Error::Json("the JSON ends too early at line 1 column 8".to_owned()));
+        assert_eq!(mac.painted.recv().await, Some(warned));
+        assert_eq!(mac.painted.recv().await, Some(Ok((3, Some(3)))));
+    }
+
+    #[rstest]
+    #[case::taken_back(without_control, Fitted::TakenBack)]
+    #[case::moved_away(on_another_tab, Fitted::MovedAway)]
+    #[tokio::test]
+    async fn lets_go_of_both_processes_when_a_line_ends_it(#[case] edit: fn(&mut Value), #[case] fitted: Fitted) {
+        let (mac, mut view, mut surface) = Mac::granted().await;
+        say(&mut view, line(edit)).await;
+        assert_eq!(mac.following.await.expect("the fit ends"), fitted);
+        assert!(released(&mut view).await && released(&mut surface).await);
+    }
+
+    #[tokio::test]
+    async fn lets_go_of_both_processes_when_the_store_moved_on() {
+        let (mac, mut view, mut surface) = Mac::granted().await;
+        mac.moved_on.send(()).expect("the fit is still followed");
+        assert_eq!(mac.following.await.expect("the fit ends"), Fitted::MovedOn);
+        assert!(released(&mut view).await && released(&mut surface).await);
+    }
+
+    #[rstest]
+    #[case::taken_back(without_control, Fitted::TakenBack)]
+    #[case::moved_away(on_another_tab, Fitted::MovedAway)]
+    #[tokio::test]
+    async fn launches_no_surface_when_the_first_line_ends_it(#[case] edit: fn(&mut Value), #[case] fitted: Fitted) {
+        let fake = FakeTransport::default().open(&ARGV, &[&line(edit)]);
+        assert_eq!(self::fitted(fake, future::pending()).await, (fitted, vec![ARGV.join(" ")]));
+    }
+
+    #[tokio::test]
+    async fn launches_no_surface_when_the_view_is_refused() {
+        let fake = FakeTransport::default().answer(&ARGV, &[], &[REFUSAL], 1);
+        let refused = Fitted::Refused(Error::Failed { code: 1, stderr: REFUSAL.to_owned() });
+        assert_eq!(fitted(fake, future::pending()).await, (refused, vec![ARGV.join(" ")]));
+    }
+
+    #[tokio::test]
+    async fn launches_no_surface_when_the_store_moved_on_before_the_first_line() {
+        let fake = FakeTransport::default().open(&ARGV, &[]);
+        assert_eq!(fitted(fake, future::ready(())).await, (Fitted::MovedOn, vec![ARGV.join(" ")]));
+    }
+
+    #[tokio::test]
+    async fn ends_with_the_surface_of_the_view() {
+        let fake = FakeTransport::default().open(&ARGV, &[&line(unchanged)]).answer(&SURFACE, &[], &[], 0);
+        let launched = vec![ARGV.join(" "), SURFACE.join(" ")];
+        assert_eq!(fitted(fake, future::pending()).await, (Fitted::Ended(Ended::Exited), launched));
     }
 }
