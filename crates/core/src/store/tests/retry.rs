@@ -20,8 +20,8 @@ fn ending(argv: &[&str], end: Result<Exit, Error>) -> FakeTransport {
 
 pub(super) fn held(fake: FakeTransport, argv: &[&str], alive: &Arc<()>) -> FakeTransport {
     let alive = alive.clone();
-    fake.script(argv, move |_, out| {
-        let held = (alive.clone(), out);
+    fake.script(argv, move |stdin, out| {
+        let held = (alive.clone(), stdin, out);
         async move {
             let _held = held;
             future::pending().await
@@ -45,7 +45,7 @@ fn closing_later(fake: FakeTransport) -> FakeTransport {
     })
 }
 
-async fn answered(mut out: OutSink, line: Option<String>) -> Result<Exit, Error> {
+pub(super) async fn answered(mut out: OutSink, line: Option<String>) -> Result<Exit, Error> {
     let line = line.ok_or(Error::Dropped)?;
     out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?;
     Ok(exit(0, ""))

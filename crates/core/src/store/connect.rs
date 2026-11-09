@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use super::{Connection, Driver};
+use crate::cli::contract::boot::Observed;
 use crate::cli::contract::{self, Descriptor};
 use crate::error::Error;
 use crate::machines::pick::{PickError, Picked, pick_route};
@@ -22,6 +23,10 @@ where
         self.machine.last_route = Some(picked.route.address().clone());
         let descriptor = Descriptor::from_value(picked.contract.clone())
             .map_err(|error| Failure::Stop(Connection::Incompatible(error)))?;
+        if self.boots.observe(descriptor.boot()) == Observed::Restarted {
+            self.shared.forget();
+        }
+        self.join(&picked.transport);
         let missing = contract::missing(&descriptor);
         if missing.is_empty() { Ok(picked) } else { Err(Failure::Stop(Connection::Missing(missing))) }
     }

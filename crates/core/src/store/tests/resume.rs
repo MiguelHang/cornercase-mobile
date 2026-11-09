@@ -14,7 +14,7 @@ use crate::cli::status::fixtures::WATCH;
 use crate::store::streams::{APP, EVENTS, STATUS};
 use crate::transport::Out;
 
-fn contracts(asked: &Asked) -> usize {
+pub(super) fn contracts(asked: &Asked) -> usize {
     asked.all().iter().filter(|asked| asked.ends_with(": contract --json")).count()
 }
 
@@ -26,10 +26,10 @@ fn slow_contract() -> FakeTransport {
     })
 }
 
-fn snapshot_once(fake: FakeTransport) -> FakeTransport {
+pub(super) fn once(fake: FakeTransport, argv: &[&str], json: &'static str) -> FakeTransport {
     let calls = AtomicUsize::new(0);
-    fake.script(STATUS, move |_, mut out| {
-        let lines: Vec<String> = (calls.fetch_add(1, Ordering::SeqCst) == 0).then(|| line(WATCH)).into_iter().collect();
+    fake.script(argv, move |_, mut out| {
+        let lines: Vec<String> = (calls.fetch_add(1, Ordering::SeqCst) == 0).then(|| line(json)).into_iter().collect();
         async move {
             for line in lines {
                 out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?;
@@ -73,7 +73,7 @@ mod resume_now {
 
     #[tokio::test(start_paused = true)]
     async fn keeps_what_it_knew_while_it_connects_again() {
-        let (store, mut changes) = spawned(snapshot_once(serving(fine())), &Asked::default());
+        let (store, mut changes) = spawned(once(serving(fine()), STATUS, WATCH), &Asked::default());
         until_connected(&mut changes).await;
         store.resume_now();
         time::sleep(Duration::from_secs(60)).await;

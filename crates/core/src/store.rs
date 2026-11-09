@@ -4,25 +4,31 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-use futures_util::future::{self, Either};
+use futures_util::FutureExt;
+use futures_util::future::{self, BoxFuture, Either};
 use serde_json::Value;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time;
 
 use self::backoff::Backoff;
 use self::connect::Failure;
+use self::streams::Ended;
 use crate::cli::contract::Missing;
+use crate::cli::contract::boot::BootWatch;
 use crate::cli::events::Event;
 use crate::cli::status::Snapshot;
 use crate::error::Error;
 use crate::machines::Machine;
 use crate::machines::pick::{PickConfig, Picked};
 use crate::machines::route::{Address, Route};
+use crate::queue::Queue;
 use crate::transport::Transport;
 
 mod backoff;
 mod connect;
 mod streams;
+
+type Worker = BoxFuture<'static, ()>;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Connection {
@@ -62,8 +68,8 @@ impl Store {
     {
         let shared = Arc::new(Shared::default());
         let (resumes, asked) = mpsc::unbounded_channel();
-        let driver = Driver { machine, factory, config, shared: shared.clone(), backoff: Backoff::default() };
-        (Self { shared, resumes }, driver.drive(asked))
+        let (driver, worker) = Driver::new(machine, factory, config, shared.clone());
+        (Self { shared, resumes }, driver.drive(asked, worker))
     }
 
     pub fn connection(&self) -> Connection {
@@ -76,6 +82,10 @@ impl Store {
 
     pub fn app(&self) -> Option<Value> {
         self.shared.state().app.clone()
+    }
+
+    pub fn queue(&self) -> Option<Queue> {
+        self.shared.queue()
     }
 
     pub fn changes(&self) -> Changes {
@@ -150,6 +160,7 @@ struct State {
     connection: Connection,
     session: Option<Snapshot>,
     app: Option<Value>,
+    queue: Option<Queue>,
     subscribers: Vec<Subscriber>,
 }
 
@@ -169,6 +180,10 @@ impl Shared {
         self.state().subscribers.retain(|subscriber| subscriber.send(change));
     }
 
+    fn queue(&self) -> Option<Queue> {
+        self.state().queue.clone()
+    }
+
     fn connected(&self) -> bool {
         matches!(self.state().connection, Connection::Connected { .. })
     }
@@ -176,6 +191,15 @@ impl Shared {
     fn set_connection(&self, connection: Connection) {
         self.state().connection = connection.clone();
         self.publish(&Change::Connection(connection));
+    }
+
+    fn forget(&self) {
+        let mut state = self.state();
+        state.session = None;
+        state.app = None;
+        drop(state);
+        self.publish(&Change::Session);
+        self.publish(&Change::App);
     }
 }
 
@@ -185,15 +209,37 @@ struct Driver<F> {
     config: PickConfig,
     shared: Arc<Shared>,
     backoff: Backoff,
+    boots: BootWatch,
+    worker: Option<oneshot::Sender<Worker>>,
 }
 
 impl<F> Driver<F>
 where
     F: Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync,
 {
-    async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>) {
+    fn new(machine: Machine, factory: F, config: PickConfig, shared: Arc<Shared>) -> (Self, oneshot::Receiver<Worker>) {
+        let (worker, started) = oneshot::channel();
+        let backoff = Backoff::default();
+        (Self { machine, factory, config, shared, backoff, boots: BootWatch::default(), worker: Some(worker) }, started)
+    }
+
+    async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>, worker: oneshot::Receiver<Worker>) {
         let mut resumes = Resumes(resumes);
-        while self.attempt(&mut resumes).await {}
+        let attempts = async { while self.attempt(&mut resumes).await {} };
+        future::select(pin!(attempts), pin!(worked(worker))).await;
+    }
+
+    fn join(&mut self, transport: &Arc<dyn Transport>) {
+        if let Some(queue) = self.shared.queue() {
+            queue.reconnect(transport.clone());
+            return;
+        }
+        let shared = self.shared.clone();
+        let (queue, worker) = Queue::new(transport.clone(), move |error| shared.publish(&Change::Warning(error)));
+        self.shared.state().queue = Some(queue);
+        if let Some(started) = self.worker.take() {
+            let _ = started.send(worker.boxed());
+        }
     }
 
     async fn attempt(&mut self, resumes: &mut Resumes) -> bool {
@@ -218,7 +264,11 @@ where
         if self.shared.connected() {
             self.backoff.reset();
         }
-        woken
+        match woken {
+            Woken::Done(Ended::Failed(error)) => Woken::Done(error),
+            Woken::Done(Ended::Restarted) | Woken::Resumed => Woken::Resumed,
+            Woken::Dropped => Woken::Dropped,
+        }
     }
 
     async fn stop(&self, connection: Connection, resumes: &mut Resumes) -> bool {
@@ -230,6 +280,12 @@ where
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
         !matches!(resumes.race(time::sleep(wait), || true).await, Woken::Dropped)
+    }
+}
+
+async fn worked(worker: oneshot::Receiver<Worker>) {
+    if let Ok(worker) = worker.await {
+        worker.await;
     }
 }
 

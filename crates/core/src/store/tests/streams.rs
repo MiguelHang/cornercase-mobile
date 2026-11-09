@@ -57,7 +57,7 @@ fn connected() -> Vec<Connection> {
     vec![Connection::Connecting, Connection::Connected { route: route(LAN).address().clone() }]
 }
 
-fn snapshot(boot: &str, revision: u64, version: &str) -> String {
+pub(super) fn snapshot(boot: &str, revision: u64, version: &str) -> String {
     json!({"boot": boot, "revision": revision, "version": version}).to_string()
 }
 
@@ -105,7 +105,6 @@ mod the_session {
     #[case::older_of_the_same_boot(snapshot("a", 6, "second"), "first")]
     #[case::as_old_of_the_same_boot(snapshot("a", 7, "second"), "first")]
     #[case::newer_of_the_same_boot(snapshot("a", 8, "second"), "second")]
-    #[case::of_another_boot(snapshot("b", 1, "second"), "second")]
     #[tokio::test(start_paused = true)]
     async fn takes_a_snapshot_only_if_newer_in_its_boot(#[case] next: String, #[case] kept: &str) {
         let [events, _, app] = fine();

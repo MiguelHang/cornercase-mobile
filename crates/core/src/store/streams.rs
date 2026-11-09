@@ -1,3 +1,4 @@
+use std::ops::ControlFlow::{self, Break, Continue};
 use std::pin::pin;
 
 use futures_util::future::{self, BoxFuture, Either};
@@ -20,21 +21,33 @@ pub(super) const APP: &[&str] = &["status", "--app", "--follow", "--json"];
 
 type End = Result<Exit, Error>;
 
+pub(super) enum Ended {
+    Failed(Error),
+    Restarted,
+}
+
 struct Opened<'a> {
     lines: mpsc::UnboundedReceiver<String>,
     run: BoxFuture<'a, End>,
 }
 
-pub(super) async fn follow(shared: &Shared, picked: &Picked) -> Error {
+pub(super) async fn follow(shared: &Shared, picked: &Picked) -> Ended {
     let transport = picked.transport.as_ref();
     let route = picked.route.address();
     let streams = [
-        pump(open(transport, EVENTS), |line| shared.event(line)).boxed(),
+        pump(open(transport, EVENTS), going(|line| shared.event(line))).boxed(),
         pump(open(transport, STATUS), |line| shared.status(line, route)).boxed(),
-        pump(open(transport, APP), |line| shared.app(line)).boxed(),
+        pump(open(transport, APP), going(|line| shared.app(line))).boxed(),
     ];
-    let (end, _, _) = future::select_all(streams).await;
-    ended(end)
+    let (ended, _, _) = future::select_all(streams).await;
+    ended
+}
+
+fn going(apply: impl Fn(&str)) -> impl Fn(&str) -> ControlFlow<()> {
+    move |line| {
+        apply(line);
+        Continue(())
+    }
 }
 
 fn open<'a>(transport: &'a dyn Transport, argv: &[&str]) -> Opened<'a> {
@@ -43,11 +56,14 @@ fn open<'a>(transport: &'a dyn Transport, argv: &[&str]) -> Opened<'a> {
     Opened { lines, run: transport.run(argv, stream::pending().boxed(), out) }
 }
 
-async fn pump(mut opened: Opened<'_>, apply: impl Fn(&str)) -> End {
+async fn pump(mut opened: Opened<'_>, apply: impl Fn(&str) -> ControlFlow<()>) -> Ended {
     loop {
-        match heard(&mut opened).await {
+        let flow = match heard(&mut opened).await {
             Either::Left(line) => apply(&line),
             Either::Right(end) => return drained(&mut opened.lines, &apply, end),
+        };
+        if flow.is_break() {
+            return Ended::Restarted;
         }
     }
 }
@@ -60,11 +76,13 @@ async fn heard(opened: &mut Opened<'_>) -> Either<String, End> {
     }
 }
 
-fn drained(lines: &mut mpsc::UnboundedReceiver<String>, apply: &impl Fn(&str), end: End) -> End {
+fn drained(lines: &mut mpsc::UnboundedReceiver<String>, apply: &impl Fn(&str) -> ControlFlow<()>, end: End) -> Ended {
     while let Ok(line) = lines.try_recv() {
-        apply(&line);
+        if apply(&line).is_break() {
+            return Ended::Restarted;
+        }
     }
-    end
+    Ended::Failed(ended(end))
 }
 
 fn ended(end: End) -> Error {
@@ -83,25 +101,32 @@ impl Shared {
         }
     }
 
-    fn status(&self, line: &str, route: &Address) {
+    fn status(&self, line: &str, route: &Address) -> ControlFlow<()> {
         let Some(snapshot) = self.parsed::<Snapshot>(line) else {
-            return;
+            return Continue(());
         };
-        self.snapshot(snapshot);
+        self.snapshot(snapshot)?;
         if !self.connected() {
             self.set_connection(Connection::Connected { route: route.clone() });
         }
+        Continue(())
     }
 
-    fn snapshot(&self, snapshot: Snapshot) {
+    fn snapshot(&self, snapshot: Snapshot) -> ControlFlow<()> {
         let mut state = self.state();
         let last = state.session.as_ref();
-        if last.is_some_and(|last| last.boot == snapshot.boot && snapshot.revision <= last.revision) {
-            return;
+        if last.is_some_and(|last| last.boot != snapshot.boot) {
+            drop(state);
+            self.forget();
+            return Break(());
+        }
+        if last.is_some_and(|last| snapshot.revision <= last.revision) {
+            return Continue(());
         }
         state.session = Some(snapshot);
         drop(state);
         self.publish(&Change::Session);
+        Continue(())
     }
 
     fn app(&self, line: &str) {

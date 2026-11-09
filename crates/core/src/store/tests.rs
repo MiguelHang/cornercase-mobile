@@ -12,6 +12,7 @@ use crate::machines::MachineId;
 use crate::transport::fake::FakeTransport;
 use crate::transport::{Exit, OutSink, Stdin};
 
+mod boot;
 mod connect;
 mod resume;
 mod retry;
@@ -179,6 +180,7 @@ mod the_handle {
         assert_eq!(store.connection(), Connection::Connecting);
         assert_eq!(store.session(), None);
         assert_eq!(store.app(), None);
+        assert!(store.queue().is_none());
     }
 
     #[tokio::test(start_paused = true)]

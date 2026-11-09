@@ -103,8 +103,7 @@ mod the_winning_route {
             Machine { last_route: Some(route(LAN).address().clone()), ..machine(vec![route(LAN), route(TAILNET)]) };
         let factory = network(vec![(TAILNET, contract(REAL))], &Asked::default());
         let shared = Arc::new(Shared::default());
-        let mut driver =
-            Driver { machine: saved, factory, config: PickConfig::default(), shared, backoff: Backoff::default() };
+        let (mut driver, _worker) = Driver::new(saved, factory, PickConfig::default(), shared);
         let picked = driver.connect().await.expect("the tailnet answers");
         assert_eq!(picked.route, route(TAILNET));
         assert_eq!(driver.machine.last_route.as_ref(), Some(route(TAILNET).address()));
