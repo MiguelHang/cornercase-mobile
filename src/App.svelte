@@ -10,7 +10,7 @@
   import { Chat, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
-  import { chatOf, openedTerminal, Router, routeFor } from './lib/router.svelte'
+  import { openedTerminal, Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
@@ -33,7 +33,7 @@
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
-  const opening = $derived(chatOf(route))
+  const opening = $derived(router.opened)
   const pane = $derived(opening?.pane ?? null)
   const owner = $derived(opening?.machine ?? null)
   const chat = $derived(pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send))

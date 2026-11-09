@@ -26,6 +26,8 @@ export const chatOf = (route: Route): ChatOf | null => {
   return route.name === 'terminal' ? { machine: route.machine, pane: route.row.pane } : null
 }
 
+const overMachines = (route: Route) => route.name === 'machines' || route.name === 'machine'
+
 export class Router {
   #stack: Route[] = $state([])
 
@@ -35,6 +37,11 @@ export class Router {
 
   get current(): Route {
     return this.#stack[this.#stack.length - 1]
+  }
+
+  get opened(): ChatOf | null {
+    const under = this.#stack.findLast((route) => !overMachines(route))
+    return under === undefined ? null : chatOf(under)
   }
 
   go(route: Route) {

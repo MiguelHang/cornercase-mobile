@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as connection from './connection'
-import { chatOf, openedTerminal, Router, routeFor } from './router.svelte'
+import { chatOf, openedTerminal, type Route, Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
@@ -215,17 +215,6 @@ const on = (machine: number | null, agents: AgentRow[] | null): connection.Scree
   agents,
 })
 
-describe('chatOf, on Back', () => {
-  it('keeps the machine the agent was opened on, after switching from Machines', () => {
-    const router = new Router(HOME)
-    router.go(AGENT)
-    router.go(MACHINES)
-    router.setBase(HOME)
-    router.back()
-    expect(chatOf(router.current)).toEqual({ machine: 1, pane: 7 })
-  })
-})
-
 describe('openedTerminal', () => {
   it('opens the terminal on the machine it was opened on', () => {
     expect(openedTerminal(TERMINAL, on(1, null))).toBe(TERMINAL)
@@ -258,5 +247,41 @@ describe('chatOf', () => {
 
   it.each([HOME, NO_MACHINES, MACHINES, MACHINE])('is none elsewhere', (route) => {
     expect(chatOf(route)).toBeNull()
+  })
+
+  it('keeps the machine the agent was opened on, after switching from Machines and going back', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(MACHINES)
+    router.setBase(HOME)
+    router.back()
+    expect(chatOf(router.current)).toEqual({ machine: 1, pane: 7 })
+  })
+})
+
+const opened = (...routes: Route[]) => {
+  const router = new Router(HOME)
+  routes.forEach((route) => router.go(route))
+  return router.opened
+}
+
+describe('Router, the opened chat', () => {
+  it('is none on the board', () => {
+    expect(opened()).toBeNull()
+    expect(new Router(NO_MACHINES).opened).toBeNull()
+  })
+
+  it("is the agent's on its screen and under its terminal", () => {
+    expect(opened(AGENT)).toEqual({ machine: 1, pane: 7 })
+    expect(opened(AGENT, { ...TERMINAL, row: { ...ROW, pane: 9 } })).toEqual({ machine: 1, pane: 9 })
+  })
+
+  it("stays the agent's under Machines and a machine opened from it, so the chat lives on", () => {
+    expect(opened(AGENT, MACHINES)).toEqual({ machine: 1, pane: 7 })
+    expect(opened(AGENT, MACHINES, MACHINE)).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it('is none under Machines opened from the board', () => {
+    expect(opened(MACHINES, MACHINE)).toBeNull()
   })
 })

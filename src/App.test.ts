@@ -140,8 +140,8 @@ describe('App wiring', () => {
     )
   })
 
-  it('opens a chat for the tapped pane on its own machine, kept alive under its terminal, and goes back from it', () => {
-    expect(source).toContain('const opening = $derived(chatOf(route))')
+  it('opens a chat for the tapped pane on its own machine, kept alive under its terminal and under Machines, and goes back from it', () => {
+    expect(source).toContain('const opening = $derived(router.opened)')
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(

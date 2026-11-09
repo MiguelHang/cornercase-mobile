@@ -31,7 +31,7 @@ const unsent: SendText = () => new Promise(() => {})
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
-const chatOf = (row: AgentRow | null, draft = '') => {
+const chatWith = (row: AgentRow | null, draft = '') => {
   const chat = new Chat(1, ROW.pane, unread, unsent)
   if (row !== null) {
     chat.see(1, [row])
@@ -49,7 +49,7 @@ const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).
 
 describe('Agent, its header', () => {
   it('shows the dot, the status in words, the agent, its place and its tab', () => {
-    const body = draw(chatOf(ROW))
+    const body = draw(chatWith(ROW))
     expect(body).toContain('aria-label="Waiting"')
     expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>/)
     expect(body).toMatch(
@@ -59,19 +59,19 @@ describe('Agent, its header', () => {
   })
 
   it('names the agent when it has no title, and only the project when it has one workspace', () => {
-    const body = draw(chatOf({ ...ROW, title: null, status: 'done', workspace_count: 1, tab_name: 'review' }))
+    const body = draw(chatWith({ ...ROW, title: null, status: 'done', workspace_count: 1, tab_name: 'review' }))
     expect(body).toMatch(/<h1 class="title svelte-[\w-]+">claude<\/h1>/)
     expect(body).toMatch(/<span class="status svelte-[\w-]+">Done<\/span> · web › review<\/p>/)
   })
 
   it('sits below the connection bar', () => {
-    expect(draw(chatOf(ROW), 52)).toContain('style="--below: 52px;"')
+    expect(draw(chatWith(ROW), 52)).toContain('style="--below: 52px;"')
   })
 })
 
 describe('Agent, its message', () => {
   it('draws the message as markdown, with the time it was written', () => {
-    const chat = chatOf(ROW)
+    const chat = chatWith(ROW)
     chat.reading = {
       kind: 'message',
       message: { pane: ROW.pane, agent: 'claude', text: 'Tests **pass**.', written: minutesAgo(5), turn_over: true },
@@ -83,7 +83,7 @@ describe('Agent, its message', () => {
   })
 
   it('leaves out the time when the message has none', () => {
-    const chat = chatOf(ROW)
+    const chat = chatWith(ROW)
     chat.reading = {
       kind: 'message',
       message: { pane: ROW.pane, agent: 'claude', text: 'Ready.', written: null, turn_over: null },
@@ -95,7 +95,7 @@ describe('Agent, its message', () => {
     ['the reason it cannot be read', { kind: 'unreadable', reason: 'no message yet' }, 'no message yet'],
     ['that it is reading', { kind: 'loading' }, 'Reading its last message…'],
   ])('says %s in its place, muted', (_, reading, text) => {
-    const chat = chatOf(ROW)
+    const chat = chatWith(ROW)
     chat.reading = reading
     const body = draw(chat)
     expect(body).toMatch(new RegExp(`<p class="reason svelte-[\\w-]+">${text}</p>`))
@@ -109,7 +109,7 @@ describe('Agent, its message', () => {
 
 describe('Agent, its field', () => {
   it('asks for the answer in a text area, with a Send button ready for typed text', () => {
-    const body = draw(chatOf({ ...ROW, status: 'done' }, 'go on'))
+    const body = draw(chatWith({ ...ROW, status: 'done' }, 'go on'))
     expect(body).toMatch(/<textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer" placeholder="Answer claude"/)
     expect(body).toContain('go on</textarea>')
     expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
@@ -118,13 +118,13 @@ describe('Agent, its field', () => {
   })
 
   it('cannot send blank text', () => {
-    const body = draw(chatOf({ ...ROW, status: 'done' }, '  '))
+    const body = draw(chatWith({ ...ROW, status: 'done' }, '  '))
     expect(send(body)?.[1]).toContain(' resting')
     expect(send(body)?.[2]).toContain('disabled=""')
   })
 
   it('says the agent is asking on its screen, keeps the text and cannot send', () => {
-    const body = draw(chatOf(ROW, 'yes, go on'))
+    const body = draw(chatWith(ROW, 'yes, go on'))
     expect(body).toMatch(
       /<p class="note svelte-[\w-]+">claude is asking you something on its screen; answer with the keys\.<\/p>/,
     )
@@ -133,7 +133,7 @@ describe('Agent, its field', () => {
   })
 
   it('shows the send under way, with the field held', () => {
-    const chat = chatOf({ ...ROW, status: 'done' }, 'go on')
+    const chat = chatWith({ ...ROW, status: 'done' }, 'go on')
     void chat.send()
     const body = draw(chat)
     expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+ busy$/)
@@ -152,7 +152,7 @@ describe('Agent, its field', () => {
 
 describe('Agent, without its row', () => {
   it('says so once its agent stops running, offers the board and has no field', () => {
-    const chat = chatOf(ROW, 'go on')
+    const chat = chatWith(ROW, 'go on')
     chat.see(1, [{ ...ROW, pane: 30 }])
     const body = draw(chat)
     expect(body).toMatch(/<p class="gone svelte-[\w-]+">This agent is no longer running\.<\/p>/)
@@ -163,33 +163,33 @@ describe('Agent, without its row', () => {
   })
 
   it('pulses the mark while it connects, before the first list', () => {
-    const body = draw(chatOf(null), 0, { state: 'connecting' })
+    const body = draw(chatWith(null), 0, { state: 'connecting' })
     expect(body).toMatch(/<span class="cell cursor svelte-[\w-]+ pulsing"><\/span>/)
     expect(body).not.toContain('no longer running')
     expect(body).not.toContain('<textarea')
   })
 
   it('keeps the mark still without a list once it stops connecting', () => {
-    const body = draw(chatOf(null), 0, { state: 'unauthorized' })
+    const body = draw(chatWith(null), 0, { state: 'unauthorized' })
     expect(body).toMatch(/<span class="cell cursor svelte-[\w-]+"><\/span>/)
     expect(body).not.toContain('no longer running')
   })
 
   it.each([ROW, null])('offers going back before it is gone', (row) => {
-    expect(draw(chatOf(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
+    expect(draw(chatWith(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
   })
 
   it('offers opening the terminal of its agent, beside going back', () => {
-    expect(draw(chatOf(ROW))).toMatch(TERMINAL)
+    expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain(
       '<Button tone="plain" onclick={onback}>Back</Button> {#if row !== null} {@const opened = row} <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button> {/if} </div>',
     )
   })
 
   it('offers no terminal without its agent, nor once it is gone', () => {
-    const gone = chatOf(ROW)
+    const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])
-    expect(draw(chatOf(null))).not.toMatch(TERMINAL)
+    expect(draw(chatWith(null))).not.toMatch(TERMINAL)
     expect(draw(gone)).not.toMatch(TERMINAL)
   })
 })
