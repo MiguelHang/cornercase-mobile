@@ -17,7 +17,7 @@ use crate::state::Active;
 use crate::test_util::{
     ADDRESS, BOOT, BRIDGE, Ipc, Recorder, Studio, TOKEN, changed, heard, launcher, released, serving, settle, snapshot,
 };
-use crate::view::RouteView;
+use crate::view::{MachineView, RouteView};
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
 
@@ -34,7 +34,7 @@ fn gated(task: Task) -> JoinHandle<()> {
 }
 
 fn names(state: &AppState) -> Vec<String> {
-    list(state).expect("the machines load").into_iter().map(|machine| machine.name).collect()
+    list(state).expect("the machines load").machines.into_iter().map(|machine| machine.name).collect()
 }
 
 mod adding_a_machine {
@@ -65,16 +65,46 @@ mod adding_a_machine {
     #[test]
     fn lists_it_without_its_token() {
         let studio = Studio::new();
-        let machines = list(&studio.state).expect("the machines load");
+        let machines = list(&studio.state).expect("the machines load").machines;
         let expected = MachineView {
             id: studio.id.0,
             name: "studio".to_owned(),
-            routes: vec![RouteView::Bridge { url: ADDRESS.to_owned() }],
+            routes: vec![RouteView::Bridge { url: ADDRESS.to_owned(), has_token: true }],
             last_route: None,
         };
         assert_eq!(machines, [expected]);
         let json = serde_json::to_string(&machines).expect("the machines serialize");
         assert!(!json.contains(TOKEN), "{json}");
+    }
+}
+
+mod listing_the_machines {
+    use super::*;
+
+    fn active(state: &AppState) -> Option<u64> {
+        list(state).expect("the machines load").active
+    }
+
+    #[test]
+    fn names_the_saved_active_machine() {
+        let studio = Studio::new();
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        studio.state.machines(|machines| machines.activate(laptop).map_err(CommandError::from)).expect("activated");
+        assert_eq!(active(&studio.reloaded()), Some(laptop.0));
+    }
+
+    #[test]
+    fn names_the_first_machine_while_none_was_activated() {
+        let studio = Studio::new();
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        assert_eq!(active(&studio.state), Some(studio.id.0));
+    }
+
+    #[test]
+    fn names_none_without_machines() {
+        let studio = Studio::new();
+        remove(&studio.state, &Recorder::default(), studio.id).expect("removed");
+        assert_eq!(list(&studio.state), Ok(MachineList { machines: vec![], active: None }));
     }
 }
 
@@ -149,9 +179,10 @@ mod over_ipc {
     fn lists_the_machines() {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
-        let machines = ipc.invoke("machines_list", json!({})).expect("the machines load");
-        assert_eq!(machines[0]["name"], "studio");
-        assert_eq!(machines.as_array().map(Vec::len), Some(1));
+        let listed = ipc.invoke("machines_list", json!({})).expect("the machines load");
+        assert_eq!(listed["machines"][0]["name"], "studio");
+        assert_eq!(listed["machines"].as_array().map(Vec::len), Some(1));
+        assert_eq!(listed["active"], studio.id.0);
     }
 
     #[test]
@@ -160,7 +191,7 @@ mod over_ipc {
         let ipc = Ipc::new(studio.reloaded());
         let id = ipc.invoke("machine_add", json!({ "url": LAPTOP, "name": "laptop" })).expect("the machine is added");
         assert_eq!(names(&ipc.state()), ["studio", "laptop"]);
-        assert_eq!(list(&ipc.state()).expect("the machines load")[1].id, id.as_u64().expect("an id"));
+        assert_eq!(list(&ipc.state()).expect("the machines load").machines[1].id, id.as_u64().expect("an id"));
     }
 
     #[test]

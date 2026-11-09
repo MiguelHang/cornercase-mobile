@@ -43,7 +43,7 @@ impl Launcher {
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
-    start(&state, app, &Launcher::bridge(), MachineId(id))
+    switch_to(&state, app, &Launcher::bridge(), MachineId(id))
 }
 
 #[tauri::command]
@@ -58,6 +58,16 @@ pub(crate) fn connection_state(state: State<'_, AppState>) -> ConnectionState {
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn session(state: State<'_, AppState>) -> Option<Snapshot> {
     latest_session(&state)
+}
+
+pub(crate) fn switch_to(
+    state: &AppState,
+    emit: impl Emit,
+    launcher: &Launcher,
+    id: MachineId,
+) -> Result<(), CommandError> {
+    state.machines(|machines| machines.activate(id).map_err(CommandError::from))?;
+    start(state, emit, launcher, id)
 }
 
 pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: MachineId) -> Result<(), CommandError> {

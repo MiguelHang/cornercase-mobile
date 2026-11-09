@@ -96,17 +96,26 @@ describe('describePanes', () => {
 describe('firstToConnect', () => {
   const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
   const IDLE = { machine: null, connection: { state: 'none' as const } }
+  const listed = (active: number | null) => ({ machines: [machine(4), machine(2)], active })
 
-  it('picks the first machine while none is active', () => {
-    expect(connection.firstToConnect([machine(4), machine(2)], IDLE)).toBe(4)
+  it('picks the saved active machine while none is connected', () => {
+    expect(connection.firstToConnect(listed(2), IDLE)).toBe(2)
+  })
+
+  it('picks the first machine once the saved one is gone', () => {
+    expect(connection.firstToConnect(listed(9), IDLE)).toBe(4)
+  })
+
+  it('picks the first machine while none was saved', () => {
+    expect(connection.firstToConnect(listed(null), IDLE)).toBe(4)
   })
 
   it('picks nothing without machines', () => {
-    expect(connection.firstToConnect([], IDLE)).toBeNull()
+    expect(connection.firstToConnect({ machines: [], active: null }, IDLE)).toBeNull()
   })
 
   it('keeps the store already running', () => {
-    expect(connection.firstToConnect([machine(4), machine(2)], { machine: 2, connection: CONNECTED })).toBeNull()
+    expect(connection.firstToConnect(listed(4), { machine: 2, connection: CONNECTED })).toBeNull()
   })
 })
 

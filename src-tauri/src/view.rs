@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use cornercase_core::cli::contract::Missing;
+use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::store::Connection;
@@ -18,9 +19,16 @@ pub(crate) struct MachineView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MachineList {
+    pub(crate) machines: Vec<MachineView>,
+    #[specta(type = Option<u32>)]
+    pub(crate) active: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum RouteView {
-    Bridge { url: String },
+    Bridge { url: String, has_token: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -64,10 +72,19 @@ impl From<&Machine> for MachineView {
     }
 }
 
+impl From<&Machines> for MachineList {
+    fn from(machines: &Machines) -> Self {
+        Self {
+            machines: machines.machines().iter().map(MachineView::from).collect(),
+            active: machines.active().map(|id| id.0),
+        }
+    }
+}
+
 impl From<&Route> for RouteView {
     fn from(route: &Route) -> Self {
         match route {
-            Route::Bridge { .. } => Self::Bridge { url: route.address().to_string() },
+            Route::Bridge { .. } => Self::Bridge { url: route.address().to_string(), has_token: route.has_token() },
         }
     }
 }

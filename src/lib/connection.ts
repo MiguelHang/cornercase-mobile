@@ -2,7 +2,7 @@ import type {
   ConnectionChanged_Serialize,
   ConnectionState_Serialize,
   ConnectionView_Serialize,
-  MachineView_Serialize,
+  MachineList_Serialize,
   SessionChanged_Serialize,
   Snapshot_Serialize,
 } from './bindings'
@@ -49,8 +49,12 @@ export const describePanes = (session: Snapshot_Serialize | null) => {
   return panes === 1 ? '1 pane' : `${panes} panes`
 }
 
-export const firstToConnect = (machines: MachineView_Serialize[], state: ConnectionState_Serialize) =>
-  state.machine === null ? (machines[0]?.id ?? null) : null
+export const firstToConnect = ({ machines, active }: MachineList_Serialize, state: ConnectionState_Serialize) => {
+  if (state.machine !== null) {
+    return null
+  }
+  return machines.some((machine) => machine.id === active) ? active : (machines[0]?.id ?? null)
+}
 
 const seconds = (ms: number) => Math.ceil(ms / 1000)
 

@@ -5,7 +5,7 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	machinesList: () => typedError<MachineView_Serialize[], CommandError>(__TAURI_INVOKE("machines_list")),
+	machinesList: () => typedError<MachineList_Serialize, CommandError>(__TAURI_INVOKE("machines_list")),
 	machineAdd: (url: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { url, name })),
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
@@ -78,6 +78,18 @@ export type Group_Serialize = {
 };
 
 export type Kind = "operation" | "feature" | "stream";
+
+export type MachineList = MachineList_Serialize | MachineList_Deserialize;
+
+export type MachineList_Deserialize = {
+	machines: MachineView_Deserialize[],
+	active?: number | null,
+};
+
+export type MachineList_Serialize = {
+	machines: MachineView_Serialize[],
+	active: number | null,
+};
 
 export type MachineView = MachineView_Serialize | MachineView_Deserialize;
 
@@ -157,7 +169,7 @@ export type Project_Serialize = {
 	workspaces: Workspace_Serialize[],
 };
 
-export type RouteView = { kind: "bridge"; url: string };
+export type RouteView = { kind: "bridge"; url: string; has_token: boolean };
 
 export type SessionChanged = SessionChanged_Serialize | SessionChanged_Deserialize;
 

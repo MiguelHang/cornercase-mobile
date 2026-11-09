@@ -69,7 +69,7 @@ describe('App wiring', () => {
   })
 
   it('turns a failed machine list into an error toast and connects to nothing then', () => {
-    expect(source).toContain("if (listed.status === 'error') { toasts.failed(listed.error) return [] }")
+    expect(source).toContain("if (listed.status === 'error') { toasts.failed(listed.error) return { machines: [], active: null } }")
     expect(source).toContain('const first = firstToConnect(remember(listed), state)')
   })
 

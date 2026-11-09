@@ -5,12 +5,12 @@ use tauri::{AppHandle, Runtime, State};
 use crate::commands::error::CommandError;
 use crate::events::{ConnectionChanged, Emit, Emitted};
 use crate::state::AppState;
-use crate::view::{ConnectionView, MachineView};
+use crate::view::{ConnectionView, MachineList};
 
 #[tauri::command]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineView>, CommandError> {
+pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<MachineList, CommandError> {
     list(&state)
 }
 
@@ -32,8 +32,8 @@ pub(crate) fn machine_remove<R: Runtime>(
     remove(&state, &app, MachineId(id))
 }
 
-pub(crate) fn list(state: &AppState) -> Result<Vec<MachineView>, CommandError> {
-    state.machines(|machines| Ok(machines.machines().iter().map(MachineView::from).collect()))
+pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
+    state.machines(|machines| Ok(MachineList::from(&*machines)))
 }
 
 pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {

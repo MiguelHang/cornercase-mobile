@@ -32,9 +32,9 @@
   const remember = (listed: Listed) => {
     if (listed.status === 'error') {
       toasts.failed(listed.error)
-      return []
+      return { machines: [], active: null }
     }
-    machines = listed.data
+    machines = listed.data.machines
     return listed.data
   }
 

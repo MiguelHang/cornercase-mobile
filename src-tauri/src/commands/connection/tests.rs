@@ -56,6 +56,39 @@ mod connecting {
     }
 }
 
+mod switching {
+    use super::*;
+    use crate::commands::machines::add;
+
+    const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+
+    fn saved_active(studio: &Studio) -> Option<MachineId> {
+        studio.reloaded().machines(|machines| Ok(machines.active())).expect("the machines load")
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn saves_the_machine_it_connects_to() {
+        let studio = Studio::new();
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let (launcher, _) = launcher(serving(&first_snapshot()));
+        switch_to(&studio.state, Recorder::default(), &launcher, laptop).expect("connected");
+        assert_eq!(saved_active(&studio), Some(laptop));
+        assert_eq!(studio.state.active().as_ref().map(Active::machine), Some(laptop));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn says_the_machine_is_unknown_and_keeps_the_saved_one() {
+        let studio = Studio::new();
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let (launcher, _) = launcher(serving(&first_snapshot()));
+        switch_to(&studio.state, Recorder::default(), &launcher, laptop).expect("connected");
+        let error = switch_to(&studio.state, Recorder::default(), &launcher, MachineId(99)).expect_err("unknown");
+        assert_eq!(error.code, ErrorCode::UnknownMachine);
+        assert_eq!(saved_active(&studio), Some(laptop));
+        assert_eq!(studio.state.active().as_ref().map(Active::machine), Some(laptop));
+    }
+}
+
 mod with_the_network {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
