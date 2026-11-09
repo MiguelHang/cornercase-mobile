@@ -1,7 +1,7 @@
 # 029 — Verificación del MVP en un iPhone por Tailscale
 
 - Estado: pendiente
-- Depende de: 015–028
+- Depende de: 015–028 y 030–032 (se hace al final, antes de la 033; decidido el 2026-11-09)
 - Riesgo: bajo (perfil de Apple gratuito: la app caduca a los 7 días)
 - Rama: `docs/029-mvp-check` · PR: `docs: record the mvp check on an iphone`
 
