@@ -9,14 +9,12 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::batch;
 use super::requests::{self, Asked, Requests};
-use super::typist::{self, Event, Typed, Typist};
+use super::typist::{Event, Typed, Typist};
 use super::{OnError, Outcome};
 use crate::error::Error;
 use crate::transport::{self, Stdin, Transport};
 
 pub(crate) type Reply = oneshot::Sender<Result<Outcome, Error>>;
-
-const PARTIAL: i32 = 3;
 
 pub(crate) enum Job {
     Command(Command),
@@ -299,25 +297,10 @@ async fn type_once(transport: &dyn Transport, on_error: &OnError, events: Vec<Ev
     for run in events.chunk_by(|(one, _), (other, _)| one == other) {
         let args = ["input", "--pane", &run[0].0.to_string(), "--json", "-"].map(str::to_owned);
         let lines: String = run.iter().map(|(_, event)| event.to_string() + "\n").collect();
-        if let Err(error) = typed_once(transport, on_error, &args, lines).await {
+        if let Err(error) = once(transport, &args, Some(Stdin::Text(lines))).await {
             on_error(error);
         }
     }
-}
-
-async fn typed_once(
-    transport: &dyn Transport,
-    on_error: &OnError,
-    args: &[String],
-    lines: String,
-) -> Result<(), Error> {
-    let output = transport::fed(transport, args.to_vec(), stream::iter([Stdin::Text(lines)]).boxed()).await?;
-    let rejected: Vec<Error> = output.stdout.lines().filter_map(|line| typist::answer(line).1).collect();
-    let partial = output.code == PARTIAL && !rejected.is_empty();
-    for error in rejected {
-        on_error(error);
-    }
-    if partial { Ok(()) } else { transport::printed(output).map(drop) }
 }
 
 async fn once(transport: &dyn Transport, args: &[String], stdin: Option<Stdin>) -> Result<String, Error> {

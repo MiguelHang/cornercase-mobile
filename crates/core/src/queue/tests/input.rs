@@ -7,6 +7,8 @@ pub(super) const NO_FOLLOW_FLAG: &str =
     "error: unexpected argument '--follow' found\n\nUsage: cornercase input [OPTIONS]";
 const REFUSED: &str = r#"{"error":"there is no pane 9","events":1,"pane":9}"#;
 const STOPPED: &str = "Error: the server stopped";
+const NO_PANE: &str = "Error: there is no pane 9";
+const SENT: [&str; 5] = ["{", r#"  "pane": 9,"#, r#"  "bytes": 1,"#, r#"  "skipped": []"#, "}"];
 const SETTLE: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy)]
@@ -21,10 +23,6 @@ pub(super) const SILENT: Answers = Answers { per: usize::MAX, ..EACH };
 
 pub(super) fn key(code: &str) -> Value {
     json!({ "key": code })
-}
-
-fn failed(code: i32) -> Error {
-    Error::Failed { code, stderr: String::new() }
 }
 
 fn refused() -> Error {
@@ -68,7 +66,7 @@ pub(super) fn typing_once(fake: FakeTransport, log: &mpsc::UnboundedSender<Strin
     panes.iter().fold(fake, |fake, &pane| {
         let log = log.clone();
         let argv = ["input", "--pane", &pane.to_string(), "--json", "-"];
-        fake.script(&argv, move |stdin, _| type_once(pane, log.clone(), stdin))
+        fake.script(&argv, move |stdin, out| type_once(pane, log.clone(), stdin, out))
     })
 }
 
@@ -127,10 +125,22 @@ async fn read_then_end(reads: bool, mut stdin: BoxStream<'static, Stdin>, end: E
     end
 }
 
-async fn type_once(pane: u64, log: mpsc::UnboundedSender<String>, stdin: BoxStream<'static, Stdin>) -> End {
+fn sent(pane: u64) -> String {
+    serde_json::to_string_pretty(&json!({ "pane": pane, "bytes": 1, "skipped": [] })).expect("an input answer")
+}
+
+async fn type_once(
+    pane: u64,
+    log: mpsc::UnboundedSender<String>,
+    stdin: BoxStream<'static, Stdin>,
+    mut out: OutSink,
+) -> End {
     let read: Vec<String> = stdin.filter_map(async |stdin| text(stdin)).collect().await;
     let lines = read.concat();
     log.send(format!("once {pane} < {}", lines.trim_end().replace('\n', " "))).expect("the test reads the log");
+    for line in sent(pane).lines() {
+        reply(&mut out, line).await?;
+    }
     Ok(exit(0, ""))
 }
 
@@ -202,36 +212,18 @@ mod keys {
     }
 
     #[rstest]
-    #[case::some_not_sent(3)]
-    #[case::all_sent(0)]
+    #[case::sent(&SENT, &[], 0, vec![])]
+    #[case::refused(&[], &[NO_PANE], 1, vec![Error::Failed { code: 1, stderr: NO_PANE.to_owned() }])]
     #[tokio::test]
-    async fn tells_a_key_typed_once_was_refused(#[case] code: i32) {
-        let (log, _said) = heard();
-        let fake = answering(FakeTransport::default(), &log, &Starts::default()).answer(
-            &["input", "--pane", "9", "--json", "-"],
-            &[REFUSED],
-            &[],
-            code,
-        );
-        let Started { queue, mut notices, .. } =
-            start(unstarted(fake, Ok(exit(2, NO_FOLLOW_FLAG)), false, &Starts::default()));
-        queue.input(9, key("a"));
-        assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
-        assert_eq!(notices.taken(), [refused()]);
-    }
-
-    #[rstest]
-    #[case::partial_without_a_refusal(3, &[], vec![failed(3)])]
-    #[case::failed_with_a_refusal(1, &[REFUSED], vec![refused(), failed(1)])]
-    #[tokio::test]
-    async fn tells_a_key_typed_once_failed_unless_the_refusals_explain_it(
+    async fn tells_only_a_failed_key_typed_once(
+        #[case] stdout: &[&str],
+        #[case] stderr: &[&str],
         #[case] code: i32,
-        #[case] said: &[&str],
         #[case] told: Vec<Error>,
     ) {
         let (log, _said) = heard();
         let args = ["input", "--pane", "9", "--json", "-"];
-        let fake = answering(FakeTransport::default(), &log, &Starts::default()).answer(&args, said, &[], code);
+        let fake = answering(FakeTransport::default(), &log, &Starts::default()).answer(&args, stdout, stderr, code);
         let Started { queue, mut notices, .. } =
             start(unstarted(fake, Ok(exit(2, NO_FOLLOW_FLAG)), false, &Starts::default()));
         queue.input(9, key("a"));

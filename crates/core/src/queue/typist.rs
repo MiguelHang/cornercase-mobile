@@ -133,7 +133,7 @@ pub(crate) fn line(pane: u64, event: &Value) -> String {
     event.to_string()
 }
 
-pub(crate) fn answer(line: &str) -> (usize, Option<Error>) {
+fn answer(line: &str) -> (usize, Option<Error>) {
     let answer = match serde_json::from_str::<Value>(line) {
         Ok(answer) => answer,
         Err(error) => return (1, Some(json_error(&error))),
