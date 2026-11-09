@@ -1,11 +1,6 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use cornercase_core::cli::surface::{Modes, MouseMode, Style};
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
-use cornercase_core::transport::Transport;
-use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
 use tokio::sync::mpsc::UnboundedSender;
@@ -14,17 +9,13 @@ use super::*;
 use crate::commands::connection::start;
 use crate::commands::error::ErrorCode;
 use crate::commands::machines::remove;
-use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle};
+use crate::test_util::{BOOT, Ipc, Recorder, Streams, Studio, connected_to, launcher, serving, settle, spawned};
 
 const SURFACE: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
 const CLAIM: [&str; 7] = ["view", "--tab", "3", "--cols", "80", "--rows", "24"];
 const VIEWED: [&str; 4] = ["surface", "--view", "41", "--patches"];
 const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 }, fit: false };
 const FITTED: Terminal = Terminal { fit: true, ..TAB };
-
-fn spawned(task: Task) -> JoinHandle<()> {
-    JoinHandle::Tokio(tokio::spawn(task))
-}
 
 fn line(text: &str) -> Line {
     let width = u16::try_from(text.len()).expect("a short text");
@@ -87,50 +78,10 @@ fn drawn_for_the_view() -> String {
     frame.to_string()
 }
 
-#[derive(Clone, Default)]
-struct Surfaces(Arc<AtomicUsize>);
-
-struct Running(Arc<AtomicUsize>);
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
-}
-
-impl Surfaces {
-    fn running(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
-    }
-
-    fn on(&self, fake: FakeTransport) -> FakeTransport {
-        self.counted(fake, &SURFACE, &drawn())
-    }
-
-    fn fitting(&self, fake: FakeTransport) -> FakeTransport {
-        let claimed = self.counted(fake, &CLAIM, &granted());
-        self.counted(claimed, &VIEWED, &drawn_for_the_view())
-    }
-
-    fn counted(&self, fake: FakeTransport, argv: &'static [&'static str], said: &str) -> FakeTransport {
-        let saying = Arc::new(FakeTransport::default().open(argv, &[said]));
-        let count = Arc::clone(&self.0);
-        fake.script(argv, move |stdin, out| {
-            count.fetch_add(1, Ordering::SeqCst);
-            let running = Running(Arc::clone(&count));
-            let saying = Arc::clone(&saying);
-            async move {
-                let _running = running;
-                saying.run(argv.iter().map(|word| (*word).to_owned()).collect(), stdin, out).await
-            }
-        })
-    }
-}
-
 struct Opened {
     studio: Studio,
-    surfaces: Surfaces,
-    views: Surfaces,
+    surfaces: Streams,
+    views: Streams,
     recorder: Recorder,
 }
 
@@ -140,10 +91,9 @@ impl Opened {
     }
 
     async fn showing(tabs: &[u64], terminal: Terminal) -> Self {
-        let studio = Studio::new();
-        let (surfaces, views) = (Surfaces::default(), Surfaces::default());
-        let (launcher, _) = launcher(views.fitting(surfaces.on(serving(&[with_tabs(tabs)]))));
-        start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connected");
+        let (surfaces, views) = (Streams::default(), Streams::default());
+        let fake = surfaces.on(serving(&[with_tabs(tabs)]), &SURFACE, &[&drawn()]);
+        let studio = connected_to(views.on(views.on(fake, &CLAIM, &[&granted()]), &VIEWED, &[&drawn_for_the_view()]));
         let recorder = Recorder::default();
         open(&studio.state, recorder.clone(), spawned, terminal).expect("the terminal opens");
         settle().await;
@@ -360,8 +310,8 @@ mod over_ipc {
     async fn cuts_the_surface_it_showed_when_closing() {
         let studio = Studio::new();
         let state = studio.reloaded();
-        let surfaces = Surfaces::default();
-        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])])));
+        let surfaces = Streams::default();
+        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])]), &SURFACE, &[&drawn()]));
         start(&state, Recorder::default(), &launcher, studio.id).expect("connected");
         open(&state, Recorder::default(), spawned, TAB).expect("the terminal opens");
         settle().await;

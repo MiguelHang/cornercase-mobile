@@ -5,10 +5,11 @@ use std::sync::Arc;
 use futures_util::future::{Either, select};
 
 use super::grid::{Changes, Grid};
-use super::live::{Ended, Followed, Live, Source, Step};
+use super::live::{Live, Source, Step};
 use crate::cli::surface::Size;
 use crate::cli::view::{self, ViewInfo, ViewLine};
 use crate::error::Error;
+use crate::follow::{Ended, Lines};
 use crate::queue::Queue;
 use crate::transport::{Transport, json_error};
 
@@ -25,16 +26,16 @@ pub(crate) enum Verdict {
 pub(crate) struct Claim {
     tab: u64,
     granted: bool,
-    followed: Followed,
+    lines: Lines,
 }
 
 impl Claim {
     pub(crate) fn open(transport: Arc<dyn Transport>, tab: u64, size: Size) -> Self {
-        Self { tab, granted: false, followed: Followed::open(transport, view::argv(tab, size)) }
+        Self { tab, granted: false, lines: Lines::open(transport, view::argv(tab, size)) }
     }
 
     pub(crate) async fn next(&mut self) -> Verdict {
-        match self.followed.next().await {
+        match self.lines.heard().await {
             Either::Left(line) => self.judged(&line),
             Either::Right(ended) if self.granted || passing(&ended) => Verdict::Ended(ended),
             Either::Right(ended) => Verdict::Refused(refusal(ended)),

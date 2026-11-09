@@ -64,6 +64,11 @@ export const icons = {
     { kind: 'rect', x: 5, y: 2, width: 14, height: 20, rx: 2 },
     { kind: 'path', d: 'M12 18h.01' },
   ],
+  square: [{ kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+  'square-check': [
+    { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
+    { kind: 'path', d: 'm9 12 2 2 4-4' },
+  ],
 } satisfies Record<string, Shape[]>
 
 export type IconName = keyof typeof icons

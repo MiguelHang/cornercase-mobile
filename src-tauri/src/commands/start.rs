@@ -5,6 +5,7 @@ use cornercase_core::queue::Outcome;
 use tauri::State;
 
 use crate::commands::error::CommandError;
+use crate::commands::reach::queue;
 use crate::state::AppState;
 use crate::view::{ProjectChoice, StartChoices};
 
@@ -43,14 +44,12 @@ pub(crate) fn projects(state: &AppState) -> Result<StartChoices, CommandError> {
 }
 
 pub(crate) async fn installed(state: &AppState) -> Result<Vec<AgentChoice>, CommandError> {
-    let queue = state.active().as_ref().and_then(|active| active.store().queue());
-    let queue = queue.ok_or_else(CommandError::not_connected)?;
+    let queue = queue(state)?;
     answered(queue.ask(ACCOUNT_LIST.map(str::to_owned).to_vec(), None).await, agents::installed)
 }
 
 pub(crate) async fn run(state: &AppState, argv: Vec<String>) -> Result<Started, CommandError> {
-    let queue = state.active().as_ref().and_then(|active| active.store().queue());
-    let queue = queue.ok_or_else(CommandError::not_connected)?;
+    let queue = queue(state)?;
     answered(queue.ask(argv, None).await, start::started)
 }
 

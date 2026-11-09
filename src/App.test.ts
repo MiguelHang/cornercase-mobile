@@ -148,7 +148,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} />",
+      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
     )
   })
 
@@ -204,9 +204,39 @@ describe('App wiring', () => {
     )
   })
 
+  it("opens the changes of an agent's workspace on top of it, on the active machine, and their diff above them", () => {
+    expect(source).toContain(
+      "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
+    )
+    expect(source).toContain(
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} onback={leaveDiff} /> {/if} {:else if route.name === 'start'}",
+    )
+  })
+
+  it("reads a file of the list and opens its diff in the list's mode", () => {
+    expect(source).toContain(
+      "const change = (path: string) => { if (changes !== null) { void changes.open(path) router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path }) } }",
+    )
+  })
+
+  it('drops the open diff before going back from it to the list', () => {
+    expect(source).toContain('const leaveDiff = () => { changes?.closeDiff() router.back() }')
+  })
+
+  it('keeps one state of the reviewed workspace under its list and its diff, following it once it listens and leaving it after', () => {
+    expect(source).toContain('const reviewedMachine = $derived(reviewed?.machine ?? null)')
+    expect(source).toContain('const reviewedWorkspace = $derived(reviewed?.workspace ?? null)')
+    expect(source).toContain(
+      'follow: commands.changesFollow, unfollow: commands.changesUnfollow, read: commands.changesFile, mark: commands.changesViewed, }, (toast) => toasts.push(toast),',
+    )
+    expect(source).toContain(
+      'const listening = events.changesChanged.listen((event) => state.see(event.payload)) listening.then(() => state.start()).catch(toasts.failed) return () => { state.stop() listening.then((unlisten) => unlisten()).catch(toasts.failed) }',
+    )
+  })
+
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
     )
   })
 })

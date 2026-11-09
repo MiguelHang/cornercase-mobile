@@ -15,9 +15,9 @@ use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::attach_image;
-use crate::commands::chat::tests::{connected_with, json_of};
+use crate::commands::chat::tests::json_of;
 use crate::commands::error::CommandError;
-use crate::test_util::{Ipc, Studio};
+use crate::test_util::{Ipc, Studio, connected_with};
 
 const PASTE: &[&str] = &["paste-file", "--pane", "543", "--name=IMG_0042.jpg", "--json", "-"];
 const PASTED: &str = include_str!(concat!(
