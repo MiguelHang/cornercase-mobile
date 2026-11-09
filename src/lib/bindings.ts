@@ -20,6 +20,7 @@ export const commands = {
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
+	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 };

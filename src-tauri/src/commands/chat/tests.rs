@@ -1,4 +1,4 @@
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use cornercase_core::error::Error;
 use cornercase_core::queue::Outcome;
@@ -9,7 +9,7 @@ use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::{send_message, sent};
+use super::{press_key, send_message, sent};
 use crate::commands::connection::start;
 use crate::commands::error::CommandError;
 use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle, snapshot};
@@ -87,12 +87,25 @@ async fn answer_lines(
     Ok(Exit { code: 0, stderr: String::new() })
 }
 
-async fn sending(answer: Option<Value>, text: &str) -> (Result<(), Value>, Vec<Value>) {
+async fn queueing(answer: Option<Value>) -> (Ipc, Receiver<String>) {
     let (lines, written) = mpsc::channel();
-    let ipc = connected_with(|fake| requests(fake, answer, &lines)).await;
+    (connected_with(|fake| requests(fake, answer, &lines)).await, written)
+}
+
+fn written(lines: &Receiver<String>) -> Vec<Value> {
+    lines.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect()
+}
+
+async fn sending(answer: Option<Value>, text: &str) -> (Result<(), Value>, Vec<Value>) {
+    let (ipc, lines) = queueing(answer).await;
     let sent = send_message(&ipc.state(), 543, text.to_owned()).await.map_err(|error| json_of(&error));
-    let written = written.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect();
-    (sent, written)
+    (sent, written(&lines))
+}
+
+async fn pressing(answer: Option<Value>, key: &str) -> (Result<(), Value>, Vec<Value>) {
+    let (ipc, lines) = queueing(answer).await;
+    let pressed = press_key(&ipc.state(), 543, key).await.map_err(|error| json_of(&error));
+    (pressed, written(&lines))
 }
 
 fn json_of(error: &CommandError) -> Value {
@@ -146,6 +159,49 @@ mod sending_a_message {
     }
 }
 
+mod pressing_a_key {
+    use super::*;
+
+    const NOT_WAITING: &str = "the agent in pane 543 is not waiting for an answer";
+
+    #[rstest]
+    #[case::down("down")]
+    #[case::enter("enter")]
+    #[case::interrupt("ctrl+c")]
+    #[case::a_digit("1")]
+    #[tokio::test(start_paused = true)]
+    async fn queues_the_keys_command_without_stdin(#[case] key: &str) {
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), key).await;
+        assert_eq!(pressed, Ok(()));
+        assert_eq!(written, [json!({ "args": ["keys", "--pane", "543", key] })]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fails_with_the_reason_cornercase_gave() {
+        let refusal = json!({ "status": 1, "error": format!("Error: {NOT_WAITING}\n") });
+        let (pressed, _) = pressing(Some(refusal), "enter").await;
+        assert_eq!(pressed, Err(json!({ "code": "failed", "message": NOT_WAITING })));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn may_have_sent_it_when_the_answer_is_lost() {
+        let (pressed, written) = pressing(None, "enter").await;
+        assert_eq!(written.len(), 1);
+        assert_eq!(pressed, Err(json_of(&CommandError::maybe_sent())));
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::an_option("--force")]
+    #[case::two_keys("down enter")]
+    #[tokio::test(start_paused = true)]
+    async fn refuses_a_name_the_app_never_sends_and_queues_nothing(#[case] key: &str) {
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), key).await;
+        assert_eq!(pressed, Err(json_of(&CommandError::from(Error::UnknownKey(key.to_owned())))));
+        assert_eq!(written, Vec::<Value>::new());
+    }
+}
+
 mod without_a_connection {
     use super::*;
 
@@ -156,10 +212,12 @@ mod without_a_connection {
         assert_eq!(refused, json!({ "code": "not_connected", "message": "no machine is connected" }));
     }
 
-    #[test]
-    fn says_it_is_not_connected_rather_than_sending() {
+    #[rstest]
+    #[case::sending("send", json!({ "pane": 543, "text": "hello" }))]
+    #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
+    fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
-        let refused = ipc.invoke("send", json!({ "pane": 543, "text": "hello" })).expect_err("nowhere to send");
+        let refused = ipc.invoke(command, args).expect_err("nowhere to queue");
         assert_eq!(refused, json!({ "code": "not_connected", "message": "no machine is connected" }));
     }
 }
