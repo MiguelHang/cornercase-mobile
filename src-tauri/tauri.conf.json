@@ -36,6 +36,9 @@
     ],
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    },
+    "iOS": {
+      "developmentTeam": "22FWTVV94S"
     }
   }
 }
