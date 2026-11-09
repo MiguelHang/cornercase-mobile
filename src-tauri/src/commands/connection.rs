@@ -37,6 +37,10 @@ impl Launcher {
     pub(crate) fn bridge() -> Self {
         Self::new(bridge_transports(BridgeConfig::default()), async_runtime::spawn)
     }
+
+    pub(crate) fn transport(&self, route: &Route) -> Result<Arc<dyn Transport>, Error> {
+        (self.transports)(route)
+    }
 }
 
 #[tauri::command(async)]

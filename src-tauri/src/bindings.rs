@@ -1,7 +1,7 @@
 use tauri::{Runtime, Wry};
 use tauri_specta::{Builder, collect_commands, collect_events};
 
-use crate::commands::{connection, identity, machines, routes};
+use crate::commands::{connection, identity, machines, probe, routes};
 use crate::events::{ConnectionChanged, SessionChanged, Toast};
 
 pub(crate) fn specta<R: Runtime>() -> Builder<R> {
@@ -14,6 +14,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             routes::machine_route_add::<Wry>,
             routes::machine_route_remove::<Wry>,
             routes::machine_route_move,
+            probe::machine_probe,
             connection::connect::<Wry>,
             connection::connection_state,
             connection::session,

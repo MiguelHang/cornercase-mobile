@@ -55,6 +55,21 @@ pub(crate) enum ConnectionView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub(crate) enum ProbeView {
+    Answers { route: String },
+    Unauthorized,
+    NoToken,
+    NoAnswer { failures: Vec<RouteFailure> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct RouteFailure {
+    pub(crate) route: String,
+    pub(crate) error: CommandError,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 pub(crate) struct ConnectionState {
     #[specta(type = Option<u32>)]
     pub(crate) machine: Option<u64>,

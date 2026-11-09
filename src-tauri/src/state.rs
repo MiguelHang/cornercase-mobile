@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -22,6 +23,7 @@ pub(crate) struct AppState {
     identity: Result<Identity, Error>,
     active: Mutex<Option<Active>>,
     network: Mutex<Option<Network>>,
+    boots: Mutex<HashMap<MachineId, String>>,
 }
 
 #[derive(Clone)]
@@ -47,6 +49,7 @@ impl AppState {
             identity,
             active: Mutex::new(None),
             network: Mutex::new(None),
+            boots: Mutex::new(HashMap::new()),
         }
     }
 
@@ -75,6 +78,18 @@ impl AppState {
 
     pub(crate) fn network_is_down(&self) -> bool {
         self.network.lock().unwrap_or_else(PoisonError::into_inner).is_some_and(Network::is_down)
+    }
+
+    pub(crate) fn saw_boot(&self, machine: MachineId, boot: String) {
+        self.boots.lock().unwrap_or_else(PoisonError::into_inner).insert(machine, boot);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn seen_boots(&self) -> HashMap<MachineId, String> {
+        let mut boots = self.boots.lock().unwrap_or_else(PoisonError::into_inner).clone();
+        let active = self.active().as_ref().and_then(|active| Some((active.machine(), active.store().boot()?)));
+        boots.extend(active);
+        boots
     }
 }
 

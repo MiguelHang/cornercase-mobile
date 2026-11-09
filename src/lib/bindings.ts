@@ -12,6 +12,7 @@ export const commands = {
 	machineRouteAdd: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_add", { id, url })),
 	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
 	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),
+	machineProbe: (id: number) => typedError<ProbeView, CommandError>(__TAURI_INVOKE("machine_probe", { id })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
@@ -155,6 +156,8 @@ export type Pane_Serialize = {
 	at_prompt: boolean | null,
 };
 
+export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+
 export type Project = Project_Serialize | Project_Deserialize;
 
 export type Project_Deserialize = {
@@ -173,6 +176,11 @@ export type Project_Serialize = {
 	path: string | null,
 	group: number | null,
 	workspaces: Workspace_Serialize[],
+};
+
+export type RouteFailure = {
+	route: string,
+	error: CommandError,
 };
 
 export type RouteView = { kind: "bridge"; url: string; has_token: boolean };
