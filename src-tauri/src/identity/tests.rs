@@ -5,7 +5,7 @@ use cornercase_core::secrets::Secrets;
 use rstest::rstest;
 
 use super::*;
-use crate::secrets::{self, KeychainSecrets, mock_store, on_mock};
+use crate::secrets::{KeychainSecrets, mock_store, on_mock};
 
 mod announce {
     use super::*;
@@ -63,7 +63,7 @@ mod line {
     #[test]
     fn says_there_is_no_store_on_this_platform() {
         assert_eq!(
-            line(&Identity::load_or_create(&secrets::store())),
+            line(&Identity::load_or_create(&crate::secrets::store())),
             "cornercase-mobile: no identity: the secret store failed: no secret store on this platform yet"
         );
     }

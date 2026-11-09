@@ -33,6 +33,7 @@ pub(crate) struct Toast {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ToastLevel {
+    #[cfg_attr(not(test), expect(dead_code, reason = "the contract has an info toast that nothing sends yet"))]
     Info,
     Error,
 }

@@ -1,25 +1,33 @@
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the bindings until the app registers them"))]
+use std::sync::Arc;
+
+use tauri::Manager;
+
+use crate::state::AppState;
+
 mod bindings;
-#[cfg_attr(not(test), expect(dead_code, reason = "nothing registers the commands until the app mounts the bindings"))]
 mod commands;
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests forward the changes until a command connects"))]
 mod events;
 mod identity;
+mod lifecycle;
 mod secrets;
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the state until the app mounts it"))]
 mod state;
 #[cfg(test)]
 mod test_util;
-#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the views until the commands return them"))]
 mod view;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let specta = bindings::specta();
     tauri::Builder::default()
-        .setup(|_app| {
-            identity::announce(&secrets::store()).ok();
+        .invoke_handler(specta.invoke_handler())
+        .setup(move |app| {
+            specta.mount_events(app);
+            let state = AppState::load(app.path().app_data_dir(), Arc::new(secrets::store()));
+            lifecycle::started(&state, app.handle());
+            app.manage(state);
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running the tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building the tauri application")
+        .run(|app, event| lifecycle::on_event(app, &event));
 }
