@@ -113,7 +113,8 @@ export class StartForm {
   }
 
   async refresh() {
-    if (await this.#readProjects()) {
+    const agentsFailed = this.agents.kind === 'failed'
+    if ((await this.#readProjects()) || agentsFailed) {
       await this.loadAgents()
     }
   }

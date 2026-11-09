@@ -216,6 +216,14 @@ describe('StartForm when the connection comes back', () => {
     expect(reads(commands)).toEqual([2, 2])
   })
 
+  it('reads the agents again on the same boot when they had failed', async () => {
+    const answers = [refused({ code: 'not_connected', message: 'offline' }), ok([agent('claude')])]
+    const { form, commands } = await loaded({ installedAgents: () => answers.shift() ?? ok([]) })
+    await reconnect(form)
+    expect(reads(commands)).toEqual([2, 2])
+    expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude')] })
+  })
+
   it('empties only a project that is gone', async () => {
     const answers = [ok(choices([project(1), project(2)])), ok(choices([project(1), project(3)], 'boot-2'))]
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
