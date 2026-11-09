@@ -104,6 +104,12 @@ struct Ahead {
     time: String,
 }
 
+impl Heard {
+    fn unseen(&self) -> bool {
+        self.status.is_none() && self.time.is_none() && self.ahead.is_some()
+    }
+}
+
 impl Since {
     pub(crate) fn heard(&mut self, pane: u64, to: Option<&str>, time: &str) {
         match self.panes.get_mut(&pane) {
@@ -120,7 +126,7 @@ impl Since {
 
     pub(crate) fn reconcile(&mut self, snapshot: &Snapshot) {
         let present: HashSet<u64> = places(snapshot).map(|place| place.pane.id).collect();
-        self.panes.retain(|pane, _| present.contains(pane));
+        self.panes.retain(|pane, heard| present.contains(pane) || heard.unseen());
         for place in places(snapshot).filter(|place| place.pane.agent.is_some()) {
             self.see(place.pane);
         }

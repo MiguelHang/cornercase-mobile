@@ -112,6 +112,13 @@ describe('base styles', () => {
     expect(Object.values(sources).filter((text) => text.includes('@keyframes pulse'))).toHaveLength(1)
   })
 
+  it('hides the text only screen readers read, for every component', () => {
+    expect(base.replace(/\s+/g, ' ')).toContain(
+      '.spoken { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
+    )
+    expect(Object.values(sources).filter((text) => text.includes('.spoken {'))).toHaveLength(1)
+  })
+
   it('keeps the brand wash fixed, 180 px tall, fading from 12 % to 0', () => {
     const wash = base.match(/body::before \{([^}]*)\}/)?.[1].replace(/\s+/g, ' ')
     expect(wash).toContain('position: fixed;')

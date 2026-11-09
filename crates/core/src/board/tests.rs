@@ -88,6 +88,24 @@ mod an_event {
     }
 
     #[test]
+    fn of_a_pane_no_snapshot_shows_yet_is_kept() {
+        let mut since = Since::default();
+        since.heard(9, Some("working"), EARLIER);
+        since.reconcile(&snapshot(vec![agent(5, "working")]));
+        since.reconcile(&snapshot(vec![agent(5, "working"), agent(9, "working")]));
+        assert_eq!(since.of(9, Some("working")), Some(EARLIER));
+    }
+
+    #[test]
+    fn of_a_pane_no_snapshot_shows_is_forgotten_on_doubt() {
+        let mut since = Since::default();
+        since.heard(9, Some("working"), EARLIER);
+        since.doubt();
+        since.reconcile(&snapshot(vec![agent(5, "working")]));
+        assert_eq!(since, seen(vec![agent(5, "working")]));
+    }
+
+    #[test]
     fn can_say_a_pane_has_no_status() {
         let mut since = Since::default();
         since.heard(4, None, EARLIER);
@@ -204,8 +222,7 @@ mod a_snapshot {
 
     #[test]
     fn forgets_a_pane_it_no_longer_shows() {
-        let mut since = Since::default();
-        since.heard(4, Some("waiting"), EARLIER);
+        let mut since = seen_at(4, "waiting", EARLIER);
         since.reconcile(&snapshot(vec![agent(5, "working")]));
         assert_eq!(since, seen(vec![agent(5, "working")]));
         since.reconcile(&snapshot(vec![agent(4, "waiting")]));

@@ -58,15 +58,6 @@
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
   }
 
-  .spoken {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
   .waiting {
     display: flex;
     justify-content: center;
