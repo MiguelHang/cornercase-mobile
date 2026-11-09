@@ -1,6 +1,6 @@
 # 010 — Núcleo: `contract` y `boot`
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 007 · decisión **D5**
 - Riesgo: bajo
 - Rama: `feat/010-core-contract` · PR: `feat: check the server's contract and notice restarts by boot`
@@ -10,21 +10,26 @@ Al conectar, leer `cornercase contract --json`, decir qué comandos del MVP falt
 y detectar reinicios del servidor por `boot`.
 
 ## Criterios de aceptación
-- [ ] CA1 — `crates/core/src/cli/contract.rs`: tipos serde de `Descriptor` (`version`, `contract`, `boot`,
+- [x] CA1 — `crates/core/src/cli/contract.rs`: tipos serde de `Descriptor` (`version`, `contract`, `boot`,
   `operations[{name, available, reason}]`, `features`, `streams`), todos `#[serde(default)]`.
-- [ ] CA2 — `REQUIRED`: lista de operaciones y features que usa el MVP (las de las pantallas 015–027, con `requests`,
+- [x] CA2 — `REQUIRED`: lista de operaciones y features que usa el MVP (las de las pantallas 015–027, con `requests`,
   `input`, `surface-patches`, `views`, `last-message`, `changes`, `issues`…). `missing(descriptor) -> Vec<Missing>`
   con nombre y motivo (`reason` del servidor si `available = false`).
-- [ ] CA3 — Un servidor sin `contract` (el CLI dice `has no \`contract\` command`) o con `contract` mayor que el que
+- [x] CA3 — Un servidor sin `contract` (el CLI dice `has no \`contract\` command`) o con `contract` mayor que el que
   entiende la app da un error explicativo ("actualiza cornercase en el Mac").
-- [ ] CA4 — `Boot` como tipo; `BootWatch::observe(boot) -> Same | Restarted`.
-- [ ] CA5 — Fixtures en `crates/core/tests/fixtures/` sacados del cornercase real (`contract --json` de upstream main)
+- [x] CA4 — `Boot` como tipo; `BootWatch::observe(boot) -> Same | Restarted`.
+- [x] CA5 — Fixtures en `crates/core/tests/fixtures/` sacados del cornercase real (`contract --json` de upstream main)
   y uno recortado sin operaciones; tests de `missing` y `observe`.
 
 ## Notas técnicas
 - `contract` no lleva `--boot`; el resto de comandos que lleven ids podrán llevarlo más adelante (`stale-boot` sale
   con código 4: mapearlo a `Error::StaleBoot` ya aquí).
 - Indicar en el fixture de qué versión de cornercase sale.
+- Hecho: `REQUIRED` tiene 25 operaciones, 7 features y 7 streams (versión 1), con la tarea que usa cada entrada en
+  `design/connection.md`. `requests` e `input --follow` quedaron fuera: son subcomandos del CLI, no operaciones del
+  socket, así que `contract` no los nombra (`design/upstream-gaps.md`); 011 cae a comandos sueltos si no arrancan.
+- Hecho: un `contract` mayor que el de la app dice "update the app" (lo viejo es la app); "update cornercase on the
+  Mac" queda para el servidor o el CLI sin `contract` y para `contract = 0`.
 
 ## Referencias
 - cornercase-terminal (`origin/main`): `design/commands-for-scripts-and-agents/contract.md`, `src/control/contract.rs`,

@@ -16,6 +16,12 @@ pub enum Error {
     Protocol(String),
     #[error("cornercase exited with code {code}: {stderr}")]
     Failed { code: i32, stderr: String },
+    #[error("the cornercase server restarted since the command was prepared: {0}")]
+    StaleBoot(String),
+    #[error("cornercase on the Mac is too old for this app; update cornercase on the Mac and restart its server")]
+    Outdated,
+    #[error("cornercase speaks contract {server} but this app knows up to {app}; update the app")]
+    ContractTooNew { server: u32, app: u32 },
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
     #[error("cannot read or write the saved machines: {0}")]

@@ -53,6 +53,8 @@ pub trait Transport: Send + Sync {
     ) -> BoxFuture<'_, Result<Exit, Error>>;
 }
 
+const STALE_BOOT: i32 = 4;
+
 pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Output, Error> {
     let (out, mut receiver) = listen(only_stdout);
     let exit = transport.run(argv, stream::empty().boxed(), out).await?;
@@ -62,8 +64,10 @@ pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Outp
 
 pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
     let output = output(transport, argv).await?;
-    if output.code != 0 {
-        return Err(Error::Failed { code: output.code, stderr: output.stderr });
+    match output.code {
+        0 => {}
+        STALE_BOOT => return Err(Error::StaleBoot(output.stderr)),
+        code => return Err(Error::Failed { code, stderr: output.stderr }),
     }
     serde_json::from_str(&output.stdout).map_err(|error| json_error(&error))
 }
@@ -86,7 +90,7 @@ fn only_stdout(out: Out) -> Option<String> {
     }
 }
 
-fn json_error(error: &serde_json::Error) -> Error {
+pub(crate) fn json_error(error: &serde_json::Error) -> Error {
     let reason = match error.classify() {
         Category::Syntax | Category::Io => "not JSON",
         Category::Eof => "the JSON ends too early",

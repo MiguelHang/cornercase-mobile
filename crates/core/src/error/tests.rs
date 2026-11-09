@@ -20,6 +20,18 @@ mod display {
         Error::Failed { code: 3, stderr: "no such project".to_owned() },
         "cornercase exited with code 3: no such project"
     )]
+    #[case::stale_boot(
+        Error::StaleBoot("error: the server restarted".to_owned()),
+        "the cornercase server restarted since the command was prepared: error: the server restarted"
+    )]
+    #[case::outdated(
+        Error::Outdated,
+        "cornercase on the Mac is too old for this app; update cornercase on the Mac and restart its server"
+    )]
+    #[case::contract_too_new(
+        Error::ContractTooNew { server: 2, app: 1 },
+        "cornercase speaks contract 2 but this app knows up to 1; update the app"
+    )]
     #[case::json(
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"
