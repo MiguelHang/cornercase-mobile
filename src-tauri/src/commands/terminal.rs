@@ -30,7 +30,7 @@ pub(crate) fn terminal_open<R: Runtime>(
     pane: Option<u64>,
     size: Size,
 ) -> Result<(), CommandError> {
-    open(&state, app, async_runtime::spawn, Terminal { tab, pane, size })
+    open(&state, app, async_runtime::spawn, Terminal { tab, pane, size, fit: false })
 }
 
 #[tauri::command]
@@ -97,6 +97,7 @@ impl Batch {
             Screen::Update(update) => self.join(update),
             Screen::Failed(error) => self.told.push(warned(&error)),
             Screen::Closed => self.held().closed = true,
+            Screen::Fit(_) => {}
         }
     }
 

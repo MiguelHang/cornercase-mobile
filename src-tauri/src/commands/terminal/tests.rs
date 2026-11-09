@@ -17,7 +17,7 @@ use crate::commands::machines::remove;
 use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle};
 
 const SURFACE: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
-const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 } };
+const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 }, fit: false };
 
 fn spawned(task: Task) -> JoinHandle<()> {
     JoinHandle::Tokio(tokio::spawn(task))

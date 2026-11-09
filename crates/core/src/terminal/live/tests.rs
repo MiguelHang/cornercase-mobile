@@ -303,7 +303,7 @@ mod a_terminal {
 
     use super::*;
     use crate::cli::contract::fixtures::REAL;
-    use crate::cli::status::fixtures::WATCH;
+    use crate::cli::status::fixtures::{VIEW, WATCH};
     use crate::machines::pick::PickConfig;
     use crate::machines::route::Route;
     use crate::machines::{Machine, MachineId};
@@ -311,6 +311,7 @@ mod a_terminal {
     const BOOT: &str = "4242-1760600000";
     const RESTARTED: &str = "4243-1760600100";
     const TAB: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
+    const CLAIM: [&str; 7] = ["view", "--tab", "3", "--cols", "80", "--rows", "24"];
 
     fn contract(boot: &str) -> Vec<Said> {
         let mut contract: Value = serde_json::from_str(REAL).expect("the real contract");
@@ -343,16 +344,19 @@ mod a_terminal {
         contracts: Vec<Vec<Said>>,
         sessions: Vec<Vec<Said>>,
         surfaces: Vec<Vec<Said>>,
+        views: Vec<Vec<Said>>,
+        fitted: Vec<Vec<Said>>,
     }
 
     impl Mac {
         fn of(sessions: Vec<Vec<Said>>, surfaces: Vec<Vec<Said>>) -> Self {
-            Self { contracts: vec![contract(BOOT)], sessions, surfaces }
+            Self { contracts: vec![contract(BOOT)], sessions, surfaces, views: Vec::new(), fitted: Vec::new() }
         }
 
         fn fake(self) -> FakeTransport {
             let fake = FakeTransport::default().open(&["events", "--json", "--notices"], &[]);
             let fake = in_turn(fake.open(&["status", "--app", "--follow", "--json"], &[]), &TAB, self.surfaces);
+            let fake = in_turn(in_turn(fake, &CLAIM, self.views), &VIEW_ARGV, self.fitted);
             let fake = in_turn(fake, &["contract", "--json"], self.contracts);
             in_turn(fake, &["status", "--follow", "--json"], self.sessions)
         }
@@ -366,6 +370,14 @@ mod a_terminal {
 
     impl Watched {
         async fn after_a_minute(mac: Mac) -> Self {
+            Self::for_a_minute(mac, false).await
+        }
+
+        async fn fitted_for_a_minute(mac: Mac) -> Self {
+            Self::for_a_minute(mac, true).await
+        }
+
+        async fn for_a_minute(mac: Mac, fit: bool) -> Self {
             let (transport, launched) = mac.fake().launched();
             let studio = Route::parse("ws://studio.local:8765/?token=c2VjcmV0").expect("a bridge url");
             let machine =
@@ -374,7 +386,7 @@ mod a_terminal {
             tokio::spawn(driver);
             let (sender, screens) = mpsc::unbounded_channel();
             let started = Instant::now();
-            let terminal = Terminal { tab: 3, pane: None, size: SIZE };
+            let terminal = Terminal { tab: 3, pane: None, size: SIZE, fit };
             let running = tokio::spawn(terminal.run(store, move |screen| {
                 sender.send((started.elapsed(), screen)).expect("the test reads every screen");
             }));
@@ -390,6 +402,8 @@ mod a_terminal {
                     Screen::Update(_) => "patched",
                     Screen::Failed(_) => "failed",
                     Screen::Closed => "closed",
+                    Screen::Fit(Unfitted::TakenBack) => "taken back",
+                    Screen::Fit(Unfitted::Refused(_)) => "refused",
                 };
                 seen.push((at.as_secs(), what));
             }
@@ -399,7 +413,7 @@ mod a_terminal {
         fn surfaces(&mut self) -> Vec<String> {
             let mut surfaces = Vec::new();
             while let Ok(argv) = self.launched.try_recv() {
-                surfaces.extend(argv.starts_with("surface").then_some(argv));
+                surfaces.extend((argv.starts_with("surface") || argv.starts_with("view ")).then_some(argv));
             }
             surfaces
         }
@@ -494,5 +508,96 @@ mod a_terminal {
         let mac = Mac { contracts: vec![contract(BOOT), contract(RESTARTED)], ..Mac::of(sessions, surfaces) };
         let mut watched = Watched::after_a_minute(mac).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (15, "replaced")]);
+    }
+
+    fn viewed(tab: u64, controls: bool) -> Said {
+        let mut line: Value = serde_json::from_str(VIEW).expect("the view fixture");
+        line["view"]["shown"]["tab"] = tab.into();
+        line["view"]["controls"] = controls.into();
+        Said::Line(line.to_string())
+    }
+
+    fn drawn_for_the_view(tab: u64) -> Said {
+        let mut frame: Value = serde_json::from_str(FRAME).expect("the frame fixture");
+        frame["view"] = 41.into();
+        frame["tab"] = tab.into();
+        frame["projection"] = 3.into();
+        Said::Line(frame.to_string())
+    }
+
+    fn fitting(views: Vec<Vec<Said>>, fitted: Vec<Vec<Said>>) -> Mac {
+        Mac { views, fitted, ..Mac::of(connected(), vec![vec![drawn()]]) }
+    }
+
+    fn granted() -> Vec<Vec<Said>> {
+        vec![vec![viewed(3, true)]]
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn claims_the_tab_with_a_view_and_shows_the_surface_of_the_view() {
+        let mut watched = Watched::fitted_for_a_minute(fitting(granted(), vec![vec![drawn_for_the_view(3)]])).await;
+        assert_eq!(watched.seen(), [(0, "replaced")]);
+        assert_eq!(watched.surfaces(), [CLAIM.join(" "), VIEW_ARGV.join(" ")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn says_the_view_was_refused_and_shows_the_tab_as_it_is_from_then_on() {
+        let mut watched = Watched::fitted_for_a_minute(fitting(vec![vec![refused()]], Vec::new())).await;
+        assert_eq!(watched.seen(), [(0, "refused"), (0, "replaced")]);
+        assert_eq!(watched.surfaces(), [CLAIM.join(" "), TAB.join(" ")]);
+    }
+
+    #[rstest]
+    #[case::taken_back(viewed(3, false), "taken back")]
+    #[case::refused(refused(), "refused")]
+    #[tokio::test(start_paused = true)]
+    async fn shows_the_tab_as_it_is_once_the_view_lets_go_of_it(#[case] said: Said, #[case] seen: &str) {
+        let views = vec![vec![viewed(3, true), Said::After(5), said]];
+        let mut watched = Watched::fitted_for_a_minute(fitting(views, vec![vec![drawn_for_the_view(3)]])).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (5, seen), (5, "replaced")]);
+        assert_eq!(watched.surfaces(), [CLAIM.join(" "), VIEW_ARGV.join(" "), TAB.join(" ")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn paints_nothing_of_the_tab_the_view_moved_to_and_says_the_tab_closed() {
+        let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), session(BOOT, 8, false)]];
+        let views = vec![vec![viewed(3, true), Said::After(5), viewed(9, true)]];
+        let fitted = vec![vec![drawn_for_the_view(3), Said::After(5), drawn_for_the_view(9)]];
+        let mut watched = Watched::fitted_for_a_minute(Mac { sessions, ..fitting(views, fitted) }).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (6, "closed")]);
+        assert_eq!(watched.surfaces(), [CLAIM.join(" "), VIEW_ARGV.join(" ")]);
+        assert!(watched.running.is_finished());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn claims_the_tab_again_at_the_same_size_once_connected_again() {
+        let sessions =
+            vec![vec![session(BOOT, 7, true), Said::After(5), exits()], vec![Said::After(20), session(BOOT, 7, true)]];
+        let mac = Mac { sessions, ..fitting(granted(), vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = Watched::fitted_for_a_minute(mac).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
+        let claimed = [CLAIM.join(" "), VIEW_ARGV.join(" ")];
+        assert_eq!(watched.surfaces(), [claimed.clone(), claimed].concat());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stays_quiet_about_a_view_lost_as_the_store_drops_its_transport() {
+        let sessions = vec![
+            vec![session(BOOT, 7, true), Said::After(5), Said::Ends(Err(Error::Dropped))],
+            vec![Said::After(20), session(BOOT, 7, true)],
+        ];
+        let views = vec![vec![viewed(3, true), Said::After(5), Said::Ends(Err(Error::Dropped))], granted().concat()];
+        let mac = Mac { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = Watched::fitted_for_a_minute(mac).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
+        assert_eq!(watched.surfaces().len(), 4);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn claims_the_tab_again_when_the_surface_of_the_view_ends() {
+        let fitted = vec![vec![drawn_for_the_view(3), Said::After(5), exits()], vec![drawn_for_the_view(3)]];
+        let mut watched = Watched::fitted_for_a_minute(fitting(granted(), fitted)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (6, "replaced")]);
+        assert_eq!(watched.surfaces().len(), 4);
     }
 }

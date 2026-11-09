@@ -7,6 +7,7 @@ use futures_util::{FutureExt, StreamExt, stream};
 use tokio::sync::mpsc;
 use tokio::time::{self, Instant};
 
+use super::fit::{Claim, Fitted, follow_fitted};
 use super::grid::{Applied, Changes, Grid};
 use super::shown::{Shown, Update};
 use crate::cli::status::Snapshot;
@@ -154,10 +155,17 @@ impl Live {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unfitted {
+    TakenBack,
+    Refused(Error),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     Update(Update),
     Failed(Error),
     Closed,
+    Fit(Unfitted),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,19 +173,48 @@ pub struct Terminal {
     pub tab: u64,
     pub pane: Option<u64>,
     pub size: Size,
+    pub fit: bool,
 }
 
 impl Terminal {
     pub async fn run(self, store: Store, sink: impl FnMut(Screen) + Send) {
         let mut told = Told { sink, failing: false };
+        let mut fit = self.fit;
         while let Some(reached) = reached(&store, self.tab).await {
             if !reached.open {
                 told.closed();
                 return;
             }
-            self.follow(&store, reached, &mut told).await;
+            if !fit {
+                self.follow(&store, reached, &mut told).await;
+            } else if !self.fitted(&store, reached, &mut told).await {
+                fit = false;
+                continue;
+            }
             time::sleep(SETTLE).await;
         }
+    }
+
+    async fn fitted(self, store: &Store, reached: Reached, told: &mut Told<impl FnMut(Screen)>) -> bool {
+        let used = reached.transport.clone();
+        let claim = Claim::open(used.clone(), self.tab, self.size);
+        let mut shown = Shown::new(self.pane);
+        let paint = |grid: &Grid, changes: Result<Changes, Error>| match changes {
+            Ok(changes) => told.shown(shown.update(grid, &changes)),
+            Err(error) => told.failed(error),
+        };
+        let fitted = follow_fitted(claim, reached.transport, reached.queue, moved_on(store, &used), paint).await;
+        let unfitted = match fitted {
+            Fitted::TakenBack => Unfitted::TakenBack,
+            Fitted::Refused(error) if still_on(store, &used) => Unfitted::Refused(error),
+            Fitted::Ended(ended) => {
+                told.ended(ended, still_on(store, &used));
+                return true;
+            }
+            Fitted::Refused(_) | Fitted::MovedAway | Fitted::MovedOn => return true,
+        };
+        told.unfitted(unfitted);
+        false
     }
 
     async fn follow(self, store: &Store, reached: Reached, told: &mut Told<impl FnMut(Screen)>) {
@@ -218,6 +255,10 @@ impl<S: FnMut(Screen)> Told<S> {
 
     fn closed(&mut self) {
         (self.sink)(Screen::Closed);
+    }
+
+    fn unfitted(&mut self, unfitted: Unfitted) {
+        (self.sink)(Screen::Fit(unfitted));
     }
 
     fn failed(&mut self, error: Error) {
