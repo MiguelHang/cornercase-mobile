@@ -514,6 +514,7 @@ name = "cornercase-mobile"
 version = "0.1.0"
 dependencies = [
  "apple-native-keyring-store",
+ "cornercase-bridge",
  "cornercase-core",
  "keyring-core",
  "rstest",
@@ -524,6 +525,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-specta",
+ "tokio",
 ]
 
 [[package]]

@@ -26,9 +26,11 @@ tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
 apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 
 [dev-dependencies]
+cornercase-bridge = { path = "../bridge", features = ["test-util"] }
 cornercase-core = { path = "../crates/core", features = ["test-util"] }
 rstest = "0.27.0"
 serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["rt", "macros", "time", "test-util"] }
 
 [lints]
 workspace = true

@@ -60,8 +60,8 @@ impl CommandError {
         Self::new(ErrorCode::NoDataDir, format!("the app has no folder for its data: {reason}"))
     }
 
-    pub(crate) fn machines_not_loaded() -> Self {
-        Self::new(ErrorCode::MachinesNotLoaded, "the saved machines are not loaded")
+    pub(crate) fn machines_not_loaded(error: &Error) -> Self {
+        Self::new(ErrorCode::MachinesNotLoaded, format!("the saved machines are not loaded: {error}"))
     }
 
     pub(crate) fn no_identity(error: &Error) -> Self {

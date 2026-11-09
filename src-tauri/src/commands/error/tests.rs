@@ -77,9 +77,9 @@ mod of_the_app {
         "the app has no folder for its data: no home folder"
     )]
     #[case::machines_not_loaded(
-        CommandError::machines_not_loaded(),
+        CommandError::machines_not_loaded(&Error::Store("locked".into())),
         "machines_not_loaded",
-        "the saved machines are not loaded"
+        "the saved machines are not loaded: cannot read or write the saved machines: locked"
     )]
     #[case::no_identity(
         CommandError::no_identity(&Error::Secrets("locked".into())),

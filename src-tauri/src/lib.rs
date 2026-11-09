@@ -2,6 +2,8 @@
 mod commands;
 mod identity;
 mod secrets;
+#[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the state until the app mounts it"))]
+mod state;
 #[cfg_attr(not(test), expect(dead_code, reason = "only the tests build the views until the commands return them"))]
 mod view;
 
@@ -9,7 +11,7 @@ mod view;
 pub fn run() {
     tauri::Builder::default()
         .setup(|_app| {
-            identity::announce();
+            identity::announce(&secrets::store()).ok();
             Ok(())
         })
         .run(tauri::generate_context!())
