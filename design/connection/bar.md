@@ -10,6 +10,7 @@ A topic of [Connection](../connection.md): how the app shows the active machine'
   - `missing`: `cornercase on the Mac lacks <names>: update it`, with the names the contract lacks, in `--failed`.
   - `unauthorized`: `The bridge rejected this phone's token`, in `--failed`, and no fix offered. The fix is adding the route again with the new token, which needs 027 (the QR and a route added to a saved machine); pasting the URL again would make a second machine, and `home` has no form. A known limit until 027.
   - `incompatible`: `Incompatible: <message>`, in `--failed`.
+  - `offline` (028): `No network`, in `--failed`, with no pulse and no countdown: the store waits for the network rather than retrying.
   - `none` reads `Not connected`, though `home` does not show it: the route goes back to `no-machines`.
 - **Checked on 2026-11-09** in the iPhone 17 simulator, iOS 27.2, against `cargo run -p cornercase-bridge` on the LAN and cornercase 0.13.19:
   - after `Add`, `Connecting…` for under half a second, then `MacBook · via 192.168.1.135:8765` and the pane count;
