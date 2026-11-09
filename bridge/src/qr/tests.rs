@@ -122,18 +122,117 @@ mod lines {
 mod block {
     use super::*;
 
-    fn target(kind: Kind, interface: &str) -> Target {
-        Target { kind, interface: interface.to_owned(), ip: ip("192.168.1.20") }
+    const TOKEN: &str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+    const LAN: &str = "ws://192.168.1.20:8765/?token=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+    const TAILSCALE: &str = "ws://100.101.102.103:8765/?token=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+
+    fn target(kind: Kind, interface: &str, address: &str) -> Target {
+        Target { kind, interface: interface.to_owned(), ip: ip(address) }
+    }
+
+    fn at(address: &str, port: u16) -> SocketAddr {
+        SocketAddr::new(ip(address), port)
+    }
+
+    fn printed(name: Option<&str>, targets: &[Target], port: u16) -> Vec<String> {
+        let places: Vec<_> =
+            targets.iter().map(|target| (Place::Network(target), at(&target.ip.to_string(), port))).collect();
+        block(name, &places, TOKEN).expect("a valid token")
+    }
+
+    fn assert_block(block: &[String], heading: &str, code: &str, urls: &[&str]) {
+        let qr = lines(code);
+        assert_eq!(block[..2], [heading, code]);
+        assert_eq!(block[2..2 + qr.len()], qr);
+        assert_eq!(block[2 + qr.len()], "");
+        assert_eq!(block[3 + qr.len()..], urls.iter().map(|&url| url.to_owned()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn gives_one_address_as_a_code_of_one_route_with_the_name() {
+        let block = printed(Some("Mac Studio"), &[target(Kind::Lan, "en0", "192.168.1.20")], 8765);
+        let code = format!("{LAN}&name=Mac%20Studio");
+        assert_block(&block, "Mac Studio — LAN (en0)", &code, &[&format!("LAN (en0)  {LAN}")]);
+    }
+
+    #[test]
+    fn gives_every_address_in_one_code_and_one_line_each_below_it() {
+        let targets = [target(Kind::Lan, "en0", "192.168.1.20"), target(Kind::Tailscale, "utun9", "100.101.102.103")];
+        let block = printed(Some("MacBook Pro"), &targets, 8765);
+        let code = format!("{LAN}&also=100.101.102.103&name=MacBook%20Pro");
+        let urls = [format!("LAN (en0)  {LAN}"), format!("Tailscale (utun9)  {TAILSCALE}")];
+        assert_block(&block, "MacBook Pro — LAN (en0), Tailscale (utun9)", &code, &urls.each_ref().map(String::as_str));
+    }
+
+    #[test]
+    fn names_an_interface_once_when_it_has_two_addresses() {
+        let targets = [
+            target(Kind::Tailscale, "utun9", "100.101.102.103"),
+            target(Kind::Tailscale, "utun9", "fd7a:115c:a1e0::1"),
+        ];
+        let block = printed(None, &targets, 8765);
+        let v6 = "ws://[fd7a:115c:a1e0::1]:8765/?token=AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE";
+        let urls = [format!("Tailscale (utun9)  {TAILSCALE}"), format!("Tailscale (utun9)  {v6}")];
+        let code = format!("{TAILSCALE}&also=fd7a:115c:a1e0::1");
+        assert_block(&block, "Tailscale (utun9)", &code, &urls.each_ref().map(String::as_str));
+    }
+
+    #[test]
+    fn gives_each_line_its_own_listener_port() {
+        let places = [(Place::Loopback, at("127.0.0.1", 40123)), (Place::Loopback, at("::1", 40124))];
+        let block = block(None, &places, TOKEN).expect("a valid token");
+        let wanted = [
+            format!("loopback  ws://127.0.0.1:40123/?token={TOKEN}"),
+            format!("loopback  ws://[::1]:40124/?token={TOKEN}"),
+        ];
+        assert_eq!(block[block.len() - 2..], wanted);
     }
 
     #[rstest]
-    #[case::lan(Some(target(Kind::Lan, "en0")), "LAN (en0)")]
-    #[case::tailscale(Some(target(Kind::Tailscale, "utun4")), "Tailscale (utun4)")]
-    #[case::loopback(None, "loopback")]
-    fn says_where_then_gives_the_url_and_its_code(#[case] target: Option<Target>, #[case] heading: &str) {
-        let place = target.as_ref().map_or(Place::Loopback, Place::Network);
-        let block = block(place, URL);
-        assert_eq!(block[..2], [heading, URL]);
-        assert_eq!(block[2..], lines(URL));
+    #[case::with_a_name(Some("studio"), "studio — loopback", "&name=studio")]
+    #[case::without_a_name(None, "loopback", "")]
+    #[case::with_a_blank_name(Some("  "), "loopback", "")]
+    fn gives_only_the_loopback_address_on_loopback(
+        #[case] name: Option<&str>,
+        #[case] heading: &str,
+        #[case] suffix: &str,
+    ) {
+        let url = format!("ws://127.0.0.1:40123/?token={TOKEN}");
+        let block = block(name, &[(Place::Loopback, at("127.0.0.1", 40123))], TOKEN).expect("a valid token");
+        assert_block(&block, heading, &format!("{url}{suffix}"), &[&format!("loopback  {url}")]);
+    }
+
+    #[test]
+    fn heads_the_block_with_the_name_the_code_keeps() {
+        let block =
+            block(Some(&"m".repeat(70)), &[(Place::Loopback, at("127.0.0.1", 1))], TOKEN).expect("a valid token");
+        assert_eq!(block[0], format!("{} — loopback", "m".repeat(64)));
+    }
+
+    #[test]
+    fn is_empty_without_an_address() {
+        assert_eq!(block(Some("studio"), &[], TOKEN), Ok(Vec::new()));
+    }
+
+    #[rstest]
+    #[case::empty("", RouteError::EmptyToken)]
+    #[case::not_base64url("a+b/c=", RouteError::TokenCharacters)]
+    fn refuses_a_token_the_app_would_refuse(#[case] token: &str, #[case] error: RouteError) {
+        assert_eq!(block(None, &[(Place::Loopback, at("127.0.0.1", 1))], token), Err(error));
+    }
+
+    #[test]
+    fn fits_in_eighty_columns_with_three_addresses_and_the_longest_name() {
+        let targets = [
+            target(Kind::Lan, "en0", "192.168.100.200"),
+            target(Kind::Tailscale, "utun9", "100.101.102.103"),
+            target(Kind::Tailscale, "utun9", "fd7a:115c:a1e0:ab12:4843:cd96:6258:b240"),
+        ];
+        let name: String = "Mac Studio de la oficina 2 ".repeat(3).chars().take(64).collect();
+        let block = printed(Some(&name), &targets, 65535);
+        let code = &block[1];
+        assert!(code.ends_with(&format!("&name={}", name.replace(' ', "%20"))), "{code}");
+        let widest = lines(code).iter().map(|line| cells(line).len()).max().expect("the code is drawn");
+        assert!(widest <= 80, "{widest} columns");
     }
 }

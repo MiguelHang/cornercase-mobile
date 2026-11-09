@@ -1,5 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::net::SocketAddr;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -14,12 +15,14 @@ use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error, Message};
 
+use cornercase_bridge::name;
 use cornercase_bridge::qr::{self, Place};
 use cornercase_bridge::test_util::{HUNG, TempDir, fake_cornercase, in_time, number_in, reaped};
 
 const BRIDGE: &str = env!("CARGO_BIN_EXE_cornercase-bridge");
 const LOOPBACK: [&str; 3] = ["--loopback", "--port", "0"];
 const QUERY: &str = "/?token=";
+const PRINTED_URL: &str = "loopback  ";
 
 fn command(home: &Path) -> Command {
     let mut command = Command::new(BRIDGE);
@@ -69,14 +72,23 @@ impl Bridge {
     }
 
     async fn read_the_url(&mut self) {
-        while !self.printed.lines().any(|line| line.starts_with("ws://")) {
+        while !self.printed.lines().any(|line| line.starts_with(PRINTED_URL)) {
             let read = in_time(self.stdout.read_line(&mut self.printed)).await.expect("the bridge's stdout");
             assert_ne!(read, 0, "the bridge never printed its URL: {}", self.printed);
         }
     }
 
+    fn code(&self) -> &str {
+        self.printed.lines().find(|line| line.starts_with("ws://")).expect("the machine code")
+    }
+
     fn url(&self) -> &str {
-        self.printed.lines().find(|line| line.starts_with("ws://")).expect("the URL")
+        self.printed.lines().find_map(|line| line.strip_prefix(PRINTED_URL)).expect("the URL")
+    }
+
+    fn address(&self) -> SocketAddr {
+        let authority = self.url().strip_prefix("ws://").and_then(|url| url.split_once('/')).expect("the authority").0;
+        authority.parse().expect("an address and a port")
     }
 
     fn token(&self) -> String {
@@ -164,13 +176,16 @@ mod printing {
     use super::*;
 
     #[tokio::test]
-    async fn puts_the_url_and_its_code_on_stdout_and_never_the_token_on_stderr() {
+    async fn puts_the_machine_code_on_stdout_and_never_the_token_on_stderr() {
         let home = TempDir::new();
         let bridge = Bridge::start(home.path(), &fake_cornercase(home.path(), HUNG), &[]).await;
-        let (url, token) = (bridge.url().to_owned(), bridge.token());
+        let (url, code, token, address) =
+            (bridge.url().to_owned(), bridge.code().to_owned(), bridge.token(), bridge.address());
         let stopped = bridge.stop(Signal::TERM).await;
-        assert_eq!(stopped.stdout, format!("{}\n", qr::block(Place::Loopback, &url).join("\n")));
+        let block = qr::block(name::read().as_deref(), &[(Place::Loopback, address)], &token).expect("the block");
+        assert_eq!(stopped.stdout, format!("{}\n", block.join("\n")));
         assert!(url.starts_with("ws://127.0.0.1:"), "{url}");
+        assert!(code.starts_with(&format!("{url}&name=")), "{code}");
         assert_eq!(fs::read_to_string(token_file(home.path())).expect("the token file"), format!("{token}\n"));
         assert!(stopped.stderr.contains("cornercase-bridge: listening on 1 address\n"), "{}", stopped.stderr);
         assert!(!stopped.stderr.contains(&token) && !stopped.stderr.contains("?token"), "{}", stopped.stderr);

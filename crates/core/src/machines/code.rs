@@ -3,6 +3,7 @@ use std::net::{IpAddr, Ipv6Addr};
 
 use tokio_tungstenite::tungstenite::http::Uri;
 
+use super::name::LONGEST_NAME;
 use super::route::{Address, BridgeUrl, Route, RouteError, Token, address, checked_token, token, values};
 
 const UNRESERVED: &[u8] = b"-._~";
@@ -33,7 +34,8 @@ impl MachineCode {
 
     #[must_use]
     pub fn with_name(mut self, name: &str) -> Self {
-        self.name = Some(name.trim()).filter(|name| !name.is_empty()).map(str::to_owned);
+        let name: String = name.trim().chars().take(LONGEST_NAME).collect();
+        self.name = Some(name.trim_end().to_owned()).filter(|name| !name.is_empty());
         self
     }
 

@@ -1,5 +1,6 @@
 pub mod allowlist;
 pub mod binary;
+pub mod name;
 pub mod network;
 pub mod process;
 pub mod qr;

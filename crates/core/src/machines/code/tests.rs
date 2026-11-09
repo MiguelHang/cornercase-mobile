@@ -73,6 +73,15 @@ mod with_name {
     fn leaves_out_a_name_with_nothing_in_it(#[case] name: &str) {
         assert_eq!(code(LAN).with_name("studio").with_name(name).name(), None);
     }
+
+    #[rstest]
+    #[case::ascii(&"m".repeat(70), &"m".repeat(64))]
+    #[case::accents(&"é".repeat(70), &"é".repeat(64))]
+    #[case::exactly_the_longest(&"m".repeat(64), &"m".repeat(64))]
+    #[case::a_space_where_it_is_cut(&format!("{} tail", "m".repeat(63)), &"m".repeat(63))]
+    fn keeps_at_most_the_longest_name_a_machine_can_have(#[case] name: &str, #[case] kept: &str) {
+        assert_eq!(code(LAN).with_name(name).name(), Some(kept));
+    }
 }
 
 mod display {
