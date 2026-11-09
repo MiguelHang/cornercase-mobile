@@ -91,7 +91,7 @@ Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020
 | Keystore de Android desde Rust | 031 | plugin de Tauri en Kotlin con `AndroidKeyStore` que cifra la semilla Ed25519 |
 | Detectar cambios de red (NWPathMonitor / ConnectivityManager) | 028 (hecha; en un iPhone, la 029), 032 | reintentar al volver a primer plano y al fallar un stream (ya en 013/012) |
 | iOS suspende los sockets en segundo plano | 012, 013 | reabrir streams al volver, reconstruir con `boot` |
-| Teclado y gestos del WebView (foco, teclado virtual sobre la página, swipe) | 021, 032 (en la 016, hecha, el campo del chat ya queda sobre el teclado en el simulador; falta el ajuste fino) | `visualViewport` + `interactive-widget=resizes-content`, como `browser-access.md` de cornercase-terminal |
+| Teclado y gestos del WebView (foco, teclado virtual sobre la página, swipe) | 021, 032 (en la 016, hecha, el campo del chat ya queda sobre el teclado en el simulador; en la 036, hecha, la cabecera fija del chat y la barra de conexión salen de la vista con el teclado abierto y no tapan el campo; falta el ajuste fino) | `visualViewport` + `interactive-widget=resizes-content`, como `browser-access.md` de cornercase-terminal |
 | tauri-specta en versión RC para Tauri 2 | 013 | tipos TS escritos a mano + test de que coinciden con un JSON de ejemplo |
 | Rendimiento de la terminal con patches frecuentes | 019, 020 | aplicar en Rust y emitir solo filas cambiadas; canvas si el DOM no llega |
 | Versión de cornercase en el Mac | 010 | la comprobación de `contract` dice qué falta |
