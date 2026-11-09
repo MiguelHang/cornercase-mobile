@@ -1,14 +1,15 @@
+use std::path::Path;
 use std::process::Command;
 
 const SCUTIL: &str = "/usr/sbin/scutil";
 const LOCAL: &str = ".local";
 
 pub fn read() -> Option<String> {
-    machine_name(computer_name(), &rustix::system::uname().nodename().to_string_lossy())
+    machine_name(computer_name(Path::new(SCUTIL)), &rustix::system::uname().nodename().to_string_lossy())
 }
 
-fn computer_name() -> Option<String> {
-    let output = Command::new(SCUTIL).args(["--get", "ComputerName"]).output().ok()?;
+fn computer_name(scutil: &Path) -> Option<String> {
+    let output = Command::new(scutil).args(["--get", "ComputerName"]).output().ok()?;
     output.status.success().then(|| String::from_utf8(output.stdout).ok()).flatten()
 }
 

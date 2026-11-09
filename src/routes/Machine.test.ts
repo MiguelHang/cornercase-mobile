@@ -213,6 +213,10 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
   })
 
+  it('reloads the machines on opening, since the bridge may have told new routes', () => {
+    expect(script).toContain('onMount(() => { void onchanged() })')
+  })
+
   it('opens Add route once, on arriving to scan again', () => {
     expect(script).toContain('untrack(() => { if (adding) { edit.open() } })')
   })

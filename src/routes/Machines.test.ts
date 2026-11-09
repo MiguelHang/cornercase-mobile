@@ -178,6 +178,10 @@ describe('Machines wiring', () => {
 
   it('probes the others on opening, and the one that stops being active, without tracking the probes', () => {
     expect(script).toContain('void probes.open( machines.map(({ id }) => id), active, ) void device.load()')
+  })
+
+  it('reloads the machines on opening, since the bridge may have told new routes', () => {
+    expect(script).toContain('onMount(() => { onrouted() void probes.open(')
     expect(script).toContain('$effect(() => { const now = active untrack(() => void probes.follow(now)) })')
   })
 

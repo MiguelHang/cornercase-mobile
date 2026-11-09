@@ -120,7 +120,7 @@ pub(crate) async fn forward(
     loop {
         let change = tokio::select! {
             change = changes.next() => change,
-            () = learned(&mut learning) => {
+            () = learned(&mut learning), if learning.is_some() => {
                 learning = None;
                 continue;
             }

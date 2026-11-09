@@ -60,6 +60,7 @@
   }
 
   onMount(() => {
+    onrouted()
     void probes.open(
       machines.map(({ id }) => id),
       active,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { commands, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
   import { routeAddress } from '../lib/connection'
   import { EditMachine } from '../lib/editMachine.svelte'
@@ -33,6 +33,10 @@
     adding?: boolean
     edit?: EditMachine
   } = $props()
+
+  onMount(() => {
+    void onchanged()
+  })
 
   untrack(() => {
     if (adding) {

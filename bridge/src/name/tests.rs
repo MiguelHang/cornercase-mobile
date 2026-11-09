@@ -1,6 +1,7 @@
 use rstest::rstest;
 
 use super::*;
+use crate::test_util::{TempDir, write_executable};
 
 mod machine_name {
     use super::*;
@@ -22,8 +23,34 @@ mod machine_name {
     }
 }
 
+mod computer_name {
+    use super::*;
+
+    #[rstest]
+    #[case::what_it_prints("printf 'Studio\\n'", Some("Studio\n"))]
+    #[case::nothing_when_it_fails("printf 'Studio'; exit 1", None)]
+    fn reads_what_scutil_prints(#[case] script: &str, #[case] wanted: Option<&str>) {
+        let dir = TempDir::new();
+        let scutil = dir.path().join("scutil");
+        write_executable(&scutil, &format!("#!/bin/sh\n{script}\n"));
+        assert_eq!(computer_name(&scutil).as_deref(), wanted);
+    }
+
+    #[test]
+    fn nothing_without_scutil() {
+        let dir = TempDir::new();
+        assert_eq!(computer_name(&dir.path().join("scutil")), None);
+    }
+}
+
 mod read {
     use super::*;
+
+    #[test]
+    fn gives_the_computer_name_else_the_hostname() {
+        let hostname = rustix::system::uname().nodename().to_string_lossy().into_owned();
+        assert_eq!(read(), machine_name(computer_name(Path::new(SCUTIL)), &hostname));
+    }
 
     #[test]
     fn gives_a_name_with_nothing_around_it() {
