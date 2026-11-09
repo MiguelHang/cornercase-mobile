@@ -533,4 +533,16 @@ mod a_projection_the_view_has_left_behind {
     }
 }
 
+mod a_written_run {
+    use super::*;
+
+    #[test]
+    fn carries_its_text_width_and_style_but_not_its_link() {
+        let style = Style { fg: Some(Colour::Index(4)), underline: true, ..Style::default() };
+        let written = serde_json::to_value(run("docs", 4, style, Some(DOCS))).expect("JSON");
+        let expected = json!({ "text": "docs", "width": 4, "style": serde_json::to_value(style).expect("JSON") });
+        assert_eq!(written, expected);
+    }
+}
+
 mod bench;
