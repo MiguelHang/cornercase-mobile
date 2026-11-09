@@ -21,9 +21,13 @@
       problem = connected.error.message
     }
   }
+
+  const submit = (event: SubmitEvent) => {
+    add(event).catch((error: unknown) => (problem = String(error)))
+  }
 </script>
 
-<form class="add" onsubmit={add}>
+<form class="add" onsubmit={submit}>
   <input type="url" placeholder="Bridge URL" autocomplete="off" bind:value={url} />
   <input type="text" placeholder="Name" autocomplete="off" bind:value={name} />
   <button type="submit">Add and connect</button>

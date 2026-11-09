@@ -22,9 +22,7 @@ pub fn run() {
         .invoke_handler(specta.invoke_handler())
         .setup(move |app| {
             specta.mount_events(app);
-            let state = AppState::load(app.path().app_data_dir(), Arc::new(secrets::store()));
-            lifecycle::started(&state, app.handle());
-            app.manage(state);
+            app.manage(AppState::load(app.path().app_data_dir(), Arc::new(secrets::store())));
             Ok(())
         })
         .build(tauri::generate_context!())

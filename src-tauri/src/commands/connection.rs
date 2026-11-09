@@ -10,7 +10,7 @@ use cornercase_core::store::Store;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::bridge::BridgeConfig;
 use tauri::async_runtime::{self, JoinHandle};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
 use crate::events::{Emit, forward};
@@ -39,10 +39,10 @@ impl Launcher {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn connect(app: AppHandle, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
+pub(crate) fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
     start(&state, app, &Launcher::bridge(), MachineId(id))
 }
 

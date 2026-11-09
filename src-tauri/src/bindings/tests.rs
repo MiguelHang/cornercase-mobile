@@ -13,7 +13,10 @@ fn committed() -> PathBuf {
 }
 
 fn export(path: &Path) {
-    specta().export(Typescript::default(), path).expect("the bindings export");
+    specta::<Wry>()
+        .dangerously_cast_bigints_to_number()
+        .export(Typescript::default(), path)
+        .expect("the bindings export");
 }
 
 fn generated() -> String {

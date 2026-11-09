@@ -164,8 +164,29 @@ describe('apply', () => {
     expect(connection.apply(ON_FIRST, event)).toBe(ON_FIRST)
   })
 
+  it('forgets the machine and its session when it is removed', () => {
+    expect(connection.apply(ON_FIRST, { machine: 1, connection: { state: 'none' } })).toEqual({
+      machine: null,
+      connection: { state: 'none' },
+      session: null,
+    })
+  })
+
   it('drops every event while no machine is active', () => {
     const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null)
     expect(connection.apply(idle, { machine: 1, connection: CONNECTED })).toBe(idle)
+  })
+})
+
+describe('noticeAfter', () => {
+  it('clears the notice once connected', () => {
+    expect(connection.noticeAfter('Retrying in 4 s: timed out', ON_FIRST)).toBeNull()
+  })
+
+  it.each([
+    ['connecting', connection.connecting(1)],
+    ['retrying', { ...ON_FIRST, connection: RETRYING }],
+  ])('keeps the notice while %s', (_, current) => {
+    expect(connection.noticeAfter('the bridge did not answer', current)).toBe('the bridge did not answer')
   })
 })

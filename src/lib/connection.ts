@@ -26,11 +26,17 @@ export const apply = (current: Screen, event: Changed): Screen => {
   if (event.machine !== current.machine) {
     return current
   }
+  if ('connection' in event && event.connection.state === 'none') {
+    return { machine: null, connection: event.connection, session: null }
+  }
   if ('connection' in event) {
     return { ...current, connection: event.connection }
   }
   return { ...current, session: event.session }
 }
+
+export const noticeAfter = (notice: string | null, current: Screen) =>
+  current.connection.state === 'connected' ? null : notice
 
 export const countPanes = (session: Snapshot_Serialize | null) =>
   (session?.projects ?? [])

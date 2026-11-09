@@ -2,7 +2,7 @@
   import { isTauri } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
   import { commands, events } from './lib/bindings'
-  import { apply, connecting, firstToConnect, screen } from './lib/connection'
+  import { apply, connecting, firstToConnect, noticeAfter, screen } from './lib/connection'
   import AddMachine from './routes/AddMachine.svelte'
   import Connection from './routes/Connection.svelte'
   import NoMachines from './routes/NoMachines.svelte'
@@ -40,11 +40,16 @@
       return
     }
     const listening = [
-      events.connectionChanged.listen((event) => (current = apply(current, event.payload))),
+      events.connectionChanged.listen((event) => {
+        current = apply(current, event.payload)
+        notice = noticeAfter(notice, current)
+      }),
       events.sessionChanged.listen((event) => (current = apply(current, event.payload))),
       events.toast.listen((event) => (notice = event.payload.message)),
     ]
-    load()
+    Promise.all(listening)
+      .then(load)
+      .catch((error: unknown) => (notice = String(error)))
     return () => listening.forEach((stop) => stop.then((unlisten) => unlisten()))
   })
 </script>

@@ -1,6 +1,6 @@
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::route::Route;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
 use crate::events::{ConnectionChanged, Emit, Emitted};
@@ -14,17 +14,21 @@ pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineVie
     list(&state)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn machine_add(state: State<'_, AppState>, url: String, name: String) -> Result<u64, CommandError> {
     add(&state, &url, name).map(|id| id.0)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machine_remove(app: AppHandle, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
+pub(crate) fn machine_remove<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    id: u64,
+) -> Result<(), CommandError> {
     remove(&state, &app, MachineId(id))
 }
 

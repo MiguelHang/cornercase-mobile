@@ -4,7 +4,9 @@ use cornercase_core::machines::MachineId;
 
 use super::*;
 use crate::commands::error::ErrorCode;
-use crate::test_util::{BOOT, Recorder, Studio, changed, connected, launcher, released, serving, settle, snapshot};
+use crate::test_util::{
+    BOOT, Ipc, Recorder, Studio, changed, connected, launcher, released, serving, settle, snapshot,
+};
 use crate::view::ConnectionView;
 
 fn first_snapshot() -> Vec<String> {
@@ -61,5 +63,43 @@ mod without_a_machine {
         let studio = Studio::new();
         assert_eq!(current(&studio.state), ConnectionState::none());
         assert_eq!(latest_session(&studio.state), None);
+    }
+}
+
+mod over_ipc {
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    #[test]
+    fn says_the_machine_to_connect_to_is_unknown() {
+        let studio = Studio::new();
+        let ipc = Ipc::new(studio.reloaded());
+        let refused = ipc.invoke("connect", json!({ "id": 99 })).expect_err("no such machine");
+        assert_eq!(refused["code"], "unknown_machine");
+    }
+
+    #[test]
+    fn answers_there_is_no_connection_nor_session() {
+        let studio = Studio::new();
+        let ipc = Ipc::new(studio.reloaded());
+        let state = ipc.invoke("connection_state", json!({})).expect("a connection state");
+        assert_eq!(state, json!({ "machine": null, "connection": { "state": "none" } }));
+        assert_eq!(ipc.invoke("session", json!({})), Ok(Value::Null));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn answers_the_active_connection_and_its_session() {
+        let studio = Studio::new();
+        let state = studio.reloaded();
+        let (launcher, _) = launcher(serving(&first_snapshot()));
+        start(&state, Recorder::default(), &launcher, studio.id).expect("connecting");
+        settle().await;
+        let ipc = Ipc::new(state);
+        let state = ipc.invoke("connection_state", json!({})).expect("a connection state");
+        assert_eq!(state["connection"]["state"], "connected");
+        assert_eq!(state["machine"], studio.id.0);
+        let session = ipc.invoke("session", json!({})).expect("a session");
+        assert_eq!(session["version"], "first");
     }
 }

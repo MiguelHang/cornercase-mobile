@@ -18,9 +18,8 @@ cornercase-core = { path = "../crates/core", features = ["specta"] }
 keyring-core = "1.0.1"
 serde = { version = "1.0.229", features = ["derive"] }
 specta = { workspace = true }
-specta-typescript = "=0.0.13"
 tauri = { version = "2.12", features = ["specta"] }
-tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+tauri-specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
@@ -30,6 +29,9 @@ cornercase-bridge = { path = "../bridge", features = ["test-util"] }
 cornercase-core = { path = "../crates/core", features = ["test-util"] }
 rstest = "0.27.0"
 serde_json = "1.0.154"
+specta-typescript = "=0.0.13"
+tauri = { version = "2.12", features = ["test"] }
+tauri-specta = { version = "=2.0.0-rc.26", features = ["typescript"] }
 tokio = { version = "1.54.1", features = ["rt", "macros", "time", "test-util"] }
 
 [lints]

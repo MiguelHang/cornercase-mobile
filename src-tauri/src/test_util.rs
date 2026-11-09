@@ -1,3 +1,4 @@
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
@@ -9,8 +10,14 @@ use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 use serde_json::{Value, json};
 use tauri::async_runtime::JoinHandle;
+use tauri::http::HeaderMap;
+use tauri::ipc::{CallbackFn, InvokeBody};
+use tauri::test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets};
+use tauri::webview::InvokeRequest;
+use tauri::{App, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio::time;
 
+use crate::bindings;
 use crate::commands::connection::Launcher;
 use crate::commands::error::CommandError;
 use crate::events::{ConnectionChanged, Emit, Emitted, SessionChanged, Toast};
@@ -63,6 +70,51 @@ impl Recorder {
             .filter_map(|event| if let Emitted::Toast(it) = event { Some(it) } else { None })
             .collect()
     }
+}
+
+pub(crate) struct Ipc {
+    pub(crate) app: App<MockRuntime>,
+    webview: WebviewWindow<MockRuntime>,
+}
+
+impl Ipc {
+    pub(crate) fn new(state: AppState) -> Self {
+        let specta = bindings::specta();
+        let app = mock_builder()
+            .invoke_handler(specta.invoke_handler())
+            .build(mock_context(noop_assets()))
+            .expect("the mock app builds");
+        specta.mount_events(&app);
+        app.manage(state);
+        let webview =
+            WebviewWindowBuilder::new(&app, "main", WebviewUrl::default()).build().expect("the mock webview opens");
+        Self { app, webview }
+    }
+
+    pub(crate) fn invoke(&self, command: &str, args: Value) -> Result<Value, Value> {
+        let request = InvokeRequest {
+            cmd: command.to_owned(),
+            callback: CallbackFn(0),
+            error: CallbackFn(1),
+            url: "tauri://localhost".parse().expect("the app's url parses"),
+            body: InvokeBody::Json(args),
+            headers: HeaderMap::default(),
+            invoke_key: INVOKE_KEY.to_owned(),
+        };
+        get_ipc_response(&self.webview, request).map(|answer| answer.deserialize().expect("the answer is json"))
+    }
+
+    pub(crate) fn state(&self) -> tauri::State<'_, AppState> {
+        self.app.state::<AppState>()
+    }
+}
+
+pub(crate) fn heard(app: &App<MockRuntime>, event: &str) -> Receiver<Value> {
+    let (sender, heard) = mpsc::channel();
+    app.listen_any(event, move |event| {
+        sender.send(serde_json::from_str(event.payload()).expect("the payload is json")).ok();
+    });
+    heard
 }
 
 pub(crate) struct Studio {

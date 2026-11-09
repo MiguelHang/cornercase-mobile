@@ -1,18 +1,14 @@
 use tauri::{AppHandle, Manager, RunEvent, Runtime};
 
-use crate::events::{Emit, Emitted, Toast};
 use crate::state::AppState;
 
-pub(crate) fn started(state: &AppState, emit: &impl Emit) {
-    if let Err(error) = state.machines(|_| Ok(())) {
-        emit.emit(Emitted::Toast(Toast::error(error.message)));
+pub(crate) fn on_event<R: Runtime>(app: &AppHandle<R>, event: &RunEvent) {
+    if foreground(event) {
+        resume(app);
     }
 }
 
-pub(crate) fn on_event<R: Runtime>(app: &AppHandle<R>, event: &RunEvent) {
-    if !foreground(event) {
-        return;
-    }
+pub(crate) fn resume<R: Runtime>(app: &AppHandle<R>) {
     if let Some(state) = app.try_state::<AppState>() {
         on_foreground(&state);
     }

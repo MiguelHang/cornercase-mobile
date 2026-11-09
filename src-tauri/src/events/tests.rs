@@ -14,8 +14,8 @@ use super::*;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
 use crate::test_util::{
-    APP, BOOT, CONTRACT, EVENTS, Recorder, STATUS, Studio, TOKEN, changed, connected, contracted, route, serving,
-    settle, snapshot,
+    APP, BOOT, CONTRACT, EVENTS, Ipc, Recorder, STATUS, Studio, TOKEN, changed, connected, contracted, heard, route,
+    serving, settle, snapshot,
 };
 
 const RESTARTED: &str = "5152-1770000100";
@@ -171,5 +171,28 @@ mod an_event {
             [ConnectionChanged::NAME, SessionChanged::NAME, Toast::NAME],
             ["connection-changed", "session-changed", "toast"]
         );
+    }
+}
+
+mod the_app {
+    use super::*;
+
+    #[rstest]
+    #[case::connection_changed(
+        Emitted::Connection(changed(MachineId(7), ConnectionView::Connecting)),
+        "connection-changed",
+        json!({ "machine": 7, "connection": { "state": "connecting" } })
+    )]
+    #[case::session_changed(
+        Emitted::Session(SessionChanged { machine: 7, session: None }),
+        "session-changed",
+        json!({ "machine": 7, "session": null })
+    )]
+    #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
+    fn emits_each_event_under_its_name(#[case] event: Emitted, #[case] name: &str, #[case] expected: Value) {
+        let ipc = Ipc::new(Studio::new().reloaded());
+        let heard = heard(&ipc.app, name);
+        ipc.app.handle().emit(event);
+        assert_eq!(heard.try_recv(), Ok(expected));
     }
 }
