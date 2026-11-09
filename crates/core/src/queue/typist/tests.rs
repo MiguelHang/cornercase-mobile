@@ -333,17 +333,18 @@ mod ended {
         assert_eq!((typist.ended().await, notices.taken()), (typed, told));
     }
 
+    fn refusing_then_crashing(mut stdin: BoxStream<'static, Stdin>, mut out: OutSink) -> BoxFuture<'static, End> {
+        async move {
+            stdin.next().await;
+            say(&mut out, REFUSED).await?;
+            Ok(exit(1, NO_SERVER))
+        }
+        .boxed()
+    }
+
     #[tokio::test]
     async fn tells_a_refusal_that_came_with_the_end_of_the_typist() {
-        let script = |mut stdin: BoxStream<'static, Stdin>, mut out: OutSink| {
-            async move {
-                stdin.next().await;
-                say(&mut out, REFUSED).await?;
-                Ok(exit(1, NO_SERVER))
-            }
-            .boxed()
-        };
-        let (mut typist, mut notices) = typist(script);
+        let (mut typist, mut notices) = typist(refusing_then_crashing);
         type_keys(&mut typist, &[(9, "a")]).await;
         assert_eq!(typist.ended().await, Typed::Gone);
         let told = notices.taken();
