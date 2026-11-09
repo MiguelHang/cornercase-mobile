@@ -48,10 +48,11 @@
       <div class="pick" aria-current="true">{@render about()}</div>
     {:else}
       <button class="pick" type="button" onclick={onpick} ontouchstart={() => {}}>{@render about()}</button>
-      <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>
     {/if}
     {#if rejected}
       <Button tone="plain" onclick={onrescan}>Scan again</Button>
+    {:else if !active}
+      <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>
     {/if}
     <Button tone="plain" onclick={onedit}>Edit</Button>
   </div>

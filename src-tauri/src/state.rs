@@ -34,6 +34,7 @@ pub(crate) struct Active {
     store: Store,
     driver: JoinHandle<()>,
     forwarder: JoinHandle<()>,
+    terminal: Option<(u64, JoinHandle<()>)>,
 }
 
 impl AppState {
@@ -107,7 +108,7 @@ impl SharedMachines {
 
 impl Active {
     pub(crate) fn new(machine: MachineId, store: Store, driver: JoinHandle<()>, forwarder: JoinHandle<()>) -> Self {
-        Self { machine, store, driver, forwarder }
+        Self { machine, store, driver, forwarder, terminal: None }
     }
 
     pub(crate) fn machine(&self) -> MachineId {
@@ -117,12 +118,30 @@ impl Active {
     pub(crate) fn store(&self) -> &Store {
         &self.store
     }
+
+    pub(crate) fn show(&mut self, tab: u64, terminal: JoinHandle<()>) {
+        self.stop_terminal();
+        self.terminal = Some((tab, terminal));
+    }
+
+    pub(crate) fn hide(&mut self, tab: u64) {
+        if self.terminal.as_ref().is_some_and(|(shown, _)| *shown == tab) {
+            self.stop_terminal();
+        }
+    }
+
+    fn stop_terminal(&mut self) {
+        if let Some((_, terminal)) = self.terminal.take() {
+            terminal.abort();
+        }
+    }
 }
 
 impl Drop for Active {
     fn drop(&mut self) {
         self.driver.abort();
         self.forwarder.abort();
+        self.stop_terminal();
     }
 }
 

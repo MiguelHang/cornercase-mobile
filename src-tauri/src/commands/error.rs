@@ -53,6 +53,7 @@ pub(crate) enum ErrorCode {
     NoDataDir,
     MachinesNotLoaded,
     NoIdentity,
+    NotConnected,
 }
 
 impl CommandError {
@@ -70,6 +71,10 @@ impl CommandError {
 
     pub(crate) fn no_identity(error: &Error) -> Self {
         Self::new(ErrorCode::NoIdentity, format!("the app has no identity: {error}"))
+    }
+
+    pub(crate) fn not_connected() -> Self {
+        Self::new(ErrorCode::NotConnected, "no machine is connected")
     }
 }
 

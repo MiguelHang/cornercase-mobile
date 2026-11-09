@@ -73,6 +73,13 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const scanAgain = /<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Scan again/
 
+const withRejected = async () => {
+  const views: Record<number, ProbeView> = { 2: { state: 'unauthorized' }, 3: { state: 'no_token' }, 4: PROBED[2] }
+  const probes = new Probes({ machineProbe: (id) => Promise.resolve({ status: 'ok', data: views[id] }) })
+  await probes.check([2, 3, 4])
+  return rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes)))
+}
+
 describe('Machines', () => {
   it('has a header with Back and its title', async () => {
     expect(await screen()).toMatch(
@@ -152,13 +159,11 @@ describe('Machines', () => {
   })
 
   it('offers Scan again on the others whose probe says their token is rejected or missing', async () => {
-    const views: Record<number, ProbeView> = { 2: { state: 'unauthorized' }, 3: { state: 'no_token' }, 4: PROBED[2] }
-    const probes = new Probes({ machineProbe: (id) => Promise.resolve({ status: 'ok', data: views[id] }) })
-    await probes.check([2, 3, 4])
-    const offered = rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes))).map((row) =>
-      scanAgain.test(row),
-    )
-    expect(offered).toEqual([false, true, true, false])
+    expect((await withRejected()).map((row) => scanAgain.test(row))).toEqual([false, true, true, false])
+  })
+
+  it('puts Scan again in the place of Check again on a row whose token is rejected or missing', async () => {
+    expect((await withRejected()).map((row) => row.includes('Check again'))).toEqual([false, false, false, true])
   })
 
   it('offers adding a machine and shows no form yet', async () => {
@@ -180,7 +185,7 @@ describe('Machines wiring', () => {
     expect(script).toContain('onpick={() => onpick(machine.id)} oncheck={() => void probes.check([machine.id])}')
     expect(script).toContain('onclick={onback}')
     expect(flat(rowSource)).toContain(
-      '<button class="pick" type="button" onclick={onpick} ontouchstart={() => {}}>{@render about()}</button> <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>',
+      '{:else if !active} <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button> {/if}',
     )
   })
 
@@ -194,7 +199,7 @@ describe('Machines wiring', () => {
     expect(script).toContain('rejected={rescannable(connectionOf(machine), probes.of(machine.id))}')
     expect(script).toContain('onrescan={() => onrescan(machine.id)}')
     expect(flat(rowSource)).toContain(
-      '{#if rejected} <Button tone="plain" onclick={onrescan}>Scan again</Button> {/if}',
+      '{#if rejected} <Button tone="plain" onclick={onrescan}>Scan again</Button> {:else if !active}',
     )
   })
 

@@ -251,3 +251,76 @@ mod missing_and_unknown_keys {
         assert!(error.to_string().contains("a list of every line or a map of the changed rows"), "{error}");
     }
 }
+
+mod writing {
+    use super::*;
+
+    fn round_trip<T: Serialize + for<'de> Deserialize<'de>>(value: &T) -> T {
+        serde_json::from_value(serde_json::to_value(value).expect("JSON")).expect("read back")
+    }
+
+    #[test]
+    fn writes_a_style_with_the_names_of_the_contract() {
+        let style = Style {
+            fg: Some(Colour::Index(1)),
+            bg: Some(Colour::Rgb([16, 32, 48])),
+            bold: true,
+            underline: true,
+            underline_kind: Some(UnderlineKind::Curly),
+            underline_colour: Some(Colour::Index(4)),
+            inverse: true,
+            ..Style::default()
+        };
+        let expected = json!({
+            "fg": { "index": 1 },
+            "bg": { "rgb": [16, 32, 48] },
+            "bold": true,
+            "dim": false,
+            "italic": false,
+            "underline": true,
+            "underline_style": "curly",
+            "underline_colour": { "index": 4 },
+            "overline": false,
+            "blink": false,
+            "inverse": true,
+            "invisible": false,
+            "strikethrough": false,
+        });
+        assert_eq!(serde_json::to_value(style).expect("JSON"), expected);
+        assert_eq!(round_trip(&style), style);
+    }
+
+    #[test]
+    fn reads_back_every_style_of_the_fixture() {
+        let styles = parsed(FRAME).styles;
+        let read_back: Vec<Style> = styles.iter().map(round_trip).collect();
+        assert_eq!(read_back, styles);
+    }
+
+    #[rstest]
+    #[case::bar(CursorShape::Bar, "bar")]
+    #[case::underline(CursorShape::Underline, "underline")]
+    #[case::block_hollow(CursorShape::BlockHollow, "block_hollow")]
+    #[case::block(CursorShape::Block, "block")]
+    fn writes_a_cursor_shape_in_snake_case(#[case] shape: CursorShape, #[case] name: &str) {
+        let cursor = Cursor { x: 3, y: 5, shape, blinking: true };
+        let expected = json!({ "x": 3, "y": 5, "shape": name, "blinking": true });
+        assert_eq!(serde_json::to_value(cursor).expect("JSON"), expected);
+        assert_eq!(round_trip(&cursor), cursor);
+    }
+
+    #[test]
+    fn writes_the_size_and_colours_of_a_pane() {
+        let colours = Colours {
+            fg: Some([1, 2, 3]),
+            bg: None,
+            cursor: Some([4, 5, 6]),
+            palette: BTreeMap::from([("17".to_owned(), [7, 8, 9])]),
+        };
+        let expected = json!({ "fg": [1, 2, 3], "bg": null, "cursor": [4, 5, 6], "palette": { "17": [7, 8, 9] } });
+        assert_eq!(serde_json::to_value(&colours).expect("JSON"), expected);
+        assert_eq!(round_trip(&colours), colours);
+        let size = Size { cols: 80, rows: 24 };
+        assert_eq!(serde_json::to_value(size).expect("JSON"), json!({ "cols": 80, "rows": 24 }));
+    }
+}

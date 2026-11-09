@@ -90,6 +90,7 @@ mod of_the_app {
         "no_identity",
         "the app has no identity: the secret store failed: locked"
     )]
+    #[case::not_connected(CommandError::not_connected(), "not_connected", "no machine is connected")]
     fn carries_its_code_and_its_message(#[case] error: CommandError, #[case] code: &str, #[case] message: &str) {
         assert_eq!(json_of(&error), json!({ "code": code, "message": message }));
     }

@@ -6,8 +6,10 @@ import projectYml from '../src-tauri/gen/apple/project.yml?raw'
 import tauriConf from '../src-tauri/tauri.conf.json?raw'
 
 describe('launch', () => {
-  it('lets the page draw under the notch', () => {
-    expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />')
+  it('lets the page draw under the notch and never zooms it', () => {
+    expect(html.replace(/\s+/g, ' ')).toContain(
+      '<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />',
+    )
   })
 
   it('paints the window in the ground colour before the page loads', () => {

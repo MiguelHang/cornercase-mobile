@@ -10,11 +10,13 @@
     connection,
     below = 0,
     onback,
+    onterminal,
   }: {
     row: AgentRow | null | undefined
     connection: ConnectionView_Serialize
     below?: number
     onback: () => void
+    onterminal: (row: AgentRow) => void
   } = $props()
 </script>
 
@@ -35,6 +37,10 @@
     <p class="gone">This agent is no longer running.</p>
   {/if}
   <div class="actions">
+    {#if row}
+      {@const opened = row}
+      <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button>
+    {/if}
     <Button tone="plain" onclick={onback}>Back</Button>
   </div>
 </section>
@@ -73,6 +79,11 @@
     color: var(--muted);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .actions {
+    display: flex;
+    gap: var(--gap);
   }
 
   .waiting {

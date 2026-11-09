@@ -1,13 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as connection from './connection'
-import { openedAgent, Router, routeFor } from './router.svelte'
+import { openedAgent, openedTerminal, Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
 const MACHINES = { name: 'machines' } as const
 const MACHINE = { name: 'machine', id: 2 } as const
 const AGENT = { name: 'agent', machine: 1, pane: 7 } as const
+const ROW: AgentRow = {
+  boot: 'b1',
+  agent: 'claude',
+  title: null,
+  status: 'working',
+  since: null,
+  pane: 7,
+  tab: 3,
+  tab_name: 'fix login',
+  workspace: 2,
+  workspace_name: 'main',
+  workspace_count: 1,
+  project: 1,
+  project_name: 'app',
+}
+const TERMINAL = { name: 'terminal', machine: 1, row: ROW } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -114,7 +130,7 @@ describe('Router', () => {
   })
 })
 
-describe('Router.setBase with an agent open', () => {
+describe('Router.setBase with an agent or its terminal open', () => {
   it('stays on an agent while the connection settles on home', () => {
     const router = new Router(HOME)
     router.go(AGENT)
@@ -139,6 +155,24 @@ describe('Router.setBase with an agent open', () => {
     expect(router.current).toEqual(HOME)
     router.back()
     expect(router.current).toEqual(HOME)
+  })
+
+  it('stays on a terminal opened from an agent while the connection settles on home', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(TERMINAL)
+    router.setBase(HOME)
+    expect(router.current).toBe(TERMINAL)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+  })
+
+  it('drops a terminal once its machine is gone', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(TERMINAL)
+    router.setBase(NO_MACHINES)
+    expect(router.current).toEqual(NO_MACHINES)
   })
 
   it('keeps the route it settles on when it is already there', () => {
@@ -215,5 +249,29 @@ describe('openedAgent', () => {
     router.back()
     expect(router.current).toEqual(AGENT)
     expect(openedAgent(router.current, on(2, [row(7)]))).toBeUndefined()
+  })
+})
+
+describe('openedTerminal', () => {
+  it('opens the terminal on the machine it was opened on', () => {
+    expect(openedTerminal(TERMINAL, on(1, null))).toBe(TERMINAL)
+  })
+
+  it('opens no terminal of another machine, so its tab id is not opened on the new one', () => {
+    expect(openedTerminal(TERMINAL, on(2, [ROW]))).toBeUndefined()
+    expect(openedTerminal(TERMINAL, on(null, null))).toBeUndefined()
+  })
+
+  it('opens nothing on another route', () => {
+    expect(openedTerminal(AGENT, on(1, [ROW]))).toBeUndefined()
+  })
+
+  it('shows no terminal once the active machine switches under it', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(TERMINAL)
+    router.setBase(HOME)
+    expect(router.current).toBe(TERMINAL)
+    expect(openedTerminal(router.current, on(2, [ROW]))).toBeUndefined()
   })
 })

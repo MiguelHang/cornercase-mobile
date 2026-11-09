@@ -1,15 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
+use serde::Serialize;
+
 use crate::cli::surface::{
     Area, Colours, Copied, Cursor, Frame, Hyperlink, Modes, Node, Scroll, Size, Style, WireLines, WirePane, WireRun,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Run {
     pub text: String,
     pub width: u16,
     pub style: Style,
+    #[serde(skip)]
     pub link: Option<Arc<str>>,
 }
 

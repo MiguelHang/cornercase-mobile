@@ -124,9 +124,12 @@ describe('App wiring', () => {
     expect(source).not.toMatch(/session/i)
   })
 
-  it('shows the connection bar on home and an agent, and puts the board, the agent and the toasts below it', () => {
+  it('shows the connection bar on home, an agent and a terminal of another machine, and puts the board, the agent and the toasts below it', () => {
     expect(source).toContain(
-      "{#if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {#if route.name === 'agent'}",
+      "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
+    )
+    expect(source).toContain(
+      "{:else if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {#if route.name === 'home'}",
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
@@ -140,7 +143,26 @@ describe('App wiring', () => {
   it('opens the agent of the tapped pane on its own machine, and goes back from it', () => {
     expect(source).toContain('const opened = $derived(openedAgent(route, current))')
     expect(source).toContain(
-      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />',
+      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} onterminal={terminal} />',
+    )
+  })
+
+  it("opens an agent's terminal on top of it, on the machine the agent runs on", () => {
+    expect(source).toContain(
+      "const terminal = (row: AgentRow) => { if (current.machine !== null) { router.go({ name: 'terminal', machine: current.machine, row }) } }",
+    )
+  })
+
+  it('shows the terminal on top of everything only on its own machine, going back from it and putting the toasts below its bar', () => {
+    expect(source).toContain('const viewed = $derived(openedTerminal(route, current))')
+    expect(source).toContain(
+      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} onback={() => router.back()} onfailed={toasts.failed} bind:height={barHeight} />',
+    )
+  })
+
+  it('shows a terminal of another machine as the gone agent', () => {
+    expect(source).toContain(
+      '{:else} <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} onterminal={terminal} /> {/if}',
     )
   })
 })

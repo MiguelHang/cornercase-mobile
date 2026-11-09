@@ -15,6 +15,7 @@ const MISSING: ConnectionView_Serialize = {
 }
 const RUNNING: AgentRow_Serialize[] = [
   {
+    boot: 'b1',
     pane: 31,
     status: 'working',
     agent: 'codex',

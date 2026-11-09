@@ -1,9 +1,11 @@
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import type { Screen } from './connection'
 
 export type Route =
   | { name: 'no-machines' }
   | { name: 'home' }
   | { name: 'agent'; machine: number | null; pane: number }
+  | { name: 'terminal'; machine: number; row: AgentRow }
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
 
@@ -18,6 +20,9 @@ export const openedAgent = (route: Route, screen: Screen) => {
   }
   return screen.agents === null ? null : screen.agents.find((agent) => agent.pane === route.pane)
 }
+
+export const openedTerminal = (route: Route, screen: Screen) =>
+  route.name === 'terminal' && route.machine === screen.machine ? route : undefined
 
 export class Router {
   #stack: Route[] = $state([])
