@@ -1,3 +1,5 @@
+use cornercase_core::board::AgentRow;
+use cornercase_core::cli::events::What;
 use cornercase_core::cli::status::Snapshot;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
@@ -25,6 +27,13 @@ pub(crate) struct SessionChanged {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct AgentsChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    pub(crate) agents: Option<Vec<AgentRow>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
 pub(crate) struct Toast {
     pub(crate) level: ToastLevel,
     pub(crate) message: String,
@@ -42,6 +51,7 @@ pub(crate) enum ToastLevel {
 pub(crate) enum Emitted {
     Connection(ConnectionChanged),
     Session(SessionChanged),
+    Agents(AgentsChanged),
     Toast(Toast),
 }
 
@@ -54,6 +64,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
         let sent = match event {
             Emitted::Connection(changed) => changed.emit(self),
             Emitted::Session(changed) => changed.emit(self),
+            Emitted::Agents(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
         sent.ok();
@@ -73,11 +84,30 @@ pub(crate) async fn forward(
     machines: SharedMachines,
     emit: impl Emit,
 ) {
+    let mut sent = None;
     while let Some(change) = changes.next().await {
-        for event in translated(machine, &store, &machines, change) {
+        let agents = if touches_agents(&change) { agents_changed(machine, &store, &mut sent) } else { None };
+        for event in translated(machine, &store, &machines, change).into_iter().chain(agents) {
             emit.emit(event);
         }
     }
+}
+
+fn touches_agents(change: &Change) -> bool {
+    match change {
+        Change::Session => true,
+        Change::Event(event) => matches!(event.what, What::Status { .. }),
+        Change::Connection(_) | Change::App | Change::Warning(_) => false,
+    }
+}
+
+fn agents_changed(machine: MachineId, store: &Store, sent: &mut Option<Vec<AgentRow>>) -> Option<Emitted> {
+    let agents = store.agents();
+    if agents == *sent {
+        return None;
+    }
+    sent.clone_from(&agents);
+    Some(Emitted::Agents(AgentsChanged { machine: machine.0, agents }))
 }
 
 fn translated(machine: MachineId, store: &Store, machines: &SharedMachines, change: Change) -> Vec<Emitted> {

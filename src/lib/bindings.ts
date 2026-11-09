@@ -11,17 +11,63 @@ export const commands = {
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
+	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 };
 
 /** Events */
 export const events = {
+	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
 	sessionChanged: makeEvent<SessionChanged_Serialize, SessionChanged_Deserialize>("session-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
 
 /* Types */
+export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
+
+export type AgentRow_Deserialize = {
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	project_name: string,
+	workspace_name: string,
+	tab_name: string,
+	workspace_count: number,
+	agent: string,
+	title?: string | null,
+	status?: string | null,
+	since?: string | null,
+};
+
+export type AgentRow_Serialize = {
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	project_name: string,
+	workspace_name: string,
+	tab_name: string,
+	workspace_count: number,
+	agent: string,
+	title: string | null,
+	status: string | null,
+	since: string | null,
+};
+
+export type AgentsChanged = AgentsChanged_Serialize | AgentsChanged_Deserialize;
+
+export type AgentsChanged_Deserialize = {
+	machine: number,
+	agents?: AgentRow_Deserialize[] | null,
+};
+
+export type AgentsChanged_Serialize = {
+	machine: number,
+	agents: AgentRow_Serialize[] | null,
+};
+
 export type CommandError = {
 	code: ErrorCode,
 	message: string,
