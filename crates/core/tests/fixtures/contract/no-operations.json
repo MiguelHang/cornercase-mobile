@@ -1,0 +1,91 @@
+{
+  "boot": "28715-1794075132409911000",
+  "contract": 1,
+  "features": [
+    "boot",
+    "structured-errors",
+    "strict-fields",
+    "views",
+    "host-events",
+    "theme",
+    "notices",
+    "surface-patches",
+    "config",
+    "close-unlock",
+    "sound",
+    "issues",
+    "todo-panel",
+    "changes",
+    "agent-folds",
+    "accounts",
+    "account-login",
+    "account-switch",
+    "issue-names",
+    "account-restart",
+    "accounts-revision",
+    "tour",
+    "close-agent-tabs",
+    "queue-undo",
+    "focus-reveal",
+    "popup-terminal",
+    "files",
+    "shared-files",
+    "build-folders",
+    "settings-search",
+    "flow-issue-prompt",
+    "machines",
+    "machine-usage",
+    "stats-cached",
+    "machine-workspaces",
+    "machine-start",
+    "search-settings",
+    "recap",
+    "queue-routines",
+    "plugin-run-view",
+    "open-code-workspace",
+    "machine-retry-at"
+  ],
+  "streams": [
+    {
+      "name": "events",
+      "version": 1
+    },
+    {
+      "name": "watch",
+      "version": 1
+    },
+    {
+      "name": "surface",
+      "version": 1
+    },
+    {
+      "name": "view",
+      "version": 1
+    },
+    {
+      "name": "app",
+      "version": 1
+    },
+    {
+      "name": "changes",
+      "version": 1
+    },
+    {
+      "name": "flow-runs",
+      "version": 1
+    },
+    {
+      "name": "flow-messages",
+      "version": 1
+    },
+    {
+      "name": "files",
+      "version": 1
+    },
+    {
+      "name": "config-pair",
+      "version": 1
+    }
+  ],
+  "version": "0.13.19"
+}

@@ -1,0 +1,589 @@
+{
+  "boot": "28715-1794075132409911000",
+  "contract": 1,
+  "features": [
+    "boot",
+    "structured-errors",
+    "strict-fields",
+    "views",
+    "host-events",
+    "theme",
+    "notices",
+    "surface-patches",
+    "config",
+    "close-unlock",
+    "sound",
+    "issues",
+    "todo-panel",
+    "changes",
+    "agent-folds",
+    "accounts",
+    "account-login",
+    "account-switch",
+    "issue-names",
+    "account-restart",
+    "accounts-revision",
+    "tour",
+    "close-agent-tabs",
+    "queue-undo",
+    "focus-reveal",
+    "popup-terminal",
+    "files",
+    "shared-files",
+    "build-folders",
+    "settings-search",
+    "flow-issue-prompt",
+    "machines",
+    "machine-usage",
+    "stats-cached",
+    "machine-workspaces",
+    "machine-start",
+    "search-settings",
+    "recap",
+    "queue-routines",
+    "plugin-run-view",
+    "open-code-workspace",
+    "machine-retry-at"
+  ],
+  "operations": [
+    {
+      "available": true,
+      "name": "status"
+    },
+    {
+      "available": true,
+      "name": "open"
+    },
+    {
+      "available": true,
+      "name": "new-workspace"
+    },
+    {
+      "available": true,
+      "name": "new-tab"
+    },
+    {
+      "available": true,
+      "name": "split"
+    },
+    {
+      "available": true,
+      "name": "start"
+    },
+    {
+      "available": true,
+      "name": "send"
+    },
+    {
+      "available": true,
+      "name": "keys"
+    },
+    {
+      "available": true,
+      "name": "read"
+    },
+    {
+      "available": true,
+      "name": "wait"
+    },
+    {
+      "available": true,
+      "name": "close"
+    },
+    {
+      "available": true,
+      "name": "rename"
+    },
+    {
+      "available": true,
+      "name": "focus"
+    },
+    {
+      "available": true,
+      "name": "notify"
+    },
+    {
+      "available": true,
+      "name": "todo"
+    },
+    {
+      "available": true,
+      "name": "wait-several"
+    },
+    {
+      "available": true,
+      "name": "events"
+    },
+    {
+      "available": true,
+      "name": "last-message"
+    },
+    {
+      "available": true,
+      "name": "restart-when-idle"
+    },
+    {
+      "available": true,
+      "name": "stats"
+    },
+    {
+      "available": true,
+      "name": "away"
+    },
+    {
+      "available": true,
+      "name": "mark"
+    },
+    {
+      "available": true,
+      "name": "queue"
+    },
+    {
+      "available": true,
+      "name": "start-with"
+    },
+    {
+      "available": true,
+      "name": "flow-list"
+    },
+    {
+      "available": true,
+      "name": "flow-run"
+    },
+    {
+      "available": true,
+      "name": "flow-export"
+    },
+    {
+      "available": true,
+      "name": "flow-import"
+    },
+    {
+      "available": true,
+      "name": "search"
+    },
+    {
+      "available": true,
+      "name": "contract"
+    },
+    {
+      "available": true,
+      "name": "start-server"
+    },
+    {
+      "available": true,
+      "name": "watch"
+    },
+    {
+      "available": true,
+      "name": "surface"
+    },
+    {
+      "available": true,
+      "name": "view"
+    },
+    {
+      "available": true,
+      "name": "view-set"
+    },
+    {
+      "available": true,
+      "name": "input"
+    },
+    {
+      "available": true,
+      "name": "scroll"
+    },
+    {
+      "available": true,
+      "name": "selection"
+    },
+    {
+      "available": true,
+      "name": "resize"
+    },
+    {
+      "available": true,
+      "name": "ratio"
+    },
+    {
+      "available": true,
+      "name": "link"
+    },
+    {
+      "available": true,
+      "name": "todo-send"
+    },
+    {
+      "available": true,
+      "name": "theme"
+    },
+    {
+      "available": true,
+      "name": "go"
+    },
+    {
+      "available": true,
+      "name": "redraw"
+    },
+    {
+      "available": true,
+      "name": "config"
+    },
+    {
+      "available": true,
+      "name": "move"
+    },
+    {
+      "available": true,
+      "name": "move-pane"
+    },
+    {
+      "available": true,
+      "name": "collapse"
+    },
+    {
+      "available": true,
+      "name": "expand"
+    },
+    {
+      "available": true,
+      "name": "group-new"
+    },
+    {
+      "available": true,
+      "name": "group-style"
+    },
+    {
+      "available": true,
+      "name": "group-delete"
+    },
+    {
+      "available": true,
+      "name": "removal-check"
+    },
+    {
+      "available": true,
+      "name": "issue-sources"
+    },
+    {
+      "available": true,
+      "name": "issue-list"
+    },
+    {
+      "available": true,
+      "name": "issue-read"
+    },
+    {
+      "available": true,
+      "name": "issue-people"
+    },
+    {
+      "available": true,
+      "name": "update-check"
+    },
+    {
+      "available": true,
+      "name": "update-install"
+    },
+    {
+      "available": true,
+      "name": "app"
+    },
+    {
+      "available": true,
+      "name": "changes"
+    },
+    {
+      "available": true,
+      "name": "changes-mode"
+    },
+    {
+      "available": true,
+      "name": "changes-file"
+    },
+    {
+      "available": true,
+      "name": "changes-gap"
+    },
+    {
+      "available": true,
+      "name": "changes-base"
+    },
+    {
+      "available": true,
+      "name": "changes-viewed"
+    },
+    {
+      "available": true,
+      "name": "usage"
+    },
+    {
+      "available": true,
+      "name": "plugin-list"
+    },
+    {
+      "available": true,
+      "name": "plugin-actions"
+    },
+    {
+      "available": true,
+      "name": "plugin-run"
+    },
+    {
+      "available": true,
+      "name": "flow-save"
+    },
+    {
+      "available": true,
+      "name": "flow-delete"
+    },
+    {
+      "available": true,
+      "name": "flow-hide"
+    },
+    {
+      "available": true,
+      "name": "flow-restore"
+    },
+    {
+      "available": true,
+      "name": "flow-runs"
+    },
+    {
+      "available": true,
+      "name": "flow-messages"
+    },
+    {
+      "available": true,
+      "name": "flow-files"
+    },
+    {
+      "available": true,
+      "name": "account-list"
+    },
+    {
+      "available": true,
+      "name": "account-add"
+    },
+    {
+      "available": true,
+      "name": "account-remove"
+    },
+    {
+      "available": true,
+      "name": "profile-list"
+    },
+    {
+      "available": true,
+      "name": "profile-new"
+    },
+    {
+      "available": true,
+      "name": "profile-set"
+    },
+    {
+      "available": true,
+      "name": "profile-use"
+    },
+    {
+      "available": true,
+      "name": "profile-delete"
+    },
+    {
+      "available": true,
+      "name": "account-rename"
+    },
+    {
+      "available": true,
+      "name": "account-use"
+    },
+    {
+      "available": true,
+      "name": "close-agent"
+    },
+    {
+      "available": true,
+      "name": "account-restart"
+    },
+    {
+      "available": true,
+      "name": "changes-discard"
+    },
+    {
+      "available": true,
+      "name": "changes-stage"
+    },
+    {
+      "available": true,
+      "name": "agents-close"
+    },
+    {
+      "available": true,
+      "name": "agents-reopen"
+    },
+    {
+      "available": true,
+      "name": "agents-forget"
+    },
+    {
+      "available": true,
+      "name": "tour"
+    },
+    {
+      "available": true,
+      "name": "config-export"
+    },
+    {
+      "available": true,
+      "name": "config-import"
+    },
+    {
+      "available": true,
+      "name": "flow-default"
+    },
+    {
+      "available": true,
+      "name": "flow-order"
+    },
+    {
+      "available": true,
+      "name": "plugin-popup-close"
+    },
+    {
+      "available": true,
+      "name": "ports"
+    },
+    {
+      "available": true,
+      "name": "stop-port"
+    },
+    {
+      "available": true,
+      "name": "files-list"
+    },
+    {
+      "available": true,
+      "name": "files-read"
+    },
+    {
+      "available": true,
+      "name": "files-search"
+    },
+    {
+      "available": true,
+      "name": "paste-file"
+    },
+    {
+      "available": true,
+      "name": "changes-merge-check"
+    },
+    {
+      "available": true,
+      "name": "worktree-size"
+    },
+    {
+      "available": true,
+      "name": "free-builds"
+    },
+    {
+      "available": true,
+      "name": "processes"
+    },
+    {
+      "available": true,
+      "name": "stop-process"
+    },
+    {
+      "available": true,
+      "name": "worktrees"
+    },
+    {
+      "available": true,
+      "name": "pull-request"
+    },
+    {
+      "available": true,
+      "name": "context"
+    },
+    {
+      "available": true,
+      "name": "recap"
+    },
+    {
+      "available": true,
+      "name": "machines"
+    },
+    {
+      "available": true,
+      "name": "clone"
+    },
+    {
+      "available": true,
+      "name": "focus-machine"
+    },
+    {
+      "available": true,
+      "name": "forum-server"
+    },
+    {
+      "available": true,
+      "name": "held"
+    },
+    {
+      "available": true,
+      "name": "run-setup"
+    },
+    {
+      "available": true,
+      "name": "config-pair"
+    },
+    {
+      "available": true,
+      "name": "worktrees-remove"
+    }
+  ],
+  "streams": [
+    {
+      "name": "events",
+      "version": 1
+    },
+    {
+      "name": "watch",
+      "version": 1
+    },
+    {
+      "name": "surface",
+      "version": 1
+    },
+    {
+      "name": "view",
+      "version": 1
+    },
+    {
+      "name": "app",
+      "version": 1
+    },
+    {
+      "name": "changes",
+      "version": 1
+    },
+    {
+      "name": "flow-runs",
+      "version": 1
+    },
+    {
+      "name": "flow-messages",
+      "version": 1
+    },
+    {
+      "name": "files",
+      "version": 1
+    },
+    {
+      "name": "config-pair",
+      "version": 1
+    }
+  ],
+  "version": "0.13.19"
+}
