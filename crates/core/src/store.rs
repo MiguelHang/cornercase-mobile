@@ -101,6 +101,10 @@ impl Store {
         self.shared.queue()
     }
 
+    pub fn boot(&self) -> Option<String> {
+        self.shared.state().boots.current().map(|boot| boot.0.clone())
+    }
+
     pub fn transport(&self) -> Option<Arc<dyn Transport>> {
         self.shared.state().transport.clone()
     }

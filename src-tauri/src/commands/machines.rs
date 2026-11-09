@@ -5,12 +5,12 @@ use tauri::{AppHandle, Runtime, State};
 use crate::commands::error::CommandError;
 use crate::events::{ConnectionChanged, Emit, Emitted};
 use crate::state::AppState;
-use crate::view::{ConnectionView, MachineView};
+use crate::view::{ConnectionView, MachineList};
 
 #[tauri::command]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineView>, CommandError> {
+pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<MachineList, CommandError> {
     list(&state)
 }
 
@@ -18,7 +18,7 @@ pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<Vec<MachineVie
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn machine_add(state: State<'_, AppState>, url: String, name: String) -> Result<u64, CommandError> {
-    add(&state, &url, name).map(|id| id.0)
+    add(&state, &url, &name).map(|id| id.0)
 }
 
 #[tauri::command(async)]
@@ -32,13 +32,24 @@ pub(crate) fn machine_remove<R: Runtime>(
     remove(&state, &app, MachineId(id))
 }
 
-pub(crate) fn list(state: &AppState) -> Result<Vec<MachineView>, CommandError> {
-    state.machines(|machines| Ok(machines.machines().iter().map(MachineView::from).collect()))
+#[tauri::command(async)]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machine_rename(state: State<'_, AppState>, id: u64, name: String) -> Result<(), CommandError> {
+    rename(&state, MachineId(id), &name)
 }
 
-pub(crate) fn add(state: &AppState, url: &str, name: String) -> Result<MachineId, CommandError> {
+pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
+    state.machines(|machines| Ok(MachineList::from(&*machines)))
+}
+
+pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {
     let route = Route::parse(url)?;
     state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
+}
+
+pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {
+    state.machines(|machines| machines.rename(id, name).map_err(CommandError::from))
 }
 
 pub(crate) fn remove(state: &AppState, emit: &dyn Emit, id: MachineId) -> Result<(), CommandError> {

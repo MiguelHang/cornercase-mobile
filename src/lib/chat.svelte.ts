@@ -50,6 +50,7 @@ export const touches = (changed: PaneStatusChanged, machine: number | null, pane
   changed.machine === machine && (changed.pane === null || changed.pane === pane)
 
 export class Chat {
+  readonly machine: number | null
   readonly pane: number
   draft = $state('')
   sending = $state(false)
@@ -62,7 +63,8 @@ export class Chat {
   #busy = false
   #again = false
 
-  constructor(pane: number, readLast: ReadLast, sendText: SendText) {
+  constructor(machine: number | null, pane: number, readLast: ReadLast, sendText: SendText) {
+    this.machine = machine
     this.pane = pane
     this.#readLast = readLast
     this.#sendText = sendText
@@ -76,12 +78,13 @@ export class Chat {
     return this.draft.trim() !== '' && !this.sending && this.row !== null && !this.asking
   }
 
-  see(agents: AgentRow[] | null) {
+  see(machine: number | null, agents: AgentRow[] | null) {
     if (this.gone) {
       return
     }
-    const row = agents === null ? null : (agents.find((agent) => agent.pane === this.pane) ?? null)
-    if (row === null && (agents !== null || this.row !== null)) {
+    const elsewhere = machine !== this.machine
+    const row = agents === null || elsewhere ? null : (agents.find((agent) => agent.pane === this.pane) ?? null)
+    if (row === null && (elsewhere || agents !== null || this.row !== null)) {
       this.#leave()
       return
     }

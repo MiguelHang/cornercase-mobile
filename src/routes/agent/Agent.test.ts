@@ -32,9 +32,9 @@ const unsent: SendText = () => new Promise(() => {})
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const chatOf = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(ROW.pane, unread, unsent)
+  const chat = new Chat(1, ROW.pane, unread, unsent)
   if (row !== null) {
-    chat.see([row])
+    chat.see(1, [row])
   }
   chat.draft = draft
   return chat
@@ -153,7 +153,7 @@ describe('Agent, its field', () => {
 describe('Agent, without its row', () => {
   it('says so once its agent stops running, offers the board and has no field', () => {
     const chat = chatOf(ROW, 'go on')
-    chat.see([{ ...ROW, pane: 30 }])
+    chat.see(1, [{ ...ROW, pane: 30 }])
     const body = draw(chat)
     expect(body).toMatch(/<p class="gone svelte-[\w-]+">This agent is no longer running\.<\/p>/)
     expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back to the board/)
@@ -188,7 +188,7 @@ describe('Agent, without its row', () => {
 
   it('offers no terminal without its agent, nor once it is gone', () => {
     const gone = chatOf(ROW)
-    gone.see([{ ...ROW, pane: 30 }])
+    gone.see(1, [{ ...ROW, pane: 30 }])
     expect(draw(chatOf(null))).not.toMatch(TERMINAL)
     expect(draw(gone)).not.toMatch(TERMINAL)
   })

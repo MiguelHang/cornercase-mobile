@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
 import { Chat, deliver, read, touches, type ReadLast, type SendText } from './chat.svelte'
 
+const MACHINE = 1
 const PANE = 12
 
 const row = (pane: number, status: string | null): AgentRow => ({
@@ -40,8 +41,8 @@ const noRead: ReadLast = () => Promise.resolve(ok(message('')))
 const sentOk: SendText = () => Promise.resolve(ok(null))
 
 const ready = (sendText: SendText = sentOk, status: string | null = 'done', readLast: ReadLast = noRead) => {
-  const chat = new Chat(PANE, readLast, sendText)
-  chat.see([row(3, 'working'), row(PANE, status)])
+  const chat = new Chat(MACHINE, PANE, readLast, sendText)
+  chat.see(MACHINE, [row(3, 'working'), row(PANE, status)])
   return chat
 }
 
@@ -121,7 +122,7 @@ describe('Chat, its field', () => {
   })
 
   it('cannot send before its row is seen', () => {
-    const chat = new Chat(PANE, noRead, sentOk)
+    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
     chat.draft = 'go on'
     expect(chat.canSend).toBe(false)
   })
@@ -225,7 +226,7 @@ describe('Chat, its reading', () => {
 
   it('reads nothing before its row is seen', async () => {
     const readLast = vi.fn(noRead)
-    const chat = new Chat(PANE, readLast, sentOk)
+    const chat = new Chat(MACHINE, PANE, readLast, sentOk)
     await chat.refresh()
     expect([readLast.mock.calls.length, chat.reading]).toEqual([0, { kind: 'loading' }])
   })
@@ -272,7 +273,7 @@ describe('Chat, its reading', () => {
     const chat = ready(sentOk, 'done', readLast)
     const reading = chat.refresh()
     void chat.refresh()
-    chat.see([row(3, 'working')])
+    chat.see(MACHINE, [row(3, 'working')])
     first.open(ok(message('old')))
     await reading
     await chat.refresh()
@@ -284,15 +285,15 @@ describe('Chat, its reading', () => {
 describe('Chat, its row', () => {
   it('follows its row as it changes', () => {
     const chat = ready()
-    chat.see([row(PANE, 'working')])
+    chat.see(MACHINE, [row(PANE, 'working')])
     expect([chat.row?.status, chat.gone]).toEqual(['working', false])
   })
 
   it('waits while the agents are not known, before its row is seen', () => {
-    const chat = new Chat(PANE, noRead, sentOk)
-    chat.see(null)
+    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
+    chat.see(MACHINE, null)
     expect([chat.row, chat.gone]).toEqual([null, false])
-    chat.see([row(PANE, 'done')])
+    chat.see(MACHINE, [row(PANE, 'done')])
     expect([chat.row?.status, chat.gone]).toEqual(['done', false])
   })
 
@@ -302,20 +303,32 @@ describe('Chat, its row', () => {
   ])('is gone when %s, and loses the draft', (_, agents) => {
     const chat = ready()
     chat.draft = 'go on'
-    chat.see(agents)
+    chat.see(MACHINE, agents)
     expect([chat.gone, chat.row, chat.draft, chat.canSend]).toEqual([true, null, '', false])
   })
 
   it('is gone when the agents are known without its row', () => {
-    const chat = new Chat(PANE, noRead, sentOk)
-    chat.see([row(3, 'working')])
+    const chat = new Chat(MACHINE, PANE, noRead, sentOk)
+    chat.see(MACHINE, [row(3, 'working')])
     expect(chat.gone).toBe(true)
+  })
+
+  it.each<[string, number | null, AgentRow[] | null]>([
+    ['another machine lists a row with its pane', 2, [row(PANE, 'done')]],
+    ['another machine has not sent its agents yet', 2, null],
+    ['no machine is active', null, null],
+  ])('is gone when %s, before or after its row was seen', (_, machine, agents) => {
+    const unseen = new Chat(MACHINE, PANE, noRead, sentOk)
+    const seen = ready()
+    unseen.see(machine, agents)
+    seen.see(machine, agents)
+    expect([unseen.gone, unseen.row, seen.gone, seen.row]).toEqual([true, null, true, null])
   })
 
   it('stays gone when a row with its pane comes back', () => {
     const chat = ready()
-    chat.see(null)
-    chat.see([row(PANE, 'done')])
+    chat.see(MACHINE, null)
+    chat.see(MACHINE, [row(PANE, 'done')])
     expect([chat.gone, chat.row]).toEqual([true, null])
   })
 })

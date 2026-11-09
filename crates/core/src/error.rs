@@ -42,6 +42,14 @@ pub enum Error {
     UnknownMachine,
     #[error("the machine has no route at that address")]
     UnknownRoute,
+    #[error("a machine keeps at least one route; remove the machine instead")]
+    LastRoute,
+    #[error("the name is empty")]
+    NameEmpty,
+    #[error("the name is longer than {longest} characters", longest = crate::machines::name::LONGEST_NAME)]
+    NameTooLong,
+    #[error("another machine already has that name")]
+    NameTaken,
     #[error("the saved identity is not a 32-byte Ed25519 seed")]
     Identity,
     #[error("the system gave no random bytes for the identity")]

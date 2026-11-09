@@ -4,22 +4,32 @@ import type { Screen } from './connection'
 export type Route =
   | { name: 'no-machines' }
   | { name: 'home' }
-  | { name: 'agent'; pane: number }
+  | { name: 'agent'; machine: number | null; pane: number }
   | { name: 'terminal'; machine: number; row: AgentRow }
+  | { name: 'machines' }
+  | { name: 'machine'; id: number; adding?: boolean }
 
-export const routeFor = (screen: Screen): Route => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
+type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
-export const chatPane = (route: Route): number | null => {
+export const routeFor = (screen: Screen, known: number): Base =>
+  screen.machine === null && known === 0 ? { name: 'no-machines' } : { name: 'home' }
+
+export const openedTerminal = (route: Route, screen: Screen) =>
+  route.name === 'terminal' && route.machine === screen.machine ? route : undefined
+
+export type ChatOf = { machine: number | null; pane: number }
+
+export const chatOf = (route: Route): ChatOf | null => {
   if (route.name === 'agent') {
-    return route.pane
+    return { machine: route.machine, pane: route.pane }
   }
-  return route.name === 'terminal' ? route.row.pane : null
+  return route.name === 'terminal' ? { machine: route.machine, pane: route.row.pane } : null
 }
 
 export class Router {
   #stack: Route[] = $state([])
 
-  constructor(first: Route) {
+  constructor(first: Base) {
     this.#stack = [first]
   }
 
@@ -31,11 +41,13 @@ export class Router {
     this.#stack = [...this.#stack, route]
   }
 
-  settle(route: Route) {
-    if (this.#stack[0].name === route.name) {
+  setBase(base: Base) {
+    const [first, ...above] = this.#stack
+    const emptied = base.name === 'no-machines'
+    if (first.name === base.name && (!emptied || above.length === 0)) {
       return
     }
-    this.#stack = [route]
+    this.#stack = emptied ? [base] : [base, ...above]
   }
 
   back() {

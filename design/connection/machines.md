@@ -1,0 +1,67 @@
+# Machines
+
+A topic of [Connection](../connection.md): the Machines screen's side of the connection (027). It covers adding machines and routes, telling that a URL belongs to a machine already saved, names, removing and ordering routes, the active machine remembered between starts, switching it, and trying the other machines. How the screens look is in `design/look.md`; the bar's `unauthorized` is in [The connection bar](bar.md).
+
+- **Adding by QR code or by pasting** (`src/lib/ui/UrlField.svelte`, `src/lib/scanner.svelte.ts`): one field, `Bridge URL`, with `Scan QR code` above it. The same field serves `Add machine`, on the empty screen and in Machines, and a machine's `Add route`, so the two forms share it rather than copy it. A code that is read fills the field and is sent at once, along the same path as a pasted URL: it is checked with `checkUrl`, then by the core.
+  - **The scanner's steps** (`Scanner`, a class with its state in `$state` and the plugin's calls passed in, so the tests drive every path without a camera):
+    - It asks for the camera before scanning: `checkPermissions`, then `requestPermissions` if needed. On iOS 14 and later `scan` does not ask by itself; it rejects with "Camera permission denied or not yet requested", after it has already put the camera's view in.
+    - Refused, it shows `Open Settings` (`openAppSettings`).
+    - Any other failure, such as no camera (the simulator, the desktop) or the plugin's error, shows its message. The field for pasting stays usable under it in both cases.
+    - Every way out calls `cancel` in a `finally`: a code read, `Cancel`, or an error. It also takes away `html.scanning`, so the camera's view never stays over the page and the page's ground always comes back.
+    - `stop` takes `html.scanning` away itself before it calls `cancel`, rather than waiting for `cancel` to end the pending `scan`, and `UrlField` calls `stop` when it goes away in the middle of a scan (its form closed, its screen left): otherwise the page stayed hidden, the camera on and no `Cancel` in sight.
+  - **`windowed: true`**: without it, the plugin's view covers the WebView with no way to close it, since it brings no button. In windowed mode the WebView turns transparent over the camera and the page draws its own frame and `Cancel` (Look › Scanning).
+- **The same machine, a new route** (`crates/core/src/machines/same.rs`, `machine_match`, `AddMachine`): before a machine is made, the core compares the new route with the saved ones. It returns the first match in this order:
+  - **Address.** A saved route has the same address. If its token is the same too, the URL is already saved: nothing is added, and the form says so.
+  - **Token.** A saved route has the same token. The bridge uses one token for all its addresses, so a Tailscale code of a bridge already added over the LAN matches here, without the network.
+  - **`boot`.** The `contract --json` of the new URL gives the same `boot` as the last one seen for a machine.
+  - **Name.** Compared without case and without the spaces at its ends.
+  - A tie goes to the first machine in the list. The tokens are compared inside the core, so `Token` never leaves it: `MatchView` names only the machine, its name and why it matched.
+  - **Why this order**: address and token cannot be wrong and work offline. `boot` changes each time cornercase's server restarts, and is known only for the active machine (`Store::boot`) and for the machines tried in this session, which `AppState` keeps in memory. The name comes last because the default name is the URL's host, which differs between the LAN and Tailscale, so it matches almost only when the user typed the same name. The ticket asked for `boot` or the name; the token was added (P4) because it is the common case and needs no answer.
+  - **`machine_match` compares first without the network**: an address or token match (or an URL already saved) is the answer, with `checked: true`, since nothing the bridge could say would change it, so the form neither waits up to 5 s on a URL that does not answer nor says the bridge could not be asked. Otherwise it tries the URL as a machine of one route, with `pick_route`, without saving it or touching the Keychain, and compares again with its `boot`, which comes before the name. If the URL does not answer, it compares without `boot`, and its `checked: false` makes the form say that the bridge could not be asked which machine it is.
+  - **The offer** (`SameOffer.svelte`) says why it matched and offers `Add as a route of <name>`, the default, or `Add as a new machine`, and `Back`.
+    - An address match reads `Update the token of <name>`: the route is added again, and since a machine's routes are keyed by their address, its token is replaced (Connection › Machines with several routes). That is how a token the bridge no longer takes is fixed (`--new-token`, or a phone restored without its Keychain).
+    - After a name match, `Add as a new machine` needs another name (D1): the error goes under `Name`.
+    - Accepting the offer in Machines (`onrouted`) only closes the form, reloads `machines_list` and tries that machine again when it is not the active one: `machine_route_add` already restarts the active machine's `Store`, so the UI neither switches the active machine nor starts it a second time. On the empty screen nothing is active (it shows only when the list could not be read), so there the machine is connected to as if it had just been added.
+  - Rejected: adding as a route without asking, since a wrong `boot` or name match would merge two Macs into one machine.
+- **Names** (`crates/core/src/machines/name.rs`, `checkName` in `src/lib/machineForm.ts`): trimmed, not empty, at most 64 characters, and different from every other machine's name without case and the spaces at its ends.
+  - The core checks them in `add` and in `rename`, so the file cannot get two equal names by either path. Renaming to its own name, in other capitals, is allowed.
+  - The UI repeats the check with the same messages, to say it before a round trip. The core's `name_*` codes go under the `Name` field, like `route_*` under the URL (`fieldOf`).
+  - Renaming does not reconnect: the bar takes the name from `machines_list`, which the screen reloads after each change.
+- **Removing and ordering routes** (`Machines::remove_route`, `move_route`):
+  - Removing writes the file before deleting the token, as removing a machine does, so a failure leaves at most an orphan secret. It forgets `last_route` when that was the route.
+  - A machine's last route cannot be removed (`last_route`): a machine without routes could not connect, so the way out is to delete the machine.
+  - Moving swaps a route with its neighbour, with buttons rather than dragging. At either end it does nothing.
+  - **The order only changes what is shown** (P2): the race tries every route at once and gives the head start to the last winner (Connection › Machines with several routes). So the order changes how the routes are listed and the order of their errors, not which one wins. Rejected for now: a head start for the first route while there is no `last_route`, which could come later without breaking anything.
+- **Changing the active machine's routes reconnects it** (`src-tauri/src/commands/routes.rs`): the `Store` keeps a copy of the machine, so a change it did not see would leave the race on the old routes.
+  - Adding a route, or replacing a token, starts the `Store` again (`connection::start`), so the new route joins the race.
+  - Removing one starts it again only if the race could be using that route. When the `Store` is connected through another route, it stays as it is; while it connects or retries, it starts again.
+  - Moving never reconnects, since the order does not matter (above).
+- **The active machine is remembered** (P3, `Machines::activate`, `active`): `machines.json` gains an `active` id, read with `#[serde(default)]`.
+  - Format version 1 stays: a file written before has no `active` and reads as none, and nothing in the old format is read differently. Rejected: a version 2, which an older app would refuse to read at all.
+  - `connect` saves the machine (`activate`, which writes only when it changes) before starting its `Store`, so the next start connects to it.
+  - `machines_list` returns `{ machines, active }` (D3) rather than a flag on each machine. `firstToConnect` takes the saved machine, or the first if it is gone.
+  - Removing the active machine clears it. The app then stays in Machines without a connection, or goes to `no-machines` if none is left. It does not connect another machine by itself: choosing one is the user's call.
+  - Rejected: moving the active machine to the top of the list, which would undo the order the user chose.
+- **Switching** (`latestWins`, `src/lib/join.ts`): a tap on a machine that is not active connects it.
+  - A second `connect` for the same machine gets the pending one's promise, which covers a double tap on `Add`.
+  - A `connect` for another machine waits for the running one and then runs, unless a newer one has taken its place. So two quick taps on two machines end on the last one tapped.
+  - The calls are kept in order in the UI because two `connect`s wait for each other in Rust but may end in either order (`design/architecture.md` › Off the main thread).
+  - Rejected: 014's `oneAtATime`, which gave the second tap the first one's promise, so the app stayed on the machine tapped first.
+- **Trying the other machines** (`machine_probe`, `src/lib/probes.svelte.ts`, `src/lib/machineRows.ts`): only the active machine has a `Store` (Store › In the app). The others are tried once with `pick_route`, without a `Store`:
+  - when Machines opens;
+  - when `Check again` is tapped;
+  - when a machine stops being active, since it has no result of its own yet.
+  - Nothing tries them on a timer: each try opens a connection to every route, and a screen at rest stays quiet.
+  - The result (D4): `Answers via <host:port>` if a route wins. Otherwise `Token rejected` if any route answered `Unauthorized`, since that one has a fix; `No token: scan its code again` if every route lacks its token; and otherwise `No answer`, with each route's error under `Errors by route`.
+  - A probe that answers keeps its `boot` for the same-machine check.
+  - Rejected: a `Store` per machine, or watching the others in the background, which costs battery and connections for rows nobody is looking at.
+- **This device** (`src/lib/thisDevice.svelte.ts`): Machines shows the identity's fingerprint, the 10 hex characters of `identity_fingerprint`, in the monospaced font. If there is no identity, it shows the reason instead (Identity).
+- **Checked on 2026-11-09** in the iPhone 17e simulator, iOS 27.2 (Xcode 27.2, macOS 26.6.2), against `cargo run -p cornercase-bridge` on the LAN and Tailscale and a second bridge with its own token on `--loopback`, cornercase 0.13.19, with taps from XCUITest:
+  - `Scan QR code` asked for the camera with the system's dialog, then showed `No camera available on this device (e.g., iOS Simulator)` under `Could not scan the code`; pasting the LAN URL into the same form then worked and connected.
+  - The Tailscale URL in `Add machine` offered `Add as a route of MacBook` because of the token; accepted, the machine had both routes and stayed connected over the LAN.
+  - Moving the LAN route down kept the connection; renaming to `Studio` changed the title and the row in Machines; removing the LAN route, the connected one, reconnected over Tailscale.
+  - The loopback bridge's URL matched by `boot` (`This bridge is the one Studio answers from.`); `Add as a new machine` connected it, and Studio's row read `Answers via …` from its probe.
+  - A tap on the other row switched the active machine; after `xcrun simctl terminate` and a new launch the app connected to the one last chosen.
+  - Deleting the active machine left Machines open, with Studio not connected.
+  - The fingerprint shown matched the one the app logs at start.
+  - Not checked: a real scan, which needs an iPhone.

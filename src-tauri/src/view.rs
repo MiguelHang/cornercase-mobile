@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use cornercase_core::cli::contract::Missing;
+use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::store::Connection;
@@ -18,9 +19,16 @@ pub(crate) struct MachineView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MachineList {
+    pub(crate) machines: Vec<MachineView>,
+    #[specta(type = Option<u32>)]
+    pub(crate) active: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum RouteView {
-    Bridge { url: String },
+    Bridge { url: String, has_token: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -47,6 +55,52 @@ pub(crate) enum ConnectionView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub(crate) enum ProbeView {
+    Answers { route: String },
+    Unauthorized,
+    NoToken,
+    NoAnswer { failures: Vec<RouteFailure> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct RouteFailure {
+    pub(crate) route: String,
+    pub(crate) error: CommandError,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MatchView {
+    pub(crate) found: MatchFound,
+    pub(crate) checked: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum MatchFound {
+    None,
+    AlreadySaved {
+        #[specta(type = u32)]
+        machine: u64,
+    },
+    Same {
+        #[specta(type = u32)]
+        machine: u64,
+        name: String,
+        why: SameWhy,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SameWhy {
+    Address,
+    Token,
+    Boot,
+    Name,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 pub(crate) struct ConnectionState {
     #[specta(type = Option<u32>)]
     pub(crate) machine: Option<u64>,
@@ -64,10 +118,19 @@ impl From<&Machine> for MachineView {
     }
 }
 
+impl From<&Machines> for MachineList {
+    fn from(machines: &Machines) -> Self {
+        Self {
+            machines: machines.machines().iter().map(MachineView::from).collect(),
+            active: machines.active().map(|id| id.0),
+        }
+    }
+}
+
 impl From<&Route> for RouteView {
     fn from(route: &Route) -> Self {
         match route {
-            Route::Bridge { .. } => Self::Bridge { url: route.address().to_string() },
+            Route::Bridge { .. } => Self::Bridge { url: route.address().to_string(), has_token: route.has_token() },
         }
     }
 }
