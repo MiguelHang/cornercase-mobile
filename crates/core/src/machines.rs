@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use self::route::{Address, Route};
 
 pub mod code;
+pub mod learned;
 pub(crate) mod name;
 pub mod pick;
 pub mod registry;

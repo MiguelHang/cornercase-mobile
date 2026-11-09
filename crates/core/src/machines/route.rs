@@ -138,7 +138,7 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-fn saved_address(text: &str) -> Option<Address> {
+pub(super) fn saved_address(text: &str) -> Option<Address> {
     let uri: Uri = text.parse().ok()?;
     address(&uri).ok().filter(|address| address.to_string() == text)
 }

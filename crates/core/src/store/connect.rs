@@ -18,6 +18,7 @@ where
     F: Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync,
 {
     pub(super) async fn connect(&mut self) -> Result<Picked, Failure> {
+        self.learn();
         let picked = pick_route(&self.machine, &self.factory, self.config).await.map_err(classify)?;
         self.machine.last_route = Some(picked.route.address().clone());
         let descriptor = Descriptor::from_value(picked.contract.clone())
@@ -26,6 +27,14 @@ where
         self.join(&picked.transport);
         let missing = contract::missing(&descriptor);
         if missing.is_empty() { Ok(picked) } else { Err(Failure::Stop(Connection::Missing(missing))) }
+    }
+
+    fn learn(&mut self) {
+        for route in self.shared.learned() {
+            if !self.machine.routes.iter().any(|saved| saved.address() == route.address()) {
+                self.machine.routes.push(route);
+            }
+        }
     }
 }
 
