@@ -1,6 +1,6 @@
 # 038 — Tablero: los subagentes, bajo su agente y plegados
 
-- Estado: en curso (faltan los checks, CA7)
+- Estado: hecha
 - Depende de: 015
 - Riesgo: medio — cambia el orden del tablero (015), que decidió una lista plana; depende de que el contrato dé el padre
   de cada panel.
@@ -34,7 +34,7 @@ Propuesta: hacer lo mismo que cornercase-gpui en su sección de agentes (cornerc
   subagentes (n trabajando, n esperando) que lleva a ellos.
 - [x] CA6 — Comprobado en el simulador con un agente que lanza subagentes (o un flow) contra cornercase real; tests del
   árbol sin DOM (orden, padre ausente, ciclos, plegado, atención de los ocultos).
-- [ ] CA7 — `hx check full` y mutation en verde.
+- [x] CA7 — `hx check full` y mutation en verde.
 
 ## Referencias
 - cornercase-terminal (`origin/main`): `design/layout/agents-section.md` (tree, folding, roles), `design/agent-status.md`

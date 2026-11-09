@@ -5,6 +5,7 @@ use crate::board::fixtures::{agent, child};
 
 const EARLIER: &str = "2026-11-09T12:00:00.000Z";
 const LATER: &str = "2026-11-09T12:05:00.000Z";
+const CHAIN: [(u64, u32, Option<u64>); 3] = [(4, 0, None), (5, 1, Some(4)), (6, 2, Some(5))];
 
 fn items(panes: &[Pane]) -> Vec<Item<'_>> {
     panes.iter().map(|pane| Item { pane, since: None }).collect()
@@ -33,7 +34,7 @@ mod a_parent {
     #[test]
     fn hangs_its_children_under_it_one_level_deeper() {
         let listed = [agent(4, "idle"), child(5, 4, "idle"), child(6, 5, "idle")];
-        assert_eq!(shape(&listed), vec![(4, 0, None), (5, 1, Some(4)), (6, 2, Some(5))]);
+        assert_eq!(shape(&listed), CHAIN);
     }
 
     #[test]
@@ -73,7 +74,7 @@ mod a_ring {
     #[test]
     fn of_three_keeps_every_row_once() {
         let listed = [child(4, 6, "idle"), child(5, 4, "idle"), child(6, 5, "idle")];
-        assert_eq!(shape(&listed), vec![(4, 0, None), (5, 1, Some(4)), (6, 2, Some(5))]);
+        assert_eq!(shape(&listed), CHAIN);
     }
 
     #[test]
