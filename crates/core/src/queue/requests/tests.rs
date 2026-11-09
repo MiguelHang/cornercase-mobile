@@ -1,13 +1,14 @@
 use std::future::Future;
 
-use futures_util::SinkExt;
 use futures_util::stream::BoxStream;
+use futures_util::{FutureExt, SinkExt, StreamExt};
 use rstest::rstest;
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
 
 use super::*;
 use crate::transport::fake::FakeTransport;
-use crate::transport::{Closed, Out, OutSink, output};
+use crate::transport::{Closed, Exit, Out, OutSink, Stdin, output};
 
 const NO_REQUESTS_COMMAND: &str = "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]";
 const NO_FOLLOW_FLAG: &str = "error: unexpected argument '--follow' found\n\nUsage: cornercase requests";
@@ -166,26 +167,6 @@ mod answer {
         let error = answer(line).expect_err("not an answer");
         assert_eq!(error, Error::Json(reason.to_owned()));
         assert!(!error.to_string().contains("secret"));
-    }
-}
-
-mod absent {
-    use super::*;
-
-    #[rstest]
-    #[case::no_requests_command(exit(2, NO_REQUESTS_COMMAND))]
-    #[case::no_follow(exit(2, NO_FOLLOW_FLAG))]
-    fn is_a_cli_that_does_not_know_the_command(#[case] exit: Exit) {
-        assert!(absent(&exit));
-    }
-
-    #[rstest]
-    #[case::another_usage_error(exit(2, "the bridge does not allow `kill-server`"))]
-    #[case::another_code(exit(1, "error: unrecognized subcommand 'requests'"))]
-    #[case::a_dropped_server(exit(1, "Error: the connection to cornercase dropped"))]
-    #[case::a_clean_end(exit(0, ""))]
-    fn is_not_any_other_end(#[case] exit: Exit) {
-        assert!(!absent(&exit));
     }
 }
 

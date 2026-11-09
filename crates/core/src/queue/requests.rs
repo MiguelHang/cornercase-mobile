@@ -1,19 +1,14 @@
-use std::pin::pin;
 use std::sync::Arc;
 
-use futures_util::future::{self, BoxFuture, Either, Fuse, FusedFuture};
-use futures_util::{FutureExt, StreamExt, stream};
+use futures_util::future::Either;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
 
+use super::follow::{End, Follow, Gone};
 use crate::error::Error;
-use crate::protocol::USAGE_EXIT;
-use crate::transport::{Exit, STALE_BOOT, Stdin, Transport, json_error, listen, only_stdout};
+use crate::transport::{STALE_BOOT, Transport, json_error};
 
 const FOLLOW: [&str; 3] = ["requests", "--follow", "-"];
-const NO_REQUESTS: &str = "unrecognized subcommand 'requests'";
-const NO_FOLLOW: &str = "unexpected argument '--follow'";
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -32,66 +27,32 @@ pub(crate) enum Asked {
     Absent,
 }
 
-type End = Result<Exit, Error>;
-
 pub(crate) struct Requests {
-    lines: mpsc::UnboundedSender<Stdin>,
-    answers: mpsc::UnboundedReceiver<String>,
-    run: Fuse<BoxFuture<'static, End>>,
-    answered: bool,
+    follow: Follow,
 }
 
 impl Requests {
     pub(crate) fn start(transport: Arc<dyn Transport>) -> Self {
-        let (lines, mut stdin) = mpsc::unbounded_channel();
-        let stdin = stream::poll_fn(move |context| stdin.poll_recv(context)).boxed();
-        let (out, answers) = listen(only_stdout);
-        let argv = FOLLOW.map(str::to_owned).to_vec();
-        let run = async move { transport.run(argv, stdin, out).await }.boxed().fuse();
-        Self { lines, answers, run, answered: false }
+        Self { follow: Follow::start(transport, &FOLLOW) }
     }
 
     pub(crate) async fn ask(&mut self, line: &str) -> Asked {
-        if self.run.is_terminated() {
-            return Asked::Unsent;
+        match self.follow.write(line).await {
+            Ok(()) => {}
+            Err(None) => return Asked::Unsent,
+            Err(Some(end)) => return self.unsent(&end),
         }
-        if let Some(end) = (&mut self.run).now_or_never() {
-            return self.unsent(&end);
-        }
-        if self.lines.send(Stdin::Text(format!("{line}\n"))).is_err() {
-            let end = (&mut self.run).await;
-            return self.unsent(&end);
-        }
-        match self.next().await {
-            Either::Left(Some(line)) => self.answer(&line),
-            Either::Left(None) => {
-                let end = (&mut self.run).await;
-                self.lost(&end)
-            }
-            Either::Right(end) => match self.answers.try_recv() {
-                Ok(line) => self.answer(&line),
-                Err(_) => self.lost(&end),
+        match self.follow.next().await {
+            Either::Left(line) => Asked::Answered(answer(&line)),
+            Either::Right(end) => match self.follow.ready() {
+                Some(line) => Asked::Answered(answer(&line)),
+                None => self.lost(&end),
             },
         }
     }
 
     pub(crate) async fn ended(&mut self) {
-        if !self.run.is_terminated() {
-            let _ = (&mut self.run).await;
-        }
-    }
-
-    async fn next(&mut self) -> Either<Option<String>, End> {
-        let answer = pin!(self.answers.recv());
-        match future::select(answer, &mut self.run).await {
-            Either::Left((line, _)) => Either::Left(line),
-            Either::Right((end, _)) => Either::Right(end),
-        }
-    }
-
-    fn answer(&mut self, line: &str) -> Asked {
-        self.answered = true;
-        Asked::Answered(answer(line))
+        let _ = self.follow.end().await;
     }
 
     fn unsent(&self, end: &End) -> Asked {
@@ -102,10 +63,10 @@ impl Requests {
     }
 
     fn lost(&self, end: &End) -> Asked {
-        match end {
-            Ok(exit) if !self.answered && absent(exit) => Asked::Absent,
-            Err(error) if unopened(error) => Asked::Unsent,
-            _ => Asked::Answered(Err(Error::Unanswered)),
+        match self.follow.gone(end) {
+            Gone::Absent => Asked::Absent,
+            Gone::Unopened => Asked::Unsent,
+            Gone::Lost => Asked::Answered(Err(Error::Unanswered)),
         }
     }
 }
@@ -125,14 +86,6 @@ pub(crate) fn answer(line: &str) -> Result<String, Error> {
         STALE_BOOT => Err(Error::StaleBoot(why(&answer))),
         code => Err(Error::Failed { code, stderr: why(&answer) }),
     }
-}
-
-pub(crate) fn absent(exit: &Exit) -> bool {
-    exit.code == USAGE_EXIT && [NO_REQUESTS, NO_FOLLOW].iter().any(|refusal| exit.stderr.contains(refusal))
-}
-
-fn unopened(error: &Error) -> bool {
-    matches!(error, Error::Unauthorized | Error::Rejected { .. } | Error::Timeout | Error::Connect(_))
 }
 
 fn printed(answer: Answer) -> String {
