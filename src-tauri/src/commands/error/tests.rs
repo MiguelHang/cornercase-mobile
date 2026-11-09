@@ -1,3 +1,4 @@
+use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::route::Route;
 use rstest::rstest;
 use serde_json::json;
@@ -66,7 +67,19 @@ mod from_a_route_error {
     #[case::token_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&token=c3R1ZGlvLXNlY3JldA", "route_token_twice")]
     #[case::token_characters("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA%3D", "route_token_characters")]
     fn carries_its_code_and_a_message_without_the_url(#[case] url: &str, #[case] code: &str) {
-        let error = Route::parse(url).expect_err("a route that does not parse");
+        assert_carries(Route::parse(url).expect_err("a route that does not parse"), code);
+    }
+
+    #[rstest]
+    #[case::also_empty("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=", "route_also_empty")]
+    #[case::also_invalid("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=[::1]", "route_also_invalid")]
+    #[case::name_encoding("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=%FF", "route_name_encoding")]
+    #[case::name_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=a&name=b", "route_name_twice")]
+    fn carries_the_code_of_a_machine_code_error(#[case] text: &str, #[case] code: &str) {
+        assert_carries(MachineCode::parse(text).expect_err("a code that does not parse"), code);
+    }
+
+    fn assert_carries(error: RouteError, code: &str) {
         let json = json_of(&CommandError::from(error));
         assert_eq!(json, json!({ "code": code, "message": error.to_string() }));
         let message = json["message"].as_str().expect("a message");

@@ -54,6 +54,10 @@ pub(crate) enum ErrorCode {
     RouteEmptyToken,
     RouteTokenTwice,
     RouteTokenCharacters,
+    RouteAlsoEmpty,
+    RouteAlsoInvalid,
+    RouteNameEncoding,
+    RouteNameTwice,
     NoDataDir,
     MachinesNotLoaded,
     NoIdentity,
@@ -169,6 +173,10 @@ fn route_code(error: RouteError) -> ErrorCode {
         RouteError::EmptyToken => ErrorCode::RouteEmptyToken,
         RouteError::TokenTwice => ErrorCode::RouteTokenTwice,
         RouteError::TokenCharacters => ErrorCode::RouteTokenCharacters,
+        RouteError::AlsoEmpty => ErrorCode::RouteAlsoEmpty,
+        RouteError::AlsoInvalid => ErrorCode::RouteAlsoInvalid,
+        RouteError::NameEncoding => ErrorCode::RouteNameEncoding,
+        RouteError::NameTwice => ErrorCode::RouteNameTwice,
     }
 }
 
