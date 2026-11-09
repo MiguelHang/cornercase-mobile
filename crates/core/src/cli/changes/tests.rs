@@ -219,3 +219,67 @@ mod leniency {
         assert!(error.to_string().contains("string"), "the error: {error}");
     }
 }
+
+mod arguments {
+    use super::*;
+
+    #[rstest]
+    #[case::uncommitted(Mode::Uncommitted, "uncommitted")]
+    #[case::commits(Mode::Commits, "commits")]
+    #[case::all(Mode::All, "all")]
+    fn follows_a_workspace_in_each_mode(#[case] mode: Mode, #[case] expected: &str) {
+        let argv = follow_args(7, mode);
+        assert_eq!(argv, ["changes", "list", "--follow", "--workspace", "7", "--mode", expected]);
+    }
+
+    #[rstest]
+    #[case::uncommitted(Mode::Uncommitted, "uncommitted")]
+    #[case::commits(Mode::Commits, "commits")]
+    #[case::all(Mode::All, "all")]
+    fn reads_a_file_in_each_mode(#[case] mode: Mode, #[case] expected: &str) {
+        let argv = file_args(7, "src/a.rs", mode);
+        assert_eq!(argv, ["changes", "file", "--workspace", "7", "--mode", expected, "--json", "--", "src/a.rs"]);
+    }
+
+    #[rstest]
+    #[case::a_dash("-v.rs")]
+    #[case::two_dashes("--help")]
+    #[case::spaces("my notes/a file.md")]
+    fn keeps_a_path_whole_after_the_options(#[case] path: &str) {
+        let read = file_args(7, path, Mode::Uncommitted);
+        let seen = viewed_args(7, path, &Mark::Seen { digest: "00c0ffee12345678".to_owned() });
+        let cleared = viewed_args(7, path, &Mark::Clear { mode: Mode::All });
+        for argv in [read, seen, cleared] {
+            assert_eq!(argv[argv.len() - 2..], ["--", path], "the arguments: {argv:?}");
+        }
+    }
+
+    #[test]
+    fn marks_a_file_seen_with_its_digest_and_no_mode() {
+        let argv = viewed_args(7, "Cargo.lock", &Mark::Seen { digest: "00c0ffee12345678".to_owned() });
+        assert_eq!(argv, ["changes", "viewed", "--workspace", "7", "--digest=00c0ffee12345678", "--", "Cargo.lock"]);
+    }
+
+    #[test]
+    fn sends_the_digest_as_it_came() {
+        let argv = viewed_args(7, "a", &Mark::Seen { digest: "-0C0FFEE 1".to_owned() });
+        assert_eq!(argv[4], "--digest=-0C0FFEE 1");
+    }
+
+    #[rstest]
+    #[case::uncommitted(Mode::Uncommitted, "uncommitted")]
+    #[case::commits(Mode::Commits, "commits")]
+    #[case::all(Mode::All, "all")]
+    fn clears_a_mark_with_its_mode_and_no_digest(#[case] mode: Mode, #[case] expected: &str) {
+        let argv = viewed_args(7, "Cargo.lock", &Mark::Clear { mode });
+        assert_eq!(argv, ["changes", "viewed", "--workspace", "7", "--clear", "--mode", expected, "--", "Cargo.lock"]);
+    }
+
+    #[rstest]
+    #[case::uncommitted(Mode::Uncommitted)]
+    #[case::commits(Mode::Commits)]
+    #[case::all(Mode::All)]
+    fn names_each_mode_as_the_summary_does(#[case] mode: Mode) {
+        assert_eq!(serde_json::to_value(mode).expect("a mode"), json!(mode.arg()));
+    }
+}

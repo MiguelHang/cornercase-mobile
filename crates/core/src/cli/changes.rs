@@ -163,5 +163,45 @@ pub struct Patch {
     pub hunks: Vec<Hunk>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Mark {
+    Seen { digest: String },
+    Clear { mode: Mode },
+}
+
+impl Mode {
+    pub fn arg(self) -> &'static str {
+        match self {
+            Self::Uncommitted => "uncommitted",
+            Self::Commits => "commits",
+            Self::All => "all",
+        }
+    }
+}
+
+pub fn follow_args(workspace: u64, mode: Mode) -> Vec<String> {
+    words(&["changes", "list", "--follow", "--workspace", &workspace.to_string(), "--mode", mode.arg()])
+}
+
+pub fn file_args(workspace: u64, path: &str, mode: Mode) -> Vec<String> {
+    let mut argv = words(&["changes", "file", "--workspace", &workspace.to_string(), "--mode", mode.arg()]);
+    argv.extend(words(&["--json", "--", path]));
+    argv
+}
+
+pub fn viewed_args(workspace: u64, path: &str, mark: &Mark) -> Vec<String> {
+    let mut argv = words(&["changes", "viewed", "--workspace", &workspace.to_string()]);
+    match mark {
+        Mark::Seen { digest } => argv.push(format!("--digest={digest}")),
+        Mark::Clear { mode } => argv.extend(words(&["--clear", "--mode", mode.arg()])),
+    }
+    argv.extend(words(&["--", path]));
+    argv
+}
+
+fn words(words: &[&str]) -> Vec<String> {
+    words.iter().map(|&word| word.to_owned()).collect()
+}
+
 #[cfg(test)]
 mod tests;
