@@ -45,10 +45,10 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 
 ## Dependencies
 
-- `tauri`: the app shell. Its default features and `specta`, which tauri-specta needs. Its only plugin is our own, `tauri-plugin-network`.
+- `tauri`: the app shell. Its default features and `specta`, which tauri-specta needs. Its plugins are our own `tauri-plugin-network` and, on the phones, Tauri's `tauri-plugin-barcode-scanner`.
 - `tauri-build`: `src-tauri/build.rs`, which turns `tauri.conf.json` and the capabilities into the context `tauri::generate_context!` embeds.
 - `@tauri-apps/cli`: `pnpm tauri`, for `ios init`, `ios dev` and the builds.
-- `@tauri-apps/api`, the only runtime package: the generated bindings import its `invoke` and `listen`, and the UI its `isTauri`. It came with the first command the UI calls (013), so that no package sat unused.
+- `@tauri-apps/api`, a runtime package: the generated bindings import its `invoke` and `listen`, and the UI its `isTauri`. It came with the first command the UI calls (013), so that no package sat unused.
 - `svelte`, `vite`, `@sveltejs/vite-plugin-svelte`, `typescript`: the UI and its build.
 - No `@types/node`: `vite.config.ts` reads one environment variable (`TAURI_DEV_HOST`), so it declares the `process` it uses instead of pulling in Node's types for the whole config.
 - `svelte-check`: type checks `.svelte` and `.ts` files (`pnpm check`).
@@ -78,6 +78,7 @@ Chosen on 2026-11-08, the latest stable of each unless said otherwise.
 - `keyring-core` in `src-tauri`, on every platform: the `Entry` API `KeychainSecrets` is written against, so the same adapter runs on iOS and over a missing store elsewhere, and its `mock` store, which tests the adapter and its errors on Linux CI. 1.0, without features (its `sample` store is not used). keyring's maintained line: `keyring` 4.x has no `apple-native` any more, and 3.6 cannot set the Keychain's accessibility.
 - `apple-native-keyring-store` in `src-tauri`, iOS only (`[target.'cfg(target_os = "ios")'.dependencies]`), with `protected`: the data protection keychain, with an `access-policy` per entry. 1.0; it brings `security-framework` 3.7, which nothing else pulled in.
 - `tauri-plugin-network` (`src-tauri/plugins/network`) in `src-tauri`: the network plugin (Native code, above).
+- `tauri-plugin-barcode-scanner` in `src-tauri`, iOS and Android only (`[target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]`, registered under `#[cfg(mobile)]`), and `@tauri-apps/plugin-barcode-scanner`, its JavaScript API: the camera scans a machine's QR code (027). Tauri's own plugin, 2.5.3, the 2.x line of Tauri 2.12; the crate is empty off the phones, hence the target. The WebView calls it directly, since the scan only fills the URL field and the network stays in Rust; `capabilities/mobile.json`, for iOS and Android only, allows its `scan`, `cancel`, `check-permissions`, `request-permissions` and `open-app-settings`, not `vibrate`. iOS asks for the camera with the `NSCameraUsageDescription` of `project.yml`. Rejected: a scanner of our own in `src-tauri/plugins/`, which would redo what this one already does on both phones.
 - `tokio` in `src-tauri`, with `macros` and `sync`: the task that follows the network plugin waits on its channel (`mpsc`) and the debounce at once with `select!`. The runtime is Tauri's; the dev line above adds `rt`, `time` and `test-util` for the tests.
 - `tauri-plugin` (build, with `build`) in the plugin: its `build.rs`, which builds the Swift package in `ios/` and links it into the app; 2.7, the line of tauri-build 2.7 and Tauri 2.12.
 - `tauri` and `cornercase-core` in the plugin: the plugin's `Builder`, `Channel` and `run_mobile_plugin`, and the core's `Network`, so the plugin hands the app the type the debounce reads; `serde` (with `derive`), iOS only, for the arguments it sends to Swift's `watch`.
