@@ -3,7 +3,7 @@
   import { onMount } from 'svelte'
   import { commands, events, type MachineView_Serialize } from './lib/bindings'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
-  import { oneAtATime } from './lib/join'
+  import { latestWins } from './lib/join'
   import { Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
@@ -38,7 +38,7 @@
     return listed.data
   }
 
-  const join = oneAtATime(async (machine: number) => {
+  const join = latestWins(async (machine: number) => {
     show(connecting(machine))
     const connected = await commands.connect(machine)
     if (connected.status === 'error') {

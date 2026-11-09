@@ -55,9 +55,9 @@ describe('App wiring', () => {
     expect(source.match(/ current = (?!\$state)/g)).toHaveLength(1)
   })
 
-  it('connects one machine at a time, and a refused connect becomes an error toast', () => {
+  it('connects to the last machine asked for, and a refused connect becomes an error toast', () => {
     expect(source).toContain(
-      "const join = oneAtATime(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { toasts.failed(connected.error) } })",
+      "const join = latestWins(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { toasts.failed(connected.error) } })",
     )
   })
 
