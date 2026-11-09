@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use self::route::{Address, Route};
 
 pub mod route;
+pub mod store;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
