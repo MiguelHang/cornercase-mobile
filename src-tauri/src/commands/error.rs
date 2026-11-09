@@ -71,7 +71,7 @@ impl CommandError {
     }
 
     pub(crate) fn not_connected() -> Self {
-        Self::new(ErrorCode::NotConnected, "not connected")
+        Self::new(ErrorCode::NotConnected, "no machine is connected")
     }
 
     pub(crate) fn not_sent() -> Self {

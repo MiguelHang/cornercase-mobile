@@ -5,6 +5,7 @@ import { Chat, deliver, read, touches, type ReadLast, type SendText } from './ch
 const PANE = 12
 
 const row = (pane: number, status: string | null): AgentRow => ({
+  boot: 'b1',
   project: 4,
   workspace: 5,
   tab: 6,

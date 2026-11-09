@@ -11,6 +11,7 @@ const MINUTE = 60 * SECOND
 const HOUR = 60 * MINUTE
 
 const agent = (pane: number, status: string | null, more: Partial<AgentRow> = {}): AgentRow => ({
+  boot: 'b1',
   project: 1,
   workspace: 2,
   tab: 3,

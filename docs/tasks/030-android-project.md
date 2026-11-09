@@ -1,7 +1,7 @@
 # 030 — Android: proyecto, arranque en emulador y dispositivo
 
 - Estado: pendiente
-- Depende de: 029
+- Depende de: 015–028 (antes era la 029; la prueba en el iPhone se dejó para el final el 2026-11-09)
 - Riesgo: medio (NDK, toolchains de Rust para Android)
 - Rama: `chore/030-android` · PR: `chore: add the android project`
 

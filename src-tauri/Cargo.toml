@@ -21,7 +21,7 @@ specta = { workspace = true }
 tauri = { version = "2.12", features = ["specta"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 tauri-plugin-network = { path = "plugins/network" }
-tokio = { version = "1.54.1", features = ["macros", "sync"] }
+tokio = { version = "1.54.1", features = ["macros", "sync", "time"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
@@ -35,7 +35,7 @@ serde_json = "1.0.154"
 specta-typescript = "=0.0.13"
 tauri = { version = "2.12", features = ["test"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["typescript"] }
-tokio = { version = "1.54.1", features = ["rt", "macros", "time", "test-util"] }
+tokio = { version = "1.54.1", features = ["rt", "test-util"] }
 
 [lints]
 workspace = true

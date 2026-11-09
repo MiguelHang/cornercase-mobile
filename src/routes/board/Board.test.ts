@@ -10,6 +10,7 @@ const NOW = Date.parse('2026-11-09T12:00:00.000Z')
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
 const BASE: Agent = {
+  boot: 'b1',
   pane: 0,
   project: 1,
   workspace: 2,

@@ -308,6 +308,11 @@ mod a_row {
     }
 
     #[test]
+    fn carries_the_boot_of_its_server() {
+        assert_eq!(only_row(&snapshot(vec![agent(4, "working")])).boot, "1-2");
+    }
+
+    #[test]
     fn counts_the_workspaces_of_its_project() {
         let busy = workspace(2, vec![tab(3, vec![agent(4, "working")])]);
         let snapshot = session(vec![project(1, vec![busy, workspace(5, vec![])])]);
@@ -329,6 +334,7 @@ mod the_agents {
 
     fn watched(pane: u64, title: Option<&str>) -> AgentRow {
         AgentRow {
+            boot: "4242-1760600000".to_owned(),
             project: 1,
             workspace: 2,
             tab: 3,

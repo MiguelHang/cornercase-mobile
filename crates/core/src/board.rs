@@ -10,6 +10,7 @@ pub(crate) mod fixtures;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AgentRow {
+    pub boot: String,
     #[cfg_attr(feature = "specta", specta(type = u32))]
     pub project: u64,
     #[cfg_attr(feature = "specta", specta(type = u32))]
@@ -55,6 +56,7 @@ fn rank(status: Option<&str>) -> u8 {
 }
 
 struct Place<'a> {
+    boot: &'a str,
     project: &'a Project,
     workspace: &'a Workspace,
     tab: &'a Tab,
@@ -66,6 +68,7 @@ impl Place<'_> {
         let agent = self.pane.agent.clone()?;
         let status = self.pane.status.clone();
         Some(AgentRow {
+            boot: self.boot.to_owned(),
             project: self.project.id,
             workspace: self.workspace.id,
             tab: self.tab.id,
@@ -161,12 +164,15 @@ impl Since {
 }
 
 fn places(snapshot: &Snapshot) -> impl Iterator<Item = Place<'_>> {
+    let boot = snapshot.boot.as_str();
     snapshot
         .projects
         .iter()
         .flat_map(|project| project.workspaces.iter().map(move |workspace| (project, workspace)))
         .flat_map(|(project, workspace)| workspace.tabs.iter().map(move |tab| (project, workspace, tab)))
-        .flat_map(|(project, workspace, tab)| tab.panes.iter().map(move |pane| Place { project, workspace, tab, pane }))
+        .flat_map(move |(project, workspace, tab)| {
+            tab.panes.iter().map(move |pane| Place { boot, project, workspace, tab, pane })
+        })
 }
 
 #[cfg(test)]

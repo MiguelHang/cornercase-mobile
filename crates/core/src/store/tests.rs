@@ -18,6 +18,7 @@ mod offline;
 mod resume;
 mod retry;
 mod streams;
+mod transport;
 
 const CONTRACT: &[&str] = &["contract", "--json"];
 const LAN: &str = "studio.local";

@@ -14,6 +14,8 @@ export const commands = {
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
+	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
+	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 };
 
 /** Events */
@@ -21,6 +23,7 @@ export const events = {
 	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
 	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
+	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
 
@@ -28,6 +31,7 @@ export const events = {
 export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
 
 export type AgentRow_Deserialize = {
+	boot: string,
 	project: number,
 	workspace: number,
 	tab: number,
@@ -43,6 +47,7 @@ export type AgentRow_Deserialize = {
 };
 
 export type AgentRow_Serialize = {
+	boot: string,
 	project: number,
 	workspace: number,
 	tab: number,
@@ -67,6 +72,24 @@ export type AgentsChanged_Deserialize = {
 export type AgentsChanged_Serialize = {
 	machine: number,
 	agents: AgentRow_Serialize[] | null,
+};
+
+export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
+
+export type Colours = Colours_Serialize | Colours_Deserialize;
+
+export type Colours_Deserialize = {
+	fg?: [number, number, number] | null,
+	bg?: [number, number, number] | null,
+	cursor?: [number, number, number] | null,
+	palette?: { [key in string]: [number, number, number] },
+};
+
+export type Colours_Serialize = {
+	fg: [number, number, number] | null,
+	bg: [number, number, number] | null,
+	cursor: [number, number, number] | null,
+	palette: { [key in string]: [number, number, number] },
 };
 
 export type CommandError = {
@@ -103,6 +126,28 @@ export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deseriali
 export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+
+export type Cursor = Cursor_Serialize | Cursor_Deserialize;
+
+export type CursorShape = CursorShape_Serialize | CursorShape_Deserialize;
+
+export type CursorShape_Deserialize = "bar" | "underline" | "block_hollow" | string;
+
+export type CursorShape_Serialize = "bar" | "underline" | "block_hollow" | "block";
+
+export type Cursor_Deserialize = {
+	x?: number,
+	y?: number,
+	shape?: CursorShape_Deserialize,
+	blinking?: boolean,
+};
+
+export type Cursor_Serialize = {
+	x: number,
+	y: number,
+	shape: CursorShape_Serialize,
+	blinking: boolean,
+};
 
 export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
 
@@ -170,12 +215,104 @@ export type PaneStatusChanged_Serialize = {
 
 export type RouteView = { kind: "bridge"; url: string };
 
+export type Run = Run_Serialize | Run_Deserialize;
+
+export type Run_Deserialize = {
+	text: string,
+	width: number,
+	style: Style_Deserialize,
+};
+
+export type Run_Serialize = {
+	text: string,
+	width: number,
+	style: Style_Serialize,
+};
+
+export type Size = Size_Serialize | Size_Deserialize;
+
+export type Size_Deserialize = {
+	cols?: number,
+	rows?: number,
+};
+
+export type Size_Serialize = {
+	cols: number,
+	rows: number,
+};
+
+export type Style = Style_Serialize | Style_Deserialize;
+
+export type Style_Deserialize = {
+	fg?: Colour | null,
+	bg?: Colour | null,
+	bold?: boolean,
+	dim?: boolean,
+	italic?: boolean,
+	underline?: boolean,
+	underline_style?: UnderlineKind_Deserialize | null,
+	underline_colour?: Colour | null,
+	overline?: boolean,
+	blink?: boolean,
+	inverse?: boolean,
+	invisible?: boolean,
+	strikethrough?: boolean,
+};
+
+export type Style_Serialize = {
+	fg: Colour | null,
+	bg: Colour | null,
+	bold: boolean,
+	dim: boolean,
+	italic: boolean,
+	underline: boolean,
+	underline_style: UnderlineKind_Serialize | null,
+	underline_colour: Colour | null,
+	overline: boolean,
+	blink: boolean,
+	inverse: boolean,
+	invisible: boolean,
+	strikethrough: boolean,
+};
+
+export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;
+
+export type TerminalChanged_Deserialize = {
+	machine: number,
+	tab: number,
+	pane?: number | null,
+	size: Size_Deserialize,
+	cursor?: Cursor_Deserialize | null,
+	colours: Colours_Deserialize,
+	replaced: boolean,
+	rows: { [key in number]: Run_Deserialize[] },
+	closed: boolean,
+};
+
+export type TerminalChanged_Serialize = {
+	machine: number,
+	tab: number,
+	pane: number | null,
+	size: Size_Serialize,
+	cursor: Cursor_Serialize | null,
+	colours: Colours_Serialize,
+	replaced: boolean,
+	rows: { [key in number]: Run_Serialize[] },
+	closed: boolean,
+};
+
 export type Toast = {
 	level: ToastLevel,
 	message: string,
 };
 
 export type ToastLevel = "info" | "error";
+
+export type UnderlineKind = UnderlineKind_Serialize | UnderlineKind_Deserialize;
+
+export type UnderlineKind_Deserialize = "double" | "curly" | "dotted" | "dashed" | string;
+
+export type UnderlineKind_Serialize = "double" | "curly" | "dotted" | "dashed" | "other";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

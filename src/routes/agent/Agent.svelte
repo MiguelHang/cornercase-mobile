@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ConnectionView_Serialize } from '../../lib/bindings'
+  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
   import { elapsed, label, place, statusName } from '../../lib/board'
   import type { Chat } from '../../lib/chat.svelte'
   import Button from '../../lib/ui/Button.svelte'
@@ -16,12 +16,14 @@
     below = 0,
     onback,
     onfailed,
+    onterminal,
   }: {
     chat: Chat
     connection: ConnectionView_Serialize
     below?: number
     onback: () => void
     onfailed: (reason: string) => void
+    onterminal: (row: AgentRow) => void
   } = $props()
 
   let now = $state(Date.now())
@@ -51,6 +53,10 @@
   {:else}
     <div class="actions">
       <Button tone="plain" onclick={onback}>Back</Button>
+      {#if row !== null}
+        {@const opened = row}
+        <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button>
+      {/if}
     </div>
     {#if row === null}
       <div class="waiting">
@@ -102,6 +108,7 @@
 
   .actions {
     display: flex;
+    gap: var(--gap);
   }
 
   .head {

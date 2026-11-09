@@ -153,13 +153,13 @@ mod without_a_connection {
     fn says_it_is_not_connected() {
         let ipc = Ipc::new(Studio::new().reloaded());
         let refused = ipc.invoke("last_message", json!({ "pane": 543 })).expect_err("nothing to read from");
-        assert_eq!(refused, json!({ "code": "not_connected", "message": "not connected" }));
+        assert_eq!(refused, json!({ "code": "not_connected", "message": "no machine is connected" }));
     }
 
     #[test]
     fn says_it_is_not_connected_rather_than_sending() {
         let ipc = Ipc::new(Studio::new().reloaded());
         let refused = ipc.invoke("send", json!({ "pane": 543, "text": "hello" })).expect_err("nowhere to send");
-        assert_eq!(refused, json!({ "code": "not_connected", "message": "not connected" }));
+        assert_eq!(refused, json!({ "code": "not_connected", "message": "no machine is connected" }));
     }
 }

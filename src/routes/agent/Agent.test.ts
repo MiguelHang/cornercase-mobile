@@ -8,6 +8,7 @@ import agentSource from './Agent.svelte?raw'
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
 const ROW: AgentRow = {
+  boot: 'b1',
   agent: 'claude',
   title: 'Fix the login flow',
   status: 'waiting',
@@ -24,6 +25,8 @@ const ROW: AgentRow = {
 
 const unread: ReadLast = () => new Promise(() => {})
 
+const TERMINAL = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Terminal/
+
 const unsent: SendText = () => new Promise(() => {})
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
@@ -38,7 +41,7 @@ const chatOf = (row: AgentRow | null, draft = '') => {
 }
 
 const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED) =>
-  render(Agent, { props: { chat, connection, below, onback: () => {}, onfailed: () => {} } }).body
+  render(Agent, { props: { chat, connection, below, onback: () => {}, onfailed: () => {}, onterminal: () => {} } }).body
 
 const send = (body: string) => body.match(/<button class="([^"]*)" type="button"([^>]*)>(?:<!--[^>]*-->|\s|<span[^>]*>.*?<\/span>)*Send/)
 
@@ -174,5 +177,19 @@ describe('Agent, without its row', () => {
 
   it.each([ROW, null])('offers going back before it is gone', (row) => {
     expect(draw(chatOf(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
+  })
+
+  it('offers opening the terminal of its agent, beside going back', () => {
+    expect(draw(chatOf(ROW))).toMatch(TERMINAL)
+    expect(flat(agentSource)).toContain(
+      '<Button tone="plain" onclick={onback}>Back</Button> {#if row !== null} {@const opened = row} <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button> {/if} </div>',
+    )
+  })
+
+  it('offers no terminal without its agent, nor once it is gone', () => {
+    const gone = chatOf(ROW)
+    gone.see([{ ...ROW, pane: 30 }])
+    expect(draw(chatOf(null))).not.toMatch(TERMINAL)
+    expect(draw(gone)).not.toMatch(TERMINAL)
   })
 })

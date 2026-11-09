@@ -1,8 +1,20 @@
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import type { Screen } from './connection'
 
-export type Route = { name: 'no-machines' } | { name: 'home' } | { name: 'agent'; pane: number }
+export type Route =
+  | { name: 'no-machines' }
+  | { name: 'home' }
+  | { name: 'agent'; pane: number }
+  | { name: 'terminal'; machine: number; row: AgentRow }
 
 export const routeFor = (screen: Screen): Route => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
+
+export const chatPane = (route: Route): number | null => {
+  if (route.name === 'agent') {
+    return route.pane
+  }
+  return route.name === 'terminal' ? route.row.pane : null
+}
 
 export class Router {
   #stack: Route[] = $state([])

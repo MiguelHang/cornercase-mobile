@@ -58,12 +58,12 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 026 | [Pantalla 5 — Ficheros (`files list/read/search`)](tasks/026-ui-files.md) | 025 | ~550 |
 | 027 | [Pantalla 6 — Máquinas: lista, QR, varias rutas](tasks/027-ui-machines-qr.md) | 014, 008 | ~550 |
 | 028 | [Cambio de red en iOS (NWPathMonitor)](tasks/028-ios-network-change.md) ⚠ | 013 | ~300 |
-| 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028 | ~150 (docs) |
+| 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
-| 030 | [Android: proyecto, arranque en emulador y dispositivo](tasks/030-android-project.md) | 029 | ~250 (+ generados) |
+| 030 | [Android: proyecto, arranque en emulador y dispositivo](tasks/030-android-project.md) | 015–028 | ~250 (+ generados) |
 | 031 | [Android: identidad en el Keystore](tasks/031-android-keystore.md) ⚠ | 030, 009 | ~450 |
 | 032 | [Android: teclado del WebView y cambio de red](tasks/032-android-keyboard-network.md) ⚠ | 030, 021, 028 | ~400 |
 
@@ -76,7 +76,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
-· `028` (tras 013) · `030 → 031, 032` (tras 029) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
+· `028` (tras 013) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
 - 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.

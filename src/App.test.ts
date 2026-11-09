@@ -87,7 +87,7 @@ describe('App wiring', () => {
 
   it('shows the connection bar with a machine, and puts the board, an agent and the toasts below it', () => {
     expect(source).toContain(
-      '{#if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if chat !== null}',
+      '{:else if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if chat !== null}',
     )
     expect(source).toContain(
       "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', pane })} />",
@@ -98,12 +98,12 @@ describe('App wiring', () => {
   })
 
   it('opens a chat for the tapped pane, and goes back from it', () => {
-    expect(source).toContain("const pane = $derived(route.name === 'agent' ? route.pane : null)")
+    expect(source).toContain('const pane = $derived(chatPane(route))')
     expect(source).toContain(
       'const chat = $derived(pane === null ? null : new Chat(pane, commands.lastMessage, commands.send))',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} />",
+      "<Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} />",
     )
   })
 
@@ -118,6 +118,18 @@ describe('App wiring', () => {
   it('reads again on a status change of its pane on its machine', () => {
     expect(source).toContain(
       'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, current.machine, chat.pane)) { void chat.refresh() } }),',
+    )
+  })
+
+  it("opens an agent's terminal on top of it, on the machine the agent runs on", () => {
+    expect(source).toContain(
+      "const terminal = (row: AgentRow) => { if (current.machine !== null) { router.go({ name: 'terminal', machine: current.machine, row }) } }",
+    )
+  })
+
+  it('shows the terminal on top of everything, going back from it and putting the toasts below its bar', () => {
+    expect(source).toContain(
+      "{#if route.name === 'terminal'} <Terminal machine={route.machine} row={route.row} onback={() => router.back()} onfailed={toasts.failed} bind:height={barHeight} />",
     )
   })
 })
