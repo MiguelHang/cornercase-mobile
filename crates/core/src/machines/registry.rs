@@ -1,10 +1,13 @@
+use std::collections::HashMap;
 use std::fmt;
+use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use super::name::checked_name;
 use super::route::{Address, Route, Token};
+use super::same::{Same, same_machine};
 use super::store::{MachineStore, Saved};
 use super::{Machine, MachineId};
 use crate::error::Error;
@@ -41,6 +44,16 @@ impl Machines {
 
     pub fn machine(&self, id: MachineId) -> Option<&Machine> {
         self.saved.machines.iter().find(|machine| machine.id == id)
+    }
+
+    pub fn same<S: BuildHasher>(
+        &self,
+        route: &Route,
+        name: &str,
+        probed_boot: Option<&str>,
+        seen_boots: &HashMap<MachineId, String, S>,
+    ) -> Option<Same> {
+        same_machine(self.machines(), route, name, probed_boot, seen_boots)
     }
 
     pub fn add(&mut self, name: &str, route: Route) -> Result<MachineId, Error> {

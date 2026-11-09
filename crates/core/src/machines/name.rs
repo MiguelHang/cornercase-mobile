@@ -18,7 +18,7 @@ pub(crate) fn checked_name(name: &str, machines: &[Machine], own: Option<Machine
     Ok(name.to_owned())
 }
 
-fn folded(name: &str) -> String {
+pub(super) fn folded(name: &str) -> String {
     name.trim().to_lowercase()
 }
 

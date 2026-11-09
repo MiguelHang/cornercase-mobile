@@ -577,6 +577,19 @@ mod active {
     }
 }
 
+mod same {
+    use super::*;
+    use crate::machines::same::Why;
+
+    #[test]
+    fn compares_the_tokens_read_back_from_the_secrets() {
+        let phone = Phone::new();
+        let (_, id) = phone.studio();
+        let same = phone.open().same(&route("studio.local", TOKEN), "new", None, &HashMap::new());
+        assert_eq!(same, Some(Same { machine: id, why: Why::Token }));
+    }
+}
+
 mod debug {
     use super::*;
 

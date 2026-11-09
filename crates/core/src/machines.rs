@@ -6,6 +6,7 @@ pub(crate) mod name;
 pub mod pick;
 pub mod registry;
 pub mod route;
+pub mod same;
 pub mod store;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
