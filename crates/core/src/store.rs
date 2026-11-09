@@ -100,6 +100,10 @@ impl Store {
         self.shared.queue()
     }
 
+    pub fn transport(&self) -> Option<Arc<dyn Transport>> {
+        self.shared.state().transport.clone()
+    }
+
     pub fn changes(&self) -> Changes {
         self.shared.subscribe()
     }
@@ -186,6 +190,7 @@ struct State {
     since: Since,
     app: Option<Value>,
     queue: Option<Queue>,
+    transport: Option<Arc<dyn Transport>>,
     subscribers: Vec<Subscriber>,
     boots: BootWatch,
 }
@@ -265,6 +270,7 @@ where
     }
 
     fn join(&mut self, transport: &Arc<dyn Transport>) {
+        self.shared.state().transport = Some(transport.clone());
         if let Some(queue) = self.shared.queue() {
             queue.reconnect(transport.clone());
             return;

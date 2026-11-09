@@ -217,6 +217,47 @@ mod the_queue {
     }
 }
 
+mod the_transport {
+    use super::*;
+    use crate::transport;
+
+    const READ: &[&str] = &["read", "--last-message", "--pane", "543", "--json"];
+
+    async fn read_on(store: &Store) {
+        let transport = store.transport().expect("a transport once connected");
+        let _ = transport::json::<Value>(transport.as_ref(), words(READ)).await;
+    }
+
+    fn reads(asked: &Asked) -> Vec<String> {
+        asked.all().into_iter().filter(|line| line.ends_with(&READ.join(" "))).collect()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_the_one_of_the_route_it_connected_on() {
+        let asked = Asked::default();
+        let (store, mut changes) = spawned(serving(fine()), &asked);
+        until_connected(&mut changes).await;
+        read_on(&store).await;
+        assert_eq!(reads(&asked), [format!("{LAN}: {}", READ.join(" "))]);
+    }
+
+    #[rstest]
+    #[tokio::test(start_paused = true)]
+    async fn moves_to_the_route_it_reconnected_on(#[values(Resume::Foreground, Resume::Network)] resume: Resume) {
+        let asked = Asked::default();
+        let lan = answering_only(serving(fine()), true);
+        let tailnet = answering_only(serving(Lines::default()), false);
+        let (store, driver) = store_on(vec![route(LAN), route(TAILNET)], vec![(LAN, lan), (TAILNET, tailnet)], &asked);
+        let mut changes = store.changes();
+        tokio::spawn(driver);
+        until_connected(&mut changes).await;
+        poke(&store, resume);
+        time::sleep(Duration::from_secs(60)).await;
+        read_on(&store).await;
+        assert_eq!(reads(&asked), [format!("{TAILNET}: {}", READ.join(" "))]);
+    }
+}
+
 mod dropping_the_store {
     use super::*;
 
