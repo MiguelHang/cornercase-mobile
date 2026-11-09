@@ -14,9 +14,13 @@ fn mock_store() -> Arc<CredentialStore> {
     mock::Store::new().expect("a mock store")
 }
 
+fn on_mock(store: Arc<CredentialStore>) -> KeychainSecrets {
+    KeychainSecrets::new(Ok(store), Modifiers::new())
+}
+
 fn secrets() -> (Arc<CredentialStore>, KeychainSecrets) {
     let store = mock_store();
-    (Arc::clone(&store), KeychainSecrets::new(store))
+    (Arc::clone(&store), on_mock(store))
 }
 
 fn fail_next_call(store: &Arc<CredentialStore>, error: keyring_core::Error) {
@@ -95,14 +99,45 @@ mod failure {
     }
 }
 
+mod modifiers {
+    use super::*;
+
+    #[test]
+    fn reach_the_store_with_each_entry() {
+        let secrets = KeychainSecrets::new(Ok(mock_store()), Modifiers::from([("access-policy", "a policy")]));
+        assert_eq!(
+            secrets.get(KEY),
+            Err(Error::Secrets("Unsupported: The mock store doesn't allow entry modifiers".to_owned()))
+        );
+    }
+}
+
+mod store {
+    use super::*;
+
+    #[cfg(not(target_os = "ios"))]
+    #[test]
+    fn fails_with_a_clear_message_on_a_platform_without_one() {
+        assert_eq!(store().get(KEY), Err(Error::Secrets(NO_STORE.to_owned())));
+    }
+
+    #[cfg(target_os = "ios")]
+    #[test]
+    fn keeps_items_on_this_device_once_it_was_unlocked() {
+        let store = store();
+        assert!(store.store.is_ok());
+        assert_eq!(store.modifiers, Modifiers::from([("access-policy", "AfterFirstUnlockThisDeviceOnly")]));
+    }
+}
+
 mod identity {
     use super::*;
 
     #[test]
     fn keeps_its_fingerprint_from_one_start_to_the_next() {
         let store = mock_store();
-        let first = Identity::load_or_create(&KeychainSecrets::new(Arc::clone(&store))).expect("a new identity");
-        let second = Identity::load_or_create(&KeychainSecrets::new(store)).expect("the saved identity");
+        let first = Identity::load_or_create(&on_mock(Arc::clone(&store))).expect("a new identity");
+        let second = Identity::load_or_create(&on_mock(store)).expect("the saved identity");
         assert_eq!(first.fingerprint(), second.fingerprint());
     }
 }

@@ -1,23 +1,42 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use cornercase_core::error::Error;
 use cornercase_core::secrets::Secrets;
 use keyring_core::{CredentialStore, Entry};
 
+#[cfg(target_os = "ios")]
+mod ios;
+
+#[cfg(target_os = "ios")]
+pub(crate) use ios::store;
+
 const SERVICE: &str = "dev.usecornercase.mobile";
 
+#[cfg(not(target_os = "ios"))]
+const NO_STORE: &str = "no secret store on this platform yet";
+
+type Modifiers = HashMap<&'static str, &'static str>;
+
 pub(crate) struct KeychainSecrets {
-    store: Arc<CredentialStore>,
+    store: Result<Arc<CredentialStore>, Error>,
+    modifiers: Modifiers,
 }
 
 impl KeychainSecrets {
-    pub(crate) fn new(store: Arc<CredentialStore>) -> Self {
-        Self { store }
+    pub(crate) fn new(store: Result<Arc<CredentialStore>, Error>, modifiers: Modifiers) -> Self {
+        Self { store, modifiers }
     }
 
     fn entry(&self, key: &str) -> Result<Entry, Error> {
-        self.store.build(SERVICE, key, None).map_err(|error| secrets_error(&error))
+        let store = self.store.as_ref().map_err(Clone::clone)?;
+        store.build(SERVICE, key, Some(&self.modifiers)).map_err(|error| secrets_error(&error))
     }
+}
+
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn store() -> KeychainSecrets {
+    KeychainSecrets::new(Err(Error::Secrets(NO_STORE.to_owned())), Modifiers::new())
 }
 
 impl Secrets for KeychainSecrets {
