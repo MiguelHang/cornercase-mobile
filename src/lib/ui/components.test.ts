@@ -6,11 +6,13 @@ import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
 import Spinner from './Spinner.svelte'
+import TextArea from './TextArea.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
+import textAreaSource from './TextArea.svelte?raw'
 
 const html = (markup: string) => createRawSnippet(() => ({ render: () => markup }))
 
@@ -137,6 +139,45 @@ describe('Field', () => {
     'color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(fieldSource)).toContain(text)
+  })
+})
+
+describe('TextArea', () => {
+  type Props = { label: string; value?: string; disabled?: boolean; placeholder?: string }
+  const area = (props: Props) => render(TextArea, { props }).body
+
+  it('shows its value, one line high, named for readers', () => {
+    expect(area({ label: 'Message', value: 'two\nlines' })).toMatch(
+      /<div class="grow svelte-[\w-]+" data-value="two\nlines"><textarea class="area svelte-[\w-]+" rows="1" aria-label="Message">two\nlines<\/textarea><\/div>/,
+    )
+  })
+
+  it('passes textarea attributes on', () => {
+    expect(area({ label: 'Reply', placeholder: 'Write to codex', disabled: true })).toMatch(
+      /<textarea [^>]*aria-label="Reply" placeholder="Write to codex" disabled="">/,
+    )
+  })
+
+  it('binds its value', () => {
+    expect(textAreaSource).toContain('value = $bindable(\'\')')
+    expect(textAreaSource).toContain('bind:value></textarea>')
+  })
+
+  it('leaves Return to the textarea, which adds a line, and sends nothing on a key', () => {
+    expect(textAreaSource).not.toMatch(/keydown|keyup|keypress|submit/i)
+  })
+
+  it.each([
+    '.grow { display: grid;',
+    "content: attr(data-value) ' '; visibility: hidden; white-space: pre-wrap;",
+    'grid-area: 1 / 1;',
+    'min-height: 44px; max-height: 152px;',
+    'overflow-y: auto; resize: none;',
+    'font-size: 16px;',
+    '-webkit-user-select: text; user-select: text;',
+    '.area:focus { border-color: var(--accent);',
+  ])('holds %s', (text) => {
+    expect(flat(textAreaSource)).toContain(text)
   })
 })
 
