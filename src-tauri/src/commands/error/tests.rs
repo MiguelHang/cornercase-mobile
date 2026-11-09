@@ -29,6 +29,7 @@ mod from_a_core_error {
     #[case::unanswered(Error::Unanswered, "unanswered")]
     #[case::settle_timeout(Error::SettleTimeout, "settle_timeout")]
     #[case::input_rejected(Error::InputRejected("closed".into()), "input_rejected")]
+    #[case::unknown_key(Error::UnknownKey("--force".into()), "unknown_key")]
     #[case::json(Error::Json("expected a value".into()), "json")]
     #[case::store(Error::Store("read-only".into()), "store")]
     #[case::secrets(Error::Secrets("locked".into()), "secrets")]
