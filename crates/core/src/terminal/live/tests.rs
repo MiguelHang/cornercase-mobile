@@ -612,6 +612,15 @@ mod a_terminal {
         assert_eq!(watched.surfaces().len(), 4);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn stays_quiet_about_a_view_refused_as_the_store_drops_its_transport() {
+        let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), Said::Ends(Err(Error::Dropped))]];
+        let views = vec![vec![Said::After(5), refused()], granted().concat()];
+        let mac = Mac { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = Watched::fitted_for_a_minute(mac).await;
+        assert!(!watched.seen().contains(&(5, "refused")));
+    }
+
     fn stale() -> Said {
         Said::Ends(Ok(Exit { code: 4, stderr: "boot changed".to_owned() }))
     }
