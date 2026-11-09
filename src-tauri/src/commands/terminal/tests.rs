@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use cornercase_core::cli::surface::Style;
+use cornercase_core::cli::surface::{Modes, Style};
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
 use cornercase_core::transport::Transport;
@@ -31,7 +31,15 @@ fn line(text: &str) -> Line {
 fn update(pane: u64, replaced: bool, rows: &[(u16, &str)]) -> Screen {
     let rows = rows.iter().map(|(row, text)| (*row, line(text))).collect();
     let size = Size { cols: 80, rows: 24 };
-    Screen::Update(Update { pane, size, cursor: None, colours: Colours::default(), replaced, rows })
+    Screen::Update(Update {
+        pane,
+        size,
+        cursor: None,
+        colours: Colours::default(),
+        modes: Modes::default(),
+        replaced,
+        rows,
+    })
 }
 
 fn texts(changed: &TerminalChanged) -> Vec<(u16, String)> {

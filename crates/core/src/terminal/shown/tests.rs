@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use super::*;
 use crate::cli::surface::fixtures::{FRAME, PATCH};
-use crate::cli::surface::{CursorShape, Frame};
+use crate::cli::surface::{CursorShape, Frame, MouseEncoding, MouseMode};
 
 struct Screen {
     grid: Grid,
@@ -166,5 +166,31 @@ mod pane_state {
         let mut screen = Screen::asking(Some(1));
         screen.shows(&frame(&json!([{ "pane": 1, "size": { "rows": 1 }, "cursor": { "x": 1, "y": 0 } }])));
         assert_eq!(screen.shows(&patch(&json!([{ "pane": 1, "cursor": null }]))).cursor, None);
+    }
+
+    #[test]
+    fn carries_the_modes_of_the_pane() {
+        let modes = Screen::asking(Some(13)).shows(&fixture(FRAME)).modes;
+        assert_eq!((modes.mouse, modes.mouse_encoding), (MouseMode::PressRelease, MouseEncoding::Sgr));
+        assert!(modes.alternate_screen && modes.bracketed_paste && modes.focus_events && !modes.application_cursor);
+        assert_eq!(modes.kitty_keyboard, 1);
+    }
+
+    #[test]
+    fn hands_a_change_of_modes_without_rows() {
+        let mut screen = Screen::asking(Some(1));
+        screen.shows(&frame(&json!([{ "pane": 1, "size": { "rows": 1 }, "lines": [[{ "cells": ["a"] }]] }])));
+        let entered = patch(&json!([{ "pane": 1, "modes": { "mouse": "any_motion", "alternate_screen": true } }]));
+        let update = screen.on(&entered).expect("an update for the modes alone");
+        let modes = (update.modes.mouse, update.modes.alternate_screen);
+        assert_eq!((update.replaced, update.rows, modes), (false, Vec::new(), (MouseMode::AnyMotion, true)));
+    }
+
+    #[test]
+    fn keeps_the_modes_a_patch_left_out() {
+        let mut screen = Screen::asking(Some(1));
+        screen.shows(&frame(&json!([{ "pane": 1, "size": { "rows": 1 }, "modes": { "bracketed_paste": true } }])));
+        let update = screen.shows(&patch(&json!([{ "pane": 1, "lines": { "0": [{ "cells": ["b"] }] } }])));
+        assert!(update.modes.bracketed_paste);
     }
 }

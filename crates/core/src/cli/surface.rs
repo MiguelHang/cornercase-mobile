@@ -109,7 +109,8 @@ pub struct Cursor {
     pub blinking: bool,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
 pub enum MouseMode {
     Press,
@@ -121,7 +122,8 @@ pub enum MouseMode {
     None,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum MouseEncoding {
     Utf8,
@@ -132,7 +134,8 @@ pub enum MouseEncoding {
 }
 
 #[expect(clippy::struct_excessive_bools, reason = "mirrors the terminal modes cornercase reports")]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default)]
 pub struct Modes {
     pub mouse: MouseMode,
