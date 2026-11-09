@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use cornercase_core::cli::last_message::{self, LastMessage};
-use cornercase_core::transport::{self, Transport};
+use cornercase_core::error::Error;
+use cornercase_core::queue::{Outcome, Queue};
+use cornercase_core::transport::{self, Stdin, Transport};
 use tauri::State;
 
 use crate::commands::error::CommandError;
@@ -13,13 +15,37 @@ pub(crate) async fn last_message(state: State<'_, AppState>, pane: u64) -> Resul
     read_last_message(&state, pane).await
 }
 
+#[tauri::command(async)]
+#[specta::specta]
+pub(crate) async fn send(state: State<'_, AppState>, pane: u64, text: String) -> Result<(), CommandError> {
+    send_message(&state, pane, text).await
+}
+
 pub(crate) async fn read_last_message(state: &AppState, pane: u64) -> Result<LastMessage, CommandError> {
     let transport = connected(state)?;
     transport::json(transport.as_ref(), last_message::args(pane)).await.map_err(|error| CommandError::reason(&error))
 }
 
+pub(crate) async fn send_message(state: &AppState, pane: u64, text: String) -> Result<(), CommandError> {
+    let queue = queue(state)?;
+    sent(queue.ask(last_message::send_args(pane), Some(Stdin::Text(text))).await)
+}
+
 fn connected(state: &AppState) -> Result<Arc<dyn Transport>, CommandError> {
     state.active().as_ref().and_then(|active| active.store().transport()).ok_or_else(CommandError::not_connected)
+}
+
+fn queue(state: &AppState) -> Result<Queue, CommandError> {
+    state.active().as_ref().and_then(|active| active.store().queue()).ok_or_else(CommandError::not_connected)
+}
+
+fn sent(outcome: Result<Outcome, Error>) -> Result<(), CommandError> {
+    match outcome {
+        Ok(Outcome::Done(_)) => Ok(()),
+        Ok(Outcome::Skipped) => Err(CommandError::not_sent()),
+        Err(Error::Unanswered) => Err(CommandError::maybe_sent()),
+        Err(error) => Err(CommandError::reason(&error)),
+    }
 }
 
 #[cfg(test)]

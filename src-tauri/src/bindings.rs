@@ -15,6 +15,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             connection::agents,
             identity::identity_fingerprint,
             chat::last_message,
+            chat::send,
         ])
         .events(collect_events![ConnectionChanged, AgentsChanged, Toast])
 }

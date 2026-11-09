@@ -50,6 +50,7 @@ pub(crate) enum ErrorCode {
     MachinesNotLoaded,
     NoIdentity,
     NotConnected,
+    NotSent,
 }
 
 impl CommandError {
@@ -71,6 +72,14 @@ impl CommandError {
 
     pub(crate) fn not_connected() -> Self {
         Self::new(ErrorCode::NotConnected, "not connected")
+    }
+
+    pub(crate) fn not_sent() -> Self {
+        Self::new(ErrorCode::NotSent, "nothing was sent")
+    }
+
+    pub(crate) fn maybe_sent() -> Self {
+        Self::new(ErrorCode::Unanswered, "it may have been sent, but no answer came back")
     }
 
     pub(crate) fn reason(error: &Error) -> Self {

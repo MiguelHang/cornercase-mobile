@@ -13,6 +13,7 @@ export const commands = {
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
+	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
 };
 
 /** Events */
@@ -102,7 +103,7 @@ export type ConnectionView_Deserialize = { state: "none" } | { state: "connectin
 
 export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
 
 export type Kind = "operation" | "feature" | "stream";
 
