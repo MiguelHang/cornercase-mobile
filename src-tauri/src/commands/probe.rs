@@ -1,19 +1,31 @@
 use cornercase_core::cli::contract::Descriptor;
 use cornercase_core::error::Error;
-use cornercase_core::machines::MachineId;
 use cornercase_core::machines::pick::{PickConfig, PickError, Picked, pick_route};
+use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::route::Route;
+use cornercase_core::machines::same::{Same, Why};
+use cornercase_core::machines::{Machine, MachineId};
 use tauri::State;
 
 use crate::commands::connection::Launcher;
 use crate::commands::error::CommandError;
 use crate::state::AppState;
-use crate::view::{ProbeView, RouteFailure};
+use crate::view::{MatchFound, MatchView, ProbeView, RouteFailure, SameWhy};
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn machine_probe(state: State<'_, AppState>, id: u64) -> Result<ProbeView, CommandError> {
     probe(&state, &Launcher::bridge(), MachineId(id)).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn machine_match(
+    state: State<'_, AppState>,
+    url: String,
+    name: String,
+) -> Result<MatchView, CommandError> {
+    matching(&state, &Launcher::bridge(), &url, &name).await
 }
 
 pub(crate) async fn probe(state: &AppState, launcher: &Launcher, id: MachineId) -> Result<ProbeView, CommandError> {
@@ -23,6 +35,37 @@ pub(crate) async fn probe(state: &AppState, launcher: &Launcher, id: MachineId) 
         Ok(picked) => answered(state, id, picked),
         Err(error) => failed(error),
     })
+}
+
+pub(crate) async fn matching(
+    state: &AppState,
+    launcher: &Launcher,
+    url: &str,
+    name: &str,
+) -> Result<MatchView, CommandError> {
+    let route = Route::parse(url)?;
+    let unsaved = Machine { id: MachineId(0), name: name.to_owned(), routes: vec![route.clone()], last_route: None };
+    let picked = pick_route(&unsaved, |route: &Route| launcher.transport(route), PickConfig::default()).await.ok();
+    let checked = picked.is_some();
+    let boot = picked.and_then(|picked| Descriptor::from_value(picked.contract).ok()).map(|found| found.boot().0);
+    let seen = state.seen_boots();
+    state.machines(|machines| {
+        let same = machines.same(&route, name, boot.as_deref(), &seen);
+        Ok(MatchView { found: same.map_or(MatchFound::None, |same| found(machines, same)), checked })
+    })
+}
+
+fn found(machines: &Machines, same: Same) -> MatchFound {
+    let machine = same.machine.0;
+    let why = match same.why {
+        Why::AlreadySaved => return MatchFound::AlreadySaved { machine },
+        Why::Address => SameWhy::Address,
+        Why::Token => SameWhy::Token,
+        Why::Boot => SameWhy::Boot,
+        Why::Name => SameWhy::Name,
+    };
+    let name = machines.machine(same.machine).map(|saved| saved.name.clone()).unwrap_or_default();
+    MatchFound::Same { machine, name, why }
 }
 
 fn answered(state: &AppState, id: MachineId, picked: Picked) -> ProbeView {

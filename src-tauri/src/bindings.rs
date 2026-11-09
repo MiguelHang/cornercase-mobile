@@ -15,6 +15,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             routes::machine_route_remove::<Wry>,
             routes::machine_route_move,
             probe::machine_probe,
+            probe::machine_match,
             connection::connect::<Wry>,
             connection::connection_state,
             connection::session,

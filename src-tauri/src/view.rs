@@ -70,6 +70,37 @@ pub(crate) struct RouteFailure {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MatchView {
+    pub(crate) found: MatchFound,
+    pub(crate) checked: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub(crate) enum MatchFound {
+    None,
+    AlreadySaved {
+        #[specta(type = u32)]
+        machine: u64,
+    },
+    Same {
+        #[specta(type = u32)]
+        machine: u64,
+        name: String,
+        why: SameWhy,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SameWhy {
+    Address,
+    Token,
+    Boot,
+    Name,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 pub(crate) struct ConnectionState {
     #[specta(type = Option<u32>)]
     pub(crate) machine: Option<u64>,

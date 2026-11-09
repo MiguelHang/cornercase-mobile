@@ -10,9 +10,10 @@ use tauri::async_runtime::JoinHandle;
 use super::*;
 use crate::commands::connection::start;
 use crate::commands::error::ErrorCode;
+use crate::commands::machines::list;
 use crate::commands::routes::add_route;
 use crate::test_util::{
-    ADDRESS, BOOT, CONTRACT, Ipc, Recorder, Studio, contracted, launcher, route, serving, settle, snapshot,
+    ADDRESS, BOOT, BRIDGE, CONTRACT, Ipc, Recorder, Studio, contracted, launcher, route, serving, settle, snapshot,
 };
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
@@ -137,6 +138,88 @@ mod probing_a_machine {
     }
 }
 
+fn same(studio: &Studio, why: SameWhy) -> MatchFound {
+    MatchFound::Same { machine: studio.id.0, name: "studio".to_owned(), why }
+}
+
+async fn matched(studio: &Studio, launcher: &Launcher, url: &str, name: &str) -> MatchView {
+    matching(&studio.state, launcher, url, name).await.expect("matched")
+}
+
+mod matching_a_url {
+    use super::*;
+
+    #[rstest]
+    #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", "desk", SameWhy::Address)]
+    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA", "desk", SameWhy::Token)]
+    #[case::by_name(LAPTOP, " Studio ", SameWhy::Name)]
+    #[tokio::test(start_paused = true)]
+    async fn finds_the_same_machine(#[case] url: &str, #[case] name: &str, #[case] why: SameWhy) {
+        let studio = Studio::new();
+        let view = matched(&studio, &answering(contracted(BOOT), Ok(contracted(PROBED))), url, name).await;
+        assert_eq!(view, MatchView { found: same(&studio, why), checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn finds_it_by_the_boot_of_a_machine_probed_before() {
+        let studio = Studio::new();
+        let launcher = answering(contracted(PROBED), Ok(contracted(PROBED)));
+        probe(&studio.state, &launcher, studio.id).await.expect("probed");
+        let view = matched(&studio, &launcher, LAPTOP, "desk").await;
+        assert_eq!(view, MatchView { found: same(&studio, SameWhy::Boot), checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn finds_it_by_the_boot_of_the_active_machine() {
+        let studio = Studio::new();
+        let (active, _transport) = launcher(serving(&[snapshot(BOOT, 7, "first")]));
+        start(&studio.state, Recorder::default(), &active, studio.id).expect("connecting");
+        settle().await;
+        let view = matched(&studio, &answering(contracted(PROBED), Ok(contracted(BOOT))), LAPTOP, "desk").await;
+        assert_eq!(view, MatchView { found: same(&studio, SameWhy::Boot), checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn leaves_the_boot_out_when_the_url_does_not_answer() {
+        let studio = Studio::new();
+        let launcher = answering(contracted(PROBED), Err(asleep()));
+        probe(&studio.state, &launcher, studio.id).await.expect("probed");
+        let view = matched(&studio, &launcher, LAPTOP, "desk").await;
+        assert_eq!(view, MatchView { found: MatchFound::None, checked: false });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn finds_none_when_nothing_matches() {
+        let studio = Studio::new();
+        let view = matched(&studio, &answering(contracted(BOOT), Ok(contracted(PROBED))), LAPTOP, "desk").await;
+        assert_eq!(view, MatchView { found: MatchFound::None, checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn says_the_route_is_already_saved() {
+        let studio = Studio::new();
+        let view = matched(&studio, &answering(contracted(BOOT), Err(asleep())), BRIDGE, "desk").await;
+        assert_eq!(view, MatchView { found: MatchFound::AlreadySaved { machine: studio.id.0 }, checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn saves_nothing() {
+        let studio = Studio::new();
+        let before = list(&studio.state).expect("listed");
+        matched(&studio, &answering(contracted(BOOT), Ok(contracted(PROBED))), LAPTOP, "desk").await;
+        assert_eq!(list(&studio.reloaded()).expect("listed"), before);
+        assert_eq!(studio.state.seen_boots(), HashMap::new());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn refuses_a_url_that_is_not_a_route() {
+        let studio = Studio::new();
+        let launcher = answering(contracted(BOOT), Err(asleep()));
+        let result = matching(&studio.state, &launcher, "http://laptop.lan:9000/?token=eA", "desk").await;
+        assert_eq!(result.map_err(|error| error.code), Err(ErrorCode::RouteScheme));
+    }
+}
+
 mod the_boots_seen {
     use super::*;
 
@@ -175,6 +258,13 @@ mod over_ipc {
         let ipc = Ipc::new(studio.reloaded());
         let answer = ipc.invoke("machine_probe", json!({ "id": studio.id.0 }));
         assert_eq!(answer, Ok(json!({ "state": "no_token" })));
+    }
+
+    #[test]
+    fn refuses_to_match_a_url_without_a_token() {
+        let ipc = Ipc::new(Studio::new().state);
+        let answer = ipc.invoke("machine_match", json!({ "url": ADDRESS, "name": "desk" })).expect_err("no token");
+        assert_eq!(answer["code"], "route_no_token");
     }
 
     #[test]

@@ -13,6 +13,7 @@ export const commands = {
 	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
 	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),
 	machineProbe: (id: number) => typedError<ProbeView, CommandError>(__TAURI_INVOKE("machine_probe", { id })),
+	machineMatch: (url: string, name: string) => typedError<MatchView, CommandError>(__TAURI_INVOKE("machine_match", { url, name })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
@@ -114,6 +115,13 @@ export type MachineView_Serialize = {
 	last_route: string | null,
 };
 
+export type MatchFound = { kind: "none" } | { kind: "already_saved"; machine: number } | { kind: "same"; machine: number; name: string; why: SameWhy };
+
+export type MatchView = {
+	found: MatchFound,
+	checked: boolean,
+};
+
 export type Missing = Missing_Serialize | Missing_Deserialize;
 
 export type Missing_Deserialize = {
@@ -184,6 +192,8 @@ export type RouteFailure = {
 };
 
 export type RouteView = { kind: "bridge"; url: string; has_token: boolean };
+
+export type SameWhy = "address" | "token" | "boot" | "name";
 
 export type SessionChanged = SessionChanged_Serialize | SessionChanged_Deserialize;
 

@@ -84,7 +84,6 @@ impl AppState {
         self.boots.lock().unwrap_or_else(PoisonError::into_inner).insert(machine, boot);
     }
 
-    #[cfg(test)]
     pub(crate) fn seen_boots(&self) -> HashMap<MachineId, String> {
         let mut boots = self.boots.lock().unwrap_or_else(PoisonError::into_inner).clone();
         let active = self.active().as_ref().and_then(|active| Some((active.machine(), active.store().boot()?)));
