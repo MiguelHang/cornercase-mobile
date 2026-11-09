@@ -2,7 +2,7 @@
 
 A topic of [Connection](../connection.md): how the app shows the active machine's connection.
 
-- **Always in sight on `home`** (`src/lib/ui/ConnectionBar.svelte`), hidden on `no-machines`: fixed at the top across the safe area, on `--veil` with the glass blur and a `--border` line under it. Its height is measured and passed on, so `home` and the toasts start under it. A dot in the state's tone and one line of text, two while retrying, each cut with an ellipsis rather than wrapped, so the bar keeps its height. The text and tone come from `status` (`src/lib/connection.ts`), a pure function tested per state. Rejected: a toast per change, since the state lasts and a toast goes.
+- **Always in sight on `home`** (`src/lib/ui/ConnectionBar.svelte`), hidden on `no-machines`: fixed at the top across the safe area, on `--veil` with the glass blur and a `--border` line under it. Its height is measured and passed on, so `home` and the toasts start under it. A dot in the state's tone (`StatusDot`, which Machines' rows share), one line of text, two while retrying, each cut with an ellipsis rather than wrapped, so the bar keeps its height, and at its end the 44 px button to Machines (Look › Navigation). The text and tone come from `status` (`src/lib/connection.ts`), a pure function tested per state. Rejected: a toast per change, since the state lasts and a toast goes.
 - **Per state** (Store › States):
   - `connecting`: `Connecting…`, in `--working`. The dot and the cursor of the mark on `home` pulse, in this state only (Look › Touch and motion).
   - `connected`: `<machine> · via <host:port>`, in `--done`. The route is cut to its address, without `ws://`, the path or the token, so the bar never shows the secret; a route that does not parse loses its query. The machine's name comes from `machines_list`; while it has none (the list failed, or has not come back after `Add`), `via <host:port>` alone, with no separator hanging before it.
@@ -11,7 +11,7 @@ A topic of [Connection](../connection.md): how the app shows the active machine'
   - `unauthorized`: `The bridge rejected this phone's token: scan its code again in Machines`, in `--failed`. The bar offers no button, since `home` has no form: in Machines, the active machine's row offers `Scan again` while its token is rejected, which opens that machine with `Add route` open, and a route added at an address already saved replaces its token and reconnects. Pasting the URL in `Add machine` would offer `Update the token of <name>` too.
   - `incompatible`: `Incompatible: <message>`, in `--failed`.
   - `offline` (028): `No network`, in `--failed`, with no pulse and no countdown: the store waits for the network rather than retrying.
-  - `none` reads `Not connected`, though `home` does not show it: the route goes back to `no-machines`.
+  - `none` reads `Not connected`, though `home` does not show it: the route goes back to `no-machines`, or, with other machines left, Machines stays open without a connection.
 - **Checked on 2026-11-09** in the iPhone 17 simulator, iOS 27.2, against `cargo run -p cornercase-bridge` on the LAN and cornercase 0.13.19:
   - after `Add`, `Connecting…` for under half a second, then `MacBook · via 192.168.1.135:8765` and the pane count;
   - with the bridge stopped by `SIGSTOP`, a relaunch stayed in `connecting`, the dot and the cursor pulsing (their colours, read in screenshots, rose and fell), then went to `Retrying in 1 s` with `the bridge did not answer in time`;
