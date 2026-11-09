@@ -1,6 +1,7 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
+import type { AttachImage } from '../../lib/attach.svelte'
 import { Chat, timers, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
@@ -33,12 +34,14 @@ const unsent: SendText = () => new Promise(() => {})
 
 const unpressed: PressKey = () => new Promise(() => {})
 
+const unattached: AttachImage = () => new Promise(() => {})
+
 const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as const, data: null }) }
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const chatWith = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, still, timers)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers)
   if (row !== null) {
     chat.see(1, [row])
   }
