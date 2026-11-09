@@ -18,15 +18,23 @@ const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: ROUTES[
 
 const done = () => Promise.resolve({ status: 'ok' as const, data: null })
 
-const CALLS = { machineRename: done, machineRouteAdd: done, machineRouteRemove: done, machineRouteMove: done }
+const CALLS = {
+  machineRename: done,
+  machineRouteAdd: done,
+  machineRouteRemove: done,
+  machineRouteMove: done,
+  machineRemove: done,
+}
+
+const nothing = () => Promise.resolve()
 
 const screen = (
   machine = studio(),
   connection: ConnectionView_Serialize | null = CONNECTED,
-  edit = new EditMachine(CALLS, () => machine, () => Promise.resolve()),
+  edit = new EditMachine(CALLS, () => machine, nothing, nothing),
 ) =>
   render(Machine, {
-    props: { machine, taken: ['Desk'], connection, onback: () => {}, onchanged: () => Promise.resolve(), edit },
+    props: { machine, taken: ['Desk'], connection, onback: () => {}, onchanged: nothing, onremoved: nothing, edit },
   }).body
 
 const routes = (body: string) => body.split(/(?=<li class="route )/).slice(1)
@@ -53,7 +61,7 @@ describe('Machine', () => {
 
   it('tells a refused name under the field', async () => {
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, () => Promise.resolve())
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
     edit.name = 'desk'
     await edit.rename(['Desk'])
     expect(screen(machine, CONNECTED, edit)).toMatch(/<p class="error svelte-[\w-]+" id="[^"]+">another machine already has that name<\/p>/)
@@ -95,7 +103,7 @@ describe('Machine', () => {
     const machine = studio()
     const refused = () =>
       Promise.resolve({ status: 'error' as const, error: { code: 'store' as const, message: 'the disk is full' } })
-    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, () => Promise.resolve())
+    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, nothing, nothing)
     await edit.move(ROUTES[0], 'down')
     expect(screen(machine, CONNECTED, edit)).toMatch(
       /<\/ul>(?:<[^p][^>]*>|<!--[^>]*-->| )*<p class="problem svelte-[\w-]+" role="alert">the disk is full<\/p>/,
@@ -106,12 +114,32 @@ describe('Machine', () => {
     expect(screen()).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add route/)
     expect(screen()).not.toContain('Bridge URL')
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, () => Promise.resolve())
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
     edit.open()
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Add route<\/h2>/)
     expect(body).toContain('Scan QR code')
     expect(body).toContain('Bridge URL')
+  })
+
+  it('offers deleting the machine in the tone of danger', () => {
+    expect(screen()).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete machine/)
+    expect(screen()).not.toContain('Delete Studio?')
+  })
+
+  it('asks before deleting, with the name and what goes, instead of Add route', () => {
+    const machine = studio()
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    edit.askToDelete()
+    const body = screen(machine, CONNECTED, edit)
+    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)
+    expect(body).toContain(
+      'Its routes and their tokens are removed from this phone. The Mac and its bridge are not touched.',
+    )
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Cancel/)
+    expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)
+    expect(body).not.toContain('Add route')
+    expect(body).not.toContain('Delete machine')
   })
 })
 
@@ -136,8 +164,14 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => edit.open()}>Add route</Button>')
   })
 
-  it('reloads the machines after each change and goes back on Back', () => {
-    expect(script).toContain('() => machine, () => onchanged(),')
+  it('asks, cancels and deletes the machine', () => {
+    expect(script).toContain('onclick={() => edit.askToDelete()}>Delete machine</Button>')
+    expect(script).toContain('onclick={() => edit.keep()}>Cancel</Button>')
+    expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
+  })
+
+  it('reloads the machines after each change, leaves once deleted and goes back on Back', () => {
+    expect(script).toContain('() => machine, () => onchanged(), () => onremoved(),')
     expect(script).toContain('onclick={onback}')
   })
 })

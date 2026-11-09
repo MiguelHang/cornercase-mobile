@@ -14,10 +14,12 @@
     connection,
     onback,
     onchanged,
+    onremoved,
     edit = new EditMachine(
       commands,
       () => machine,
       () => onchanged(),
+      () => onremoved(),
     ),
   }: {
     machine: MachineView_Serialize
@@ -25,6 +27,7 @@
     connection: ConnectionView_Serialize | null
     onback: () => void
     onchanged: () => Promise<unknown>
+    onremoved: () => Promise<unknown>
     edit?: EditMachine
   } = $props()
 
@@ -107,7 +110,18 @@
   {#if edit.formError !== null}
     <p class="problem" role="alert">{edit.formError}</p>
   {/if}
-  {#if edit.adding}
+  {#if edit.deleting}
+    <Glass>
+      <div class="form">
+        <h2 class="heading">Delete {machine.name}?</h2>
+        <p class="lost">Its routes and their tokens are removed from this phone. The Mac and its bridge are not touched.</p>
+        <div class="buttons">
+          <Button tone="plain" resting={edit.busy} onclick={() => edit.keep()}>Cancel</Button>
+          <Button tone="danger" busy={edit.busy} onclick={() => void edit.deleteMachine()}>Delete</Button>
+        </div>
+      </div>
+    </Glass>
+  {:else if edit.adding}
     <Glass>
       <form class="form" onsubmit={addRoute}>
         <h2 class="heading">Add route</h2>
@@ -126,6 +140,7 @@
   {:else}
     <div class="actions">
       <Button resting={edit.busy} onclick={() => edit.open()}>Add route</Button>
+      <Button tone="danger" resting={edit.busy} onclick={() => edit.askToDelete()}>Delete machine</Button>
     </div>
   {/if}
 </section>
@@ -260,8 +275,15 @@
     font-size: 13px;
   }
 
+  .lost {
+    margin: 0;
+    color: var(--soft);
+    font-size: 14px;
+  }
+
   .actions {
     display: flex;
     justify-content: center;
+    gap: var(--gap);
   }
 </style>

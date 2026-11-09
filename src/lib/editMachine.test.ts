@@ -29,13 +29,15 @@ const calls = (overrides: Partial<EditCalls> = {}) => ({
   machineRouteAdd: vi.fn(overrides.machineRouteAdd ?? done),
   machineRouteRemove: vi.fn(overrides.machineRouteRemove ?? done),
   machineRouteMove: vi.fn(overrides.machineRouteMove ?? done),
+  machineRemove: vi.fn(overrides.machineRemove ?? done),
 })
 
 const editor = (overrides: Partial<EditCalls> = {}, machine = studio()) => {
   const commands = calls(overrides)
   const onchanged = vi.fn(() => Promise.resolve())
-  const edit = new EditMachine(commands, () => machine, onchanged)
-  return { edit, commands, onchanged }
+  const onremoved = vi.fn(() => Promise.resolve())
+  const edit = new EditMachine(commands, () => machine, onchanged, onremoved)
+  return { edit, commands, onchanged, onremoved }
 }
 
 describe('EditMachine renaming', () => {
@@ -189,5 +191,61 @@ describe('EditMachine adding a route', () => {
     edit.urlError = NO_TOKEN
     edit.close()
     expect([edit.adding, edit.url, edit.urlError]).toEqual([false, '', null])
+  })
+})
+
+describe('EditMachine deleting', () => {
+  it('deletes nothing until asked and confirmed', async () => {
+    const { edit, commands } = editor()
+    await edit.deleteMachine()
+    expect(commands.machineRemove).not.toHaveBeenCalled()
+    edit.askToDelete()
+    expect(edit.deleting).toBe(true)
+  })
+
+  it('deletes nothing when cancelled', async () => {
+    const { edit, commands } = editor()
+    edit.askToDelete()
+    edit.formError = 'the disk is full'
+    edit.keep()
+    await edit.deleteMachine()
+    expect([edit.deleting, edit.formError]).toEqual([false, null])
+    expect(commands.machineRemove).not.toHaveBeenCalled()
+  })
+
+  it('deletes the machine once confirmed, then leaves its screen', async () => {
+    const { edit, commands, onchanged, onremoved } = editor()
+    edit.askToDelete()
+    await edit.deleteMachine()
+    expect(commands.machineRemove.mock.calls).toEqual([[3]])
+    expect([onremoved.mock.calls.length, onchanged.mock.calls.length, edit.busy]).toEqual([1, 0, false])
+  })
+
+  it('tells a refused deletion under the routes, still asking', async () => {
+    const { edit, onremoved } = editor({
+      machineRemove: () => refused({ code: 'secrets', message: 'the keychain is locked' }),
+    })
+    edit.askToDelete()
+    await edit.deleteMachine()
+    expect([edit.formError, edit.deleting, edit.busy]).toEqual(['the keychain is locked', true, false])
+    expect(onremoved).not.toHaveBeenCalled()
+  })
+
+  it('neither asks nor cancels while a change runs', async () => {
+    const pending = gate()
+    const { edit } = editor({ machineRemove: () => pending.promise })
+    edit.askToDelete()
+    const deleting = edit.deleteMachine()
+    edit.keep()
+    expect(edit.deleting).toBe(true)
+    pending.open()
+    await deleting
+    const moved = gate()
+    const other = editor({ machineRouteMove: () => moved.promise })
+    const moving = other.edit.move(ROUTES[0], 'down')
+    other.edit.askToDelete()
+    expect(other.edit.deleting).toBe(false)
+    moved.open()
+    await moving
   })
 })

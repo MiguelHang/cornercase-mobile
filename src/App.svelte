@@ -20,7 +20,7 @@
   let current = $state(idle)
   let machines = $state<MachineView_Serialize[]>([])
   let barHeight = $state(0)
-  const router = new Router(routeFor(idle))
+  const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
 
   const home = $derived(router.current.name === 'home')
@@ -33,7 +33,7 @@
 
   const show = (next: Screen) => {
     current = next
-    router.setBase(routeFor(next))
+    router.setBase(routeFor(next, machines.length))
   }
 
   const remember = (listed: Listed) => {
@@ -46,6 +46,12 @@
   }
 
   const reload = () => commands.machinesList().then(remember).catch(toasts.failed)
+
+  const removed = async () => {
+    router.back()
+    await reload()
+    router.setBase(routeFor(current, machines.length))
+  }
 
   const join = latestWins(async (machine: number) => {
     show(connecting(machine))
@@ -113,6 +119,7 @@
       connection={editing.id === current.machine ? current.connection : null}
       onback={() => router.back()}
       onchanged={reload}
+      onremoved={removed}
     />
   {:else}
     <NoMachines onadded={added} />

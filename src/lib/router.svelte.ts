@@ -4,7 +4,8 @@ export type Route = { name: 'no-machines' } | { name: 'home' } | { name: 'machin
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
-export const routeFor = (screen: Screen): Base => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
+export const routeFor = (screen: Screen, known: number): Base =>
+  screen.machine === null && known === 0 ? { name: 'no-machines' } : { name: 'home' }
 
 export class Router {
   #stack: Route[] = $state([])

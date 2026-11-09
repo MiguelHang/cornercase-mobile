@@ -51,7 +51,10 @@ describe('App wiring', () => {
   const source = appSource.replace(/\s+/g, ' ')
 
   it('takes the base route from the screen on every change', () => {
-    expect(source).toContain('const show = (next: Screen) => { current = next router.setBase(routeFor(next)) }')
+    expect(source).toContain('const router = new Router(routeFor(idle, 0))')
+    expect(source).toContain(
+      'const show = (next: Screen) => { current = next router.setBase(routeFor(next, machines.length)) }',
+    )
     expect(source.match(/ current = (?!\$state)/g)).toHaveLength(1)
   })
 
@@ -88,8 +91,15 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} onremoved={removed} />',
     )
+  })
+
+  it('leaves a deleted machine for Machines, connecting no other, and for the empty screen after the last', () => {
+    expect(source).toContain(
+      'const removed = async () => { router.back() await reload() router.setBase(routeFor(current, machines.length)) }',
+    )
+    expect(source.match(/join\(/g)).toHaveLength(3)
   })
 
   it('listens before loading, and sends toasts and failures to the stack', () => {

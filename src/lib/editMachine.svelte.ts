@@ -4,7 +4,7 @@ import { checkName, checkUrl, type Field } from './machineForm'
 
 export type EditCalls = Pick<
   typeof commands,
-  'machineRename' | 'machineRouteAdd' | 'machineRouteRemove' | 'machineRouteMove'
+  'machineRename' | 'machineRouteAdd' | 'machineRouteRemove' | 'machineRouteMove' | 'machineRemove'
 >
 
 export class EditMachine {
@@ -14,15 +14,23 @@ export class EditMachine {
   urlError = $state<string | null>(null)
   formError = $state<string | null>(null)
   adding = $state(false)
+  deleting = $state(false)
   busy = $state(false)
   #calls: EditCalls
   #machine: () => MachineView_Serialize
   #onchanged: () => Promise<unknown>
+  #onremoved: () => Promise<unknown>
 
-  constructor(calls: EditCalls, machine: () => MachineView_Serialize, onchanged: () => Promise<unknown>) {
+  constructor(
+    calls: EditCalls,
+    machine: () => MachineView_Serialize,
+    onchanged: () => Promise<unknown>,
+    onremoved: () => Promise<unknown>,
+  ) {
     this.#calls = calls
     this.#machine = machine
     this.#onchanged = onchanged
+    this.#onremoved = onremoved
     this.name = machine().name
   }
 
@@ -87,7 +95,26 @@ export class EditMachine {
     }
   }
 
-  async #run(call: () => Promise<Answer<null>>, own: Field) {
+  askToDelete() {
+    if (!this.busy) {
+      this.deleting = true
+    }
+  }
+
+  keep() {
+    if (!this.busy) {
+      this.deleting = false
+      this.formError = null
+    }
+  }
+
+  async deleteMachine() {
+    if (this.deleting && !this.busy) {
+      await this.#run(() => this.#calls.machineRemove(this.#machine().id), 'form', this.#onremoved)
+    }
+  }
+
+  async #run(call: () => Promise<Answer<null>>, own: Field, after = this.#onchanged) {
     this.busy = true
     this.nameError = null
     this.urlError = null
@@ -95,7 +122,7 @@ export class EditMachine {
     const outcome = await send(call)
     if (outcome.kind === 'done') {
       try {
-        await this.#onchanged()
+        await after()
       } finally {
         this.busy = false
       }

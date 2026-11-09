@@ -77,6 +77,14 @@ describe('Router', () => {
     expect(router.current).toBe(base)
   })
 
+  it('keeps Machines on top when the active machine is removed and others remain', () => {
+    const router = new Router(HOME)
+    router.go(MACHINES)
+    const removed = connection.apply(connection.connecting(1), { machine: 1, connection: { state: 'none' } })
+    router.setBase(routeFor(removed, 1))
+    expect(router.current).toEqual(MACHINES)
+  })
+
   it('goes back one route at a time down to the base', () => {
     const router = new Router(HOME)
     router.go(MACHINES)
@@ -98,20 +106,26 @@ describe('Router', () => {
 
 describe('routeFor', () => {
   it('shows home with a machine', () => {
-    expect(routeFor(connection.screen({ machine: 1, connection: CONNECTED }, null))).toEqual(HOME)
+    expect(routeFor(connection.screen({ machine: 1, connection: CONNECTED }, null), 1)).toEqual(HOME)
   })
 
   it('shows home while connecting to a machine just added', () => {
-    expect(routeFor(connection.connecting(3))).toEqual(HOME)
+    expect(routeFor(connection.connecting(3), 0)).toEqual(HOME)
   })
 
   it('shows the empty screen without a machine', () => {
-    expect(routeFor(connection.screen({ machine: null, connection: { state: 'none' } }, null))).toEqual(NO_MACHINES)
+    expect(routeFor(connection.screen({ machine: null, connection: { state: 'none' } }, null), 0)).toEqual(NO_MACHINES)
   })
 
-  it('goes back to the empty screen once the active machine is removed', () => {
+  it('goes back to the empty screen once the last machine is removed', () => {
     const current = connection.screen({ machine: 1, connection: CONNECTED }, null)
     const removed = connection.apply(current, { machine: 1, connection: { state: 'none' } })
-    expect(routeFor(removed)).toEqual(NO_MACHINES)
+    expect(routeFor(removed, 0)).toEqual(NO_MACHINES)
+  })
+
+  it('stays home without a connection once the active machine is removed and others remain', () => {
+    const current = connection.screen({ machine: 1, connection: CONNECTED }, null)
+    const removed = connection.apply(current, { machine: 1, connection: { state: 'none' } })
+    expect(routeFor(removed, 2)).toEqual(HOME)
   })
 })
