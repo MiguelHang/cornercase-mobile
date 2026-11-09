@@ -29,6 +29,15 @@ body::before {
   pointer-events: none;
 }
 
+html.scanning,
+html.scanning body {
+  background: transparent;
+}
+
+html.scanning body::before {
+  display: none;
+}
+
 #app {
   position: relative;
 }

@@ -10,7 +10,7 @@
     onclick,
     children,
   }: {
-    tone?: 'primary' | 'plain'
+    tone?: 'primary' | 'plain' | 'danger'
     type?: 'button' | 'submit'
     resting?: boolean
     busy?: boolean
@@ -64,6 +64,12 @@
     color: var(--soft);
   }
 
+  .danger {
+    border: 1px solid color-mix(in srgb, var(--failed) 35%, transparent);
+    background: color-mix(in srgb, var(--failed) 10%, transparent);
+    color: var(--failed);
+  }
+
   .primary:not(.resting):active {
     background: var(--brand-hover);
   }
@@ -71,6 +77,11 @@
   .plain:not(.resting):active {
     border-color: var(--edge);
     background: var(--selected);
+  }
+
+  .danger:not(.resting):active {
+    border-color: color-mix(in srgb, var(--failed) 70%, transparent);
+    background: color-mix(in srgb, var(--failed) 18%, transparent);
   }
 
   .resting {
