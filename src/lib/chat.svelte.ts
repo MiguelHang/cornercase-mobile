@@ -19,6 +19,8 @@ export type Clock = { after: (ms: number, then: () => void) => () => void; now: 
 
 export const INTERRUPT_WINDOW_MS = 3000
 
+export const FOLLOW_MS = 10_000
+
 export const timers: Clock = {
   after: (ms, then) => {
     const timer = setTimeout(then, ms)
@@ -77,6 +79,29 @@ export const deliver = async (call: () => ReturnType<SendText>): Promise<string 
 export const touches = (changed: PaneStatusChanged, machine: number | null, pane: number) =>
   changed.machine === machine && (changed.pane === null || changed.pane === pane)
 
+export type Page = Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & {
+  visibilityState: DocumentVisibilityState
+}
+
+export const whileShown = (page: Page, start: () => () => void) => {
+  let stop: (() => void) | null = null
+  const look = () => {
+    const shown = page.visibilityState === 'visible'
+    if (shown && stop === null) {
+      stop = start()
+    } else if (!shown && stop !== null) {
+      stop()
+      stop = null
+    }
+  }
+  look()
+  page.addEventListener('visibilitychange', look)
+  return () => {
+    page.removeEventListener('visibilitychange', look)
+    stop?.()
+  }
+}
+
 export class Chat {
   readonly machine: number | null
   readonly pane: number
@@ -94,6 +119,8 @@ export class Chat {
   #haptics: HapticsApi
   #clock: Clock
   #cancelExpiry: () => void = () => {}
+  #cancelFollow: (() => void) | null = null
+  #following = false
   #asked = 0
   #busy = false
   #again = false
@@ -163,6 +190,7 @@ export class Chat {
     }
     this.#hear(row)
     this.row = row
+    this.#pace()
   }
 
   #hear(row: AgentRow | null) {
@@ -189,6 +217,28 @@ export class Chat {
         this.#show(kept(this.reading, answer))
       }
       this.#busy = this.#again
+    }
+  }
+
+  follow() {
+    this.#following = true
+    this.#pace()
+    return () => {
+      this.#following = false
+      this.#pace()
+    }
+  }
+
+  #pace() {
+    if (!this.#following || this.row?.status !== 'working') {
+      this.#cancelFollow?.()
+      this.#cancelFollow = null
+    } else if (this.#cancelFollow === null) {
+      this.#cancelFollow = this.#clock.after(FOLLOW_MS, () => {
+        this.#cancelFollow = null
+        void this.refresh()
+        this.#pace()
+      })
     }
   }
 

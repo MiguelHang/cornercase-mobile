@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
   import { elapsed, label, place, statusName } from '../../lib/board'
-  import type { Chat } from '../../lib/chat.svelte'
+  import { whileShown, type Chat } from '../../lib/chat.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
@@ -36,6 +37,11 @@
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), TICK_MS)
     return () => clearInterval(timer)
+  })
+
+  $effect(() => {
+    const followed = chat
+    return untrack(() => whileShown(document, () => followed.follow()))
   })
 
   const row = $derived(chat.row)

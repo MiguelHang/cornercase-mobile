@@ -1,7 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AttachImage } from './attach.svelte'
 import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
-import { Chat, deliver, INTERRUPT_WINDOW_MS, read, timers, touches, type PressKey, type ReadLast, type SendText } from './chat.svelte'
+import {
+  Chat,
+  deliver,
+  FOLLOW_MS,
+  INTERRUPT_WINDOW_MS,
+  read,
+  timers,
+  touches,
+  whileShown,
+  type Page,
+  type PressKey,
+  type ReadLast,
+  type SendText,
+} from './chat.svelte'
 import {
   MACHINE,
   PANE,
@@ -680,5 +693,175 @@ describe('timers', () => {
   it("tells the phone's time", () => {
     vi.useFakeTimers({ now: Date.parse('2026-11-09T21:30:00.000Z') })
     expect(timers.now()).toBe(Date.parse('2026-11-09T21:30:00.000Z'))
+  })
+})
+
+const followed = (status: string | null, readLast: ReadLast = vi.fn(noRead)) => {
+  const { clock, tick } = fakeClock()
+  const chat = seen({ readLast, clock }, status)
+  const stop = chat.follow()
+  return { chat, stop, tick, readLast }
+}
+
+describe('Chat, while it is followed', () => {
+  it('reads its last message again every 10 s while the agent works', async () => {
+    const { tick, readLast } = followed('working')
+    tick(FOLLOW_MS - 1)
+    expect(readLast).not.toHaveBeenCalled()
+    tick(1)
+    await settle()
+    tick(FOLLOW_MS)
+    await settle()
+    expect(readLast).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['waiting', 'done', 'shell', null])('reads nothing while the agent is %s', (status) => {
+    const { tick, readLast } = followed(status)
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('reads nothing while it is not followed', () => {
+    const readLast = vi.fn(noRead)
+    const { clock, tick } = fakeClock()
+    seen({ readLast, clock }, 'working')
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('keeps its pace when the same work is seen again', () => {
+    const { chat, tick, readLast } = followed('working')
+    tick(FOLLOW_MS / 2)
+    chat.see(MACHINE, [row(PANE, 'working')])
+    tick(FOLLOW_MS / 2)
+    expect(readLast).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops when the agent stops working, and starts again when it works again', async () => {
+    const { chat, tick, readLast } = followed('working')
+    tick(FOLLOW_MS)
+    await settle()
+    chat.see(MACHINE, [row(PANE, 'done')])
+    tick(FOLLOW_MS * 3)
+    expect(readLast).toHaveBeenCalledTimes(1)
+    chat.see(MACHINE, [row(PANE, 'working')])
+    tick(FOLLOW_MS)
+    expect(readLast).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops when it is told to', () => {
+    const { stop, tick, readLast } = followed('working')
+    stop()
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('stops when the agent is gone', () => {
+    const { chat, tick, readLast } = followed('working')
+    chat.see(MACHINE, [row(3, 'working')])
+    tick(FOLLOW_MS * 3)
+    expect(chat.gone).toBe(true)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('reads once more, not once per beat, behind a slow read', async () => {
+    const first = gate<ReturnType<typeof ok<LastMessage>>>()
+    const readLast = vi.fn<ReadLast>().mockReturnValueOnce(first.promise).mockResolvedValue(ok(message('second')))
+    const { chat, tick } = followed('working', readLast)
+    tick(FOLLOW_MS)
+    tick(FOLLOW_MS)
+    tick(FOLLOW_MS)
+    expect(readLast).toHaveBeenCalledTimes(1)
+    first.open(ok(message('first')))
+    await settle()
+    await settle()
+    expect(readLast).toHaveBeenCalledTimes(2)
+    expect(chat.reading).toEqual({ kind: 'message', message: message('second') })
+  })
+
+  it('keeps the message shown while it reads it again', async () => {
+    const later = gate<ReturnType<typeof ok<LastMessage>>>()
+    const readLast = vi.fn<ReadLast>().mockResolvedValueOnce(ok(message('Half'))).mockReturnValueOnce(later.promise)
+    const { chat, tick } = followed('working', readLast)
+    tick(FOLLOW_MS)
+    await settle()
+    tick(FOLLOW_MS)
+    await settle()
+    expect([readLast.mock.calls.length, chat.reading]).toEqual([2, { kind: 'message', message: message('Half') }])
+    later.open(ok(message('Half, and the rest')))
+    await settle()
+    expect(chat.reading).toEqual({ kind: 'message', message: message('Half, and the rest') })
+  })
+})
+
+class FakePage implements Page {
+  visibilityState: DocumentVisibilityState
+  #listeners = new Set<() => void>()
+
+  constructor(visibilityState: DocumentVisibilityState) {
+    this.visibilityState = visibilityState
+  }
+
+  addEventListener(name: string, listener: () => void) {
+    if (name === 'visibilitychange') this.#listeners.add(listener)
+  }
+
+  removeEventListener(name: string, listener: () => void) {
+    if (name === 'visibilitychange') this.#listeners.delete(listener)
+  }
+
+  turn(visibilityState: DocumentVisibilityState) {
+    this.visibilityState = visibilityState
+    for (const listener of this.#listeners) listener()
+  }
+
+  get listening() {
+    return this.#listeners.size
+  }
+}
+
+const watched = (visibilityState: DocumentVisibilityState) => {
+  const page = new FakePage(visibilityState)
+  const stop = vi.fn()
+  const start = vi.fn(() => stop)
+  const leave = whileShown(page, start)
+  return { page, start, stop, leave }
+}
+
+describe('whileShown', () => {
+  it('starts at once on a page that shows', () => {
+    const { start, stop } = watched('visible')
+    expect([start.mock.calls.length, stop.mock.calls.length]).toEqual([1, 0])
+  })
+
+  it('waits for a hidden page to show', () => {
+    const { page, start } = watched('hidden')
+    expect(start).not.toHaveBeenCalled()
+    page.turn('visible')
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops when the page hides and starts again when it shows', () => {
+    const { page, start, stop } = watched('visible')
+    page.turn('hidden')
+    page.turn('hidden')
+    expect(stop).toHaveBeenCalledTimes(1)
+    page.turn('visible')
+    page.turn('visible')
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops and stops listening when it is left', () => {
+    const { page, start, stop, leave } = watched('visible')
+    leave()
+    page.turn('hidden')
+    page.turn('visible')
+    expect([start.mock.calls.length, stop.mock.calls.length, page.listening]).toEqual([1, 1, 0])
+  })
+
+  it('stops nothing when it is left while the page is hidden', () => {
+    const { stop, leave } = watched('hidden')
+    leave()
+    expect(stop).not.toHaveBeenCalled()
   })
 })

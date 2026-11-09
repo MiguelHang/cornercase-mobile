@@ -118,6 +118,12 @@ describe('Agent, its message', () => {
   it('mutes the reason and the note', () => {
     expect(flat(agentSource)).toContain('.reason, .note { margin: 0; color: var(--muted); }')
   })
+
+  it('reads it again while the screen shows, and stops when it goes', () => {
+    expect(flat(agentSource)).toContain(
+      '$effect(() => { const followed = chat return untrack(() => whileShown(document, () => followed.follow())) })',
+    )
+  })
 })
 
 describe('Agent, its field', () => {
