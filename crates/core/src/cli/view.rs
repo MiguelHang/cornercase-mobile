@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use crate::cli::status::Snapshot;
+use crate::cli::surface::{Size, on_tab};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default)]
@@ -45,6 +46,12 @@ pub struct ViewLine {
     #[serde(flatten)]
     pub snapshot: Snapshot,
     pub view: ViewInfo,
+}
+
+pub fn argv(tab: u64, size: Size) -> Vec<String> {
+    let mut argv = vec!["view".to_owned()];
+    argv.extend(on_tab(tab, size));
+    argv
 }
 
 #[cfg(test)]

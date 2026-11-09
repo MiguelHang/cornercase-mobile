@@ -14,6 +14,7 @@ use crate::transport::{Out, OutSink, Stdin};
 
 const ARGV: [&str; 8] = ["surface", "--tab", "12", "--cols", "80", "--rows", "24", "--patches"];
 const SIZE: Size = Size { cols: 80, rows: 24 };
+const TAB_12: Source = Source::Tab { tab: 12, size: SIZE };
 
 struct Launched {
     fake: FakeTransport,
@@ -42,7 +43,7 @@ fn idle_queue() -> Queue {
 }
 
 fn live(fake: FakeTransport) -> Live {
-    Live::open(Arc::new(fake), idle_queue(), 12, SIZE)
+    Live::open(Arc::new(fake), idle_queue(), TAB_12)
 }
 
 fn printing(lines: &[&str]) -> Live {
@@ -116,10 +117,19 @@ mod open {
     #[tokio::test]
     async fn launches_only_the_surface_of_the_tab_at_its_size_with_patches() {
         let (transport, mut argv) = launched(FakeTransport::default().answer(&ARGV, &[], &[], 0));
-        let live = Live::open(transport, idle_queue(), 12, SIZE);
+        let live = Live::open(transport, idle_queue(), TAB_12);
         assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
         assert_eq!(argv.recv().await, Some(ARGV.join(" ")));
         assert!(argv.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn launches_the_surface_of_a_view_with_patches() {
+        let argv = ["surface", "--view", "41", "--patches"];
+        let (transport, mut launched) = launched(FakeTransport::default().answer(&argv, &[], &[], 0));
+        let live = Live::open(transport, idle_queue(), Source::View(41));
+        assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
+        assert_eq!(launched.recv().await, Some(argv.join(" ")));
     }
 
     #[tokio::test]
@@ -229,7 +239,7 @@ mod a_patch_on_another_base {
         let lines = [one_line(FRAME), on_another_base(), on_another_base(), one_line(PATCH), one_line(FRAME)];
         let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
         let fake = FakeTransport::default().answer(&ARGV, &lines, &[], 0);
-        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), TAB_12);
         assert_eq!(steps(live).await, [whole_frame(), whole_frame(), Step::Ended(Ended::Exited)]);
         assert_eq!(redraws.asked().await, 1);
     }
@@ -240,7 +250,7 @@ mod a_patch_on_another_base {
         let patch = || Said::Line(on_another_base());
         let said = vec![Said::Line(one_line(FRAME)), patch(), Said::After(1), patch(), exits()];
         let fake = FakeTransport::default().script(&ARGV, move |_, out| played(out, said.clone()));
-        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), TAB_12);
         assert_eq!(steps(live).await, [whole_frame(), Step::Ended(Ended::Exited)]);
         assert_eq!(redraws.asked().await, 1);
     }
@@ -252,7 +262,7 @@ mod a_patch_on_another_base {
         let said =
             vec![Said::Line(one_line(FRAME)), patch(), Said::After(1), patch(), Said::After(2), patch(), exits()];
         let fake = FakeTransport::default().script(&ARGV, move |_, out| played(out, said.clone()));
-        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), TAB_12);
         assert_eq!(steps(live).await, [whole_frame(), Step::Ended(Ended::Exited)]);
         assert_eq!(redraws.asked().await, 2);
     }

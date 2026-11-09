@@ -10,7 +10,7 @@ use tokio::time::{self, Instant};
 use super::grid::{Applied, Changes, Grid};
 use super::shown::{Shown, Update};
 use crate::cli::status::Snapshot;
-use crate::cli::surface::{Frame, Size};
+use crate::cli::surface::{Frame, Size, on_tab};
 use crate::error::Error;
 use crate::queue::Queue;
 use crate::store::{Connection, Store};
@@ -36,6 +36,12 @@ pub enum Step {
     Ended(Ended),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    Tab { tab: u64, size: Size },
+    View(u64),
+}
+
 pub struct Live {
     queue: Queue,
     grid: Grid,
@@ -47,9 +53,9 @@ pub struct Live {
 
 impl Live {
     #[must_use]
-    pub fn open(transport: Arc<dyn Transport>, queue: Queue, tab: u64, size: Size) -> Self {
+    pub fn open(transport: Arc<dyn Transport>, queue: Queue, source: Source) -> Self {
         let (out, lines) = listen(only_stdout);
-        let argv = surface(tab, size);
+        let argv = surface(source);
         let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
         Self { queue, grid: Grid::default(), redrawing: None, lines, run, ended: None }
     }
@@ -148,7 +154,8 @@ impl Terminal {
 
     async fn follow(self, store: &Store, reached: Reached, told: &mut Told<impl FnMut(Screen)>) {
         let used = reached.transport.clone();
-        let mut live = Live::open(reached.transport, reached.queue, self.tab, self.size);
+        let source = Source::Tab { tab: self.tab, size: self.size };
+        let mut live = Live::open(reached.transport, reached.queue, source);
         let mut moved = pin!(moved_on(store, &used));
         let mut shown = Shown::new(self.pane);
         loop {
@@ -246,9 +253,14 @@ fn holds(session: &Snapshot, tab: u64) -> bool {
     workspaces.flat_map(|workspace| &workspace.tabs).any(|open| open.id == tab)
 }
 
-fn surface(tab: u64, size: Size) -> Vec<String> {
-    let (tab, cols, rows) = (tab.to_string(), size.cols.to_string(), size.rows.to_string());
-    ["surface", "--tab", &tab, "--cols", &cols, "--rows", &rows, "--patches"].map(str::to_owned).to_vec()
+fn surface(source: Source) -> Vec<String> {
+    let mut argv = vec!["surface".to_owned()];
+    match source {
+        Source::Tab { tab, size } => argv.extend(on_tab(tab, size)),
+        Source::View(id) => argv.extend(["--view".to_owned(), id.to_string()]),
+    }
+    argv.push("--patches".to_owned());
+    argv
 }
 
 fn ended(end: End) -> Ended {
