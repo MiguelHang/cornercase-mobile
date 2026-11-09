@@ -15,6 +15,8 @@ use crate::transport::{Out, OutSink, Stdin};
 const ARGV: [&str; 8] = ["surface", "--tab", "12", "--cols", "80", "--rows", "24", "--patches"];
 const SIZE: Size = Size { cols: 80, rows: 24 };
 const TAB_12: Source = Source::Tab { tab: 12, size: SIZE };
+const VIEW_ARGV: [&str; 4] = ["surface", "--view", "41", "--patches"];
+const VIEW_41: Source = Source::View { view: 41, tab: 12 };
 
 struct Launched {
     fake: FakeTransport,
@@ -125,11 +127,10 @@ mod open {
 
     #[tokio::test]
     async fn launches_the_surface_of_a_view_with_patches() {
-        let argv = ["surface", "--view", "41", "--patches"];
-        let (transport, mut launched) = launched(FakeTransport::default().answer(&argv, &[], &[], 0));
-        let live = Live::open(transport, idle_queue(), Source::View(41));
+        let (transport, mut launched) = launched(FakeTransport::default().answer(&VIEW_ARGV, &[], &[], 0));
+        let live = Live::open(transport, idle_queue(), VIEW_41);
         assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
-        assert_eq!(launched.recv().await, Some(argv.join(" ")));
+        assert_eq!(launched.recv().await, Some(VIEW_ARGV.join(" ")));
     }
 
     #[tokio::test]
@@ -199,6 +200,55 @@ mod next {
     async fn says_how_the_stream_ended(#[case] end: End, #[case] ended: Ended) {
         let live = live(FakeTransport::default().script(&ARGV, move |_, _| future::ready(end.clone())));
         assert_eq!(steps(live).await, [Step::Ended(ended)]);
+    }
+}
+
+mod a_view {
+    use super::*;
+
+    fn of_view(json: &str, edit: impl FnOnce(&mut Value)) -> String {
+        let mut line: Value = serde_json::from_str(json).expect("a surface fixture");
+        line["view"] = Value::from(41);
+        edit(&mut line);
+        line.to_string()
+    }
+
+    fn at(json: &str, projection: u64) -> String {
+        of_view(json, |line| line["projection"] = Value::from(projection))
+    }
+
+    fn printing(lines: &[String]) -> Live {
+        let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
+        let fake = FakeTransport::default().answer(&VIEW_ARGV, &lines, &[], 0);
+        Live::open(Arc::new(fake), idle_queue(), VIEW_41)
+    }
+
+    #[rstest]
+    #[case::a_patch_of_another_view(PATCH, |line: &mut Value| line["view"] = Value::from(40))]
+    #[case::a_patch_of_another_tab(PATCH, |line: &mut Value| line["tab"] = Value::from(13))]
+    #[case::a_frame_without_a_view(FRAME, |line: &mut Value| line["view"] = Value::Null)]
+    #[case::a_frame_of_another_tab(FRAME, |line: &mut Value| line["tab"] = Value::from(13))]
+    #[tokio::test]
+    async fn does_not_apply_a_line_meant_for_another(#[case] json: &str, #[case] edit: fn(&mut Value)) {
+        let mut live = printing(&[of_view(FRAME, |_| {}), of_view(json, edit)]);
+        assert_eq!(live.next().await, whole_frame());
+        assert_eq!(live.next().await, Step::Ended(Ended::Exited));
+        assert_eq!((live.grid().tab, live.grid().revision), (12, 3));
+    }
+
+    #[tokio::test]
+    async fn hands_nothing_of_a_frame_older_than_the_projection_it_saw() {
+        let mut live = printing(&[at(FRAME, 2)]);
+        live.saw_projection(3);
+        assert_eq!(steps(live).await, [Step::Ended(Ended::Exited)]);
+    }
+
+    #[tokio::test]
+    async fn hands_the_first_complete_frame_after_the_projection_rose_as_replaced() {
+        let mut live = printing(&[at(FRAME, 2), at(&without_copy(), 2), at(FRAME, 3)]);
+        assert_eq!(live.next().await, whole_frame());
+        live.saw_projection(3);
+        assert_eq!(steps(live).await, [whole_frame(), Step::Ended(Ended::Exited)]);
     }
 }
 

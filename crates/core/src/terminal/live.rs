@@ -39,10 +39,20 @@ pub enum Step {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
     Tab { tab: u64, size: Size },
-    View(u64),
+    View { view: u64, tab: u64 },
+}
+
+impl Source {
+    fn shows(self, frame: &Frame) -> bool {
+        match self {
+            Self::Tab { .. } => true,
+            Self::View { view, tab } => frame.view == Some(view) && frame.tab == tab,
+        }
+    }
 }
 
 pub struct Live {
+    source: Source,
     queue: Queue,
     grid: Grid,
     redrawing: Option<Instant>,
@@ -57,12 +67,16 @@ impl Live {
         let (out, lines) = listen(only_stdout);
         let argv = surface(source);
         let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
-        Self { queue, grid: Grid::default(), redrawing: None, lines, run, ended: None }
+        Self { source, queue, grid: Grid::default(), redrawing: None, lines, run, ended: None }
     }
 
     #[must_use]
     pub fn grid(&self) -> &Grid {
         &self.grid
+    }
+
+    pub fn saw_projection(&mut self, projection: u64) {
+        self.grid.saw_projection(projection);
     }
 
     pub async fn next(&mut self) -> Step {
@@ -97,6 +111,9 @@ impl Live {
             Ok(frame) => frame,
             Err(error) => return Some(Step::Warned(json_error(&error))),
         };
+        if !self.source.shows(&frame) {
+            return None;
+        }
         let surface = frame.surface;
         if frame.base.is_some() && self.still_redrawing(surface) {
             return None;
@@ -106,7 +123,8 @@ impl Live {
             return None;
         }
         self.redrawing = None;
-        Some(Step::Changed(self.grid.changed_rows()))
+        let changes = self.grid.changed_rows();
+        self.grid.is_current().then_some(Step::Changed(changes))
     }
 
     fn still_redrawing(&mut self, surface: u64) -> bool {
@@ -257,7 +275,7 @@ fn surface(source: Source) -> Vec<String> {
     let mut argv = vec!["surface".to_owned()];
     match source {
         Source::Tab { tab, size } => argv.extend(on_tab(tab, size)),
-        Source::View(id) => argv.extend(["--view".to_owned(), id.to_string()]),
+        Source::View { view, .. } => argv.extend(["--view".to_owned(), view.to_string()]),
     }
     argv.push("--patches".to_owned());
     argv
