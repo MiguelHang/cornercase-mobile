@@ -4,6 +4,8 @@ import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '.
 import { Chat, timers, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
+import KeyRow from './KeyRow.svelte'
+import keyRowSource from './KeyRow.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
@@ -47,7 +49,7 @@ const chatWith = (row: AgentRow | null, draft = '') => {
 const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED) =>
   render(Agent, { props: { chat, connection, below, onback: () => {}, onfailed: () => {}, onterminal: () => {} } }).body
 
-const send = (body: string) => body.match(/<button class="([^"]*)" type="button"([^>]*)>(?:<!--[^>]*-->|\s|<span[^>]*>.*?<\/span>)*Send/)
+const send = (body: string) => body.match(/<button class="([^"]*)" type="button"([^>]*)>(?:<!--[^>]*-->|\s|<span class="spinner[^>]*>.*?<\/span>)*Send/)
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
 
@@ -195,5 +197,91 @@ describe('Agent, without its row', () => {
     gone.see(1, [{ ...ROW, pane: 30 }])
     expect(draw(chatWith(null))).not.toMatch(TERMINAL)
     expect(draw(gone)).not.toMatch(TERMINAL)
+  })
+})
+
+const keys = (chat: Chat, digits = false) =>
+  render(KeyRow, { props: { chat, digits, onfailed: () => {} } }).body
+
+const group = (body: string, name: string) =>
+  body.match(new RegExp(`<div class="row svelte-[\\w-]+" role="group" aria-label="${name}">(.*?)</div>`))?.[1] ?? ''
+
+const labels = (markup: string) => [...markup.matchAll(/<button [^>]*aria-label="([^"]+)"/g)].map((found) => found[1])
+
+const key = (body: string, name: string) =>
+  body.match(new RegExp(`<button class="([^"]*)" type="button" aria-label="${name}"[^>]*>(.*?)</button>`))
+
+describe('Agent, its keys', () => {
+  it('shows every key in the composer, above the field, named for every reader', () => {
+    const body = draw(chatWith({ ...ROW, status: 'done' }))
+    expect(labels(group(body, 'Keys'))).toEqual(['Escape', 'Tab', 'Up', 'Down', 'Left', 'Right', 'Enter', 'Ctrl-C', 'Digits'])
+    expect(body.indexOf('aria-label="Keys"')).toBeLessThan(body.indexOf('<textarea'))
+    expect(flat(agentSource)).toContain('{/if} <KeyRow {chat} {onfailed} /> <div class="fields">')
+  })
+
+  it('offers the keys while the agent is asking, when the field cannot send', () => {
+    expect(labels(group(draw(chatWith(ROW)), 'Keys'))).toHaveLength(9)
+  })
+
+  it('has no keys without its agent, nor once it is gone', () => {
+    const gone = chatWith(ROW)
+    gone.see(1, [{ ...ROW, pane: 30 }])
+    expect(draw(chatWith(null))).not.toContain('aria-label="Keys"')
+    expect(draw(gone)).not.toContain('aria-label="Keys"')
+  })
+
+  it.each<[string, string]>([
+    ['Escape', 'Esc'],
+    ['Tab', 'Tab'],
+    ['Enter', 'Enter'],
+    ['Ctrl-C', '<span aria-live="polite">Ctrl-C</span>'],
+  ])('labels %s with its short name', (name, text) => {
+    const found = key(keys(chatWith(ROW)), name)
+    expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact$/)
+    expect(found?.[2]).toContain(text)
+  })
+
+  it.each(['Up', 'Down', 'Left', 'Right'])('draws %s as an arrow', (name) => {
+    const drawn = key(keys(chatWith(ROW)), name)?.[2] ?? ''
+    expect(drawn).toContain('<svg')
+    expect(drawn).not.toMatch(/[↑↓←→]/)
+  })
+
+  it('presses the key of each button and hands the reason of a failure over, to be told', () => {
+    expect(keyRowSource.match(/onclick=\{\(\) => void press\(key\.key\)\}/g)).toHaveLength(2)
+    expect(flat(keyRowSource)).toContain(
+      'const press = async (key: KeyName) => { const failed = await chat.press(key) if (failed !== null) { onfailed(failed) } }',
+    )
+  })
+
+  it('keeps the digits folded until their button opens them', () => {
+    const body = keys(chatWith(ROW))
+    expect(key(body, 'Digits')?.[0]).toContain('aria-expanded="false"')
+    expect(body).not.toContain('aria-label="1"')
+  })
+
+  it('opens the digits from 1 to 0 above the keys', () => {
+    const body = keys(chatWith(ROW), true)
+    expect(key(body, 'Digits')?.[0]).toContain('aria-expanded="true"')
+    expect(labels(group(body, 'Digits'))).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'])
+    expect(body.indexOf('aria-label="Digits"')).toBeLessThan(body.indexOf('aria-label="Keys"'))
+  })
+
+  it('folds the digits only from their button, so they stay open after one is pressed', () => {
+    expect(keyRowSource.match(/digits = (?!false,)/g)).toEqual(['digits = '])
+    expect(keyRowSource).toContain('expanded={digits} onclick={() => (digits = !digits)}>0–9</Button>')
+  })
+
+  it('asks for a second tap in the danger tone once Ctrl-C is armed, and says it aloud', () => {
+    const chat = chatWith(ROW)
+    void chat.press('ctrl+c')
+    const found = key(keys(chat), 'Tap again to interrupt')
+    expect(found?.[1]).toMatch(/^button danger svelte-[\w-]+ compact$/)
+    expect(found?.[2]).toContain('<span aria-live="polite">Tap again to interrupt</span>')
+    expect(keys(chat)).not.toContain('aria-label="Ctrl-C"')
+  })
+
+  it('wraps the keys onto more lines rather than scroll sideways', () => {
+    expect(flat(keyRowSource)).toContain('.row { display: flex; flex-wrap: wrap; gap: var(--gap); }')
   })
 })

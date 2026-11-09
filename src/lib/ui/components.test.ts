@@ -100,6 +100,20 @@ describe('Button', () => {
     expect(buttonSource).toMatch(/\.resting \{\s*opacity: 0\.4;\s*pointer-events: none;\s*\}/)
   })
 
+  it('names itself and says whether what it opens is open', () => {
+    const named = (expanded?: boolean) =>
+      render(Button, { props: { tone: 'plain', label: 'Digits', expanded, children: html('0–9') } }).body
+    expect(named()).toMatch(/<button class="button plain svelte-[\w-]+" type="button" aria-label="Digits">/)
+    expect(named(false)).toContain('aria-label="Digits" aria-expanded="false">')
+    expect(named(true)).toContain('aria-label="Digits" aria-expanded="true">')
+  })
+
+  it('narrows to a square of 44 px when compact', () => {
+    const body = render(Button, { props: { tone: 'plain', compact: true, children: html('Esc') } }).body
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+ compact" type="button">/)
+    expect(flat(buttonSource)).toContain('.compact { min-width: 44px; padding: 0 var(--inset); }')
+  })
+
   it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
     expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
