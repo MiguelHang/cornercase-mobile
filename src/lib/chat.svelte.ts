@@ -7,7 +7,7 @@ import type {
 import { Attachments, type AttachImage, type Chip } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import type { KeyName } from './keys'
-import { messageOf } from './toasts'
+import { deliver, messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
 
@@ -66,15 +66,6 @@ const kept = (shown: Reading, answer: Answer): Reading => {
 
 const news = (shown: Reading, next: Reading) =>
   next.kind === 'message' && (shown.kind !== 'message' || shown.message.text !== next.message.text)
-
-export const deliver = async (call: () => ReturnType<SendText>): Promise<string | null> => {
-  try {
-    const sent = await call()
-    return sent.status === 'ok' ? null : sent.error.message
-  } catch (error) {
-    return messageOf(error)
-  }
-}
 
 export const touches = (changed: PaneStatusChanged, machine: number | null, pane: number) =>
   changed.machine === machine && (changed.pane === null || changed.pane === pane)

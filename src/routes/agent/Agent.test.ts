@@ -38,6 +38,8 @@ const unread: ReadLast = () => new Promise(() => {})
 
 const TERMINAL = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Terminal/
 
+const CHANGES = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Changes/
+
 const unsent: SendText = () => new Promise(() => {})
 
 const unpressed: PressKey = () => new Promise(() => {})
@@ -59,7 +61,7 @@ const chatWith = (row: AgentRow | null, draft = '') => {
 
 const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED, starting: string | null = null) =>
   render(Agent, {
-    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {} },
+    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {}, onchanges: () => {} },
   }).body
 
 const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
@@ -139,7 +141,7 @@ describe('Agent, its sticky header', () => {
     const source = flat(chatHeaderSource)
     expect(source).toContain('min-width: 0; min-height: 44px; visibility: hidden; opacity: 0;')
     expect(source).toContain('.compact .short { visibility: visible; opacity: 1; }')
-    expect(source.match(/<Button tone="plain" onclick=/g)).toHaveLength(2)
+    expect(source.match(/<Button tone="plain" onclick=/g)).toHaveLength(3)
   })
 
   it('changes without animation under Reduce Motion', () => {
@@ -292,17 +294,28 @@ describe('Agent, without its row', () => {
     expect(draw(chatWith(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
   })
 
-  it('offers opening the terminal of its agent, beside going back', () => {
+  it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} /> <Thread {chat} {now} />')
-    expect(flat(chatHeaderSource)).toContain('<Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button>')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} {onchanges} /> <Thread {chat} {now} />')
+    expect(flat(chatHeaderSource)).toContain(
+      '<Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button> <Button tone="plain" onclick={() => onchanges(row.workspace, row.workspace_name)}>Changes</Button> </div>',
+    )
   })
 
-  it('offers no terminal without its agent, nor once it is gone', () => {
+  it("offers the changes of its agent's workspace, beside its terminal", () => {
+    const body = draw(chatWith(ROW))
+    expect(body).toMatch(CHANGES)
+    expect(body.search(CHANGES)).toBeGreaterThan(body.search(TERMINAL))
+  })
+
+  it.each([
+    ['terminal', TERMINAL],
+    ['changes', CHANGES],
+  ])('offers no %s without its agent, nor once it is gone', (_, button) => {
     const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])
-    expect(draw(chatWith(null))).not.toMatch(TERMINAL)
-    expect(draw(gone)).not.toMatch(TERMINAL)
+    expect(draw(chatWith(null))).not.toMatch(button)
+    expect(draw(gone)).not.toMatch(button)
   })
 })
 

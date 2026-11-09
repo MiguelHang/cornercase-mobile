@@ -3,7 +3,6 @@ import type { AttachImage } from './attach.svelte'
 import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
 import {
   Chat,
-  deliver,
   FOLLOW_MS,
   INTERRUPT_WINDOW_MS,
   read,
@@ -66,16 +65,6 @@ describe('read', () => {
     const readLast = vi.fn(noRead)
     await read(readLast, PANE)
     expect(readLast.mock.calls).toEqual([[PANE]])
-  })
-})
-
-describe('deliver', () => {
-  it.each<[string, SendText, string | null]>([
-    ['nothing once sent', sentOk, null],
-    ['the reason of a refusal', () => Promise.resolve(refused('the agent is asking a question')), 'the agent is asking a question'],
-    ['the message of a rejected call', () => Promise.reject(new Error('no window')), 'no window'],
-  ])('gives %s', async (_, sendText, failed) => {
-    expect(await deliver(() => sendText(PANE, 'hi', false))).toBe(failed)
   })
 })
 

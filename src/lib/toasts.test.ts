@@ -91,6 +91,20 @@ describe('messageOf', () => {
   })
 })
 
+describe('deliver', () => {
+  it.each<[string, () => ReturnType<Parameters<typeof toasts.deliver>[0]>, string | null]>([
+    ['nothing once sent', () => Promise.resolve({ status: 'ok' }), null],
+    [
+      'the reason of a refusal',
+      () => Promise.resolve({ status: 'error', error: { message: 'the agent is asking a question' } }),
+      'the agent is asking a question',
+    ],
+    ['the message of a rejected call', () => Promise.reject(new Error('no window')), 'no window'],
+  ])('gives %s', async (_, call, failed) => {
+    expect(await toasts.deliver(call)).toBe(failed)
+  })
+})
+
 describe('Toasts', () => {
   beforeEach(() => {
     vi.useFakeTimers()

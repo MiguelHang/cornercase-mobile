@@ -1,18 +1,10 @@
-use std::sync::mpsc::{self, Receiver, Sender};
-
 use cornercase_core::error::Error;
-use cornercase_core::queue::Outcome;
-use cornercase_core::transport::fake::FakeTransport;
-use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin};
-use futures_util::stream::BoxStream;
-use futures_util::{SinkExt, StreamExt};
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::{answered, press_key, send_message};
-use crate::commands::connection::start;
+use super::{press_key, send_message};
 use crate::commands::error::CommandError;
-use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle, snapshot};
+use crate::test_util::{Ipc, Studio, connected_with, queueing, written};
 
 const READ: &[&str] = &["read", "--last-message", "--pane", "543", "--json"];
 const TURN_OVER: &str = include_str!(concat!(
@@ -20,18 +12,8 @@ const TURN_OVER: &str = include_str!(concat!(
     "/../crates/core/tests/fixtures/control/last-message/0.13.19/turn-over.json"
 ));
 const NO_PANE: &str = "Error: there is no pane 543; `cornercase status` lists them";
-const REQUESTS: &[&str] = &["requests", "--follow", "-"];
 const SEND: [&str; 7] = ["send", "--pane", "543", "--enter", "--timeout", "30", "-"];
 const FORCED: [&str; 8] = ["send", "--pane", "543", "--force", "--enter", "--timeout", "30", "-"];
-
-pub(super) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {
-    let studio = Studio::new();
-    let state = studio.reloaded();
-    let (launcher, _) = launcher(scripted(serving(&[snapshot(BOOT, 7, "first")])));
-    start(&state, Recorder::default(), &launcher, studio.id).expect("connecting");
-    settle().await;
-    Ipc::new(state)
-}
 
 mod reading_the_last_message {
     use super::*;
@@ -67,34 +49,6 @@ mod reading_the_last_message {
         let refused = ipc.invoke("last_message", json!({ "pane": 543 })).expect_err("the read dropped");
         assert_eq!(refused, json!({ "code": "dropped", "message": Error::Dropped.to_string() }));
     }
-}
-
-fn requests(fake: FakeTransport, answer: Option<Value>, lines: &Sender<String>) -> FakeTransport {
-    let lines = lines.clone();
-    fake.script(REQUESTS, move |stdin, out| answer_lines(lines.clone(), answer.clone(), stdin, out))
-}
-
-async fn answer_lines(
-    lines: Sender<String>,
-    answer: Option<Value>,
-    mut stdin: BoxStream<'static, Stdin>,
-    mut out: OutSink,
-) -> Result<Exit, Error> {
-    while let Some(Stdin::Text(line)) = stdin.next().await {
-        lines.send(line).expect("the test reads the lines");
-        let Some(answer) = &answer else { break };
-        out.send(Out::Stdout(answer.to_string())).await.map_err(|Closed| Error::OutputClosed)?;
-    }
-    Ok(Exit { code: 0, stderr: String::new() })
-}
-
-async fn queueing(answer: Option<Value>) -> (Ipc, Receiver<String>) {
-    let (lines, written) = mpsc::channel();
-    (connected_with(|fake| requests(fake, answer, &lines)).await, written)
-}
-
-fn written(lines: &Receiver<String>) -> Vec<Value> {
-    lines.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect()
 }
 
 async fn sending(answer: Option<Value>, text: &str, force: bool) -> (Result<(), Value>, Vec<Value>) {
@@ -162,18 +116,6 @@ mod sending_a_message {
         let (sent, written) = sending(None, "fix the failing test", false).await;
         assert_eq!(written.len(), 1);
         assert_eq!(sent, Err(json_of(&CommandError::maybe_sent())));
-    }
-
-    #[rstest]
-    #[case::done(Ok(Outcome::Done("printed".to_owned())), Ok("printed".to_owned()))]
-    #[case::skipped(Ok(Outcome::Skipped), Err(CommandError::not_sent()))]
-    #[case::unanswered(Err(Error::Unanswered), Err(CommandError::maybe_sent()))]
-    #[case::dropped(Err(Error::Dropped), Err(CommandError::from(Error::Dropped)))]
-    fn maps_what_the_queue_answered(
-        #[case] outcome: Result<Outcome, Error>,
-        #[case] mapped: Result<String, CommandError>,
-    ) {
-        assert_eq!(answered(outcome), mapped);
     }
 }
 

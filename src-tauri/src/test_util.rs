@@ -1,13 +1,17 @@
-use std::sync::mpsc::{self, Receiver};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use cornercase_bridge::test_util::TempDir;
+use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
-use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
+use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
+use futures_util::stream::BoxStream;
+use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
 use tauri::async_runtime::JoinHandle;
 use tauri::http::HeaderMap;
@@ -18,9 +22,11 @@ use tauri::{App, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuil
 use tokio::time;
 
 use crate::bindings;
-use crate::commands::connection::Launcher;
+use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::CommandError;
-use crate::events::{AgentsChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast};
+use crate::events::{
+    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast,
+};
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
 use crate::view::ConnectionView;
@@ -33,6 +39,7 @@ pub(crate) const CONTRACT: &[&str] = &["contract", "--json"];
 pub(crate) const EVENTS: &[&str] = &["events", "--json", "--notices"];
 pub(crate) const STATUS: &[&str] = &["status", "--follow", "--json"];
 pub(crate) const APP: &[&str] = &["status", "--app", "--follow", "--json"];
+const REQUESTS: &[&str] = &["requests", "--follow", "-"];
 const REAL_CONTRACT: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/contract/0.13.19.json"));
 
@@ -75,6 +82,13 @@ impl Recorder {
         self.all()
             .into_iter()
             .filter_map(|event| if let Emitted::Terminal(it) = event { Some(it) } else { None })
+            .collect()
+    }
+
+    pub(crate) fn changes(&self) -> Vec<ChangesChanged> {
+        self.all()
+            .into_iter()
+            .filter_map(|event| if let Emitted::Changes(it) = event { Some(it) } else { None })
             .collect()
     }
 
@@ -196,9 +210,85 @@ pub(crate) async fn released<T>(held: &Arc<T>) {
 pub(crate) fn launcher(fake: FakeTransport) -> (Launcher, Arc<FakeTransport>) {
     let transport = Arc::new(fake);
     let held = Arc::clone(&transport);
-    let launcher = Launcher::new(
-        move |_: &Route| Ok(Arc::clone(&held) as Arc<dyn Transport>),
-        |task| JoinHandle::Tokio(tokio::spawn(task)),
-    );
+    let launcher = Launcher::new(move |_: &Route| Ok(Arc::clone(&held) as Arc<dyn Transport>), spawned);
     (launcher, transport)
+}
+
+pub(crate) fn spawned(task: Task) -> JoinHandle<()> {
+    JoinHandle::Tokio(tokio::spawn(task))
+}
+
+pub(crate) fn connected_to(fake: FakeTransport) -> Studio {
+    let studio = Studio::new();
+    let (launcher, _) = launcher(fake);
+    start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connected");
+    studio
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct Streams(Arc<AtomicUsize>);
+
+struct Running(Arc<AtomicUsize>);
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+impl Streams {
+    pub(crate) fn running(&self) -> usize {
+        self.0.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn on(&self, fake: FakeTransport, argv: &[&str], lines: &[&str]) -> FakeTransport {
+        let printing = Arc::new(FakeTransport::default().open(argv, lines));
+        let owned: Vec<String> = argv.iter().map(|word| (*word).to_owned()).collect();
+        let count = Arc::clone(&self.0);
+        fake.script(argv, move |stdin, out| {
+            count.fetch_add(1, Ordering::SeqCst);
+            let running = Running(Arc::clone(&count));
+            let (printing, argv) = (Arc::clone(&printing), owned.clone());
+            async move {
+                let _running = running;
+                printing.run(argv, stdin, out).await
+            }
+        })
+    }
+}
+
+pub(crate) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {
+    let studio = Studio::new();
+    let state = studio.reloaded();
+    let (launcher, _) = launcher(scripted(serving(&[snapshot(BOOT, 7, "first")])));
+    start(&state, Recorder::default(), &launcher, studio.id).expect("connecting");
+    settle().await;
+    Ipc::new(state)
+}
+fn requests(fake: FakeTransport, answer: Option<Value>, lines: &Sender<String>) -> FakeTransport {
+    let lines = lines.clone();
+    fake.script(REQUESTS, move |stdin, out| answer_lines(lines.clone(), answer.clone(), stdin, out))
+}
+
+async fn answer_lines(
+    lines: Sender<String>,
+    answer: Option<Value>,
+    mut stdin: BoxStream<'static, Stdin>,
+    mut out: OutSink,
+) -> Result<Exit, Error> {
+    while let Some(Stdin::Text(line)) = stdin.next().await {
+        lines.send(line).expect("the test reads the lines");
+        let Some(answer) = &answer else { break };
+        out.send(Out::Stdout(answer.to_string())).await.map_err(|Closed| Error::OutputClosed)?;
+    }
+    Ok(Exit { code: 0, stderr: String::new() })
+}
+
+pub(crate) async fn queueing(answer: Option<Value>) -> (Ipc, Receiver<String>) {
+    let (lines, written) = mpsc::channel();
+    (connected_with(|fake| requests(fake, answer, &lines)).await, written)
+}
+
+pub(crate) fn written(lines: &Receiver<String>) -> Vec<Value> {
+    lines.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect()
 }

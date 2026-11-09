@@ -7,8 +7,8 @@ use tauri::async_runtime;
 use tauri::{AppHandle, Manager, Runtime, State};
 use tauri_plugin_photos::Photos;
 
-use super::{asked, queue};
 use crate::commands::error::CommandError;
+use crate::commands::reach::{asked, queue};
 use crate::state::AppState;
 
 struct Image {

@@ -4,8 +4,9 @@ use std::time::Duration;
 use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::Store;
-use cornercase_core::terminal::live::{Screen, Terminal};
+use cornercase_core::terminal::live::{Screen, Terminal, Unfitted};
 use cornercase_core::terminal::shown::Update;
+use serde::Deserialize;
 use tauri::async_runtime::{self, JoinHandle};
 use tauri::{AppHandle, Runtime, State};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
@@ -13,12 +14,19 @@ use tokio::time;
 
 use crate::commands::connection::Task;
 use crate::commands::error::CommandError;
-use crate::events::{Emit, Emitted, TerminalChanged, warned};
+use crate::events::{Emit, Emitted, TerminalChanged, Toast, warned};
 use crate::state::AppState;
 
 pub(crate) mod input;
 
 const FRAME: Duration = Duration::from_millis(16);
+const TAKEN_BACK: &str = "The Mac took this tab back";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
+pub(crate) struct Shape {
+    pub(crate) size: Size,
+    pub(crate) fit: bool,
+}
 
 #[tauri::command(async)]
 #[specta::specta]
@@ -28,9 +36,9 @@ pub(crate) fn terminal_open<R: Runtime>(
     state: State<'_, AppState>,
     tab: u64,
     pane: Option<u64>,
-    size: Size,
+    shape: Shape,
 ) -> Result<(), CommandError> {
-    open(&state, app, async_runtime::spawn, Terminal { tab, pane, size })
+    open(&state, app, async_runtime::spawn, Terminal { tab, pane, size: shape.size, fit: shape.fit })
 }
 
 #[tauri::command]
@@ -97,6 +105,7 @@ impl Batch {
             Screen::Update(update) => self.join(update),
             Screen::Failed(error) => self.told.push(warned(&error)),
             Screen::Closed => self.held().closed = true,
+            Screen::Fit(unfitted) => self.unfit(unfitted),
         }
     }
 
@@ -119,6 +128,14 @@ impl Batch {
         held.modes = update.modes;
     }
 
+    fn unfit(&mut self, unfitted: Unfitted) {
+        self.held().unfitted = true;
+        self.told.push(match unfitted {
+            Unfitted::TakenBack => Emitted::Toast(Toast::info(TAKEN_BACK)),
+            Unfitted::Refused(error) => warned(&error),
+        });
+    }
+
     fn held(&mut self) -> &mut TerminalChanged {
         let (machine, tab) = (self.machine.0, self.tab);
         self.pending.get_or_insert_with(|| TerminalChanged {
@@ -132,6 +149,7 @@ impl Batch {
             replaced: false,
             rows: BTreeMap::new(),
             closed: false,
+            unfitted: false,
         })
     }
 }

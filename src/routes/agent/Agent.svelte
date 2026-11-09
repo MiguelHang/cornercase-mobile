@@ -21,6 +21,7 @@
     onback,
     onfailed,
     onterminal,
+    onchanges,
   }: {
     chat: Chat
     connection: ConnectionView_Serialize
@@ -29,6 +30,7 @@
     onback: () => void
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
+    onchanges: (workspace: number, title: string) => void
   } = $props()
 
   let now = $state(untrack(() => chat.now()))
@@ -72,7 +74,7 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} {below} {onback} {onterminal} />
+    <ChatHeader {row} {below} {onback} {onterminal} {onchanges} />
     <Thread {chat} {now} />
     <div class="composer">
       {#if chat.asking}

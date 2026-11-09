@@ -10,11 +10,13 @@
     below = 0,
     onback,
     onterminal,
+    onchanges,
   }: {
     row: AgentRow
     below?: number
     onback: () => void
     onterminal: (row: AgentRow) => void
+    onchanges: (workspace: number, title: string) => void
   } = $props()
 
   let scrolled = $state(0)
@@ -38,6 +40,7 @@
     <span class="state">{statusName(row.status)}</span>
   </div>
   <Button tone="plain" onclick={() => onterminal(row)}>Terminal</Button>
+  <Button tone="plain" onclick={() => onchanges(row.workspace, row.workspace_name)}>Changes</Button>
 </div>
 <header class="head" bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />

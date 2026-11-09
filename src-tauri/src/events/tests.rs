@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use cornercase_core::cli::changes::Mode;
 use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
@@ -114,6 +115,7 @@ fn closed_terminal() -> Emitted {
         replaced: false,
         rows: BTreeMap::new(),
         closed: true,
+        unfitted: false,
     })
 }
 
@@ -124,7 +126,15 @@ fn closed_terminal_json() -> Value {
         "alternate_scroll": false, "bracketed_paste": false, "application_cursor": false, "focus_events": false,
         "kitty_keyboard": 0 });
     json!({ "machine": 7, "tab": 3, "pane": null, "size": size, "cursor": null, "colours": colours,
-        "modes": modes, "replaced": false, "rows": {}, "closed": true })
+        "modes": modes, "replaced": false, "rows": {}, "closed": true, "unfitted": false })
+}
+
+fn closed_changes() -> Emitted {
+    Emitted::Changes(ChangesChanged { machine: 7, workspace: 2, mode: Mode::Commits, summary: None, closed: true })
+}
+
+fn closed_changes_json() -> Value {
+    json!({ "machine": 7, "workspace": 2, "mode": "commits", "summary": null, "closed": true })
 }
 
 fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {
@@ -348,6 +358,7 @@ mod an_event {
         json!({ "machine": 7, "pane": null })
     )]
     #[case::terminal_changed(closed_terminal(), closed_terminal_json())]
+    #[case::changes_changed_once_the_workspace_closed(closed_changes(), closed_changes_json())]
     #[case::error_toast(
         Emitted::Toast(Toast::error("it failed")),
         json!({ "level": "error", "message": "it failed" })
@@ -362,6 +373,7 @@ mod an_event {
             Emitted::Agents(changed) => serde_json::to_value(changed),
             Emitted::PaneStatus(changed) => serde_json::to_value(changed),
             Emitted::Terminal(changed) => serde_json::to_value(changed),
+            Emitted::Changes(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
         assert_eq!(json.expect("an event serializes"), expected);
@@ -369,10 +381,23 @@ mod an_event {
 
     #[test]
     fn is_named_in_kebab_case() {
-        assert_eq!(
-            [ConnectionChanged::NAME, AgentsChanged::NAME, PaneStatusChanged::NAME, TerminalChanged::NAME, Toast::NAME],
-            ["connection-changed", "agents-changed", "pane-status-changed", "terminal-changed", "toast"]
-        );
+        let names = [
+            ConnectionChanged::NAME,
+            AgentsChanged::NAME,
+            PaneStatusChanged::NAME,
+            TerminalChanged::NAME,
+            ChangesChanged::NAME,
+            Toast::NAME,
+        ];
+        let kebab = [
+            "connection-changed",
+            "agents-changed",
+            "pane-status-changed",
+            "terminal-changed",
+            "changes-changed",
+            "toast",
+        ];
+        assert_eq!(names, kebab);
     }
 }
 
@@ -396,6 +421,7 @@ mod the_app {
         json!({ "machine": 7, "pane": 4 })
     )]
     #[case::terminal_changed(closed_terminal(), "terminal-changed", closed_terminal_json())]
+    #[case::changes_changed(closed_changes(), "changes-changed", closed_changes_json())]
     #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
     fn emits_each_event_under_its_name(#[case] event: Emitted, #[case] name: &str, #[case] expected: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());

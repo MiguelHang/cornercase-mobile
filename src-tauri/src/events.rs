@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use cornercase_core::board::AgentRow;
+use cornercase_core::cli::changes::{Mode, Summary};
 use cornercase_core::cli::events::{Event as CliEvent, What};
 use cornercase_core::cli::surface::{Colours, Cursor, Modes, Size};
 use cornercase_core::error::Error;
@@ -52,6 +53,18 @@ pub(crate) struct TerminalChanged {
     pub(crate) replaced: bool,
     pub(crate) rows: BTreeMap<u16, Line>,
     pub(crate) closed: bool,
+    pub(crate) unfitted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct ChangesChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    #[specta(type = u32)]
+    pub(crate) workspace: u64,
+    pub(crate) mode: Mode,
+    pub(crate) summary: Option<Summary>,
+    pub(crate) closed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
@@ -63,7 +76,6 @@ pub(crate) struct Toast {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ToastLevel {
-    #[cfg_attr(not(test), expect(dead_code, reason = "the contract has an info toast that nothing sends yet"))]
     Info,
     Error,
 }
@@ -74,6 +86,7 @@ pub(crate) enum Emitted {
     Agents(AgentsChanged),
     PaneStatus(PaneStatusChanged),
     Terminal(TerminalChanged),
+    Changes(ChangesChanged),
     Toast(Toast),
 }
 
@@ -88,6 +101,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
             Emitted::Agents(changed) => changed.emit(self),
             Emitted::PaneStatus(changed) => changed.emit(self),
             Emitted::Terminal(changed) => changed.emit(self),
+            Emitted::Changes(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
         sent.ok();
@@ -95,6 +109,10 @@ impl<R: Runtime> Emit for AppHandle<R> {
 }
 
 impl Toast {
+    pub(crate) fn info(message: impl Into<String>) -> Self {
+        Self { level: ToastLevel::Info, message: message.into() }
+    }
+
     pub(crate) fn error(message: impl Into<String>) -> Self {
         Self { level: ToastLevel::Error, message: message.into() }
     }

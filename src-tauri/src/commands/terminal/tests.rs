@@ -1,11 +1,6 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use cornercase_core::cli::surface::{Modes, MouseMode, Style};
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
-use cornercase_core::transport::Transport;
-use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
 use tokio::sync::mpsc::UnboundedSender;
@@ -14,14 +9,13 @@ use super::*;
 use crate::commands::connection::start;
 use crate::commands::error::ErrorCode;
 use crate::commands::machines::remove;
-use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle};
+use crate::test_util::{BOOT, Ipc, Recorder, Streams, Studio, connected_to, launcher, serving, settle, spawned};
 
 const SURFACE: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
-const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 } };
-
-fn spawned(task: Task) -> JoinHandle<()> {
-    JoinHandle::Tokio(tokio::spawn(task))
-}
+const CLAIM: [&str; 7] = ["view", "--tab", "3", "--cols", "80", "--rows", "24"];
+const VIEWED: [&str; 4] = ["surface", "--view", "41", "--patches"];
+const TAB: Terminal = Terminal { tab: 3, pane: None, size: Size { cols: 80, rows: 24 }, fit: false };
+const FITTED: Terminal = Terminal { fit: true, ..TAB };
 
 fn line(text: &str) -> Line {
     let width = u16::try_from(text.len()).expect("a short text");
@@ -70,53 +64,44 @@ fn drawn() -> String {
     json!({ "boot": BOOT, "surface": 1, "revision": 1, "tab": 3, "panes": [pane] }).to_string()
 }
 
-#[derive(Clone, Default)]
-struct Surfaces(Arc<AtomicUsize>);
-
-struct Running(Arc<AtomicUsize>);
-
-impl Drop for Running {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::SeqCst);
-    }
+fn granted() -> String {
+    let mut line: Value = serde_json::from_str(&with_tabs(&[3])).expect("a session");
+    line["view"] = json!({ "id": 41, "projection": 1, "active": true, "cols": 80, "rows": 24,
+        "shown": { "tab": 3 }, "controls": true });
+    line.to_string()
 }
 
-impl Surfaces {
-    fn running(&self) -> usize {
-        self.0.load(Ordering::SeqCst)
-    }
-
-    fn on(&self, fake: FakeTransport) -> FakeTransport {
-        let drawing = Arc::new(FakeTransport::default().open(&SURFACE, &[&drawn()]));
-        let count = Arc::clone(&self.0);
-        fake.script(&SURFACE, move |stdin, out| {
-            count.fetch_add(1, Ordering::SeqCst);
-            let running = Running(Arc::clone(&count));
-            let drawing = Arc::clone(&drawing);
-            async move {
-                let _running = running;
-                drawing.run(SURFACE.map(str::to_owned).to_vec(), stdin, out).await
-            }
-        })
-    }
+fn drawn_for_the_view() -> String {
+    let mut frame: Value = serde_json::from_str(&drawn()).expect("a frame");
+    frame["view"] = 41.into();
+    frame["projection"] = 1.into();
+    frame.to_string()
 }
 
 struct Opened {
     studio: Studio,
-    surfaces: Surfaces,
+    surfaces: Streams,
+    views: Streams,
     recorder: Recorder,
 }
 
 impl Opened {
     async fn with_tabs(tabs: &[u64]) -> Self {
-        let studio = Studio::new();
-        let surfaces = Surfaces::default();
-        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(tabs)])));
-        start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connected");
+        Self::showing(tabs, TAB).await
+    }
+
+    async fn showing(tabs: &[u64], terminal: Terminal) -> Self {
+        let (surfaces, views) = (Streams::default(), Streams::default());
+        let fake = surfaces.on(serving(&[with_tabs(tabs)]), &SURFACE, &[&drawn()]);
+        let studio = connected_to(views.on(views.on(fake, &CLAIM, &[&granted()]), &VIEWED, &[&drawn_for_the_view()]));
         let recorder = Recorder::default();
-        open(&studio.state, recorder.clone(), spawned, TAB).expect("the terminal opens");
+        open(&studio.state, recorder.clone(), spawned, terminal).expect("the terminal opens");
         settle().await;
-        Self { studio, surfaces, recorder }
+        Self { studio, surfaces, views, recorder }
+    }
+
+    fn running(&self) -> (usize, usize) {
+        (self.views.running(), self.surfaces.running())
     }
 }
 
@@ -171,6 +156,21 @@ mod a_batch {
         assert!(matches!(&taken[..], [Emitted::Terminal(_), _]), "{taken:?}");
         assert_eq!(taken[1], warned(&failed));
         assert_eq!(batch.take(), []);
+    }
+
+    #[rstest]
+    #[case::when_the_mac_takes_the_tab_back(Unfitted::TakenBack, Toast::info("The Mac took this tab back"))]
+    #[case::when_the_view_is_refused(
+        Unfitted::Refused(Error::Failed { code: 2, stderr: "view 41 cannot size a tab now".to_owned() }),
+        Toast::error("cornercase exited with code 2: view 41 cannot size a tab now")
+    )]
+    fn turns_the_fit_off_and_tells_why(#[case] unfitted: Unfitted, #[case] toast: Toast) {
+        let mut batch = Batch::new(MachineId(7), 3);
+        batch.add(Screen::Fit(unfitted));
+        let taken = batch.take();
+        let [Emitted::Terminal(changed), told] = &taken[..] else { panic!("a change and a toast: {taken:?}") };
+        assert_eq!((changed.unfitted, changed.closed, changed.pane), (true, false, None));
+        assert_eq!(*told, Emitted::Toast(toast));
     }
 }
 
@@ -234,6 +234,22 @@ mod opening {
         settle().await;
         assert_eq!(opened.surfaces.running(), 1);
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn fitted_claims_the_tab_with_a_view_and_shows_its_surface() {
+        let opened = Opened::showing(&[3], FITTED).await;
+        assert_eq!(opened.running(), (2, 0));
+        let shown: Vec<_> = opened.recorder.terminals().iter().map(|it| (it.pane, it.unfitted)).collect();
+        assert_eq!(shown, [(Some(1), false)]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn again_without_the_fit_lets_the_view_go_and_shows_the_tab_as_it_is() {
+        let opened = Opened::showing(&[3], FITTED).await;
+        open(&opened.studio.state, Recorder::default(), spawned, TAB).expect("the terminal opens again");
+        settle().await;
+        assert_eq!(opened.running(), (0, 1));
+    }
 }
 
 mod stopping {
@@ -279,8 +295,8 @@ mod over_ipc {
     #[test]
     fn refuses_to_open_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        let size = json!({ "cols": 80, "rows": 24 });
-        let refused = ipc.invoke("terminal_open", json!({ "tab": 3, "pane": null, "size": size }));
+        let shape = json!({ "size": { "cols": 80, "rows": 24 }, "fit": true });
+        let refused = ipc.invoke("terminal_open", json!({ "tab": 3, "pane": null, "shape": shape }));
         assert_eq!(refused.expect_err("no machine")["code"], "not_connected");
     }
 
@@ -294,8 +310,8 @@ mod over_ipc {
     async fn cuts_the_surface_it_showed_when_closing() {
         let studio = Studio::new();
         let state = studio.reloaded();
-        let surfaces = Surfaces::default();
-        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])])));
+        let surfaces = Streams::default();
+        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])]), &SURFACE, &[&drawn()]));
         start(&state, Recorder::default(), &launcher, studio.id).expect("connected");
         open(&state, Recorder::default(), spawned, TAB).expect("the terminal opens");
         settle().await;

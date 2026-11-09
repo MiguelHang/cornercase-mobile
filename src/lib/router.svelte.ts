@@ -9,6 +9,8 @@ export type Route =
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
   | { name: 'start'; machine: number }
+  | { name: 'changes'; machine: number; workspace: number; title: string }
+  | { name: 'change'; machine: number; workspace: number; path: string }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
@@ -29,6 +31,10 @@ export const chatOf = (route: Route): ChatOf | null => {
 
 const overMachines = (route: Route) => route.name === 'machines' || route.name === 'machine'
 
+const overChat = (route: Route) => overMachines(route) || route.name === 'changes' || route.name === 'change'
+
+export type Reviewed = { machine: number; workspace: number }
+
 export class Router {
   #stack: Route[] = $state([])
 
@@ -41,8 +47,13 @@ export class Router {
   }
 
   get opened(): ChatOf | null {
-    const under = this.#stack.findLast((route) => !overMachines(route))
+    const under = this.#stack.findLast((route) => !overChat(route))
     return under === undefined ? null : chatOf(under)
+  }
+
+  get reviewed(): Reviewed | null {
+    const top = this.current
+    return top.name === 'changes' || top.name === 'change' ? { machine: top.machine, workspace: top.workspace } : null
   }
 
   go(route: Route) {
