@@ -18,7 +18,7 @@ reutilizarlo como identidad de iroh más adelante. En la fase 0 el puente no lo 
   `dev.usecornercase.mobile`), accesibilidad `AfterFirstUnlockThisDeviceOnly` si el crate lo permite (si no, anotar).
   Hecho con `keyring-core` 1 y `apple-native-keyring-store` 1 (`protected`), que sí la permite: `keyring` 4 ya no
   tiene `apple-native`.
-- [ ] CA3 — Comprobado en el simulador de iOS y en un iPhone: la clave sobrevive a cerrar y abrir la app; la huella se
+- [ ] CA3 — Comprobado en el simulador de iOS (hecho, 2026-11-09) y en un iPhone (pendiente del usuario): la clave sobrevive a cerrar y abrir la app; la huella se
   ve en un log o en una pantalla de depuración temporal que no se mergea. Simulador hecho el 2026-11-09 (iPhone 17,
   iOS 27.2, la huella en el log); **pendiente: la prueba en un iPhone**, que necesita un equipo de firma.
 - [x] CA4 — Si el Keychain falla, la app arranca igualmente y avisa (la identidad no se usa en la fase 0); nunca se
