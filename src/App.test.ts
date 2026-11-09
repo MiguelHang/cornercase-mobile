@@ -24,10 +24,8 @@ describe('App', () => {
     expect(body).toContain('It needs the cornercase bridge running on your Mac, and the URL it prints.')
   })
 
-  it('offers adding a machine, not yet pressable', () => {
-    expect(body).toMatch(
-      /<button class="button primary svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">(<!--[^>]*-->)* Add machine<\/button>/,
-    )
+  it('offers adding a machine, ready to be pressed', () => {
+    expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(<!--[^>]*-->)* Add machine<\/button>/)
   })
 
   it('neither calls nor listens to Tauri while rendering on the server', () => {

@@ -18,6 +18,10 @@
     }
   }
 
+  const added = (machine: number) => {
+    join(machine).catch((error: unknown) => (notice = String(error)))
+  }
+
   const load = async () => {
     const [machines, state, session] = await Promise.all([
       commands.machinesList(),
@@ -56,7 +60,7 @@
 
 <main>
   {#if current.machine === null}
-    <NoMachines />
+    <NoMachines onadded={added} />
   {:else}
     <Connection screen={current} />
   {/if}
