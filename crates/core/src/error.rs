@@ -30,6 +30,8 @@ pub enum Error {
     SettleTimeout,
     #[error("cornercase input: {0}")]
     InputRejected(String),
+    #[error("the app sends no key named {0:?}")]
+    UnknownKey(String),
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
     #[error("cannot read or write the saved machines: {0}")]

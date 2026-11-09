@@ -4,11 +4,26 @@ import type {
   LastMessage_Serialize as LastMessage,
   PaneStatusChanged_Serialize as PaneStatusChanged,
 } from './bindings'
+import { tap, type HapticsApi } from './haptics'
+import type { KeyName } from './keys'
 import { messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
 
 export type SendText = typeof commands.send
+
+export type PressKey = typeof commands.keys
+
+export type Clock = { after: (ms: number, then: () => void) => () => void }
+
+export const INTERRUPT_WINDOW_MS = 3000
+
+export const timers: Clock = {
+  after: (ms, then) => {
+    const timer = setTimeout(then, ms)
+    return () => clearTimeout(timer)
+  },
+}
 
 export type Reading =
   | { kind: 'loading' }
@@ -37,9 +52,9 @@ const kept = (shown: Reading, answer: Answer): Reading => {
   return shown.kind === 'message' ? shown : { kind: 'unreadable', reason: answer.reason }
 }
 
-export const deliver = async (sendText: SendText, pane: number, text: string): Promise<string | null> => {
+export const deliver = async (call: () => ReturnType<SendText>): Promise<string | null> => {
   try {
-    const sent = await sendText(pane, text)
+    const sent = await call()
     return sent.status === 'ok' ? null : sent.error.message
   } catch (error) {
     return messageOf(error)
@@ -57,18 +72,34 @@ export class Chat {
   reading = $state<Reading>({ kind: 'loading' })
   row = $state<AgentRow | null>(null)
   gone = $state(false)
+  interrupting = $state(false)
   #readLast: ReadLast
   #sendText: SendText
+  #pressKey: PressKey
+  #haptics: HapticsApi
+  #clock: Clock
+  #cancelExpiry: () => void = () => {}
   #asked = 0
   #busy = false
   #again = false
   #starting = false
 
-  constructor(machine: number | null, pane: number, readLast: ReadLast, sendText: SendText) {
+  constructor(
+    machine: number | null,
+    pane: number,
+    readLast: ReadLast,
+    sendText: SendText,
+    pressKey: PressKey,
+    haptics: HapticsApi,
+    clock: Clock,
+  ) {
     this.machine = machine
     this.pane = pane
     this.#readLast = readLast
     this.#sendText = sendText
+    this.#pressKey = pressKey
+    this.#haptics = haptics
+    this.#clock = clock
   }
 
   get asking() {
@@ -77,6 +108,10 @@ export class Chat {
 
   get canSend() {
     return this.draft.trim() !== '' && !this.sending && this.row !== null && !this.asking
+  }
+
+  get canPress() {
+    return this.row !== null
   }
 
   see(machine: number | null, agents: AgentRow[] | null, starting = false) {
@@ -118,7 +153,7 @@ export class Chat {
       return null
     }
     this.sending = true
-    const failed = await deliver(this.#sendText, this.pane, this.draft)
+    const failed = await deliver(() => this.#sendText(this.pane, this.draft))
     this.sending = false
     if (failed === null) {
       this.draft = ''
@@ -128,6 +163,29 @@ export class Chat {
 
   #lost(agents: AgentRow[] | null) {
     return (agents !== null && !this.#starting) || this.row !== null
+  }
+
+  async press(key: KeyName): Promise<string | null> {
+    if (!this.canPress) {
+      return null
+    }
+    void tap(this.#haptics)
+    if (key === 'ctrl+c' && !this.interrupting) {
+      this.#arm()
+      return null
+    }
+    this.#disarm()
+    return deliver(() => this.#pressKey(this.pane, key))
+  }
+
+  #arm() {
+    this.interrupting = true
+    this.#cancelExpiry = this.#clock.after(INTERRUPT_WINDOW_MS, () => (this.interrupting = false))
+  }
+
+  #disarm() {
+    this.#cancelExpiry()
+    this.interrupting = false
   }
 
   #leave() {

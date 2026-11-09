@@ -22,8 +22,29 @@ export const icons = {
     { kind: 'rect', x: 7, y: 7, width: 5, height: 5, rx: 1 },
   ],
   'chevron-left': [{ kind: 'path', d: 'm15 18-6-6 6-6' }],
+  'arrow-up': [
+    { kind: 'path', d: 'm5 12 7-7 7 7' },
+    { kind: 'path', d: 'M12 19V5' },
+  ],
+  'arrow-down': [
+    { kind: 'path', d: 'M12 5v14' },
+    { kind: 'path', d: 'm19 12-7 7-7-7' },
+  ],
+  'arrow-left': [
+    { kind: 'path', d: 'm12 19-7-7 7-7' },
+    { kind: 'path', d: 'M19 12H5' },
+  ],
+  'arrow-right': [
+    { kind: 'path', d: 'M5 12h14' },
+    { kind: 'path', d: 'm12 5 7 7-7 7' },
+  ],
   'chevron-up': [{ kind: 'path', d: 'm18 15-6-6-6 6' }],
   'chevron-down': [{ kind: 'path', d: 'm6 9 6 6 6-6' }],
+  'clipboard-paste': [
+    { kind: 'path', d: 'M15 2H9a1 1 0 0 0-1 1v2c0 .6.4 1 1 1h6c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1Z' },
+    { kind: 'path', d: 'M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2M16 4h2a2 2 0 0 1 2 2v2M11 14h10' },
+    { kind: 'path', d: 'm17 10 4 4-4 4' },
+  ],
   'trash-2': [
     { kind: 'path', d: 'M3 6h18' },
     { kind: 'path', d: 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' },

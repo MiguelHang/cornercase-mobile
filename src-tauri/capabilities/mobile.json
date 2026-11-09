@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
-  "description": "enables the barcode scanner on the phones",
+  "description": "enables the barcode scanner and the haptics on the phones",
   "windows": [
     "main"
   ],
@@ -14,6 +14,7 @@
     "barcode-scanner:allow-cancel",
     "barcode-scanner:allow-check-permissions",
     "barcode-scanner:allow-request-permissions",
-    "barcode-scanner:allow-open-app-settings"
+    "barcode-scanner:allow-open-app-settings",
+    "haptics:allow-impact-feedback"
   ]
 }

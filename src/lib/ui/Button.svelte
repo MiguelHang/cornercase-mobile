@@ -7,6 +7,9 @@
     type = 'button',
     resting = false,
     busy = false,
+    compact = false,
+    label,
+    expanded,
     onclick,
     children,
   }: {
@@ -14,6 +17,9 @@
     type?: 'button' | 'submit'
     resting?: boolean
     busy?: boolean
+    compact?: boolean
+    label?: string
+    expanded?: boolean
     onclick?: (event: MouseEvent) => void
     children: Snippet
   } = $props()
@@ -21,12 +27,15 @@
 
 <button
   class="button {tone}"
+  class:compact
   class:resting
   class:busy
   {type}
   disabled={resting || busy}
   aria-disabled={resting ? 'true' : undefined}
   aria-busy={busy ? 'true' : undefined}
+  aria-label={label}
+  aria-expanded={expanded}
   {onclick}
   ontouchstart={() => {}}
 >
@@ -48,6 +57,11 @@
     font: inherit;
     font-size: 16px;
     white-space: nowrap;
+  }
+
+  .compact {
+    min-width: 44px;
+    padding: 0 var(--inset);
   }
 
   .primary {

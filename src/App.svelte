@@ -1,5 +1,6 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
+  import * as haptics from '@tauri-apps/plugin-haptics'
   import { onMount, untrack } from 'svelte'
   import {
     commands,
@@ -8,7 +9,7 @@
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
-  import { Chat, touches } from './lib/chat.svelte'
+  import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
@@ -39,7 +40,11 @@
   const opening = $derived(router.opened)
   const pane = $derived(opening?.pane ?? null)
   const owner = $derived(opening?.machine ?? null)
-  const chat = $derived(pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send))
+  const chat = $derived(
+    pane === null
+      ? null
+      : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, haptics, timers),
+  )
   const seen = $derived(chat?.row != null)
   const viewed = $derived(openedTerminal(route, current))
   const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)
