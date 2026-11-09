@@ -42,6 +42,8 @@ pub enum Error {
     UnknownMachine,
     #[error("the machine has no route at that address")]
     UnknownRoute,
+    #[error("a machine keeps at least one route; remove the machine instead")]
+    LastRoute,
     #[error("the name is empty")]
     NameEmpty,
     #[error("the name is longer than {longest} characters", longest = crate::machines::name::LONGEST_NAME)]

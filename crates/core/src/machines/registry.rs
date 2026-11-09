@@ -1,12 +1,22 @@
 use std::fmt;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 use super::name::checked_name;
 use super::route::{Address, Route, Token};
 use super::store::{MachineStore, Saved};
 use super::{Machine, MachineId};
 use crate::error::Error;
 use crate::secrets::Secrets;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "lowercase")]
+pub enum Direction {
+    Up,
+    Down,
+}
 
 pub struct Machines {
     store: Box<dyn MachineStore>,
@@ -77,6 +87,36 @@ impl Machines {
         removed.routes.iter().map(|route| self.secrets.delete(&key(id, route.address()))).fold(Ok(()), Result::and)
     }
 
+    pub fn remove_route(&mut self, id: MachineId, address: &Address) -> Result<(), Error> {
+        let mut saved = self.saved.clone();
+        let machine = find(&mut saved, id)?;
+        let index = position(&machine.routes, address)?;
+        if machine.routes.len() == 1 {
+            return Err(Error::LastRoute);
+        }
+        machine.routes.remove(index);
+        if machine.last_route.as_ref() == Some(address) {
+            machine.last_route = None;
+        }
+        self.commit(saved)?;
+        self.secrets.delete(&key(id, address))
+    }
+
+    pub fn move_route(&mut self, id: MachineId, address: &Address, direction: Direction) -> Result<(), Error> {
+        let mut saved = self.saved.clone();
+        let routes = &mut find(&mut saved, id)?.routes;
+        let index = position(routes, address)?;
+        let neighbour = match direction {
+            Direction::Up => index.checked_sub(1),
+            Direction::Down => Some(index + 1).filter(|next| *next < routes.len()),
+        };
+        let Some(neighbour) = neighbour else {
+            return Ok(());
+        };
+        routes.swap(index, neighbour);
+        self.commit(saved)
+    }
+
     pub fn remember(&mut self, id: MachineId, address: &Address) -> Result<(), Error> {
         let machine = self.machine(id).ok_or(Error::UnknownMachine)?;
         if machine.last_route.as_ref() == Some(address) {
@@ -118,6 +158,10 @@ fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error
 
 fn find(saved: &mut Saved, id: MachineId) -> Result<&mut Machine, Error> {
     saved.machines.iter_mut().find(|machine| machine.id == id).ok_or(Error::UnknownMachine)
+}
+
+fn position(routes: &[Route], address: &Address) -> Result<usize, Error> {
+    routes.iter().position(|route| route.address() == address).ok_or(Error::UnknownRoute)
 }
 
 fn key(id: MachineId, address: &Address) -> String {

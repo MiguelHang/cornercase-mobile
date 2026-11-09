@@ -312,6 +312,146 @@ mod remove {
     }
 }
 
+mod remove_route {
+    use super::*;
+
+    #[test]
+    fn deletes_its_token_and_keeps_the_other_routes_after_loading_again() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.remove_route(id, &address(LAN)).expect("remove the lan route");
+        assert_eq!(machines.machine(id).expect("the studio").routes, [route(TAILNET, TOKEN)]);
+        assert_eq!(phone.open().machine(id).expect("the studio").routes, [route(TAILNET, TOKEN)]);
+        assert_eq!((phone.secret(id, LAN), phone.secret(id, TAILNET).as_deref()), (None, Some(TOKEN)));
+    }
+
+    #[rstest]
+    #[case::the_removed_one(TAILNET, None)]
+    #[case::another_one(LAN, Some(address(TAILNET)))]
+    fn forgets_the_last_winner_only_when_it_is_removed(#[case] removed: &str, #[case] last: Option<Address>) {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.remember(id, &address(TAILNET)).expect("remember the tailnet route");
+        machines.remove_route(id, &address(removed)).expect("remove a route");
+        assert_eq!(phone.open().machine(id).expect("the studio").last_route, last);
+    }
+
+    #[test]
+    fn refuses_the_last_route_and_keeps_its_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        machines.remove_route(id, &address(LAN)).expect("remove the lan route");
+        let result = phone.unchanged(&mut machines, |machines| machines.remove_route(id, &address(TAILNET)));
+        assert_eq!(result, Err(Error::LastRoute));
+        assert_eq!(phone.secret(id, TAILNET).as_deref(), Some(TOKEN));
+    }
+
+    #[test]
+    fn refuses_an_address_the_machine_has_no_route_to() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.remove_route(id, &address(GONE)));
+        assert_eq!(result, Err(Error::UnknownRoute));
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let other = MachineId(id.0 + 1);
+        let result = phone.unchanged(&mut machines, |machines| machines.remove_route(other, &address(LAN)));
+        assert_eq!(result, Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn writes_the_file_before_deleting_the_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.secrets.fail_writes(true);
+        assert!(matches!(machines.remove_route(id, &address(LAN)), Err(Error::Secrets(_))));
+        assert_eq!(phone.open().machine(id).expect("the studio").routes, [route(TAILNET, TOKEN)]);
+        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
+    }
+
+    #[test]
+    fn keeps_the_route_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.block_the_file();
+        assert!(matches!(machines.remove_route(id, &address(LAN)), Err(Error::Store(_))));
+        assert_eq!(machines.machine(id).expect("the studio").routes.len(), 2);
+        assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
+    }
+}
+
+mod move_route {
+    use super::*;
+
+    fn three_routes(phone: &Phone) -> (Machines, MachineId) {
+        let (mut machines, id) = phone.studio();
+        machines.add_route(id, route(GONE, TOKEN)).expect("add a third route");
+        (machines, id)
+    }
+
+    fn hosts(machines: &Machines, id: MachineId) -> Vec<String> {
+        let routes = &machines.machine(id).expect("the studio").routes;
+        routes.iter().map(|route| route.address().host.clone()).collect()
+    }
+
+    #[rstest]
+    #[case::up(TAILNET, Direction::Up, [TAILNET, LAN, GONE])]
+    #[case::down(TAILNET, Direction::Down, [LAN, GONE, TAILNET])]
+    fn swaps_the_route_with_its_neighbour_and_keeps_the_order(
+        #[case] moved: &str,
+        #[case] direction: Direction,
+        #[case] order: [&str; 3],
+    ) {
+        let phone = Phone::new();
+        let (mut machines, id) = three_routes(&phone);
+        machines.move_route(id, &address(moved), direction).expect("move the route");
+        assert_eq!(hosts(&machines, id), order);
+        assert_eq!(hosts(&phone.open(), id), order);
+    }
+
+    #[rstest]
+    #[case::the_first_up(LAN, Direction::Up)]
+    #[case::the_last_down(GONE, Direction::Down)]
+    fn writes_nothing_at_the_ends(#[case] moved: &str, #[case] direction: Direction) {
+        let phone = Phone::new();
+        let (mut machines, id) = three_routes(&phone);
+        phone.block_the_file();
+        assert_eq!(machines.move_route(id, &address(moved), direction), Ok(()));
+        assert_eq!(hosts(&machines, id), [LAN, TAILNET, GONE]);
+    }
+
+    #[test]
+    fn refuses_an_address_the_machine_has_no_route_to() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.move_route(id, &address(GONE), Direction::Up));
+        assert_eq!(result, Err(Error::UnknownRoute));
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let other = MachineId(id.0 + 1);
+        let result =
+            phone.unchanged(&mut machines, |machines| machines.move_route(other, &address(LAN), Direction::Down));
+        assert_eq!(result, Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn keeps_the_order_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, id) = three_routes(&phone);
+        phone.block_the_file();
+        assert!(matches!(machines.move_route(id, &address(LAN), Direction::Down), Err(Error::Store(_))));
+        assert_eq!(hosts(&machines, id), [LAN, TAILNET, GONE]);
+    }
+}
+
 mod remember {
     use super::*;
 
