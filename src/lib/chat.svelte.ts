@@ -151,7 +151,7 @@ export class Chat {
       return null
     }
     this.sending = true
-    const failed = await deliver(() => this.#sendText(this.pane, this.draft))
+    const failed = await deliver(() => this.#sendText(this.pane, this.draft, false))
     this.sending = false
     if (failed === null) {
       this.draft = ''

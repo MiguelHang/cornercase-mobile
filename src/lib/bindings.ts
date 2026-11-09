@@ -19,8 +19,9 @@ export const commands = {
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
-	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
+	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
+	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
@@ -323,6 +324,20 @@ export type PaneStatusChanged_Deserialize = {
 export type PaneStatusChanged_Serialize = {
 	machine: number,
 	pane: number | null,
+};
+
+export type Pasted = Pasted_Serialize | Pasted_Deserialize;
+
+export type Pasted_Deserialize = {
+	pane?: number,
+	path?: string,
+	bytes?: number,
+};
+
+export type Pasted_Serialize = {
+	pane: number,
+	path: string,
+	bytes: number,
 };
 
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };

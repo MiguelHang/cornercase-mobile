@@ -131,7 +131,7 @@ describe('deliver', () => {
     ['the reason of a refusal', () => Promise.resolve(refused('the agent is asking a question')), 'the agent is asking a question'],
     ['the message of a rejected call', () => Promise.reject(new Error('no window')), 'no window'],
   ])('gives %s', async (_, sendText, failed) => {
-    expect(await deliver(() => sendText(PANE, 'hi'))).toBe(failed)
+    expect(await deliver(() => sendText(PANE, 'hi', false))).toBe(failed)
   })
 })
 
@@ -183,7 +183,7 @@ describe('Chat, its field', () => {
     const chat = ready(sendText)
     chat.draft = '- not a flag\n'
     await chat.send()
-    expect(sendText.mock.calls).toEqual([[PANE, '- not a flag\n']])
+    expect(sendText.mock.calls).toEqual([[PANE, '- not a flag\n', false]])
     expect([chat.draft, chat.sending]).toEqual(['', false])
   })
 
@@ -220,8 +220,8 @@ describe('Chat, its field', () => {
     await chat.send()
     expect(await chat.send()).toBeNull()
     expect(sendText.mock.calls).toEqual([
-      [PANE, 'go on'],
-      [PANE, 'go on'],
+      [PANE, 'go on', false],
+      [PANE, 'go on', false],
     ])
     expect(chat.draft).toBe('')
   })
