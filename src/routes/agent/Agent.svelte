@@ -20,6 +20,7 @@
     onback,
     onfailed,
     onterminal,
+    onchanges,
   }: {
     chat: Chat
     connection: ConnectionView_Serialize
@@ -28,6 +29,7 @@
     onback: () => void
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
+    onchanges: (workspace: number, title: string) => void
   } = $props()
 
   let now = $state(Date.now())
@@ -60,6 +62,7 @@
       {#if row !== null}
         {@const opened = row}
         <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button>
+        <Button tone="plain" onclick={() => onchanges(opened.workspace, opened.workspace_name)}>Changes</Button>
       {/if}
     </div>
     {#if row === null && starting !== null}

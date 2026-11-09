@@ -26,6 +26,8 @@ const ROW: AgentRow = {
   project_name: 'app',
 }
 const TERMINAL = { name: 'terminal', machine: 1, row: ROW } as const
+const CHANGES = { name: 'changes', machine: 1, workspace: 2, title: 'main' } as const
+const CHANGE = { name: 'change', machine: 1, workspace: 2, path: 'src/app.rs', mode: 'commits' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -319,5 +321,49 @@ describe('Router, the opened chat', () => {
 
   it('is none under Machines opened from the board', () => {
     expect(opened(MACHINES, MACHINE)).toBeNull()
+  })
+})
+
+describe('Router, the changes of a workspace', () => {
+  it('stacks a diff on its list and goes back to the list, then to the agent', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(CHANGES)
+    router.go(CHANGE)
+    expect(router.current).toEqual(CHANGE)
+    router.back()
+    expect(router.current).toEqual(CHANGES)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+  })
+
+  it("keeps the agent's chat under its changes and their diffs, so a draft lives on", () => {
+    expect(opened(AGENT, CHANGES)).toEqual({ machine: 1, pane: 7 })
+    expect(opened(AGENT, CHANGES, CHANGE)).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it.each<[string, Route[]]>([
+    ['its list', [AGENT, CHANGES]],
+    ['a diff on it', [AGENT, CHANGES, CHANGE]],
+  ])('reviews the workspace of %s on its machine', (_, routes) => {
+    const router = new Router(HOME)
+    routes.forEach((route) => router.go(route))
+    expect(router.reviewed).toEqual({ machine: 1, workspace: 2 })
+  })
+
+  it('reviews nothing on the board, on Machines, nor back on the agent', () => {
+    const router = new Router(HOME)
+    expect(router.reviewed).toBeNull()
+    router.go(AGENT)
+    router.go(CHANGES)
+    router.back()
+    expect(router.reviewed).toBeNull()
+    router.go(MACHINES)
+    expect(router.reviewed).toBeNull()
+  })
+
+  it('is no chat of its own', () => {
+    expect(chatOf(CHANGES)).toBeNull()
+    expect(chatOf(CHANGE)).toBeNull()
   })
 })

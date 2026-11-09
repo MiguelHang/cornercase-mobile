@@ -29,6 +29,8 @@ const unread: ReadLast = () => new Promise(() => {})
 
 const TERMINAL = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Terminal/
 
+const CHANGES = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Changes/
+
 const unsent: SendText = () => new Promise(() => {})
 
 const unpressed: PressKey = () => new Promise(() => {})
@@ -48,7 +50,7 @@ const chatWith = (row: AgentRow | null, draft = '') => {
 
 const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED, starting: string | null = null) =>
   render(Agent, {
-    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {} },
+    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {}, onchanges: () => {} },
   }).body
 
 const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
@@ -215,18 +217,27 @@ describe('Agent, without its row', () => {
     expect(draw(chatWith(row))).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
   })
 
-  it('offers opening the terminal of its agent, beside going back', () => {
+  it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain(
-      '<Button tone="plain" onclick={onback}>Back</Button> {#if row !== null} {@const opened = row} <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button> {/if} </div>',
+      '<Button tone="plain" onclick={onback}>Back</Button> {#if row !== null} {@const opened = row} <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button> <Button tone="plain" onclick={() => onchanges(opened.workspace, opened.workspace_name)}>Changes</Button> {/if} </div>',
     )
   })
 
-  it('offers no terminal without its agent, nor once it is gone', () => {
+  it("offers the changes of its agent's workspace, beside its terminal", () => {
+    const body = draw(chatWith(ROW))
+    expect(body).toMatch(CHANGES)
+    expect(body.search(CHANGES)).toBeGreaterThan(body.search(TERMINAL))
+  })
+
+  it.each([
+    ['terminal', TERMINAL],
+    ['changes', CHANGES],
+  ])('offers no %s without its agent, nor once it is gone', (_, button) => {
     const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])
-    expect(draw(chatWith(null))).not.toMatch(TERMINAL)
-    expect(draw(gone)).not.toMatch(TERMINAL)
+    expect(draw(chatWith(null))).not.toMatch(button)
+    expect(draw(gone)).not.toMatch(button)
   })
 })
 
