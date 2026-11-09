@@ -9,6 +9,7 @@
   } from '../../lib/bindings'
   import { label, place } from '../../lib/board'
   import { ShownCtrl } from '../../lib/terminal/ctrl.svelte'
+  import { Fit } from '../../lib/terminal/fit.svelte'
   import { Keyboard, whileClosed } from '../../lib/terminal/keyboard.svelte'
   import KeyRow from '../../lib/terminal/KeyRow.svelte'
   import { Opening } from '../../lib/terminal/opening'
@@ -35,6 +36,7 @@
   const shown = new Pane()
   const ctrl = new ShownCtrl()
   const keyboard = new Keyboard(globalThis)
+  const fit = new Fit()
   const sending = new Sending(shown, {
     input: commands.terminalInput,
     scroll: commands.terminalScroll,
@@ -50,14 +52,19 @@
     const unlisten = events.terminalChanged.listen((event) => {
       if (shows(event.payload, machine, row.tab)) {
         shown.apply(event.payload)
+        if (event.payload.unfitted) {
+          fit.unfitted()
+        }
       }
     })
     const open = (size: Size_Deserialize, fit: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit })
     const close = () => commands.terminalClose(row.tab)
     opening = new Opening(unlisten, { open, close, failed: onfailed })
     const unwatch = keyboard.watch()
+    const unwatchPage = fit.watch(document)
     return () => {
       unwatch()
+      unwatchPage()
       unlisten.then((stop) => stop()).catch(onfailed)
       opening?.leave()
     }
@@ -65,7 +72,7 @@
 
   $effect(() => {
     if (wanted !== null) {
-      opening?.open(wanted, false)
+      opening?.open(wanted, fit.wanted)
     }
   })
 </script>
@@ -83,6 +90,9 @@
       <span class="line name">{label(row)}</span>
       <span class="line where">{row.tab_name} · {place(row)}</span>
     </span>
+    <button class="fit" type="button" aria-label="Fit to this phone" aria-pressed={fit.on} onclick={() => fit.toggle()}>
+      <Icon name="smartphone" />
+    </button>
   </header>
   <div class="view">
     <TerminalView
@@ -128,7 +138,8 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .back {
+  .back,
+  .fit {
     display: inline-flex;
     flex: none;
     align-items: center;
@@ -141,8 +152,13 @@
     color: var(--soft);
   }
 
-  .back:active {
+  .back:active,
+  .fit:active {
     color: var(--text);
+  }
+
+  .fit[aria-pressed='true'] {
+    color: var(--accent);
   }
 
   .lines {

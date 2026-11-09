@@ -36,6 +36,10 @@ export const icons = {
     { kind: 'line', x1: 10, y1: 11, x2: 10, y2: 17 },
     { kind: 'line', x1: 14, y1: 11, x2: 14, y2: 17 },
   ],
+  smartphone: [
+    { kind: 'rect', x: 5, y: 2, width: 14, height: 20, rx: 2 },
+    { kind: 'path', d: 'M12 18h.01' },
+  ],
 } satisfies Record<string, Shape[]>
 
 export type IconName = keyof typeof icons

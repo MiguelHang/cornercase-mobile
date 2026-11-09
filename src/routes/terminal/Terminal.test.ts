@@ -1,6 +1,7 @@
 import { render } from 'svelte/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, Size_Deserialize } from '../../lib/bindings'
+import { Fit, type Page } from '../../lib/terminal/fit.svelte'
 import { Keyboard, whileClosed } from '../../lib/terminal/keyboard.svelte'
 import { Opening } from '../../lib/terminal/opening'
 import { empty, type PaneState } from '../../lib/terminal/pane.svelte'
@@ -50,7 +51,7 @@ describe('the terminal screen', () => {
   })
 
   it('takes only the changes of its machine and tab', () => {
-    expect(source).toContain('if (shows(event.payload, machine, row.tab)) { shown.apply(event.payload) }')
+    expect(source).toContain('if (shows(event.payload, machine, row.tab)) { shown.apply(event.payload)')
   })
 
   it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
@@ -61,7 +62,7 @@ describe('the terminal screen', () => {
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
     expect(source).toContain('const close = () => commands.terminalClose(row.tab)')
     expect(source).toContain('new Opening(unlisten, { open, close, failed: onfailed })')
-    expect(source).toContain('opening?.open(wanted, false)')
+    expect(source).toContain('opening?.open(wanted, fit.wanted)')
     expect(source).toContain('opening?.leave()')
   })
 })
@@ -82,7 +83,8 @@ describe('typing and the keys on the terminal screen', () => {
   })
 
   it('follows whatever covers the screen while it watches, and asks for a size only with the keyboard closed', () => {
-    expect(source).toContain('const unwatch = keyboard.watch() return () => { unwatch()')
+    expect(source).toContain('const unwatch = keyboard.watch()')
+    expect(source).toContain('return () => { unwatch()')
     expect(source).toContain('class:keyboard={keyboard.covered}')
     expect(source).toContain('style:height={keyboard.covered ? `${keyboard.height}px` : undefined}')
     expect(source).toContain('style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}')
@@ -130,6 +132,82 @@ describe('a keyboard opening and closing', () => {
     fitted({ cols: 40, rows: 50 })
     await settled()
     expect(open.mock.calls).toEqual([[{ cols: 40, rows: 50 }, false]])
+  })
+})
+
+describe('fitting the pane to the phone', () => {
+  const SIZE = { cols: 40, rows: 50 }
+
+  let changed = () => {}
+  const page: Page = {
+    visibilityState: 'visible',
+    addEventListener: (_: string, listener: EventListenerOrEventListenerObject | null) => {
+      changed = () => (typeof listener === 'function' ? listener(new Event('visibilitychange')) : undefined)
+    },
+    removeEventListener: () => {},
+  }
+
+  const turn = (state: DocumentVisibilityState) => {
+    Object.assign(page, { visibilityState: state })
+    changed()
+  }
+
+  const fitting = () => {
+    const open = vi.fn(() => Promise.resolve<Sent>({ status: 'ok' }))
+    const opening = new Opening(Promise.resolve(), { open, close: () => Promise.resolve(), failed: () => {} })
+    return { open, opening, fit: new Fit() }
+  }
+
+  it('shows a toggle in the bar, off and named for what it does', () => {
+    expect(body).toMatch(
+      /<button class="fit svelte-[\w-]+" type="button" aria-label="Fit to this phone" aria-pressed="false"><svg/,
+    )
+    expect(source).toContain('aria-pressed={fit.on} onclick={() => fit.toggle()}> <Icon name="smartphone" />')
+    expect(source).toContain('.back, .fit { display: inline-flex;')
+    expect(source).toContain("width: 44px; height: 44px;")
+  })
+
+  it('opens the pane fitted once the toggle is pressed', async () => {
+    const { open, opening, fit } = fitting()
+    opening.open(SIZE, fit.wanted)
+    await settled()
+    fit.toggle()
+    opening.open(SIZE, fit.wanted)
+    await settled()
+    expect(open.mock.calls).toEqual([
+      [SIZE, false],
+      [SIZE, true],
+    ])
+    expect(source).toContain('const fit = new Fit()')
+  })
+
+  it('turns the toggle off when the Mac takes the tab back', () => {
+    const { fit } = fitting()
+    fit.toggle()
+    fit.unfitted()
+    expect(fit.on).toBe(false)
+    expect(source).toContain('shown.apply(event.payload) if (event.payload.unfitted) { fit.unfitted() }')
+  })
+
+  it('lets the tab go while the app is in the background and claims it again on its return', async () => {
+    const { open, opening, fit } = fitting()
+    fit.watch(page)
+    fit.toggle()
+    opening.open(SIZE, fit.wanted)
+    await settled()
+    turn('hidden')
+    opening.open(SIZE, fit.wanted)
+    await settled()
+    turn('visible')
+    opening.open(SIZE, fit.wanted)
+    await settled()
+    expect(open.mock.calls).toEqual([
+      [SIZE, true],
+      [SIZE, false],
+      [SIZE, true],
+    ])
+    expect(source).toContain('const unwatchPage = fit.watch(document)')
+    expect(source).toContain('unwatch() unwatchPage()')
   })
 })
 
