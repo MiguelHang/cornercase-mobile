@@ -232,6 +232,7 @@
     <Terminal
       machine={viewed.machine}
       row={viewed.row}
+      {backTo}
       onback={goBack}
       onfailed={toasts.failed}
       bind:height={barHeight}

@@ -207,7 +207,7 @@ describe('App wiring', () => {
   it('shows the terminal on top of everything only on its own machine, going back from it and putting the toasts below its bar', () => {
     expect(source).toContain('const viewed = $derived(openedTerminal(route, current))')
     expect(source).toContain(
-      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} onback={goBack} onfailed={toasts.failed} bind:height={barHeight} />',
+      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} {backTo} onback={goBack} onfailed={toasts.failed} bind:height={barHeight} />',
     )
   })
 
