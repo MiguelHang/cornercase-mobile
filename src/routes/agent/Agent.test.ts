@@ -39,13 +39,12 @@ const unread: ReadLast = () => new Promise(() => {})
 const tool = (name: string, path: string) =>
   new RegExp(`<button class="tool svelte-[\\w-]+" type="button" aria-label="${name}">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!</svg>)[^])*?<path d="${path}"></path>`)
 
-const BACK = tool('Back', 'm15 18-6-6 6-6')
+const BACK =
+  /<button class="back svelte-[\w-]+" type="button" aria-label="Back to Agents">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!<\/svg>)[^])*?<path d="m15 18-6-6 6-6"><\/path>/
 
 const TERMINAL = tool('Terminal', 'm7 11 2-2-2-2')
 
 const CHANGES = tool('Changes', 'M13 6h3a2 2 0 0 1 2 2v7')
-
-const BACK_WORD = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/
 
 const unsent: SendText = () => new Promise(() => {})
 
@@ -68,7 +67,7 @@ const chatWith = (row: AgentRow | null, draft = '') => {
 
 const draw = (chat: Chat, below = 0, connection: ConnectionView_Serialize = CONNECTED, starting: string | null = null) =>
   render(Agent, {
-    props: { chat, connection, below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {}, onchanges: () => {} },
+    props: { chat, connection, backTo: 'Agents', below, starting, onback: () => {}, onfailed: () => {}, onterminal: () => {}, onchanges: () => {} },
   }).body
 
 const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
@@ -99,30 +98,33 @@ describe('Agent, its header', () => {
   })
 })
 
-const BAR = /<div class="bar svelte-[\w-]+" style="--below: 0px;">(.*?)<\/div> <header class="head svelte-[\w-]+">/
+const BAR = /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 0px;">(.*?)<\/div><!----> <header class="head svelte-[\w-]+">/
 
 const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
 
 const bar = (row: AgentRow) => draw(chatWith(row)).match(BAR)?.[1] ?? ''
 
 describe('Agent, its sticky header', () => {
-  it('keeps Back, Terminal and Changes in a bar of their own, with the large header after it to scroll away', () => {
+  it('keeps Back at the start of the bar and Terminal and Changes at its end, with the large header after it to scroll away', () => {
     const shown = bar(ROW)
-    expect(shown.search(BACK)).toBe(0)
-    expect(shown).toMatch(TERMINAL)
-    expect(shown).toMatch(CHANGES)
+    const end = shown.slice(shown.indexOf('<div class="end'))
+    expect(shown.slice(0, shown.indexOf('<div class="center'))).toMatch(BACK)
+    expect(end).toMatch(TERMINAL)
+    expect(end).toMatch(CHANGES)
     expect(shown).not.toContain('<h1')
   })
 
   it('starts large at the top of the page, below the connection bar', () => {
-    expect(draw(chatWith(ROW), 52)).toMatch(/<div class="bar svelte-[\w-]+" style="--below: 52px;"><button/)
+    expect(draw(chatWith(ROW), 52)).toMatch(/<div class="bar ios svelte-[\w-]+ fixed" style="--below: 52px;"><div class="start/)
   })
 
   it('carries a compact line between them, with the dot, the title and the status, hidden from VoiceOver', () => {
     const short = bar(ROW).match(SHORT)?.[1] ?? ''
     expect(short).toContain('aria-label="Waiting"')
     expect(short).toMatch(/<span class="called svelte-[\w-]+">Fix the login flow<\/span> <span class="state svelte-[\w-]+">Waiting<\/span>$/)
-    expect(bar(ROW).indexOf('class="short')).toBeLessThan(bar(ROW).indexOf('Terminal'))
+    const shown = bar(ROW)
+    expect(shown.indexOf('class="short')).toBeGreaterThan(shown.indexOf('<div class="center'))
+    expect(shown.indexOf('class="short')).toBeLessThan(shown.indexOf('<div class="end'))
   })
 
   it('names the agent in the compact line when it has no title', () => {
@@ -133,29 +135,30 @@ describe('Agent, its sticky header', () => {
   it('turns compact past the large header, measured, following the page with a passive listener', () => {
     const source = flat(chatHeaderSource)
     expect(source).toContain('const compact = $derived(compactHeader(scrolled, tall))')
-    expect(source).toContain('<div class="bar" class:compact style:--below="{below}px">')
+    expect(source).toContain('<NavBar {backTo} {onback} {below} edge={compact}> {#snippet center()} <div class="short" class:compact aria-hidden="true">')
     expect(source).toContain('<header class="head" bind:clientHeight={tall}>')
     expect(source).toContain("const seen = () => (scrolled = window.scrollY) seen() window.addEventListener('scroll', seen, { passive: true })")
     expect(source).toContain("return () => window.removeEventListener('scroll', seen)")
   })
 
-  it('sticks under the connection bar, over its veil and blur', () => {
-    const source = flat(chatHeaderSource)
-    expect(source).toContain('.bar { position: sticky; top: calc(env(safe-area-inset-top) + var(--below)); z-index: 4;')
-    expect(source).toContain('background: var(--veil); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }')
+  it('sticks under the connection bar in the shared bar, with its edge only while compact', () => {
+    expect(bar(ROW)).not.toContain('edge')
+    expect(flat(chatHeaderSource)).not.toContain('.bar {')
   })
 
   it('shows the compact line only while compact, as tall as its 44 px buttons', () => {
     const source = flat(chatHeaderSource)
     expect(source).toContain('min-width: 0; min-height: 44px; visibility: hidden; opacity: 0;')
-    expect(source).toContain('.compact .short { visibility: visible; opacity: 1; }')
+    expect(source).toContain('.short.compact { visibility: visible; opacity: 1; }')
+    expect(bar(ROW)).not.toMatch(/class="short[^"]* compact"/)
   })
 
-  it('leaves the compact line the room its icon buttons of 44 by 44 px do not take', () => {
+  it('leaves the compact line the room its icon buttons of 44 by 44 px do not take, centred and cut at the end', () => {
     const source = flat(chatHeaderSource)
-    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(3)
+    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(2)
+    expect(source).toContain('{#snippet right()} <button class="tool" type="button" aria-label="Terminal"')
     expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
-    expect(source).toContain('padding: var(--gap) calc(var(--inset-wide) - var(--inset));')
+    expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 100%; vertical-align: middle;')
     expect(source).not.toContain('<Button')
   })
 
@@ -255,23 +258,25 @@ describe('Agent, its field', () => {
 })
 
 describe('Agent, without its row', () => {
-  it('says so once its agent stops running, offers the board and has no field', () => {
+  it('says so once its agent stops running, offers going back to the board in the bar and has no field', () => {
     const chat = chatWith(ROW, 'go on')
     chat.see(1, [{ ...ROW, pane: 30 }])
     const body = draw(chat)
     expect(body).toMatch(/<p class="gone svelte-[\w-]+">This agent is no longer running\.<\/p>/)
-    expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back to the board/)
+    expect(body).toMatch(BACK)
+    expect(body.search(BACK)).toBeLessThan(body.indexOf('class="gone'))
+    expect(body).not.toContain('Back to the board')
     expect(body).not.toContain('<textarea')
     expect(body).not.toContain('<h1')
     expect(body).not.toContain('role="img"')
   })
 
-  it('says the agent it started is starting until its row comes, with Back and no field', () => {
+  it('says the agent it started is starting until its row comes, with the bar and no field', () => {
     const chat = chatWith(null)
     chat.see(1, [{ ...ROW, pane: 30 }], true)
     const body = draw(chat, 0, CONNECTED, 'claude')
     expect(body).toMatch(STARTING)
-    expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/)
+    expect(body).toMatch(BACK)
     expect(body).not.toContain('no longer running')
     expect(body).not.toContain('<textarea')
     expect(body).not.toContain('class="cell cursor')
@@ -305,14 +310,33 @@ describe('Agent, without its row', () => {
     expect(body).not.toContain('no longer running')
   })
 
-  it('offers going back before it is gone', () => {
-    expect(draw(chatWith(ROW))).toMatch(BACK)
-    expect(draw(chatWith(null))).toMatch(BACK_WORD)
+  it.each([
+    ['with its row', () => chatWith(ROW)],
+    ['without its row', () => chatWith(null)],
+    [
+      'once it is gone',
+      () => {
+        const chat = chatWith(ROW)
+        chat.see(1, [{ ...ROW, pane: 30 }])
+        return chat
+      },
+    ],
+  ])('offers going back to the Agents in one bar %s, with no word button', (_, made) => {
+    const body = draw(made())
+    expect(body.match(/<div class="bar /g)).toHaveLength(1)
+    expect(body).toMatch(BACK)
+    expect(body).not.toMatch(/>(?:<!--[^>]*-->| )*Back(?: to the board)?<!---->/)
+  })
+
+  it('draws the bar of the shared NavBar in every state, with no text Button to go back', () => {
+    const source = flat(agentSource)
+    expect(source.match(/<NavBar \{backTo\} \{onback\} \{below\} \/>/g)).toHaveLength(2)
+    expect(source).not.toContain('<Button tone="plain" onclick={onback}>')
   })
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} {onchanges} /> <Thread {chat} {now} />')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {backTo} {below} {onback} {onterminal} {onchanges} /> <Thread {chat} {now} />')
     const source = flat(chatHeaderSource)
     expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
     expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')

@@ -148,7 +148,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
     )
   })
 
@@ -248,7 +248,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
     )
   })
 })

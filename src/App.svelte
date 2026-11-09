@@ -255,6 +255,7 @@
       <Agent
         {chat}
         connection={current.connection}
+        {backTo}
         below={barHeight}
         {starting}
         onback={goBack}
