@@ -16,24 +16,17 @@
 
 <div class="toasts" style:--below="{below}px" aria-live="polite">
   {#each items as toast (toast.id)}
-    <button
-      class="toast {toast.level}"
-      type="button"
-      onclick={() => ondismiss(toast.id)}
-      ontouchstart={() => {}}
-      in:dropIn
-      out:fadeOut
-    >
+    <div class="toast {toast.level}" in:dropIn out:fadeOut>
       <Glass>
-        <span class="body">
+        <button class="body" type="button" onclick={() => ondismiss(toast.id)} ontouchstart={() => {}}>
           <span class="bar"></span>
           <span class="text">{toast.message}</span>
           {#if toast.count > 1}
             <span class="count">×{toast.count}</span>
           {/if}
-        </span>
+        </button>
       </Glass>
-    </button>
+    </div>
   {/each}
 </div>
 
@@ -55,12 +48,6 @@
   .toast {
     width: 100%;
     max-width: 520px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text);
-    font: inherit;
-    text-align: left;
     pointer-events: auto;
   }
 
@@ -69,8 +56,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
     min-height: 44px;
     padding: 10px 14px;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
   }
 
   .bar {

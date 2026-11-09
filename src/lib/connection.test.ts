@@ -125,6 +125,10 @@ describe('status', () => {
     expect(connection.status(view, 'MacBook')).toEqual(shown)
   })
 
+  it('shows the route alone while the machine has no name', () => {
+    expect(connection.status(CONNECTED, '').text).toBe('via 127.0.0.1:7000')
+  })
+
   it('counts down while retrying', () => {
     expect(connection.status({ ...RETRYING, in_ms: 5000 }, 'MacBook', 2500).text).toBe('Retrying in 3 s')
   })
@@ -154,7 +158,7 @@ describe('retryLeft', () => {
     [4000, 4000, 1],
     [4000, 9000, 1],
   ])('waits %d ms after %d ms gone as %d s', (in_ms, gone, left) => {
-    expect(connection.retryLeft(in_ms, 100, 100 + gone)).toBe(left)
+    expect(connection.retryLeft(in_ms, gone)).toBe(left)
   })
 })
 

@@ -27,13 +27,17 @@
   })
 
   const shown = $derived(status(connection, machineName, elapsed))
+  const counting = $derived(connection.state === 'retrying')
 </script>
 
 <div class="connection" role="status">
   <div class="row" bind:clientHeight={height}>
     <span class="dot {shown.tone}" class:pulsing={shown.pulsing}></span>
     <span class="lines">
-      <span class="line text">{shown.text}</span>
+      <span class="line text" aria-hidden={counting ? 'true' : undefined}>{shown.text}</span>
+      {#if counting}
+        <span class="spoken">Retrying</span>
+      {/if}
       {#if shown.detail !== undefined}
         <span class="line detail">{shown.detail}</span>
       {/if}
@@ -83,22 +87,6 @@
     background: var(--failed);
   }
 
-  .pulsing {
-    animation: pulse var(--pulse) ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .pulsing {
-      animation: none;
-    }
-  }
-
   .lines {
     display: flex;
     flex: 1;
@@ -115,6 +103,15 @@
   .text {
     color: var(--text);
     font-size: 14px;
+  }
+
+  .spoken {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .detail {

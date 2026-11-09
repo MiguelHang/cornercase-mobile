@@ -13,12 +13,16 @@ const toasts = (items: Shown[], below?: number) =>
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 describe('Toasts', () => {
-  it('draws each toast as one button around a glass card with its bar and text', () => {
+  it('draws each toast as a glass card filled by one button with its bar and text', () => {
     const body = toasts([INFO, ERROR])
     expect(body).toMatch(
-      /<button class="toast info svelte-[\w-]+" type="button"><div class="glass [^"]+">.*?<span class="bar svelte-[\w-]+"><\/span> <span class="text svelte-[\w-]+">Machine added<\/span>/,
+      /<div class="toast info svelte-[\w-]+"><div class="glass [^"]+"><span class="highlight [^"]+"><\/span> <button class="body svelte-[\w-]+" type="button"><span class="bar svelte-[\w-]+"><\/span> <span class="text svelte-[\w-]+">Machine added<\/span>/,
     )
-    expect(body).toMatch(/<button class="toast error svelte-[\w-]+" type="button">.*?>Could not reach the bridge<\/span>/)
+    expect(body).toMatch(/<div class="toast error svelte-[\w-]+">.*?<button class="body [^"]+" type="button">.*?>Could not reach the bridge<\/span>/)
+  })
+
+  it('puts no block inside a button', () => {
+    expect(toasts([INFO, ERROR])).not.toMatch(/<button[^>]*>(?:(?!<\/button>).)*<div/)
   })
 
   it('shows the count only when a toast has merged', () => {
@@ -42,14 +46,15 @@ describe('Toasts', () => {
 
   it('drops each toast in and fades it out', () => {
     expect(toastsSource).toContain('{#each items as toast (toast.id)}')
-    expect(flat(toastsSource)).toMatch(/<button class="toast \{toast.level\}" [^<]*\sin:dropIn out:fadeOut >/)
+    expect(toastsSource).toContain('<div class="toast {toast.level}" in:dropIn out:fadeOut>')
   })
 
   it.each([
     'position: fixed; top: 0; left: 0; right: 0;',
     'padding: calc(env(safe-area-inset-top) + var(--below) + var(--gap)) var(--inset-wide) 0; pointer-events: none;',
-    'text-align: left; pointer-events: auto;',
-    'min-height: 44px;',
+    'width: 100%; max-width: 520px; pointer-events: auto;',
+    'width: 100%; min-height: 44px; padding: 10px 14px; border: 0; background: none;',
+    'font: inherit; text-align: left;',
     'width: 3px; height: 18px; border-radius: 999px;',
     '.info .bar { background: var(--accent); box-shadow: 0 0 8px rgb(116 163 255 / 0.6); }',
     '.error .bar { background: var(--failed); box-shadow: 0 0 8px rgb(255 107 139 / 0.6); }',

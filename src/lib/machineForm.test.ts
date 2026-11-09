@@ -14,6 +14,7 @@ describe('checkUrl', () => {
     ['no host', 'ws://', form.NOT_A_URL],
     ['a space in the host', 'ws://studio lan:9000/?token=abc', form.NOT_A_URL],
     ['no token', 'ws://studio.lan:9000/', form.NO_TOKEN],
+    ['an empty token', 'ws://studio.lan:9000/?token=', form.NO_TOKEN],
     ['another parameter', 'ws://studio.lan:9000/?tokens=abc', form.NO_TOKEN],
   ])('refuses %s', (_, raw, error) => {
     expect(form.checkUrl(raw)).toEqual({ ok: false, error })

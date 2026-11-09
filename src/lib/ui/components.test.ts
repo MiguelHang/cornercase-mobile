@@ -133,7 +133,7 @@ describe('Field', () => {
     'background: var(--field);',
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
-    '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(0 95 255 / 0.32); }',
+    '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
     'color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(fieldSource)).toContain(text)

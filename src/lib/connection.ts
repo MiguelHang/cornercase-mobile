@@ -68,7 +68,10 @@ const parsed = (route: string) => {
 
 export const routeAddress = (route: string) => parsed(route)?.host || route.replace(/\?.*$/s, '')
 
-export const retryLeft = (in_ms: number, since: number, now: number) => Math.max(1, seconds(in_ms - (now - since)))
+export const retryLeft = (in_ms: number, elapsed: number) => Math.max(1, seconds(in_ms - elapsed))
+
+const connectedTo = (machineName: string, route: string) =>
+  machineName ? `${machineName} · via ${routeAddress(route)}` : `via ${routeAddress(route)}`
 
 const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
 
@@ -79,9 +82,9 @@ export const status = (connection: ConnectionView_Serialize, machineName: string
     case 'connecting':
       return { text: 'Connecting…', tone: 'working', pulsing: true }
     case 'connected':
-      return { text: `${machineName} · via ${routeAddress(connection.route)}`, tone: 'done', pulsing: false }
+      return { text: connectedTo(machineName, connection.route), tone: 'done', pulsing: false }
     case 'retrying':
-      return { ...failed(`Retrying in ${retryLeft(connection.in_ms, 0, elapsed)} s`), detail: connection.error.message }
+      return { ...failed(`Retrying in ${retryLeft(connection.in_ms, elapsed)} s`), detail: connection.error.message }
     case 'missing':
       return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
     case 'unauthorized':

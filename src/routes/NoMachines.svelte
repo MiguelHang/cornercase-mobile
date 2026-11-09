@@ -7,7 +7,9 @@
   import { fadeOut, riseIn } from '../lib/ui/motion'
   import MachineForm from './MachineForm.svelte'
 
-  let { onadded, open = false }: { onadded: (machine: number) => void; open?: boolean } = $props()
+  let { onadded }: { onadded: (machine: number) => void } = $props()
+
+  let open = $state(false)
 
   const LINES = [
     'A machine is a computer running cornercase whose agents you follow from here.',

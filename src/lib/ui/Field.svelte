@@ -70,7 +70,7 @@
 
   .input:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgb(0 95 255 / 0.32);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent);
   }
 
   .input:disabled {

@@ -41,12 +41,8 @@ describe('Mark', () => {
     expect(html.match(/pulsing/g)).toHaveLength(1)
   })
 
-  it('fades the cursor to 0.3 and back over the pulse, and not with reduced motion', () => {
-    const style = markSource.replace(/\s+/g, ' ')
-    expect(style).toContain('.pulsing { animation: pulse var(--pulse) ease-in-out infinite; }')
-    expect(style).toContain('@keyframes pulse { 50% { opacity: 0.3; } }')
-    expect(style).toContain('@media (prefers-reduced-motion: reduce) { .pulsing { animation: none; } }')
-    expect(style.match(/animation:/g)).toHaveLength(2)
+  it('leaves the pulse to the shared one in the base styles', () => {
+    expect(markSource).not.toMatch(/animation|@keyframes/)
   })
 })
 

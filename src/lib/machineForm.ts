@@ -33,7 +33,7 @@ export const checkUrl = (raw: string): Checked => {
   if (found === null) {
     return refused(NOT_A_URL)
   }
-  return found.searchParams.has('token') ? { ok: true, url } : refused(NO_TOKEN)
+  return found.searchParams.get('token') ? { ok: true, url } : refused(NO_TOKEN)
 }
 
 const hostOf = (raw: string) => {

@@ -30,7 +30,7 @@ describe('ConnectionBar', () => {
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
     const body = bar(connection)
     expect(body).toMatch(new RegExp(`<span class="dot ${tone} svelte-[\\w-]+( pulsing)?"></span>`))
-    expect(body.match(/<span class="line text svelte-[\w-]+">([^<]*)<\/span>/)?.[1]).toBe(text)
+    expect(body.match(/<span class="line text svelte-[\w-]+"(?: aria-hidden="true")?>([^<]*)<\/span>/)?.[1]).toBe(text)
   })
 
   it('pulses the dot only while connecting', () => {
@@ -48,6 +48,21 @@ describe('ConnectionBar', () => {
   it('announces itself as a status', () => {
     expect(bar({ state: 'connecting' })).toMatch(/^<!--\[--><div class="connection svelte-[\w-]+" role="status">/)
   })
+
+  it('keeps the countdown out of what readers announce, which says only that it retries and why', () => {
+    expect(bar(RETRYING)).toMatch(
+      /<span class="line text svelte-[\w-]+" aria-hidden="true">Retrying in 2 s<\/span> <!--\[0--><span class="spoken svelte-[\w-]+">Retrying<\/span>/,
+    )
+    expect(bar(RETRYING)).toMatch(/<span class="line detail svelte-[\w-]+">timed out<\/span>/)
+  })
+
+  it.each<ConnectionView_Serialize>([{ state: 'connecting' }, MISSING, { state: 'unauthorized' }])(
+    'reads its text aloud as shown when $state',
+    (connection) => {
+      const body = bar(connection)
+      expect(body).not.toMatch(/aria-hidden|class="spoken/)
+    },
+  )
 
   it('counts down every second only while retrying, and stops when it leaves', () => {
     const script = flat(barSource)
@@ -70,10 +85,8 @@ describe('ConnectionBar', () => {
     '.working { background: var(--working); }',
     '.done { background: var(--done); }',
     '.failed { background: var(--failed); }',
-    '.pulsing { animation: pulse var(--pulse) ease-in-out infinite; }',
-    '@keyframes pulse { 50% { opacity: 0.3; } }',
-    '@media (prefers-reduced-motion: reduce) { .pulsing { animation: none; } }',
     'overflow: hidden; white-space: nowrap; text-overflow: ellipsis;',
+    '.spoken { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
   ])('holds %s', (text) => {
     expect(flat(barSource)).toContain(text)
   })

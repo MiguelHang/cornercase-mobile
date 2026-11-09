@@ -1,58 +1,29 @@
 <script lang="ts">
+  import { AddMachine } from '../lib/addMachine.svelte'
   import { commands } from '../lib/bindings'
-  import { checkUrl, fieldOf, nameFor, placeholderName } from '../lib/machineForm'
+  import { placeholderName } from '../lib/machineForm'
   import Button from '../lib/ui/Button.svelte'
   import Field from '../lib/ui/Field.svelte'
 
   let { onadded, oncancel }: { onadded: (machine: number) => void; oncancel: () => void } = $props()
 
-  let url = $state('')
-  let name = $state('')
-  let urlError = $state<string | null>(null)
-  let formError = $state<string | null>(null)
-  let busy = $state(false)
-
-  const add = async () => {
-    const checked = checkUrl(url)
-    if (!checked.ok) {
-      urlError = checked.error
-      return
-    }
-    busy = true
-    const added = await commands.machineAdd(checked.url, nameFor(name, url))
-    busy = false
-    if (added.status === 'ok') {
-      onadded(added.data)
-    } else if (fieldOf(added.error) === 'url') {
-      urlError = added.error.message
-    } else {
-      formError = added.error.message
-    }
-  }
+  const form = new AddMachine(commands.machineAdd, (machine) => onadded(machine))
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    if (busy) {
-      return
-    }
-    urlError = null
-    formError = null
-    add().catch((error: unknown) => {
-      busy = false
-      formError = String(error)
-    })
+    void form.submit()
   }
 </script>
 
 <form class="form" onsubmit={submit}>
-  <Field label="Bridge URL" url bind:value={url} error={urlError} disabled={busy} />
-  <Field label="Name" bind:value={name} placeholder={placeholderName(url)} disabled={busy} />
-  {#if formError !== null}
-    <p class="problem" role="alert">{formError}</p>
+  <Field label="Bridge URL" url bind:value={form.url} error={form.urlError} disabled={form.busy} />
+  <Field label="Name" bind:value={form.name} placeholder={placeholderName(form.url)} disabled={form.busy} />
+  {#if form.formError !== null}
+    <p class="problem" role="alert">{form.formError}</p>
   {/if}
   <div class="buttons">
-    <Button tone="plain" resting={busy} onclick={oncancel}>Cancel</Button>
-    <Button type="submit" {busy}>{busy ? 'Adding…' : 'Add'}</Button>
+    <Button tone="plain" resting={form.busy} onclick={oncancel}>Cancel</Button>
+    <Button type="submit" busy={form.busy}>{form.busy ? 'Adding…' : 'Add'}</Button>
   </div>
 </form>
 

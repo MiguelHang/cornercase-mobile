@@ -48,20 +48,4 @@
     height: calc(5 * var(--unit));
     background: var(--text);
   }
-
-  .pulsing {
-    animation: pulse var(--pulse) ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.3;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .pulsing {
-      animation: none;
-    }
-  }
 </style>

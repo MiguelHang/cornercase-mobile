@@ -40,6 +40,16 @@ describe('Router', () => {
     expect(router.current).toEqual(HOME)
   })
 
+  it('keeps the route on top when it is replaced by the same one', () => {
+    const top = { name: 'home' } as const
+    const router = new Router(NO_MACHINES)
+    router.go(top)
+    router.replace({ name: 'home' })
+    expect(router.current).toBe(top)
+    router.back()
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+
   it('stays on the only route when going back', () => {
     const router = new Router(HOME)
     router.back()
