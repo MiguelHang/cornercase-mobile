@@ -50,6 +50,24 @@ const TEAM = [
   agent(20, 'idle'),
 ]
 
+const FLOW = [
+  agent(30, 'working', { role: 'orchestrator', title: 'Ship login', workspace_count: 1 }),
+  { ...under(31, 'working', 30, 1), role: 'coder', title: 'Write the form' },
+  { ...under(32, 'waiting', 30, 1), role: 'reviewer', title: null, agent: 'codex' },
+  { ...under(33, 'working', 30, 1), tab_name: 'coder' },
+  agent(40, 'working'),
+  { ...under(41, 'working', 40, 1), role: 'coder' },
+  agent(50, 'working', { role: 'coder', tab_name: 'coder' }),
+]
+
+const named = (pane: number, listed: AgentRow[] = FLOW) => {
+  const found = FLOW.find((agent) => agent.pane === pane) ?? agent(pane, null)
+  return [board.label(found, listed), board.place(found, listed)]
+}
+
+const children = (rows: AgentRow[], pane: number) =>
+  board.subagents(rows, pane)?.children.map((item) => [item.row.pane, item.hasChildren, item.hidden, item.attention])
+
 const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
   board
     .items(rows, expanded)
@@ -241,6 +259,72 @@ describe('label', () => {
 
   it.each([null, undefined])('is the name of the agent with %o as its title', (title) => {
     expect(board.label(agent(1, null, { title, agent: 'codex' }))).toBe('codex')
+  })
+})
+
+describe('label and place of a flow', () => {
+  it('names a member by its role and puts its title below', () => {
+    expect(named(31)).toEqual(['coder', 'Write the form'])
+  })
+
+  it('puts the name of the agent below the role when the member has no title', () => {
+    expect(named(32)).toEqual(['reviewer', 'codex'])
+  })
+
+  it('keeps the title of the orchestrator and adds its role to the place', () => {
+    expect(named(30)).toEqual(['Ship login', 'shop · orchestrator'])
+  })
+
+  it.each([
+    ['a member whose parent has no role', 41],
+    ['a member left as a root', 50],
+  ])('shows %s as before', (_, pane) => {
+    expect(named(pane)).toEqual([`Agent ${pane}`, 'shop › login'])
+  })
+
+  it('never takes the role from the name of the tab', () => {
+    expect(named(33)).toEqual(['Agent 33', 'shop › login'])
+  })
+
+  it('shows a member as before when its parent is not listed', () => {
+    expect([named(31, FLOW.slice(1)), named(31, [])]).toEqual([
+      ['Write the form', 'shop › login'],
+      ['Write the form', 'shop › login'],
+    ])
+  })
+})
+
+describe('subagents', () => {
+  it('counts the subagents of every level by status', () => {
+    expect(board.subagents(TEAM, 5)?.line).toBe('3 subagents · 1 waiting, 1 done, 1 working')
+  })
+
+  it('lists the direct children with the attention and count of what is below them', () => {
+    expect(children(TEAM, 5)).toEqual([
+      [7, true, 1, 'waiting'],
+      [12, false, 0, null],
+    ])
+  })
+
+  it('says it in the singular for one subagent', () => {
+    expect(board.subagents(TEAM, 7)?.line).toBe('1 subagent · 1 waiting')
+  })
+
+  it('puts the statuses that need attention first and calls the rest idle', () => {
+    const rows = [agent(1, 'working'), under(2, 'working', 1, 1), under(3, null, 1, 1), under(4, 'waiting', 2, 2)]
+    expect(board.subagents(rows, 1)?.line).toBe('3 subagents · 1 waiting, 1 working, 1 idle')
+  })
+
+  it('says 3 subagents · 1 waiting, 2 working', () => {
+    const rows = [agent(1, 'working'), under(2, 'working', 1, 1), under(3, 'working', 2, 2), under(4, 'waiting', 1, 1)]
+    expect(board.subagents(rows, 1)?.line).toBe('3 subagents · 1 waiting, 2 working')
+  })
+
+  it.each([
+    ['an agent without children', 9],
+    ['a pane that is not listed', 99],
+  ])('is nothing for %s', (_, pane) => {
+    expect(board.subagents(TEAM, pane)).toBeNull()
   })
 })
 

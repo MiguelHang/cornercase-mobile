@@ -17,6 +17,8 @@ export type Row = {
 
 export type Item = { kind: 'header'; key: string; section: Section } | Row
 
+export type Subagents = { children: Row[]; line: string }
+
 type Tree = { roots: AgentRow[]; children: Map<number, AgentRow[]>; expanded: ReadonlySet<number> }
 
 const SECTION_OF: Record<string, Section> = {
@@ -48,6 +50,10 @@ const MAX_DEPTH = 3
 const ATTENTION = ['waiting', 'failed', 'done', 'pending']
 
 const NO_PANES: ReadonlySet<number> = new Set()
+
+const ORCHESTRATOR = 'orchestrator'
+
+const COUNTED = ['waiting', 'failed', 'done', 'pending', 'working', 'shell', 'idle']
 
 export const sectionOf = (status: string | null): Section => SECTION_OF[status ?? ''] ?? 'Idle'
 
@@ -100,6 +106,28 @@ const sectionItems = (made: Tree, section: Section): Item[] => {
   return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => branch(made, agent))]
 }
 
+const closed = (made: Tree, agent: AgentRow) => {
+  const hidden = descendants(made, agent)
+  return row(agent, hidden.length > 0, hidden.length > 0, hidden)
+}
+
+const tally = (agents: AgentRow[]) =>
+  COUNTED.flatMap((status) => {
+    const count = agents.filter((agent) => statusName(agent.status).toLowerCase() === status).length
+    return count === 0 ? [] : [`${count} ${status}`]
+  }).join(', ')
+
+export const subagents = (rows: AgentRow[], pane: number): Subagents | null => {
+  const made = tree(rows, NO_PANES)
+  const children = made.children.get(pane) ?? []
+  if (children.length === 0) {
+    return null
+  }
+  const all = children.flatMap((child) => [child, ...descendants(made, child)])
+  const noun = all.length === 1 ? 'subagent' : 'subagents'
+  return { children: children.map((child) => closed(made, child)), line: `${all.length} ${noun} · ${tally(all)}` }
+}
+
 export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES): Item[] => {
   const made = tree(rows, expanded)
   return SECTIONS.flatMap((section) => sectionItems(made, section))
@@ -120,7 +148,22 @@ export const elapsed = (since: string | null, now: number) => {
   return Number.isNaN(start) ? '' : span(now - start)
 }
 
-export const place = (agent: AgentRow) =>
+const member = (agent: AgentRow, listed: AgentRow[]) =>
+  agent.role !== null &&
+  agent.role !== ORCHESTRATOR &&
+  (listed.find((other) => other.pane === agent.parent)?.role ?? null) !== null
+
+const named = (agent: AgentRow) => agent.title ?? agent.agent
+
+const where = (agent: AgentRow) =>
   agent.workspace_count > 1 ? `${agent.project_name} › ${agent.workspace_name}` : agent.project_name
 
-export const label = (agent: AgentRow) => agent.title ?? agent.agent
+export const place = (agent: AgentRow, listed: AgentRow[] = []) => {
+  if (member(agent, listed)) {
+    return named(agent)
+  }
+  return agent.role === ORCHESTRATOR ? `${where(agent)} · ${ORCHESTRATOR}` : where(agent)
+}
+
+export const label = (agent: AgentRow, listed: AgentRow[] = []) =>
+  (member(agent, listed) ? agent.role : null) ?? named(agent)
