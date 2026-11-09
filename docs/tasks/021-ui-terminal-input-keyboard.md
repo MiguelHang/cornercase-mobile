@@ -37,7 +37,7 @@ historial con el dedo.
 - [x] CA5 — Pegar desde el portapapeles del móvil: un botón que pega (input bracketed si el programa lo pide, lo
   decide cornercase). Con `navigator.clipboard.readText()` y el globo «Paste» de iOS, sin plugin (P4 a); vacío o
   rechazado, un toast. Probado en `ios dev`; falta el build de release (`tauri://`).
-- [ ] CA6 — Probado en simulador **y** en iPhone real: escribir un prompt largo, borrar, flechas, `Ctrl-C`; anotar lo
+- [x] CA6 — Probado en simulador **y** en iPhone real: escribir un prompt largo, borrar, flechas, `Ctrl-C`; anotar lo
   que no funcionó y cómo se resolvió. Hecho en el simulador iPhone Air (iOS 27.2, cornercase 0.13.19, 2026-11-09), en
   una shell y en Claude Code 2.1.319: tres fallos encontrados y arreglados (foco del toque, la fila cerraba el teclado,
   pegar rechazado), en `design/terminal.md` › Typing. Falta el iPhone real, con su lista en el mismo sitio.
