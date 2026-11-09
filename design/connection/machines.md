@@ -54,3 +54,12 @@ A topic of [Connection](../connection.md): the Machines screen's side of the con
   - A probe that answers keeps its `boot` for the same-machine check.
   - Rejected: a `Store` per machine, or watching the others in the background, which costs battery and connections for rows nobody is looking at.
 - **This device** (`src/lib/thisDevice.svelte.ts`): Machines shows the identity's fingerprint, the 10 hex characters of `identity_fingerprint`, in the monospaced font. If there is no identity, it shows the reason instead (Identity).
+- **Checked on 2026-11-09** in the iPhone 17e simulator, iOS 27.2 (Xcode 27.2, macOS 26.6.2), against `cargo run -p cornercase-bridge` on the LAN and Tailscale and a second bridge with its own token on `--loopback`, cornercase 0.13.19, with taps from XCUITest:
+  - `Scan QR code` asked for the camera with the system's dialog, then showed `No camera available on this device (e.g., iOS Simulator)` under `Could not scan the code`; pasting the LAN URL into the same form then worked and connected.
+  - The Tailscale URL in `Add machine` offered `Add as a route of MacBook` because of the token; accepted, the machine had both routes and stayed connected over the LAN.
+  - Moving the LAN route down kept the connection; renaming to `Studio` changed the title and the row in Machines; removing the LAN route, the connected one, reconnected over Tailscale.
+  - The loopback bridge's URL matched by `boot` (`This bridge is the one Studio answers from.`); `Add as a new machine` connected it, and Studio's row read `Answers via …` from its probe.
+  - A tap on the other row switched the active machine; after `xcrun simctl terminate` and a new launch the app connected to the one last chosen.
+  - Deleting the active machine left Machines open, with Studio not connected.
+  - The fingerprint shown matched the one the app logs at start.
+  - Not checked: a real scan, which needs an iPhone.
