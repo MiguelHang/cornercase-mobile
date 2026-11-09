@@ -1,4 +1,4 @@
-import type { AgentRow } from './bindings'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 
 export const SECTIONS = ['Waiting', 'Done', 'Working', 'Idle'] as const
 
@@ -21,7 +21,7 @@ const HOUR = 60 * MINUTE
 
 const DAY = 24 * HOUR
 
-export const sectionOf = (status: string | null | undefined): Section => SECTION_OF[status ?? ''] ?? 'Idle'
+export const sectionOf = (status: string | null): Section => SECTION_OF[status ?? ''] ?? 'Idle'
 
 const header = (section: Section): Item => ({ kind: 'header', key: `section:${section}`, section })
 
@@ -44,7 +44,7 @@ const span = (millis: number) => {
   return millis < DAY ? `${Math.floor(millis / HOUR)} h` : `${Math.floor(millis / DAY)} d`
 }
 
-export const elapsed = (since: string | null | undefined, now: number) => {
+export const elapsed = (since: string | null, now: number) => {
   const start = Date.parse(since ?? '')
   return Number.isNaN(start) ? '' : span(now - start)
 }

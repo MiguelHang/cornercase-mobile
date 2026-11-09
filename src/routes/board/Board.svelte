@@ -1,6 +1,6 @@
 <script lang="ts">
   import { flip } from 'svelte/animate'
-  import type { AgentRow as Agent, ConnectionView_Serialize } from '../../lib/bindings'
+  import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
   import { items } from '../../lib/board'
   import Mark from '../../lib/ui/Mark.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
@@ -31,6 +31,7 @@
 </script>
 
 <section class="board" style:--below="{below}px">
+  <h1 class="spoken">Agents</h1>
   {#if agents === null}
     <div class="waiting">
       <Mark unit={5} pulsing={connection.state === 'connecting'} />
@@ -55,6 +56,15 @@
 <style>
   .board {
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
+  }
+
+  .spoken {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .waiting {

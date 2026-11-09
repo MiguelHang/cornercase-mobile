@@ -1,7 +1,9 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
-import type { AgentRow } from '../../lib/bindings'
+import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import Agent from './Agent.svelte'
+
+const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
 const ROW: AgentRow = {
   agent: 'claude',
@@ -18,7 +20,8 @@ const ROW: AgentRow = {
   project_name: 'web',
 }
 
-const draw = (row: AgentRow | undefined, below = 0) => render(Agent, { props: { row, below, onback: () => {} } }).body
+const draw = (row: AgentRow | null | undefined, below = 0, connection: ConnectionView_Serialize = CONNECTED) =>
+  render(Agent, { props: { row, connection, below, onback: () => {} } }).body
 
 describe('Agent', () => {
   it('shows the status, title and place of its agent', () => {
@@ -40,7 +43,20 @@ describe('Agent', () => {
     expect(body).not.toContain('role="img"')
   })
 
-  it.each([ROW, undefined])('offers going back, with or without its agent', (row) => {
+  it('pulses the mark while it connects, before the first list', () => {
+    const body = draw(null, 0, { state: 'connecting' })
+    expect(body).toMatch(/<span class="cell cursor svelte-[\w-]+ pulsing"><\/span>/)
+    expect(body).not.toContain('no longer running')
+    expect(body).not.toContain('<h1')
+  })
+
+  it('keeps the mark still without a list once it stops connecting', () => {
+    const body = draw(null, 0, { state: 'unauthorized' })
+    expect(body).toMatch(/<span class="cell cursor svelte-[\w-]+"><\/span>/)
+    expect(body).not.toContain('no longer running')
+  })
+
+  it.each([ROW, null, undefined])('offers going back, with or without its agent', (row) => {
     expect(draw(row)).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back/)
   })
 

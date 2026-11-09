@@ -99,8 +99,10 @@ describe('App wiring', () => {
 
   it('opens the agent of the tapped pane, and goes back from it', () => {
     expect(source).toContain(
-      "route.name === 'agent' ? current.agents?.find((agent) => agent.pane === route.pane) : undefined",
+      "route.name === 'agent' && current.agents !== null ? current.agents.find((agent) => agent.pane === route.pane) : null",
     )
-    expect(source).toContain('<Agent row={opened} below={barHeight} onback={() => router.back()} />')
+    expect(source).toContain(
+      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />',
+    )
   })
 })

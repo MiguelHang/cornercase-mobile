@@ -95,12 +95,27 @@ pub(crate) struct Since {
 struct Heard {
     status: Option<String>,
     time: Option<String>,
+    ahead: Option<Ahead>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Ahead {
+    status: Option<String>,
+    time: String,
 }
 
 impl Since {
     pub(crate) fn heard(&mut self, pane: u64, to: Option<&str>, time: &str) {
-        let heard = Heard { status: to.map(str::to_owned), time: Some(time.to_owned()) };
-        self.panes.insert(pane, heard);
+        match self.panes.get_mut(&pane) {
+            Some(heard) if heard.status.as_deref() == to => {
+                heard.time = Some(time.to_owned());
+                heard.ahead = None;
+            }
+            _ => {
+                let ahead = Ahead { status: to.map(str::to_owned), time: time.to_owned() };
+                self.panes.entry(pane).or_default().ahead = Some(ahead);
+            }
+        }
     }
 
     pub(crate) fn reconcile(&mut self, snapshot: &Snapshot) {
@@ -109,6 +124,14 @@ impl Since {
         for place in places(snapshot).filter(|place| place.pane.agent.is_some()) {
             self.see(place.pane);
         }
+    }
+
+    pub(crate) fn doubt(&mut self) -> bool {
+        let mut doubted = false;
+        for heard in self.panes.values_mut() {
+            doubted |= heard.time.take().is_some() | heard.ahead.take().is_some();
+        }
+        doubted
     }
 
     pub(crate) fn clear(&mut self) {
@@ -122,8 +145,11 @@ impl Since {
 
     fn see(&mut self, pane: &Pane) {
         let heard = self.panes.entry(pane.id).or_default();
-        if heard.status != pane.status {
-            *heard = Heard { status: pane.status.clone(), time: None };
+        if let Some(ahead) = heard.ahead.take_if(|ahead| ahead.status == pane.status) {
+            *heard = Heard { status: ahead.status, time: Some(ahead.time), ahead: None };
+        } else if heard.status != pane.status {
+            heard.status.clone_from(&pane.status);
+            heard.time = None;
         }
     }
 }

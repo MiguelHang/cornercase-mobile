@@ -1,14 +1,29 @@
 <script lang="ts">
-  import type { AgentRow } from '../../lib/bindings'
+  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
   import { label, place } from '../../lib/board'
   import Button from '../../lib/ui/Button.svelte'
+  import Mark from '../../lib/ui/Mark.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
-  let { row, below = 0, onback }: { row: AgentRow | undefined; below?: number; onback: () => void } = $props()
+  let {
+    row,
+    connection,
+    below = 0,
+    onback,
+  }: {
+    row: AgentRow | null | undefined
+    connection: ConnectionView_Serialize
+    below?: number
+    onback: () => void
+  } = $props()
 </script>
 
 <section class="agent" style:--below="{below}px">
-  {#if row}
+  {#if row === null}
+    <div class="waiting">
+      <Mark unit={5} pulsing={connection.state === 'connecting'} />
+    </div>
+  {:else if row}
     <header class="head">
       <StatusDot status={row.status} size={20} />
       <div class="lines">
@@ -58,6 +73,12 @@
     color: var(--muted);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .waiting {
+    display: flex;
+    justify-content: center;
+    padding-top: 28px;
   }
 
   .gone {

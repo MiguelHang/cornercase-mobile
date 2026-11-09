@@ -36,6 +36,7 @@ struct Opened<'a> {
 pub(super) async fn follow(shared: &Shared, picked: &Picked) -> Ended {
     let transport = picked.transport.as_ref();
     let route = picked.route.address();
+    shared.doubt();
     let streams = [
         pump(open(transport, EVENTS), going(|line| shared.event(line))).boxed(),
         pump(open(transport, STATUS), |line| shared.status(line, route)).boxed(),
@@ -105,8 +106,19 @@ impl Shared {
     }
 
     fn heard(&self, event: &Event) {
-        if let (What::Status { to, .. }, Some(pane)) = (&event.what, event.pane) {
-            self.state().since.heard(pane, to.as_deref(), &event.time);
+        match (&event.what, event.pane) {
+            (What::Status { to, .. }, Some(pane)) => self.state().since.heard(pane, to.as_deref(), &event.time),
+            (What::Dropped { .. }, _) => {
+                self.state().since.doubt();
+            }
+            _ => {}
+        }
+    }
+
+    fn doubt(&self) {
+        let doubted = self.state().since.doubt();
+        if doubted {
+            self.publish(&Change::Session);
         }
     }
 

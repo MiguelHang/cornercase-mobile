@@ -86,7 +86,7 @@ pub(crate) async fn forward(
 fn touches_agents(change: &Change) -> bool {
     match change {
         Change::Session => true,
-        Change::Event(event) => matches!(event.what, What::Status { .. }),
+        Change::Event(event) => matches!(event.what, What::Status { .. } | What::Dropped { .. }),
         Change::Connection(_) | Change::App | Change::Warning(_) => false,
     }
 }

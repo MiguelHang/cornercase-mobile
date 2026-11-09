@@ -76,13 +76,13 @@ pub(super) fn snapshot(boot: &str, revision: u64, version: &str) -> String {
     json!({"boot": boot, "revision": revision, "version": version}).to_string()
 }
 
-fn status_event(to: &str) -> String {
+pub(super) fn status_event(to: &str) -> String {
     let mut event: Value = serde_json::from_str(events::STATUS).expect("the status event fixture");
     event["to"] = to.into();
     event.to_string()
 }
 
-fn watched(revision: u64, status: &str) -> String {
+pub(super) fn watched(revision: u64, status: &str) -> String {
     let mut watch: Value = serde_json::from_str(snapshots::WATCH).expect("the watch fixture");
     watch["revision"] = revision.into();
     watch["projects"][0]["workspaces"][0]["tabs"][0]["panes"][0]["status"] = status.into();
@@ -219,10 +219,20 @@ mod the_agents {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn have_no_time_for_a_status_event_another_snapshot_contradicted() {
+    async fn keep_the_time_of_a_status_event_through_a_late_snapshot_of_the_status_before() {
         let snapshots = vec![watched(7, "working"), watched(8, "waiting")];
         let lines = [vec![status_event("waiting")], snapshots, vec![line(snapshots::APP)]];
-        assert_eq!(agents_once(lines, 1).await, [agent(4, "waiting", None), agent(5, "working", None)]);
+        assert_eq!(agents_once(lines, 1).await, [agent(4, "waiting", Some(TIME)), agent(5, "working", None)]);
+    }
+
+    #[rstest]
+    #[case::before_the_snapshot(1)]
+    #[case::after_the_snapshot(0)]
+    #[tokio::test(start_paused = true)]
+    async fn have_no_time_once_some_events_were_dropped(#[case] late: usize) {
+        let events = vec![status_event("waiting"), line(events::DROPPED)];
+        let lines = [events, vec![watched(7, "waiting")], vec![line(snapshots::APP)]];
+        assert_eq!(agents_once(lines, late).await, [agent(4, "waiting", None), agent(5, "working", None)]);
     }
 
     #[tokio::test(start_paused = true)]

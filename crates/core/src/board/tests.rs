@@ -27,6 +27,12 @@ fn seen(panes: Vec<Pane>) -> Since {
     since
 }
 
+fn seen_at(pane: u64, status: &str, time: &str) -> Since {
+    let mut since = seen(vec![agent(pane, status)]);
+    since.heard(pane, Some(status), time);
+    since
+}
+
 mod an_event {
     use super::*;
 
@@ -59,7 +65,17 @@ mod an_event {
         let mut since = Since::default();
         since.heard(4, Some("working"), EARLIER);
         since.heard(4, Some("waiting"), LATER);
+        since.reconcile(&snapshot(vec![agent(4, "waiting")]));
         assert_eq!(since.of(4, Some("waiting")), Some(LATER));
+    }
+
+    #[test]
+    fn replaced_gives_no_time_to_the_status_it_said() {
+        let mut since = Since::default();
+        since.heard(4, Some("working"), EARLIER);
+        since.heard(4, Some("waiting"), LATER);
+        since.reconcile(&snapshot(vec![agent(4, "working")]));
+        assert_eq!(since.of(4, Some("working")), None);
     }
 
     #[test]
@@ -77,6 +93,92 @@ mod an_event {
         since.heard(4, None, EARLIER);
         since.reconcile(&snapshot(vec![pane(4, Some("claude"), None)]));
         assert_eq!(since.of(4, None), Some(EARLIER));
+    }
+}
+
+mod an_event_ahead_of_the_snapshot {
+    use super::*;
+
+    fn ahead() -> Since {
+        let mut since = seen(vec![agent(4, "working")]);
+        since.heard(4, Some("working"), EARLIER);
+        since.heard(4, Some("waiting"), LATER);
+        since
+    }
+
+    #[test]
+    fn leaves_the_time_of_the_status_the_snapshot_still_shows() {
+        assert_eq!(ahead().of(4, Some("working")), Some(EARLIER));
+    }
+
+    #[test]
+    fn leaves_the_rows_as_they_were() {
+        let snapshot = snapshot(vec![agent(4, "working")]);
+        assert_eq!(agents(&snapshot, &ahead()), agents(&snapshot, &seen_at(4, "working", EARLIER)));
+    }
+
+    #[test]
+    fn outlives_a_late_snapshot_of_the_status_before() {
+        let mut since = ahead();
+        since.reconcile(&snapshot(vec![agent(4, "working")]));
+        assert_eq!(since.of(4, Some("working")), Some(EARLIER));
+        since.reconcile(&snapshot(vec![agent(4, "waiting")]));
+        assert_eq!(since.of(4, Some("waiting")), Some(LATER));
+    }
+
+    #[test]
+    fn outlives_a_late_snapshot_of_a_status_in_between() {
+        let mut since = seen(vec![agent(4, "working")]);
+        since.heard(4, Some("waiting"), EARLIER);
+        since.heard(4, Some("done"), LATER);
+        since.reconcile(&snapshot(vec![agent(4, "waiting")]));
+        assert_eq!(since.of(4, Some("waiting")), None);
+        since.reconcile(&snapshot(vec![agent(4, "done")]));
+        assert_eq!(since.of(4, Some("done")), Some(LATER));
+    }
+
+    #[test]
+    fn is_dropped_by_an_event_back_to_the_status_seen() {
+        let mut since = ahead();
+        since.heard(4, Some("working"), LATER);
+        assert_eq!(since.of(4, Some("working")), Some(LATER));
+        since.reconcile(&snapshot(vec![agent(4, "waiting")]));
+        assert_eq!(since.of(4, Some("waiting")), None);
+    }
+}
+
+mod doubting {
+    use super::*;
+
+    #[test]
+    fn forgets_every_time_and_keeps_every_status() {
+        let mut since = seen_at(4, "waiting", EARLIER);
+        assert!(since.doubt());
+        assert_eq!(since.of(4, Some("waiting")), None);
+        assert_eq!(since, seen(vec![agent(4, "waiting")]));
+    }
+
+    #[test]
+    fn forgets_an_event_ahead_of_the_snapshot() {
+        let mut since = seen(vec![agent(4, "working")]);
+        since.heard(4, Some("waiting"), EARLIER);
+        assert!(since.doubt());
+        since.reconcile(&snapshot(vec![agent(4, "waiting")]));
+        assert_eq!(since.of(4, Some("waiting")), None);
+    }
+
+    #[test]
+    fn says_so_only_when_there_was_a_time_to_forget() {
+        let mut since = seen(vec![agent(4, "waiting")]);
+        assert!(!since.doubt());
+    }
+
+    #[test]
+    fn takes_the_time_of_an_event_heard_after() {
+        let mut since = seen_at(4, "waiting", EARLIER);
+        since.doubt();
+        since.heard(4, Some("waiting"), LATER);
+        assert_eq!(since.of(4, Some("waiting")), Some(LATER));
     }
 }
 

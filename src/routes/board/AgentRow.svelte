@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AgentRow } from '../../lib/bindings'
+  import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
   import { elapsed, label, place } from '../../lib/board'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 

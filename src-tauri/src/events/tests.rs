@@ -206,6 +206,26 @@ mod the_agents {
         assert_eq!(rows(&recorder), [Some(claude("waiting", None)), Some(claude("waiting", Some(HEARD)))]);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn are_not_sent_again_for_a_status_event_ahead_of_the_snapshot() {
+        let studio = Studio::new();
+        let events = [status_event("working"), status_event("waiting")];
+        let fake = later(serving(&[with_claude(7, "working")]), EVENTS, &events);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("working", None)), Some(claude("working", Some(HEARD)))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_again_without_their_times_once_some_events_were_dropped() {
+        let studio = Studio::new();
+        let dropped = json!({ "time": HEARD, "event": "dropped", "count": 3 }).to_string();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[status_event("waiting"), dropped]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder).last(), Some(&Some(claude("waiting", None))));
+    }
+
     #[rstest]
     #[case::opened(json!({ "time": HEARD, "event": "opened", "kind": "tab", "project": 1, "workspace": 2, "tab": 3 }))]
     #[case::notice(json!({
@@ -311,6 +331,7 @@ mod a_change {
     #[rstest]
     #[case::session(Change::Session, true)]
     #[case::status(event(What::Status { agent: "claude".into(), from: None, to: Some("waiting".into()) }), true)]
+    #[case::dropped(event(What::Dropped { count: 3 }), true)]
     #[case::exited(event(What::Exited { program: "sh".into() }), false)]
     #[case::app(Change::App, false)]
     fn touches_the_agents_only_when_a_row_may_change(#[case] change: Change, #[case] touches: bool) {

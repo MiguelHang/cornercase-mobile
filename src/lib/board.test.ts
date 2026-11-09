@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRow } from './bindings'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as board from './board'
 
 const NOW = Date.parse('2026-11-09T12:00:00.000Z')
@@ -41,7 +41,6 @@ describe('sectionOf', () => {
     ['idle', 'Idle'],
     ['something new', 'Idle'],
     [null, 'Idle'],
-    [undefined, 'Idle'],
   ])('puts %o in %s', (status, section) => {
     expect(board.sectionOf(status)).toBe(section)
   })
@@ -107,7 +106,7 @@ describe('elapsed', () => {
     expect(board.elapsed(ago(millis), NOW)).toBe(text)
   })
 
-  it.each([null, undefined, 'not a time'])('says nothing for %o', (since) => {
+  it.each([null, 'not a time'])('says nothing for %o', (since) => {
     expect(board.elapsed(since, NOW)).toBe('')
   })
 })

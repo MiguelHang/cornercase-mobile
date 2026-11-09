@@ -25,7 +25,9 @@
   const route = $derived(router.current)
   const machine = $derived(route.name !== 'no-machines')
   const opened = $derived(
-    route.name === 'agent' ? current.agents?.find((agent) => agent.pane === route.pane) : undefined,
+    route.name === 'agent' && current.agents !== null
+      ? current.agents.find((agent) => agent.pane === route.pane)
+      : null,
   )
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
@@ -87,7 +89,7 @@
   {#if machine}
     <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
     {#if route.name === 'agent'}
-      <Agent row={opened} below={barHeight} onback={() => router.back()} />
+      <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />
     {:else}
       <Board
         agents={current.agents}

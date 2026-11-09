@@ -1,6 +1,6 @@
 import { render } from 'svelte/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentRow as Agent, ConnectionView_Serialize } from '../../lib/bindings'
+import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
 import Board from './Board.svelte'
 import boardSource from './Board.svelte?raw'
 import rowSource from './AgentRow.svelte?raw'
@@ -116,6 +116,13 @@ describe('Board', () => {
     )
     expect(source.match(/setInterval/g)).toHaveLength(1)
     expect(rowSource).not.toMatch(/setInterval|setTimeout/)
+  })
+
+  it.each([null, [], [at(1, 'waiting')]])('heads the screen with an h1 only a screen reader reads, for %o', (agents) => {
+    expect(draw(agents)).toMatch(/<h1 class="spoken svelte-[\w-]+">Agents<\/h1>/)
+    expect(flat(boardSource)).toContain(
+      '.spoken { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }',
+    )
   })
 
   it('starts below the connection bar', () => {
