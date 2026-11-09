@@ -48,7 +48,7 @@ pub struct ViewLine {
     pub view: ViewInfo,
 }
 
-pub fn argv(tab: u64, size: Size) -> Vec<String> {
+pub(crate) fn argv(tab: u64, size: Size) -> Vec<String> {
     let mut argv = vec!["view".to_owned()];
     argv.extend(on_tab(tab, size));
     argv

@@ -51,23 +51,48 @@ impl Source {
     }
 }
 
-pub struct Live {
-    source: Source,
-    queue: Queue,
-    grid: Grid,
-    redrawing: Option<Instant>,
+pub(crate) struct Followed {
     lines: mpsc::UnboundedReceiver<String>,
     run: Fuse<BoxFuture<'static, End>>,
     ended: Option<Ended>,
 }
 
+impl Followed {
+    pub(crate) fn open(transport: Arc<dyn Transport>, argv: Vec<String>) -> Self {
+        let (out, lines) = listen(only_stdout);
+        let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
+        Self { lines, run, ended: None }
+    }
+
+    pub(crate) async fn next(&mut self) -> Either<String, Ended> {
+        if self.ended.is_none() {
+            let end = match future::select(pin!(self.lines.recv()), &mut self.run).await {
+                Either::Left((Some(line), _)) => return Either::Left(line),
+                Either::Left((None, run)) => run.await,
+                Either::Right((end, _)) => end,
+            };
+            self.ended = Some(ended(end));
+        }
+        match self.lines.try_recv() {
+            Ok(line) => Either::Left(line),
+            Err(_) => Either::Right(self.ended.clone().unwrap_or(Ended::Exited)),
+        }
+    }
+}
+
+pub struct Live {
+    source: Source,
+    queue: Queue,
+    grid: Grid,
+    redrawing: Option<Instant>,
+    followed: Followed,
+}
+
 impl Live {
     #[must_use]
     pub fn open(transport: Arc<dyn Transport>, queue: Queue, source: Source) -> Self {
-        let (out, lines) = listen(only_stdout);
-        let argv = surface(source);
-        let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
-        Self { source, queue, grid: Grid::default(), redrawing: None, lines, run, ended: None }
+        let followed = Followed::open(transport, surface(source));
+        Self { source, queue, grid: Grid::default(), redrawing: None, followed }
     }
 
     #[must_use]
@@ -81,28 +106,13 @@ impl Live {
 
     pub async fn next(&mut self) -> Step {
         loop {
-            let line = match self.heard().await {
+            let line = match self.followed.next().await {
                 Either::Left(line) => line,
                 Either::Right(ended) => return Step::Ended(ended),
             };
             if let Some(step) = self.applied(&line) {
                 return step;
             }
-        }
-    }
-
-    async fn heard(&mut self) -> Either<String, Ended> {
-        if self.ended.is_none() {
-            let end = match future::select(pin!(self.lines.recv()), &mut self.run).await {
-                Either::Left((Some(line), _)) => return Either::Left(line),
-                Either::Left((None, run)) => run.await,
-                Either::Right((end, _)) => end,
-            };
-            self.ended = Some(ended(end));
-        }
-        match self.lines.try_recv() {
-            Ok(line) => Either::Left(line),
-            Err(_) => Either::Right(self.ended.clone().unwrap_or(Ended::Exited)),
         }
     }
 
