@@ -33,10 +33,12 @@ export class AddMachine {
   busy = $state(false)
   #calls: MachineCalls
   #onadded: (machine: number) => void
+  #onrouted: (machine: number) => void
 
-  constructor(calls: MachineCalls, onadded: (machine: number) => void) {
+  constructor(calls: MachineCalls, onadded: (machine: number) => void, onrouted: (machine: number) => void) {
     this.#calls = calls
     this.#onadded = onadded
+    this.#onrouted = onrouted
   }
 
   get held() {
@@ -72,7 +74,8 @@ export class AddMachine {
       return
     }
     this.busy = true
-    this.#settle(await send(() => this.#calls.machineRouteAdd(offer.machine, offer.url)), () => offer.machine)
+    const outcome = await send(() => this.#calls.machineRouteAdd(offer.machine, offer.url))
+    this.#settle(outcome, () => this.#onrouted(offer.machine))
   }
 
   async addNew() {
@@ -114,12 +117,12 @@ export class AddMachine {
   }
 
   async #add(url: string, name: string) {
-    this.#settle(await send(() => this.#calls.machineAdd(url, name)), (machine) => machine)
+    this.#settle(await send(() => this.#calls.machineAdd(url, name)), (machine) => this.#onadded(machine))
   }
 
-  #settle<T>(outcome: Outcome<T>, machine: (data: T) => number) {
+  #settle<T>(outcome: Outcome<T>, done: (data: T) => void) {
     if (outcome.kind === 'done') {
-      this.#onadded(machine(outcome.data))
+      done(outcome.data)
       return
     }
     this.#refuse(outcome)

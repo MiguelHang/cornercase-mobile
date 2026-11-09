@@ -20,6 +20,8 @@
 
   const scanner = new Scanner(barcode, pageClasses)
 
+  $effect(() => () => void scanner.stop())
+
   const scan = async () => {
     const url = await scanner.scan()
     if (url !== null) {

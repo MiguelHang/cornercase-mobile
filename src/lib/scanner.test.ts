@@ -122,6 +122,15 @@ describe('Scanner', () => {
     expect([scanner.state, scanner.error]).toEqual(['idle', null])
   })
 
+  it('stop removes the page class even when the scan never settles', async () => {
+    const { classes, scanner } = plugin({ scan: () => new Promise(() => {}) })
+    void scanner.scan()
+    await settled()
+    expect(classes.has('scanning')).toBe(true)
+    await scanner.stop()
+    expect([scanner.state, classes.has('scanning')]).toEqual(['idle', false])
+  })
+
   it('ignores a code read after the scan was cancelled', async () => {
     const { api, scanner } = plugin()
     api.scan.mockImplementation(async () => {

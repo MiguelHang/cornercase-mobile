@@ -71,20 +71,24 @@ describe('App wiring', () => {
     expect(source).toContain("machines.find((machine) => machine.id === current.machine)?.name ?? ''")
   })
 
+  it('reads the machines before the first screen, so saved machines never show the empty screen', () => {
+    expect(source).toContain('const known = remember(listed) show(screen(state, agents))')
+  })
+
   it('turns a failed machine list into an error toast and connects to nothing then', () => {
     expect(source).toContain("if (listed.status === 'error') { toasts.failed(listed.error) return { machines: [], active: null } }")
-    expect(source).toContain('const first = firstToConnect(remember(listed), state)')
+    expect(source).toContain('const known = remember(listed) show(screen(state, agents)) const first = firstToConnect(known, state)')
   })
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
     )
   })
 
   it('edits the machine asked for, against the names of the others, and reloads the machines after each change', () => {
     expect(source).toContain(
-      "const editing = $derived.by(() => { const route = router.current return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined })",
+      "const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)",
     )
     expect(source).toContain(
       'const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))',
@@ -97,7 +101,7 @@ describe('App wiring', () => {
 
   it('opens a machine with Add route open when Machines asks to scan it again', () => {
     expect(source).toContain(
-      "const rescanning = $derived(router.current.name === 'machine' && router.current.adding === true)",
+      "const rescanning = $derived(route.name === 'machine' && route.adding === true)",
     )
   })
 
@@ -126,17 +130,15 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', pane })} />",
+      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} />",
     )
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
     )
   })
 
-  it('opens the agent of the tapped pane, and goes back from it', () => {
-    expect(source).toContain(
-      "route.name === 'agent' && current.agents !== null ? current.agents.find((agent) => agent.pane === route.pane) : null",
-    )
+  it('opens the agent of the tapped pane on its own machine, and goes back from it', () => {
+    expect(source).toContain('const opened = $derived(openedAgent(route, current))')
     expect(source).toContain(
       '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />',
     )

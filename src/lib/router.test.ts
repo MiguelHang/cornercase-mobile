@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as connection from './connection'
-import { Router, routeFor } from './router.svelte'
+import { openedAgent, Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
 const MACHINES = { name: 'machines' } as const
 const MACHINE = { name: 'machine', id: 2 } as const
-const AGENT = { name: 'agent', pane: 7 } as const
+const AGENT = { name: 'agent', machine: 1, pane: 7 } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -171,5 +172,48 @@ describe('routeFor', () => {
     const current = connection.screen({ machine: 1, connection: CONNECTED }, null)
     const removed = connection.apply(current, { machine: 1, connection: { state: 'none' } })
     expect(routeFor(removed, 2)).toEqual(HOME)
+  })
+})
+
+const row = (pane: number) => ({ pane }) as AgentRow
+
+const on = (machine: number | null, agents: AgentRow[] | null): connection.Screen => ({
+  machine,
+  connection: CONNECTED,
+  agents,
+})
+
+describe('openedAgent', () => {
+  it('finds the row of its pane on the machine it was opened on', () => {
+    const rows = [row(3), row(7)]
+    expect(openedAgent(AGENT, on(1, rows))).toBe(rows[1])
+  })
+
+  it('waits while that machine has not sent its agents yet', () => {
+    expect(openedAgent(AGENT, on(1, null))).toBeNull()
+  })
+
+  it('says the agent is gone once its pane is not listed', () => {
+    expect(openedAgent(AGENT, on(1, [row(3)]))).toBeUndefined()
+  })
+
+  it('says the agent is gone on another machine, even one with a pane of the same id', () => {
+    expect(openedAgent(AGENT, on(2, [row(7)]))).toBeUndefined()
+    expect(openedAgent(AGENT, on(2, null))).toBeUndefined()
+    expect(openedAgent(AGENT, on(null, null))).toBeUndefined()
+  })
+
+  it('opens nothing on another route', () => {
+    expect(openedAgent(HOME, on(1, [row(7)]))).toBeUndefined()
+  })
+
+  it('shows no agent of the new machine on Back from Machines after switching', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(MACHINES)
+    router.setBase(HOME)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+    expect(openedAgent(router.current, on(2, [row(7)]))).toBeUndefined()
   })
 })

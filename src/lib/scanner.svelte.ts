@@ -53,6 +53,7 @@ export class Scanner {
   async stop() {
     this.state = 'idle'
     this.error = null
+    this.#root.remove(SCANNING)
     await this.#api.cancel().catch(() => undefined)
   }
 

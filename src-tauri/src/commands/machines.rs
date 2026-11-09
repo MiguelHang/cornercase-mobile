@@ -32,7 +32,7 @@ pub(crate) fn machine_remove<R: Runtime>(
     remove(&state, &app, MachineId(id))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn machine_rename(state: State<'_, AppState>, id: u64, name: String) -> Result<(), CommandError> {

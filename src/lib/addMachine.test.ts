@@ -29,11 +29,12 @@ const calls = (overrides: Partial<MachineCalls> = {}) => ({
 
 const form = (overrides: Partial<MachineCalls> = {}, url = URL_TEXT, name = '') => {
   const onadded = vi.fn()
+  const onrouted = vi.fn()
   const commands = calls(overrides)
-  const draft = new AddMachine(commands, onadded)
+  const draft = new AddMachine(commands, onadded, onrouted)
   draft.url = url
   draft.name = name
-  return { draft, onadded, commands }
+  return { draft, onadded, onrouted, commands }
 }
 
 const offered = async (why: SameWhy, name = '') => {
@@ -196,18 +197,18 @@ describe('AddMachine offering the same machine', () => {
     expect(draft.offer?.checked).toBe(false)
   })
 
-  it('adds the URL as a route of that machine and hands it over', async () => {
-    const { draft, onadded, commands } = await offered('token')
+  it('adds the URL as a route of that machine and says so, without calling it added', async () => {
+    const { draft, onadded, onrouted, commands } = await offered('token')
     await draft.addRoute()
     expect([commands.machineRouteAdd.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, URL_TEXT]], []])
-    expect(onadded.mock.calls).toEqual([[3]])
+    expect([onrouted.mock.calls, onadded.mock.calls]).toEqual([[[3]], []])
   })
 
   it('adds a new machine instead under the name checked', async () => {
-    const { draft, onadded, commands } = await offered('boot', ' Desk ')
+    const { draft, onadded, onrouted, commands } = await offered('boot', ' Desk ')
     await draft.addNew()
     expect([commands.machineAdd.mock.calls, commands.machineRouteAdd.mock.calls]).toEqual([[[URL_TEXT, 'Desk']], []])
-    expect(onadded.mock.calls).toEqual([[1]])
+    expect([onadded.mock.calls, onrouted.mock.calls]).toEqual([[[1]], []])
   })
 
   it('asks for another name for a new machine when it matched by name, without sending', async () => {
@@ -219,11 +220,11 @@ describe('AddMachine offering the same machine', () => {
 
   it('drops the offer and puts the error in its place when adding the route fails', async () => {
     const failing = { code: 'secrets', message: 'the keychain is locked' } as const
-    const { draft, onadded } = form({ machineMatch: () => same('address'), machineRouteAdd: () => refused(failing) })
+    const { draft, onrouted } = form({ machineMatch: () => same('address'), machineRouteAdd: () => refused(failing) })
     await draft.submit()
     await draft.addRoute()
     expect([draft.formError, draft.offer, draft.busy]).toEqual([failing.message, null, false])
-    expect(onadded).not.toHaveBeenCalled()
+    expect(onrouted).not.toHaveBeenCalled()
   })
 
   it('goes back to the form on Back, and ignores the choices without an offer', async () => {

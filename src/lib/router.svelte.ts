@@ -3,7 +3,7 @@ import type { Screen } from './connection'
 export type Route =
   | { name: 'no-machines' }
   | { name: 'home' }
-  | { name: 'agent'; pane: number }
+  | { name: 'agent'; machine: number | null; pane: number }
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
 
@@ -11,6 +11,13 @@ type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
 export const routeFor = (screen: Screen, known: number): Base =>
   screen.machine === null && known === 0 ? { name: 'no-machines' } : { name: 'home' }
+
+export const openedAgent = (route: Route, screen: Screen) => {
+  if (route.name !== 'agent' || route.machine !== screen.machine) {
+    return undefined
+  }
+  return screen.agents === null ? null : screen.agents.find((agent) => agent.pane === route.pane)
+}
 
 export class Router {
   #stack: Route[] = $state([])

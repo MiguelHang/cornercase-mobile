@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
   import { commands, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
-  import { rowStatus } from '../lib/machineRows'
+  import { rescannable, rowStatus } from '../lib/machineRows'
   import { Probes } from '../lib/probes.svelte'
   import { retryClock } from '../lib/retryClock.svelte'
   import { ThisDevice } from '../lib/thisDevice.svelte'
@@ -18,6 +18,7 @@
     onback,
     onpick,
     onadded,
+    onrouted,
     onedit,
     onrescan,
     probes = new Probes(commands),
@@ -29,6 +30,7 @@
     onback: () => void
     onpick: (machine: number) => void
     onadded: (machine: number) => void
+    onrouted: () => void
     onedit: (machine: number) => void
     onrescan: (machine: number) => void
     probes?: Probes
@@ -39,12 +41,22 @@
 
   let adding = $state(false)
 
+  const connectionOf = (machine: MachineView_Serialize) => (machine.id === active ? connection : null)
+
   const shownFor = (machine: MachineView_Serialize) =>
-    rowStatus(machine, machine.id === active ? connection : null, probes.of(machine.id), clock.elapsed)
+    rowStatus(machine, connectionOf(machine), probes.of(machine.id), clock.elapsed)
 
   const added = (machine: number) => {
     adding = false
     onadded(machine)
+  }
+
+  const routed = (machine: number) => {
+    adding = false
+    if (machine !== active) {
+      void probes.check([machine])
+    }
+    onrouted()
   }
 
   onMount(() => {
@@ -76,7 +88,7 @@
           shown={shownFor(machine)}
           active={machine.id === active}
           checking={machine.id !== active && probes.of(machine.id).state === 'checking'}
-          rejected={machine.id === active && connection.state === 'unauthorized'}
+          rejected={rescannable(connectionOf(machine), probes.of(machine.id))}
           onpick={() => onpick(machine.id)}
           oncheck={() => void probes.check([machine.id])}
           onrescan={() => onrescan(machine.id)}
@@ -88,7 +100,7 @@
   {#if adding}
     <Glass>
       <h2 class="heading adding">Add machine</h2>
-      <MachineForm onadded={added} oncancel={() => (adding = false)} />
+      <MachineForm onadded={added} onrouted={routed} oncancel={() => (adding = false)} />
     </Glass>
   {:else}
     <div class="actions">

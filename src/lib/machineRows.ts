@@ -43,3 +43,6 @@ export const rowStatus = (
   probe: Probe,
   elapsed = 0,
 ): RowStatus => (active === null ? probed(probe) : { ...status(active, machine.name, elapsed), failures: [] })
+
+export const rescannable = (active: ConnectionView_Serialize | null, probe: Probe) =>
+  active === null ? probe.state === 'unauthorized' || probe.state === 'no_token' : active.state === 'unauthorized'

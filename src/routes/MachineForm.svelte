@@ -7,9 +7,13 @@
   import SameOffer from '../lib/ui/SameOffer.svelte'
   import UrlField from '../lib/ui/UrlField.svelte'
 
-  let { onadded, oncancel }: { onadded: (machine: number) => void; oncancel: () => void } = $props()
+  let {
+    onadded,
+    onrouted,
+    oncancel,
+  }: { onadded: (machine: number) => void; onrouted: (machine: number) => void; oncancel: () => void } = $props()
 
-  const form = new AddMachine(commands, (machine) => onadded(machine))
+  const form = new AddMachine(commands, (machine) => onadded(machine), (machine) => onrouted(machine))
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()

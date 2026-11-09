@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ConnectionView_Serialize, MachineView_Serialize } from './bindings'
 import { status } from './connection'
-import { CHECKING, rowStatus, type Probe } from './machineRows'
+import { CHECKING, rescannable, rowStatus, type Probe } from './machineRows'
 
 const MACHINE: MachineView_Serialize = {
   id: 2,
@@ -91,5 +91,25 @@ describe('rowStatus of another machine', () => {
 
   it('carries no route errors while it answers', () => {
     expect(rowStatus(MACHINE, null, { state: 'answers', route: 'ws://studio.lan:9000/' }).failures).toEqual([])
+  })
+})
+
+describe('rescannable', () => {
+  it.each<[string, Probe, boolean]>([
+    ['a rejected token', { state: 'unauthorized' }, true],
+    ['no token', { state: 'no_token' }, true],
+    ['an answer', { state: 'answers', route: 'ws://studio.lan:9000/' }, false],
+    ['no answer', { state: 'no_answer', failures: [] }, false],
+    ['a probe still running', CHECKING, false],
+  ])('sends another machine with %s to scan again or not', (_, probe, expected) => {
+    expect(rescannable(null, probe)).toBe(expected)
+  })
+
+  it.each<[ConnectionView_Serialize, boolean]>([
+    [{ state: 'unauthorized' }, true],
+    [{ state: 'connected', route: 'ws://studio.lan:9000/' }, false],
+    [{ state: 'offline' }, false],
+  ])('follows the connection of the active one, not its last probe (%o)', (connection, expected) => {
+    expect(rescannable(connection, { state: 'no_token' })).toBe(expected)
   })
 })

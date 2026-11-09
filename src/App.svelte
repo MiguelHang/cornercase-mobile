@@ -4,7 +4,7 @@
   import { commands, events, type MachineView_Serialize } from './lib/bindings'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
-  import { Router, routeFor } from './lib/router.svelte'
+  import { openedAgent, Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
@@ -26,16 +26,9 @@
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent')
-  const opened = $derived(
-    route.name === 'agent' && current.agents !== null
-      ? current.agents.find((agent) => agent.pane === route.pane)
-      : null,
-  )
-  const editing = $derived.by(() => {
-    const route = router.current
-    return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined
-  })
-  const rescanning = $derived(router.current.name === 'machine' && router.current.adding === true)
+  const opened = $derived(openedAgent(route, current))
+  const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)
+  const rescanning = $derived(route.name === 'machine' && route.adding === true)
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
@@ -80,8 +73,9 @@
       commands.connectionState(),
       commands.agents(),
     ])
+    const known = remember(listed)
     show(screen(state, agents))
-    const first = firstToConnect(remember(listed), state)
+    const first = firstToConnect(known, state)
     if (first !== null) {
       await join(first)
     }
@@ -116,10 +110,10 @@
         agents={current.agents}
         connection={current.connection}
         below={barHeight}
-        onopen={(pane) => router.go({ name: 'agent', pane })}
+        onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })}
       />
     {/if}
-  {:else if router.current.name === 'machines'}
+  {:else if route.name === 'machines'}
     <Machines
       {machines}
       active={current.machine}
@@ -127,6 +121,7 @@
       onback={() => router.back()}
       onpick={(machine) => void join(machine)}
       onadded={added}
+      onrouted={reload}
       onedit={(machine) => router.go({ name: 'machine', id: machine })}
       onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
     />

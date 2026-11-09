@@ -202,6 +202,25 @@ mod matching_a_url {
         assert_eq!(view, MatchView { found: MatchFound::AlreadySaved { machine: studio.id.0 }, checked: true });
     }
 
+    #[rstest]
+    #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", Some(SameWhy::Address))]
+    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA", Some(SameWhy::Token))]
+    #[case::already_saved(BRIDGE, None)]
+    #[tokio::test(start_paused = true)]
+    async fn answers_an_address_or_a_token_without_asking_the_url(#[case] url: &str, #[case] why: Option<SameWhy>) {
+        let studio = Studio::new();
+        let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), url, "desk").await;
+        let found = why.map_or(MatchFound::AlreadySaved { machine: studio.id.0 }, |why| same(&studio, why));
+        assert_eq!(view, MatchView { found, checked: true });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn still_asks_the_url_after_a_name_match() {
+        let studio = Studio::new();
+        let view = matched(&studio, &answering(contracted(BOOT), Err(asleep())), LAPTOP, "Studio").await;
+        assert_eq!(view, MatchView { found: same(&studio, SameWhy::Name), checked: false });
+    }
+
     #[tokio::test(start_paused = true)]
     async fn saves_nothing() {
         let studio = Studio::new();

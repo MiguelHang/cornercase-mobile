@@ -44,15 +44,27 @@ pub(crate) async fn matching(
     name: &str,
 ) -> Result<MatchView, CommandError> {
     let route = Route::parse(url)?;
+    if let Some(found) = compare(state, &route, name, None, |same| same.why != Why::Name)? {
+        return Ok(MatchView { found, checked: true });
+    }
     let unsaved = Machine { id: MachineId(0), name: name.to_owned(), routes: vec![route.clone()], last_route: None };
     let picked = pick_route(&unsaved, |route: &Route| launcher.transport(route), PickConfig::default()).await.ok();
     let checked = picked.is_some();
     let boot = picked.and_then(|picked| Descriptor::from_value(picked.contract).ok()).map(|found| found.boot().0);
+    let found = compare(state, &route, name, boot.as_deref(), |_| true)?.unwrap_or(MatchFound::None);
+    Ok(MatchView { found, checked })
+}
+
+fn compare(
+    state: &AppState,
+    route: &Route,
+    name: &str,
+    boot: Option<&str>,
+    keep: impl FnOnce(&Same) -> bool,
+) -> Result<Option<MatchFound>, CommandError> {
     let seen = state.seen_boots();
-    state.machines(|machines| {
-        let same = machines.same(&route, name, boot.as_deref(), &seen);
-        Ok(MatchView { found: same.map_or(MatchFound::None, |same| found(machines, same)), checked })
-    })
+    state
+        .machines(|machines| Ok(machines.same(route, name, boot, &seen).filter(keep).map(|same| found(machines, same))))
 }
 
 fn found(machines: &Machines, same: Same) -> MatchFound {

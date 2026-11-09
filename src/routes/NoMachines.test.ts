@@ -60,14 +60,14 @@ describe('NoMachines', () => {
   it('swaps the button for the form inside the card, under the emblem, and back on Cancel', () => {
     const markup = flat(noMachinesSource)
     expect(markup).toContain(
-      '<Emblem icon="server" title="No machines yet" lines={LINES} /> {#if open} <MachineForm {onadded} oncancel={() => (open = false)} /> {:else}',
+      '<Emblem icon="server" title="No machines yet" lines={LINES} /> {#if open} <MachineForm {onadded} onrouted={onadded} oncancel={() => (open = false)} /> {:else}',
     )
     expect(markup).toContain('<Button onclick={() => (open = true)}>Add machine</Button>')
   })
 })
 
 describe('MachineForm', () => {
-  const body = render(MachineForm, { props: { onadded: () => {}, oncancel: () => {} } }).body
+  const body = render(MachineForm, { props: { onadded: () => {}, onrouted: () => {}, oncancel: () => {} } }).body
 
   it('is a form', () => {
     expect(body).toMatch(/^<!--\[--><form class="form svelte-[\w-]+">/)
@@ -104,7 +104,9 @@ describe('MachineForm', () => {
   const script = flat(formSource)
 
   it('submits through AddMachine, with the commands and the handover', () => {
-    expect(script).toContain('const form = new AddMachine(commands, (machine) => onadded(machine))')
+    expect(script).toContain(
+      'const form = new AddMachine(commands, (machine) => onadded(machine), (machine) => onrouted(machine))',
+    )
     expect(script).toContain('event.preventDefault() void form.submit()')
   })
 
@@ -190,6 +192,7 @@ describe('scanning a QR code', () => {
         machineRouteAdd: () => Promise.resolve({ status: 'ok', data: null }),
       },
       onadded,
+      () => {},
     )
     const url = await camera('granted', qrCode).scan()
     await form.fill(url ?? '')
@@ -199,6 +202,7 @@ describe('scanning a QR code', () => {
   it('hands the code read to the form, and nothing when there is none', () => {
     const script = flat(urlFieldSource)
     expect(script).toContain('const scanner = new Scanner(barcode, pageClasses)')
+    expect(script).toContain('$effect(() => () => void scanner.stop())')
     expect(script).toContain('const url = await scanner.scan() if (url !== null) { onscanned(url) }')
     expect(script).toContain('<Button tone="plain" resting={disabled} onclick={() => void scan()}>')
   })

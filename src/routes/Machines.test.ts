@@ -46,7 +46,11 @@ const loaded = async (identityFingerprint: DeviceCalls['identityFingerprint']) =
 
 const FINGERPRINT = () => Promise.resolve({ status: 'ok' as const, data: '0a1b2c3d4e' })
 
-const screen = async (device = loaded(FINGERPRINT), connection: ConnectionView_Serialize = CONNECTED) =>
+const screen = async (
+  device = loaded(FINGERPRINT),
+  connection: ConnectionView_Serialize = CONNECTED,
+  probes: Promise<Probes> = probed(),
+) =>
   render(Machines, {
     props: {
       machines: MACHINES,
@@ -55,9 +59,10 @@ const screen = async (device = loaded(FINGERPRINT), connection: ConnectionView_S
       onback: () => {},
       onpick: () => {},
       onadded: () => {},
+      onrouted: () => {},
       onedit: () => {},
       onrescan: () => {},
-      probes: await probed(),
+      probes: await probes,
       device: await device,
     },
   }).body
@@ -65,6 +70,8 @@ const screen = async (device = loaded(FINGERPRINT), connection: ConnectionView_S
 const rows = (body: string) => body.split(/(?=<li class="machine )/).slice(1)
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
+
+const scanAgain = /<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Scan again/
 
 describe('Machines', () => {
   it('has a header with Back and its title', async () => {
@@ -136,13 +143,22 @@ describe('Machines', () => {
     }
   })
 
-  it('offers Scan again on the active one only while the bridge rejects its token', async () => {
-    const scanAgain = /<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Scan again/
+  it('offers Scan again on the active one while the bridge rejects its token, and on no row that answers', async () => {
     const [active, ...others] = rows(await screen(loaded(FINGERPRINT), { state: 'unauthorized' }))
     expect(active).toMatch(scanAgain)
     expect(active).toContain("The bridge rejected this phone's token: scan its code again in Machines")
     expect(others.filter((row) => scanAgain.test(row))).toEqual([])
     expect(rows(await screen()).filter((row) => scanAgain.test(row))).toEqual([])
+  })
+
+  it('offers Scan again on the others whose probe says their token is rejected or missing', async () => {
+    const views: Record<number, ProbeView> = { 2: { state: 'unauthorized' }, 3: { state: 'no_token' }, 4: PROBED[2] }
+    const probes = new Probes({ machineProbe: (id) => Promise.resolve({ status: 'ok', data: views[id] }) })
+    await probes.check([2, 3, 4])
+    const offered = rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes))).map((row) =>
+      scanAgain.test(row),
+    )
+    expect(offered).toEqual([false, true, true, false])
   })
 
   it('offers adding a machine and shows no form yet', async () => {
@@ -173,8 +189,9 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain('{/if} <Button tone="plain" onclick={onedit}>Edit</Button>')
   })
 
-  it('opens Add route of the active one on Scan again', () => {
-    expect(script).toContain("rejected={machine.id === active && connection.state === 'unauthorized'}")
+  it('opens Add route on Scan again of a machine whose token is rejected or missing', () => {
+    expect(script).toContain('const connectionOf = (machine: MachineView_Serialize) => (machine.id === active ? connection : null)')
+    expect(script).toContain('rejected={rescannable(connectionOf(machine), probes.of(machine.id))}')
     expect(script).toContain('onrescan={() => onrescan(machine.id)}')
     expect(flat(rowSource)).toContain(
       '{#if rejected} <Button tone="plain" onclick={onrescan}>Scan again</Button> {/if}',
@@ -184,13 +201,19 @@ describe('Machines wiring', () => {
   it('counts down a retry of the active one like the bar', () => {
     expect(script).toContain('const clock = retryClock(() => connection)')
     expect(script).toContain(
-      'rowStatus(machine, machine.id === active ? connection : null, probes.of(machine.id), clock.elapsed)',
+      'rowStatus(machine, connectionOf(machine), probes.of(machine.id), clock.elapsed)',
+    )
+  })
+
+  it('closes the form once a route is added, probes that machine again unless active, and leaves the active one alone', () => {
+    expect(script).toContain(
+      'const routed = (machine: number) => { adding = false if (machine !== active) { void probes.check([machine]) } onrouted() }',
     )
   })
 
   it('swaps Add machine for the form, closing it once a machine is added', () => {
     expect(script).toContain('const added = (machine: number) => { adding = false onadded(machine) }')
-    expect(script).toContain('<MachineForm onadded={added} oncancel={() => (adding = false)} />')
+    expect(script).toContain('<MachineForm onadded={added} onrouted={routed} oncancel={() => (adding = false)} />')
     expect(script).toContain('<Button onclick={() => (adding = true)}>Add machine</Button>')
   })
 })
