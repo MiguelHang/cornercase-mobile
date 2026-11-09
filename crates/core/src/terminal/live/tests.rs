@@ -235,6 +235,17 @@ mod a_patch_on_another_base {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn does_not_ask_again_for_patches_one_second_after_a_redraw() {
+        let redraws = Redraws::answering(1);
+        let patch = || Said::Line(on_another_base());
+        let said = vec![Said::Line(one_line(FRAME)), patch(), Said::After(1), patch(), exits()];
+        let fake = FakeTransport::default().script(&ARGV, move |_, out| played(out, said.clone()));
+        let live = Live::open(Arc::new(fake), redraws.queue.clone(), 12, SIZE);
+        assert_eq!(steps(live).await, [whole_frame(), Step::Ended(Ended::Exited)]);
+        assert_eq!(redraws.asked().await, 1);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn asks_again_when_patches_go_on_two_seconds_after_a_redraw_that_brought_nothing() {
         let redraws = Redraws::answering(1);
         let patch = || Said::Line(on_another_base());
@@ -416,6 +427,17 @@ mod a_terminal {
         let surfaces = vec![vec![drawn(), Said::After(5), Said::Ends(Err(Error::Dropped))], vec![drawn()]];
         let mut watched = Watched::after_a_minute(Mac::of(connected(), surfaces)).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (5, "failed"), (6, "replaced")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stays_quiet_about_a_surface_lost_as_the_store_drops_its_transport() {
+        let sessions = vec![
+            vec![session(BOOT, 7, true), Said::After(5), Said::Ends(Err(Error::Dropped))],
+            vec![Said::After(20), session(BOOT, 7, true)],
+        ];
+        let surfaces = vec![vec![drawn(), Said::After(5), Said::Ends(Err(Error::Dropped))], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(sessions, surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
     }
 
     #[tokio::test(start_paused = true)]
