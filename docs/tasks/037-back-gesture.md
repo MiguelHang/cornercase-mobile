@@ -28,7 +28,12 @@ gestos para ir atrás? O por lo menos poner el chevron en vez de un botón Back"
   texto siguen igual. Investigar si WKWebView ofrece `allowsBackForwardNavigationGestures` y por qué no sirve (no hay
   historial de navegación: el router es estado), y anotarlo.
 - [ ] CA4 — Nada que hacer en la base: en el tablero y en `no-machines` el gesto no hace nada.
-- [ ] CA5 — Android (032) puede llamar al mismo `back()` con su botón atrás; anotarlo en `design/look.md`.
+- [ ] CA5 — Android, con la misma barra pero sus convenciones (la app sigue el look de cornercase-gpui, no Material, así
+  que solo cambia lo que el usuario de Android espera del sistema): en Android la barra lleva `←` (`arrow-left`) sin el
+  título de la pantalla anterior y el título a la izquierda; **no** hay gesto de borde propio, porque los dos bordes son
+  el gesto atrás del sistema, y volver va por el atrás del sistema (botón o gesto, con predictive back si Tauri lo
+  permite), que llama al mismo `router.back()` (032, CA3). La variante sale de la plataforma (p. ej. `platform()` del
+  plugin `os` de Tauri o `navigator.userAgent`), en un solo sitio. Anotarlo en `design/look.md`.
 - [ ] CA6 — Comprobado en el simulador (gesto con XCUITest o simctl) y pendiente para el usuario en su iPhone; tests del
   reconocedor del gesto sin DOM (umbral, borde, cancelación).
 - [ ] CA7 — `hx check full` y mutation en verde.
