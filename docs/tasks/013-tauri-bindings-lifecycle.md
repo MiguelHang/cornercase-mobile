@@ -1,6 +1,6 @@
 # 013 — App: comandos y eventos de Tauri con tipos (tauri-specta) y ciclo de vida
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 009, 012
 - Riesgo: medio (tauri-specta para Tauri 2 en versión RC)
 - Rama: `feat/013-tauri-bindings` · PR: `feat: expose the store to the webview with typed commands and events`
@@ -10,16 +10,17 @@ Unir el núcleo a la WebView: comandos y eventos de Tauri con tipos TypeScript g
 la reconexión al volver a primer plano.
 
 ## Criterios de aceptación
-- [ ] CA1 — `src-tauri/src/commands/`: comandos tipados mínimos para lo que hay: `machines_list`, `machine_add(url,
+- [x] CA1 — `src-tauri/src/commands/`: comandos tipados mínimos para lo que hay: `machines_list`, `machine_add(url,
   name)`, `machine_remove`, `connect(machine)`, `connection_state`, `identity_fingerprint`. Errores serializados con
   un tipo propio (código + mensaje), nunca `String` suelto.
-- [ ] CA2 — Eventos tipados: `connection-changed`, `session-changed` (el estado del `Store` o un diff), `toast`.
-- [ ] CA3 — Bindings generados con tauri-specta a `src/lib/bindings.ts` (fichero generado, excluido de
+- [x] CA2 — Eventos tipados: `connection-changed`, `session-changed` (el estado del `Store` o un diff), `toast`.
+- [x] CA3 — Bindings generados con tauri-specta a `src/lib/bindings.ts` (fichero generado, excluido de
   `check-rules`); un test de Rust en CI regenera y falla si el fichero cambia (bindings al día).
-- [ ] CA4 — Ciclo de vida: al volver a primer plano (`RunEvent::Resumed` en móvil) se llama a `resume_now()`; al ir a
-  segundo plano no se hace nada activo (iOS suspende), y al volver no queda ningún stream zombi.
-- [ ] CA5 — `Secrets` de iOS (009) y `MachineStore` de fichero en el directorio de datos de la app conectados al núcleo.
-- [ ] CA6 — Una pantalla Svelte de prueba (se reemplaza en 014) que lista el estado de conexión y el número de
+- [x] CA4 — Ciclo de vida: al volver a primer plano (`RunEvent::Resumed` en móvil) se llama a `resume_now()`; al ir a
+  segundo plano no se hace nada activo (iOS suspende), y al volver no queda ningún stream zombi. En Tauri 2.12.5 la
+  vuelta es `WindowEvent::Resumed`, no `RunEvent::Resumed` (`design/connection/store.md` › In the app).
+- [x] CA5 — `Secrets` de iOS (009) y `MachineStore` de fichero en el directorio de datos de la app conectados al núcleo.
+- [x] CA6 — Una pantalla Svelte de prueba (se reemplaza en 014) que lista el estado de conexión y el número de
   paneles, comprobada en el simulador contra el puente real.
 
 ## Plan B
