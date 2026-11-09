@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rstest::rstest;
 
 use super::*;
@@ -18,6 +20,92 @@ mod address {
     #[case::name("mac.local", "ws://mac.local:8765/")]
     fn shows_as_a_bare_ws_url(#[case] host: &str, #[case] shown: &str) {
         assert_eq!(bridge(host, 8765, None).address().to_string(), shown);
+    }
+}
+
+mod parse {
+    use super::*;
+
+    #[rstest]
+    #[case::ipv4("ws://192.168.1.20:8765/?token=c2VjcmV0LXRva2Vu", "192.168.1.20", 8765)]
+    #[case::ipv6("ws://[fd7a:115c:a1e0::1]:8765/?token=c2VjcmV0LXRva2Vu", "fd7a:115c:a1e0::1", 8765)]
+    #[case::name("ws://mac.local:8765/?token=c2VjcmV0LXRva2Vu", "mac.local", 8765)]
+    #[case::trailing_newline("ws://mac.local:8765/?token=c2VjcmV0LXRva2Vu\n", "mac.local", 8765)]
+    #[case::spaces_around(" \tws://mac.local:8765/?token=c2VjcmV0LXRva2Vu  ", "mac.local", 8765)]
+    #[case::no_port("ws://mac.local/?token=c2VjcmV0LXRva2Vu", "mac.local", 80)]
+    #[case::ipv6_without_port("ws://[fd7a:115c:a1e0::1]/?token=c2VjcmV0LXRva2Vu", "fd7a:115c:a1e0::1", 80)]
+    #[case::upper_case_scheme("WS://mac.local:8765/?token=c2VjcmV0LXRva2Vu", "mac.local", 8765)]
+    #[case::other_parameters("ws://mac.local:8765/?v=1&token=c2VjcmV0LXRva2Vu", "mac.local", 8765)]
+    fn reads_the_address_and_the_token(#[case] url: &str, #[case] host: &str, #[case] port: u16) {
+        assert_eq!(Route::parse(url), Ok(bridge(host, port, Some(TOKEN))));
+    }
+
+    #[test]
+    fn gives_back_the_url_the_bridge_printed() {
+        let url = "ws://[fd7a:115c:a1e0::1]:8765/?token=c2VjcmV0LXRva2Vu";
+        let route = Route::parse(url).expect("read the url");
+        assert_eq!(route.connection_url(), Ok(url.to_owned()));
+    }
+
+    #[rstest]
+    #[case::wss("wss://mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
+    #[case::http("http://mac.local:8765/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
+    #[case::no_scheme("/?token=c2VjcmV0LXRva2Vu", RouteError::Scheme)]
+    #[case::empty_host("ws://:8765/?token=c2VjcmV0LXRva2Vu", RouteError::NoHost)]
+    #[case::empty_brackets("ws://[]:8765/?token=c2VjcmV0LXRva2Vu", RouteError::NoHost)]
+    #[case::port_text("ws://mac.local:port/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
+    #[case::port_sign("ws://mac.local:+8765/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
+    #[case::port_too_high("ws://mac.local:65536/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
+    #[case::port_zero("ws://mac.local:0/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
+    #[case::port_empty("ws://mac.local:/?token=c2VjcmV0LXRva2Vu", RouteError::Port)]
+    #[case::other_path("ws://mac.local:8765/other?token=c2VjcmV0LXRva2Vu", RouteError::Path)]
+    #[case::empty_path("ws://mac.local:8765?token=c2VjcmV0LXRva2Vu", RouteError::Path)]
+    #[case::no_query("ws://mac.local:8765/", RouteError::NoToken)]
+    #[case::no_token("ws://mac.local:8765/?v=c2VjcmV0LXRva2Vu", RouteError::NoToken)]
+    #[case::empty_token("ws://mac.local:8765/?token=", RouteError::EmptyToken)]
+    #[case::bare_token_key("ws://mac.local:8765/?token", RouteError::EmptyToken)]
+    #[case::token_twice("ws://mac.local:8765/?token=c2VjcmV0LXRva2Vu&token=c2VjcmV0LXRva2Vu", RouteError::TokenTwice)]
+    #[case::padding("ws://mac.local:8765/?token=c2VjcmV0LXRva2Vu=", RouteError::TokenCharacters)]
+    #[case::plus("ws://mac.local:8765/?token=c2VjcmV0+LXRva2Vu", RouteError::TokenCharacters)]
+    #[case::escaped("ws://mac.local:8765/?token=c2VjcmV0%2FLXRva2Vu", RouteError::TokenCharacters)]
+    #[case::not_a_url("not a url c2VjcmV0LXRva2Vu", RouteError::NotAUrl)]
+    #[case::unclosed_bracket("ws://[fd7a:115c:a1e0::1:8765/?token=c2VjcmV0LXRva2Vu", RouteError::NotAUrl)]
+    #[case::empty("", RouteError::NotAUrl)]
+    #[case::only_spaces(" \n", RouteError::NotAUrl)]
+    fn refuses_with_its_own_reason_and_without_the_url(#[case] url: &str, #[case] reason: RouteError) {
+        let refused = Route::parse(url).expect_err("refuse the url");
+        assert_eq!(refused, reason);
+        for text in [refused.to_string(), format!("{refused:?}")] {
+            assert!(!text.contains("mac.local"), "{text}");
+            assert!(!text.contains("fd7a"), "{text}");
+            assert!(!text.contains(TOKEN), "{text}");
+        }
+    }
+}
+
+mod route_error {
+    use super::*;
+
+    #[test]
+    fn has_a_message_of_its_own_for_each_reason() {
+        let reasons = [
+            RouteError::NotAUrl,
+            RouteError::Scheme,
+            RouteError::NoHost,
+            RouteError::Port,
+            RouteError::Path,
+            RouteError::NoToken,
+            RouteError::EmptyToken,
+            RouteError::TokenTwice,
+            RouteError::TokenCharacters,
+        ];
+        let messages: HashSet<String> = reasons.iter().map(ToString::to_string).collect();
+        assert_eq!(messages.len(), reasons.len());
+    }
+
+    #[test]
+    fn says_that_only_ws_works() {
+        assert!(RouteError::Scheme.to_string().contains("ws://"));
     }
 }
 
