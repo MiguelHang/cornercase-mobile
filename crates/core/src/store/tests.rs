@@ -1,15 +1,94 @@
 use std::iter;
+use std::sync::PoisonError;
 use std::time::Duration;
 
 use futures_util::FutureExt;
+use futures_util::future::BoxFuture;
+use futures_util::stream::BoxStream;
 use tokio::time::{self, Instant};
 
 use super::*;
 use crate::machines::MachineId;
+use crate::transport::fake::FakeTransport;
+use crate::transport::{Exit, OutSink, Stdin};
+
+mod connect;
+
+const CONTRACT: &[&str] = &["contract", "--json"];
+const LAN: &str = "studio.local";
+const TAILNET: &str = "studio.tailnet.ts.net";
+const TOKEN: &str = "c2VjcmV0LXRva2Vu";
+
+#[derive(Clone, Default)]
+struct Asked(Arc<Mutex<Vec<String>>>);
+
+impl Asked {
+    fn record(&self, host: &str, argv: &[String]) {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).push(format!("{host}: {}", argv.join(" ")));
+    }
+
+    fn all(&self) -> Vec<String> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).clone()
+    }
+}
+
+struct Recording {
+    host: &'static str,
+    fake: FakeTransport,
+    asked: Asked,
+}
+
+impl Transport for Recording {
+    fn run(
+        &self,
+        argv: Vec<String>,
+        stdin: BoxStream<'static, Stdin>,
+        out: OutSink,
+    ) -> BoxFuture<'_, Result<Exit, Error>> {
+        self.asked.record(self.host, &argv);
+        self.fake.run(argv, stdin, out)
+    }
+}
+
+fn route(host: &str) -> Route {
+    Route::parse(&format!("ws://{host}:8765/?token={TOKEN}")).expect("a bridge url")
+}
+
+fn machine(routes: Vec<Route>) -> Machine {
+    Machine { id: MachineId(1), name: "studio".to_owned(), routes, last_route: None }
+}
+
+fn network(
+    hosts: Vec<(&'static str, FakeTransport)>,
+    asked: &Asked,
+) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync + 'static + use<> {
+    let transports: Vec<(&str, Arc<dyn Transport>)> = hosts
+        .into_iter()
+        .map(|(host, fake)| (host, Arc::new(Recording { host, fake, asked: asked.clone() }) as Arc<dyn Transport>))
+        .collect();
+    move |route: &Route| {
+        let found = transports.iter().find(|(host, _)| *host == route.address().host);
+        found.map(|(_, transport)| transport.clone()).ok_or_else(|| Error::Connect("no route to host".to_owned()))
+    }
+}
+
+fn store_on(
+    routes: Vec<Route>,
+    hosts: Vec<(&'static str, FakeTransport)>,
+    asked: &Asked,
+) -> (Store, impl Future<Output = ()> + Send + 'static + use<>) {
+    Store::new(machine(routes), network(hosts, asked), PickConfig::default())
+}
 
 fn unreachable() -> (Store, impl Future<Output = ()> + Send + 'static) {
-    let machine = Machine { id: MachineId(1), name: "studio".to_owned(), routes: Vec::new(), last_route: None };
-    Store::new(machine, |_: &Route| Err(Error::Connect("no network in this test".to_owned())), PickConfig::default())
+    store_on(vec![route(LAN)], Vec::new(), &Asked::default())
+}
+
+async fn settled(store: &Store, driver: impl Future<Output = ()> + Send + 'static) -> Vec<Change> {
+    let mut changes = store.changes();
+    tokio::spawn(driver);
+    time::sleep(Duration::from_secs(60)).await;
+    unread(&mut changes)
 }
 
 fn unread(changes: &mut Changes) -> Vec<Change> {

@@ -10,16 +10,18 @@ use tokio::sync::mpsc;
 use tokio::time;
 
 use self::backoff::Backoff;
+use self::connect::Failure;
 use crate::cli::contract::Missing;
 use crate::cli::events::Event;
 use crate::cli::status::Snapshot;
 use crate::error::Error;
 use crate::machines::Machine;
-use crate::machines::pick::{PickConfig, pick_route};
+use crate::machines::pick::PickConfig;
 use crate::machines::route::{Address, Route};
 use crate::transport::Transport;
 
 mod backoff;
+mod connect;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Connection {
@@ -191,11 +193,17 @@ where
     async fn cycle(&mut self) {
         loop {
             self.shared.set_connection(Connection::Connecting);
-            match pick_route(&self.machine, &self.factory, self.config).await {
+            match self.connect().await {
                 Ok(_picked) => future::pending::<()>().await,
-                Err(error) => self.retry(Error::Connect(error.to_string())).await,
+                Err(Failure::Retry(error)) => self.retry(error).await,
+                Err(Failure::Stop(connection)) => self.stop(connection).await,
             }
         }
+    }
+
+    async fn stop(&self, connection: Connection) {
+        self.shared.set_connection(connection);
+        future::pending::<()>().await;
     }
 
     async fn retry(&mut self, error: Error) {
