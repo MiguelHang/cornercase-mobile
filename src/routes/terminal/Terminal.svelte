@@ -52,7 +52,7 @@
         shown.apply(event.payload)
       }
     })
-    const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, size)
+    const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, { size, fit: false })
     const close = () => commands.terminalClose(row.tab)
     opening = new Opening(unlisten, { open, close, failed: onfailed })
     const unwatch = keyboard.watch()

@@ -44,6 +44,7 @@ const changed = (rows: Record<number, string>, partial: Partial<TerminalChanged_
     replaced: false,
     rows: Object.fromEntries(Object.entries(rows).map(([row, text]) => [row, runs(text)])),
     closed: false,
+    unfitted: false,
     ...partial,
   }
   return event

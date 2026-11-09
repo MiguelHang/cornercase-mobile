@@ -114,6 +114,7 @@ fn closed_terminal() -> Emitted {
         replaced: false,
         rows: BTreeMap::new(),
         closed: true,
+        unfitted: false,
     })
 }
 
@@ -124,7 +125,7 @@ fn closed_terminal_json() -> Value {
         "alternate_scroll": false, "bracketed_paste": false, "application_cursor": false, "focus_events": false,
         "kitty_keyboard": 0 });
     json!({ "machine": 7, "tab": 3, "pane": null, "size": size, "cursor": null, "colours": colours,
-        "modes": modes, "replaced": false, "rows": {}, "closed": true })
+        "modes": modes, "replaced": false, "rows": {}, "closed": true, "unfitted": false })
 }
 
 fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {

@@ -54,7 +54,7 @@ describe('the terminal screen', () => {
   })
 
   it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
-    expect(source).toContain('const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, size)')
+    expect(source).toContain('const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, { size, fit: false })')
     expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab }}')
   })
 
