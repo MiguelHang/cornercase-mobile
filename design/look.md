@@ -77,7 +77,7 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 
 - **The list is one `Glass` card**, in the saved order, a `MachineRow` per machine: its name, then a `ToneDot` and the state's line in that state's colour.
   - The active machine's line is the bar's own text, its countdown included, from the same `retryClock`. The others show their last try (Connection › Machines).
-  - A row that is not active is a button that connects to it, with `Check again` beside it. While it is being checked, `Check again` rests and the spinner takes the dot's place.
+  - A row that is not active is a button that connects to it, with `Check again` beside it (unless its token was rejected or it has none, when `Scan again` takes its place). While it is being checked, `Check again` rests and the spinner takes the dot's place.
   - The active row is `aria-current` and not a button. It shows `Scan again` while its token is rejected (Connection › The connection bar).
   - A row that is not active and whose probe says its token is rejected or missing shows `Scan again` in the place of `Check again`: the token does not change on its own, and adding the route already tries the machine again. So a row holds at most two buttons beside its name and state, as the other rows do; with three, the name and state had little room left at 390 pt (not yet looked at in the simulator). Rejected: wrapping the buttons onto a second line, which makes those rows taller than the others.
   - Every row has `Edit`. The errors of each route sit in a closed `details`, so a row stays short until it is opened.
