@@ -303,10 +303,25 @@ describe('Icon', () => {
     ['chevron-down', 'm6 9 6 6 6-6', ''],
     ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
     ['image-plus', 'M16 5h6', '<circle cx="9" cy="9" r="2"></circle>'],
+    ['check', 'M20 6 9 17l-5-5', ''],
+    ['pencil', 'm15 5 4 4', ''],
+    ['rotate-ccw', 'M3 3v5h5', ''],
+    ['smartphone', 'M12 18h.01', '<rect x="5" y="2" width="14" height="20" rx="2"></rect>'],
+    ['square-check', 'm9 12 2 2 4-4', '<rect x="3" y="3" width="18" height="18" rx="2"></rect>'],
+    ['square-terminal', 'm7 11 2-2-2-2', '<rect x="3" y="3" width="18" height="18" rx="2"></rect>'],
+    ['git-compare', 'M13 6h3a2 2 0 0 1 2 2v7', '<circle cx="18" cy="18" r="3"></circle>'],
   ] as const)('draws %s', (name, path, other) => {
     const body = render(Icon, { props: { name } }).body
     expect(body).toContain(`<path d="${path}"></path>`)
     expect(body).toContain(other)
+  })
+
+  it('draws circle-alert with a circle and two lines, and no path', () => {
+    const body = render(Icon, { props: { name: 'circle-alert' } }).body
+    expect(body).toContain('<circle cx="12" cy="12" r="10"></circle>')
+    expect(body).toContain('<line x1="12" y1="8" x2="12" y2="12"></line>')
+    expect(body).toContain('<line x1="12" y1="16" x2="12.01" y2="16"></line>')
+    expect(body).not.toContain('<path')
   })
 })
 

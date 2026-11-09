@@ -72,6 +72,11 @@ pub struct Size {
     pub rows: u16,
 }
 
+pub(crate) fn on_tab(tab: u64, size: Size) -> [String; 6] {
+    let (tab, cols, rows) = (tab.to_string(), size.cols.to_string(), size.rows.to_string());
+    ["--tab".to_owned(), tab, "--cols".to_owned(), cols, "--rows".to_owned(), rows]
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Node {

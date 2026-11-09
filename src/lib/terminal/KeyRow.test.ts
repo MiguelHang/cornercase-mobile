@@ -55,8 +55,15 @@ describe('KeyRow', () => {
     expect(keyRowSource).toContain('ontouchend={(event) => event.preventDefault()}')
   })
 
+  it.each(['Up', 'Down', 'Left', 'Right'])('draws %s as an icon named for screen readers', (name) => {
+    const drawn = `<button class="key svelte-[\\w-]+" type="button" aria-label="${name}"><svg [^>]*width="20"`
+    expect(row()).toMatch(new RegExp(drawn))
+  })
+
   it.each([
-    '.key { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 0; min-height: 44px;',
+    '.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(52px, 1fr)); gap: 4px;',
+    '.key { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 8px;',
+    'font-size: 15px; white-space: nowrap; }',
     '.armed { border-color: var(--accent);',
   ])('holds %s', (text) => {
     expect(flat(keyRowSource)).toContain(text)

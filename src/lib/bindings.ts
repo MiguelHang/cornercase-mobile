@@ -23,7 +23,7 @@ export const commands = {
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
-	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
+	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
 	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
@@ -31,11 +31,16 @@ export const commands = {
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
 	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
+	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
+	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
+	changesFollow: (workspace: number, mode: Mode) => typedError<null, CommandError>(__TAURI_INVOKE("changes_follow", { workspace, mode })),
+	changesUnfollow: (workspace: number) => __TAURI_INVOKE<void>("changes_unfollow", { workspace }),
 };
 
 /** Events */
 export const events = {
 	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
+	changesChanged: makeEvent<ChangesChanged_Serialize, ChangesChanged_Deserialize>("changes-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
 	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
@@ -104,6 +109,70 @@ export type AgentsChanged_Serialize = {
 };
 
 export type Button = "left" | "middle" | "right";
+
+export type ChangedFile = ChangedFile_Serialize | ChangedFile_Deserialize;
+
+export type ChangedFile_Deserialize = {
+	path?: string,
+	old_path?: string | null,
+	status?: Status_Deserialize,
+	added?: number,
+	removed?: number,
+	fold?: Fold_Deserialize,
+	viewed?: boolean,
+	staged?: Staged_Deserialize | null,
+	digest?: string,
+};
+
+export type ChangedFile_Serialize = {
+	path: string,
+	old_path: string | null,
+	status: Status_Serialize,
+	added: number,
+	removed: number,
+	fold: Fold_Serialize,
+	viewed: boolean,
+	staged: Staged_Serialize | null,
+	digest: string,
+};
+
+export type ChangedWorkspace = ChangedWorkspace_Serialize | ChangedWorkspace_Deserialize;
+
+export type ChangedWorkspace_Deserialize = {
+	project?: number,
+	workspace?: number,
+	base?: string | null,
+	added?: number,
+	removed?: number,
+	files?: ChangedFile_Deserialize[],
+};
+
+export type ChangedWorkspace_Serialize = {
+	project: number,
+	workspace: number,
+	base: string | null,
+	added: number,
+	removed: number,
+	files: ChangedFile_Serialize[],
+};
+
+export type ChangesChanged = ChangesChanged_Serialize | ChangesChanged_Deserialize;
+
+export type ChangesChanged_Deserialize = {
+	machine: number,
+	workspace: number,
+	mode: Mode,
+	summary?: Summary_Deserialize | null,
+	closed: boolean,
+};
+
+export type ChangesChanged_Serialize = {
+	machine: number,
+	workspace: number,
+	mode: Mode,
+	summary: Summary_Serialize | null,
+	closed: boolean,
+};
 
 export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
 
@@ -182,7 +251,29 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
+
+export type Fold = Fold_Serialize | Fold_Deserialize;
+
+export type Fold_Deserialize = "open" | "lockfile" | "binary" | "large" | string;
+
+export type Fold_Serialize = "open" | "lockfile" | "binary" | "large" | "other";
+
+export type Hunk = Hunk_Serialize | Hunk_Deserialize;
+
+export type Hunk_Deserialize = {
+	old_start?: number,
+	new_start?: number,
+	context?: string,
+	lines?: Line_Deserialize[],
+};
+
+export type Hunk_Serialize = {
+	old_start: number,
+	new_start: number,
+	context: string,
+	lines: Line_Serialize[],
+};
 
 export type InputEvent = InputEvent_Serialize | InputEvent_Deserialize;
 
@@ -224,6 +315,32 @@ export type LastMessage_Serialize = {
 	text: string,
 	written: string | null,
 	turn_over: boolean | null,
+};
+
+export type Line = Line_Serialize | Line_Deserialize;
+
+export type LineKind = LineKind_Serialize | LineKind_Deserialize;
+
+export type LineKind_Deserialize = "context" | "removed" | "added" | string;
+
+export type LineKind_Serialize = "context" | "removed" | "added" | "other";
+
+export type Line_Deserialize = {
+	kind?: LineKind_Deserialize,
+	old?: number | null,
+	new?: number | null,
+	text?: string,
+	raw?: string | null,
+	emphasis?: ([number, number])[],
+};
+
+export type Line_Serialize = {
+	kind: LineKind_Serialize,
+	old: number | null,
+	new: number | null,
+	text: string,
+	raw: string | null,
+	emphasis: ([number, number])[],
 };
 
 export type MachineList = MachineList_Serialize | MachineList_Deserialize;
@@ -280,6 +397,8 @@ export type Missing_Serialize = {
 	kind: Kind,
 	reason: string | null,
 };
+
+export type Mode = "uncommitted" | "commits" | "all";
 
 export type Modes = Modes_Serialize | Modes_Deserialize;
 
@@ -371,6 +490,20 @@ export type Pasted_Serialize = {
 	bytes: number,
 };
 
+export type Patch = Patch_Serialize | Patch_Deserialize;
+
+export type Patch_Deserialize = {
+	workspace?: number,
+	mode?: Mode,
+	hunks?: Hunk_Deserialize[],
+} & ChangedFile_Deserialize;
+
+export type Patch_Serialize = {
+	workspace: number,
+	mode: Mode,
+	hunks: Hunk_Serialize[],
+} & ChangedFile_Serialize;
+
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
@@ -401,6 +534,18 @@ export type Run_Serialize = {
 
 export type SameWhy = "address" | "boot" | "name";
 
+export type Shape = Shape_Serialize | Shape_Deserialize;
+
+export type Shape_Deserialize = {
+	size: Size_Deserialize,
+	fit: boolean,
+};
+
+export type Shape_Serialize = {
+	size: Size_Serialize,
+	fit: boolean,
+};
+
 export type Size = Size_Serialize | Size_Deserialize;
 
 export type Size_Deserialize = {
@@ -412,6 +557,12 @@ export type Size_Serialize = {
 	cols: number,
 	rows: number,
 };
+
+export type Staged = Staged_Serialize | Staged_Deserialize;
+
+export type Staged_Deserialize = "no" | "partly" | "yes" | string;
+
+export type Staged_Serialize = "no" | "partly" | "yes" | "other";
 
 export type StartAgent = {
 	project: number,
@@ -451,6 +602,18 @@ export type Started_Serialize = {
 	warning: string | null,
 };
 
+export type State = State_Serialize | State_Deserialize;
+
+export type State_Deserialize = "loading" | "ready" | "failed" | string;
+
+export type State_Serialize = "loading" | "ready" | "failed" | "other";
+
+export type Status = Status_Serialize | Status_Deserialize;
+
+export type Status_Deserialize = "modified" | "added" | "deleted" | "renamed" | "untracked" | string;
+
+export type Status_Serialize = "modified" | "added" | "deleted" | "renamed" | "untracked" | "other";
+
 export type Style = Style_Serialize | Style_Deserialize;
 
 export type Style_Deserialize = {
@@ -485,6 +648,30 @@ export type Style_Serialize = {
 	strikethrough: boolean,
 };
 
+export type Summary = Summary_Serialize | Summary_Deserialize;
+
+export type Summary_Deserialize = {
+	boot?: string,
+	stream?: number,
+	revision?: number,
+	scope?: string,
+	mode?: Mode,
+	state?: State_Deserialize,
+	error?: string | null,
+	workspaces?: ChangedWorkspace_Deserialize[],
+};
+
+export type Summary_Serialize = {
+	boot: string,
+	stream: number,
+	revision: number,
+	scope: string,
+	mode: Mode,
+	state: State_Serialize,
+	error: string | null,
+	workspaces: ChangedWorkspace_Serialize[],
+};
+
 export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;
 
 export type TerminalChanged_Deserialize = {
@@ -498,6 +685,7 @@ export type TerminalChanged_Deserialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Deserialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type TerminalChanged_Serialize = {
@@ -511,6 +699,7 @@ export type TerminalChanged_Serialize = {
 	replaced: boolean,
 	rows: { [key in number]: Run_Serialize[] },
 	closed: boolean,
+	unfitted: boolean,
 };
 
 export type Toast = {
@@ -525,6 +714,24 @@ export type UnderlineKind = UnderlineKind_Serialize | UnderlineKind_Deserialize;
 export type UnderlineKind_Deserialize = "double" | "curly" | "dotted" | "dashed" | string;
 
 export type UnderlineKind_Serialize = "double" | "curly" | "dotted" | "dashed" | "other";
+
+export type ViewedFile = ViewedFile_Serialize | ViewedFile_Deserialize;
+
+export type ViewedFile_Deserialize = {
+	workspace: number,
+	path: string,
+	viewed: boolean,
+	digest?: string | null,
+	mode: Mode,
+};
+
+export type ViewedFile_Serialize = {
+	workspace: number,
+	path: string,
+	viewed: boolean,
+	digest: string | null,
+	mode: Mode,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

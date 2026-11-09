@@ -9,6 +9,7 @@
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
+  import { ChangesState } from './lib/changes.svelte'
   import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
@@ -18,6 +19,8 @@
   import ToastStack from './lib/ui/Toasts.svelte'
   import Agent from './routes/agent/Agent.svelte'
   import Board from './routes/board/Board.svelte'
+  import Changes from './routes/changes/Changes.svelte'
+  import Diff from './routes/changes/Diff.svelte'
   import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
@@ -52,6 +55,24 @@
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
   const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)
+  const reviewed = $derived(router.reviewed)
+  const reviewedMachine = $derived(reviewed?.machine ?? null)
+  const reviewedWorkspace = $derived(reviewed?.workspace ?? null)
+  const changes = $derived(
+    reviewedMachine === null || reviewedWorkspace === null
+      ? null
+      : new ChangesState(
+          reviewedMachine,
+          reviewedWorkspace,
+          {
+            follow: commands.changesFollow,
+            unfollow: commands.changesUnfollow,
+            read: commands.changesFile,
+            mark: commands.changesViewed,
+          },
+          (toast) => toasts.push(toast),
+        ),
+  )
 
   $effect(() => {
     const { machine, agents } = current
@@ -67,6 +88,19 @@
     }
   })
 
+  $effect(() => {
+    const state = changes
+    if (state === null) {
+      return
+    }
+    const listening = events.changesChanged.listen((event) => state.see(event.payload))
+    listening.then(() => state.start()).catch(toasts.failed)
+    return () => {
+      state.stop()
+      listening.then((unlisten) => unlisten()).catch(toasts.failed)
+    }
+  })
+
   const show = (next: Screen) => {
     current = next
     router.setBase(routeFor(next, machines.length))
@@ -76,6 +110,24 @@
     if (current.machine !== null) {
       router.go({ name: 'terminal', machine: current.machine, row })
     }
+  }
+
+  const review = (workspace: number, title: string) => {
+    if (current.machine !== null) {
+      router.go({ name: 'changes', machine: current.machine, workspace, title })
+    }
+  }
+
+  const change = (path: string) => {
+    if (changes !== null) {
+      void changes.open(path)
+      router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path })
+    }
+  }
+
+  const leaveDiff = () => {
+    changes?.closeDiff()
+    router.back()
   }
 
   const start = () => {
@@ -200,7 +252,16 @@
         onback={() => router.back()}
         onfailed={(message) => toasts.push({ level: 'error', message })}
         onterminal={terminal}
+        onchanges={review}
       />
+    {/if}
+  {:else if route.name === 'changes'}
+    {#if changes !== null}
+      <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} />
+    {/if}
+  {:else if route.name === 'change'}
+    {#if changes !== null}
+      <Diff path={route.path} {changes} onback={leaveDiff} />
     {/if}
   {:else if route.name === 'start'}
     <Start

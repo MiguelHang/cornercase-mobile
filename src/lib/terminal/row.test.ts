@@ -23,7 +23,7 @@ describe('press', () => {
   it('arms Ctrl for the next key and sends nothing', async () => {
     const row = pressing()
     await press(keyOf('Ctrl'), row.with)
-    await press(keyOf('↑'), row.with)
+    await press(keyOf('Up'), row.with)
     expect([row.sent, row.ctrl.armed]).toEqual([[[{ key: { code: 'up', mods: ['ctrl'] } }]], false])
   })
 

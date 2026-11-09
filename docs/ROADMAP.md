@@ -60,6 +60,9 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 028 | [Cambio de red en iOS (NWPathMonitor)](tasks/028-ios-network-change.md) ⚠ | 013 | ~300 |
 | 035 | [Una máquina, un código: el puente da todas sus rutas y la app elige](tasks/035-one-code-per-machine.md) | 027, 028 | ~500 |
 | 036 | [Chat: ver lo que has enviado y qué está haciendo el agente](tasks/036-chat-feedback.md) | 016, 017, 018 | ~400 |
+| 037 | [Volver atrás con el gesto de iOS y un chevron en todas las pantallas](tasks/037-back-gesture.md) | 036 | ~350 |
+| 038 | [Tablero: los subagentes, bajo su agente y plegados](tasks/038-board-subagents.md) | 015 | ~450 |
+| 039 | [Chat: ver las preguntas y menús del agente sin ir a la terminal](tasks/039-chat-shows-questions.md) | 036, 020 | ~450 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
@@ -78,7 +81,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
-· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
+· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `037`, `038`, `039` (antes de Android; pedidas por el usuario el 2026-11-09) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
 - 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
@@ -91,7 +94,7 @@ Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020
 | Keystore de Android desde Rust | 031 | plugin de Tauri en Kotlin con `AndroidKeyStore` que cifra la semilla Ed25519 |
 | Detectar cambios de red (NWPathMonitor / ConnectivityManager) | 028 (hecha; en un iPhone, la 029), 032 | reintentar al volver a primer plano y al fallar un stream (ya en 013/012) |
 | iOS suspende los sockets en segundo plano | 012, 013 | reabrir streams al volver, reconstruir con `boot` |
-| Teclado y gestos del WebView (foco, teclado virtual sobre la página, swipe) | 021, 032 (en la 016, hecha, el campo del chat ya queda sobre el teclado en el simulador; falta el ajuste fino) | `visualViewport` + `interactive-widget=resizes-content`, como `browser-access.md` de cornercase-terminal |
+| Teclado y gestos del WebView (foco, teclado virtual sobre la página, swipe) | 021, 032 (en la 016, hecha, el campo del chat ya queda sobre el teclado en el simulador; en la 036, hecha, la cabecera fija del chat y la barra de conexión salen de la vista con el teclado abierto y no tapan el campo; falta el ajuste fino) | `visualViewport` + `interactive-widget=resizes-content`, como `browser-access.md` de cornercase-terminal |
 | tauri-specta en versión RC para Tauri 2 | 013 | tipos TS escritos a mano + test de que coinciden con un JSON de ejemplo |
 | Rendimiento de la terminal con patches frecuentes | 019, 020 | aplicar en Rust y emitir solo filas cambiadas; canvas si el DOM no llega |
 | Versión de cornercase en el Mac | 010 | la comprobación de `contract` dice qué falta |

@@ -27,20 +27,21 @@
       class:armed={key.kind === 'ctrl' && ctrl.armed}
       type="button"
       aria-pressed={key.kind === 'ctrl' ? ctrl.armed : undefined}
-      aria-label={key.kind === 'paste' ? key.label : undefined}
+      aria-label={key.icon === undefined ? undefined : key.label}
       {disabled}
       onpointerup={() => pressed(key)}
       onclick={(event) => byKeyboard(event) && pressed(key)}
       ontouchstart={() => {}}
       ontouchend={(event) => event.preventDefault()}
-      >{#if key.kind === 'paste'}<Icon name={key.icon} size={20} />{:else}{key.label}{/if}</button
+      >{#if key.icon === undefined}{key.label}{:else}<Icon name={key.icon} size={20} />{/if}</button
     >
   {/each}
 </div>
 
 <style>
   .keys {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
     gap: 4px;
     padding: 4px;
     border-top: 1px solid var(--border);
@@ -49,18 +50,17 @@
 
   .key {
     display: flex;
-    flex: 1 1 0;
     align-items: center;
     justify-content: center;
-    min-width: 0;
     min-height: 44px;
-    padding: 0;
+    padding: 0 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-control);
     background: var(--hover);
     color: var(--soft);
     font-family: var(--font-mono);
     font-size: 15px;
+    white-space: nowrap;
   }
 
   .key:active {

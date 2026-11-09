@@ -240,4 +240,66 @@ mod an_active_store {
         let kept = active.as_ref().map(|active| (active.machine(), active.store().session()));
         assert_eq!(kept, Some((MachineId(2), None)));
     }
+
+    fn task(marker: &Arc<()>) -> JoinHandle<()> {
+        let marker = Arc::clone(marker);
+        JoinHandle::Tokio(tokio::spawn(async move {
+            future::pending::<()>().await;
+            drop(marker);
+        }))
+    }
+
+    fn holds(marker: &Arc<()>) -> bool {
+        Arc::strong_count(marker) > 1
+    }
+
+    struct Both {
+        active: Active,
+        changes: Arc<()>,
+        terminal: Arc<()>,
+    }
+
+    fn both() -> Both {
+        let Running { mut active, .. } = running(1, idle);
+        let (changes, terminal) = (Arc::new(()), Arc::new(()));
+        active.follow(2, task(&changes));
+        active.show(3, task(&terminal));
+        Both { active, changes, terminal }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_following_changes_while_a_terminal_comes_and_goes() {
+        let Both { mut active, changes, terminal } = both();
+        active.hide(3);
+        released(&terminal).await;
+        assert!(holds(&changes));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_the_terminal_while_changes_are_followed_again_and_dropped() {
+        let Both { mut active, changes, terminal } = both();
+        let next = Arc::new(());
+        active.follow(4, task(&next));
+        released(&changes).await;
+        active.unfollow(4);
+        released(&next).await;
+        assert!(holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_both_when_another_workspace_is_unfollowed_or_another_tab_hidden() {
+        let Both { mut active, changes, terminal } = both();
+        active.unfollow(3);
+        active.hide(2);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&changes) && holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_both_when_dropped() {
+        let Both { active, changes, terminal } = both();
+        drop(active);
+        released(&changes).await;
+        released(&terminal).await;
+    }
 }
