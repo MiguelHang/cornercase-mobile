@@ -32,6 +32,10 @@ pub enum Error {
     InputRejected(String),
     #[error("the app sends no key named {0:?}")]
     UnknownKey(String),
+    #[error("the image is empty: there is nothing to paste")]
+    ImageEmpty,
+    #[error("the image is over {most} MiB, the most cornercase pastes", most = crate::cli::paste_file::MAX_IMAGE_BYTES >> 20)]
+    ImageTooLarge,
     #[error("cornercase's output is not the expected JSON: {0}")]
     Json(String),
     #[error("cannot read or write the saved machines: {0}")]
