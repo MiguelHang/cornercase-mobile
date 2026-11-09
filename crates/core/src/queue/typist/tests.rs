@@ -334,6 +334,23 @@ mod ended {
     }
 
     #[tokio::test]
+    async fn tells_a_refusal_that_came_with_the_end_of_the_typist() {
+        let script = |mut stdin: BoxStream<'static, Stdin>, mut out: OutSink| {
+            async move {
+                stdin.next().await;
+                say(&mut out, REFUSED).await?;
+                Ok(exit(1, NO_SERVER))
+            }
+            .boxed()
+        };
+        let (mut typist, mut notices) = typist(script);
+        type_keys(&mut typist, &[(9, "a")]).await;
+        assert_eq!(typist.ended().await, Typed::Gone);
+        let told = notices.taken();
+        assert_eq!(told.first(), Some(&Error::InputRejected("there is no pane 9".to_owned())));
+    }
+
+    #[tokio::test]
     async fn comes_at_once_and_says_nothing_more_once_the_typist_is_over() {
         let (mut typist, mut notices) = typist(ending(0, 0, Ok(exit(1, NO_SERVER))));
         assert_eq!(typist.ended().await, Typed::Gone);
