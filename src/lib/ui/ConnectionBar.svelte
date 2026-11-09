@@ -1,38 +1,31 @@
 <script lang="ts">
   import type { ConnectionView_Serialize } from '../bindings'
   import { status } from '../connection'
-
-  const TICK_MS = 1000
+  import { retryClock } from '../retryClock.svelte'
+  import Icon from './Icon.svelte'
+  import StatusDot from './StatusDot.svelte'
 
   let {
     connection,
     machineName,
     height = $bindable(0),
+    onmachines,
   }: {
     connection: ConnectionView_Serialize
     machineName: string
     height?: number
+    onmachines: () => void
   } = $props()
 
-  let elapsed = $state(0)
+  const clock = retryClock(() => connection)
 
-  $effect(() => {
-    elapsed = 0
-    if (connection.state !== 'retrying') {
-      return
-    }
-    const since = Date.now()
-    const timer = setInterval(() => (elapsed = Date.now() - since), TICK_MS)
-    return () => clearInterval(timer)
-  })
-
-  const shown = $derived(status(connection, machineName, elapsed))
+  const shown = $derived(status(connection, machineName, clock.elapsed))
   const counting = $derived(connection.state === 'retrying')
 </script>
 
 <div class="connection" role="status">
   <div class="row" bind:clientHeight={height}>
-    <span class="dot {shown.tone}" class:pulsing={shown.pulsing}></span>
+    <StatusDot tone={shown.tone} pulsing={shown.pulsing} />
     <span class="lines">
       <span class="line text" aria-hidden={counting ? 'true' : undefined}>{shown.text}</span>
       {#if counting}
@@ -42,6 +35,9 @@
         <span class="line detail">{shown.detail}</span>
       {/if}
     </span>
+    <button class="machines" type="button" aria-label="Machines" onclick={onmachines} ontouchstart={() => {}}>
+      <Icon name="server" size={20} />
+    </button>
   </div>
 </div>
 
@@ -66,25 +62,6 @@
     gap: 10px;
     min-height: 44px;
     padding: var(--gap) var(--inset-wide);
-  }
-
-  .dot {
-    flex: none;
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-  }
-
-  .working {
-    background: var(--working);
-  }
-
-  .done {
-    background: var(--done);
-  }
-
-  .failed {
-    background: var(--failed);
   }
 
   .lines {
@@ -117,5 +94,24 @@
   .detail {
     color: var(--muted);
     font-size: 12px;
+  }
+
+  .machines {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: calc(-1 * var(--gap)) calc(-1 * var(--gap)) calc(-1 * var(--gap)) 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--soft);
+  }
+
+  .machines:active {
+    background: var(--hover);
   }
 </style>

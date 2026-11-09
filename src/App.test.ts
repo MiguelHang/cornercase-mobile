@@ -73,6 +73,12 @@ describe('App wiring', () => {
     expect(source).toContain('const first = firstToConnect(remember(listed), state)')
   })
 
+  it('opens Machines from the bar, with the list, the active machine and its connection', () => {
+    expect(source).toContain(
+      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} />",
+    )
+  })
+
   it('listens before loading, and sends toasts and failures to the stack', () => {
     expect(source).toContain('events.toast.listen((event) => toasts.push(event.payload)),')
     expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed)')
@@ -80,8 +86,9 @@ describe('App wiring', () => {
 
   it('shows the connection bar only at home, and puts home and the toasts below it', () => {
     expect(source).toContain(
-      '{#if home} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> <Home screen={current} below={barHeight} /> {:else} <NoMachines onadded={added} /> {/if}',
+      '{#if home} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: \'machines\' })} /> <Home screen={current} below={barHeight} />',
     )
+    expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={home ? barHeight : 0} />',
     )

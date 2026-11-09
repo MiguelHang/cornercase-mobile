@@ -7,6 +7,7 @@ export type ProbeCalls = Pick<typeof commands, 'machineProbe'>
 export class Probes {
   #results = $state<Record<number, Probe>>({})
   #calls: ProbeCalls
+  #active: number | null = null
 
   constructor(calls: ProbeCalls) {
     this.#calls = calls
@@ -14,6 +15,17 @@ export class Probes {
 
   of(machine: number): Probe {
     return this.#results[machine] ?? CHECKING
+  }
+
+  open(machines: number[], active: number | null) {
+    this.#active = active
+    return this.check(machines.filter((machine) => machine !== active))
+  }
+
+  follow(active: number | null) {
+    const left = this.#active
+    this.#active = active
+    return left === null || left === active ? Promise.resolve() : this.check([left])
   }
 
   async check(machines: number[]) {

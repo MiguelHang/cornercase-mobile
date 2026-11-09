@@ -9,6 +9,7 @@
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
   import Home from './routes/Home.svelte'
+  import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
 
   type Listed = Awaited<ReturnType<typeof commands.machinesList>>
@@ -80,8 +81,22 @@
 
 <main>
   {#if home}
-    <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
+    <ConnectionBar
+      connection={current.connection}
+      {machineName}
+      bind:height={barHeight}
+      onmachines={() => router.go({ name: 'machines' })}
+    />
     <Home screen={current} below={barHeight} />
+  {:else if router.current.name === 'machines'}
+    <Machines
+      {machines}
+      active={current.machine}
+      connection={current.connection}
+      onback={() => router.back()}
+      onpick={(machine) => void join(machine)}
+      onadded={added}
+    />
   {:else}
     <NoMachines onadded={added} />
   {/if}

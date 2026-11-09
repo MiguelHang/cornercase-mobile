@@ -79,6 +79,36 @@ describe('Probes', () => {
     expect(probes().probes.of(9)).toEqual({ state: 'checking' })
   })
 
+  it('probes on opening every machine but the active one', async () => {
+    const { probes: made, calls } = probes()
+    await made.open([1, 2, 3], 2)
+    expect(calls.machineProbe.mock.calls).toEqual([[1], [3]])
+  })
+
+  it('probes every machine on opening without an active one', async () => {
+    const { probes: made, calls } = probes()
+    await made.open([1, 2], null)
+    expect(calls.machineProbe.mock.calls).toEqual([[1], [2]])
+  })
+
+  it('probes the machine that stops being the active one, and only it', async () => {
+    const { probes: made, calls } = probes()
+    await made.open([1, 2, 3], 2)
+    calls.machineProbe.mockClear()
+    await made.follow(3)
+    await made.follow(3)
+    await made.follow(null)
+    expect(calls.machineProbe.mock.calls).toEqual([[2], [3]])
+  })
+
+  it('probes nothing when a machine becomes active with none before', async () => {
+    const { probes: made, calls } = probes()
+    await made.open([1, 2], null)
+    calls.machineProbe.mockClear()
+    await made.follow(1)
+    expect(calls.machineProbe).not.toHaveBeenCalled()
+  })
+
   it('probes nothing by itself and leaves no timer behind', async () => {
     vi.useFakeTimers()
     const { probes: made, calls } = probes()
