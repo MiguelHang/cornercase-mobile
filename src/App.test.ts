@@ -80,10 +80,22 @@ describe('App wiring', () => {
 
   it('shows the connection bar only at home, and puts home and the toasts below it', () => {
     expect(source).toContain(
-      '{#if home} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> <Home screen={current} below={barHeight} /> {:else} <NoMachines onadded={added} /> {/if}',
+      '{:else if home} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> <Home screen={current} below={barHeight} onopen={opened} /> {:else} <NoMachines onadded={added} /> {/if}',
     )
     expect(source).toContain(
-      '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={home ? barHeight : 0} />',
+      "<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={route.name === 'no-machines' ? 0 : barHeight} />",
+    )
+  })
+
+  it('opens a tab of home on top of it, on the machine and boot it belongs to', () => {
+    expect(source).toContain(
+      "const opened = (tab: AgentTab) => { if (current.machine !== null && current.session !== null) { router.go({ name: 'terminal', machine: current.machine, boot: current.session.boot, tab }) } }",
+    )
+  })
+
+  it('shows the terminal on top of everything, going back from it and putting the toasts below its bar', () => {
+    expect(source).toContain(
+      "{#if route.name === 'terminal'} <Terminal machine={route.machine} boot={route.boot} tab={route.tab} onback={() => router.back()} onfailed={toasts.failed} bind:height={barHeight} />",
     )
   })
 })

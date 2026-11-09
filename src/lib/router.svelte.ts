@@ -1,6 +1,9 @@
-import type { Screen } from './connection'
+import type { AgentTab, Screen } from './connection'
 
-export type Route = { name: 'no-machines' } | { name: 'home' }
+export type Route =
+  | { name: 'no-machines' }
+  | { name: 'home' }
+  | { name: 'terminal'; machine: number; boot: string; tab: AgentTab }
 
 export const routeFor = (screen: Screen): Route => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
 
@@ -20,10 +23,9 @@ export class Router {
   }
 
   replace(route: Route) {
-    if (this.current.name === route.name) {
-      return
+    if (this.#stack[0].name !== route.name) {
+      this.#stack = [route]
     }
-    this.#stack = [...this.#stack.slice(0, -1), route]
   }
 
   back() {

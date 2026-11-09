@@ -5,6 +5,7 @@ import type {
   MachineView_Serialize,
   SessionChanged_Serialize,
   Snapshot_Serialize,
+  Tab_Serialize,
 } from './bindings'
 
 export type Screen = {
@@ -48,6 +49,25 @@ export const describePanes = (session: Snapshot_Serialize | null) => {
   const panes = countPanes(session)
   return panes === 1 ? '1 pane' : `${panes} panes`
 }
+
+export type AgentTab = { tab: number; pane: number; name: string; agent: string; where: string }
+
+const named = (item: { name: string; custom_name: string | null }) => item.custom_name ?? item.name
+
+const withAgent = (tab: Tab_Serialize, where: string): AgentTab[] => {
+  const pane = tab.panes.find((candidate) => candidate.agent !== null)
+  if (pane === undefined || pane.agent === null) {
+    return []
+  }
+  return [{ tab: tab.id, pane: pane.id, name: named(tab), agent: pane.agent, where }]
+}
+
+export const agentTabs = (session: Snapshot_Serialize | null): AgentTab[] =>
+  (session?.projects ?? []).flatMap((project) =>
+    project.workspaces.flatMap((workspace) =>
+      workspace.tabs.flatMap((tab) => withAgent(tab, `${named(project)} · ${named(workspace)}`)),
+    ),
+  )
 
 export const firstToConnect = (machines: MachineView_Serialize[], state: ConnectionState_Serialize) =>
   state.machine === null ? (machines[0]?.id ?? null) : null

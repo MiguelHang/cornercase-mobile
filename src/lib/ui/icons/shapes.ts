@@ -11,6 +11,7 @@ export const icons = {
     { kind: 'line', x1: 6, y1: 18, x2: 6.01, y2: 18 },
   ],
   'loader-circle': [{ kind: 'path', d: 'M21 12a9 9 0 1 1-6.219-8.56' }],
+  'chevron-left': [{ kind: 'path', d: 'm15 18-6-6 6-6' }],
 } satisfies Record<string, Shape[]>
 
 export type IconName = keyof typeof icons

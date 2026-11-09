@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Colours_Serialize, Cursor_Serialize, Style_Serialize, TerminalChanged_Serialize } from '../bindings'
-import { apply, empty, Pane, type PaneState } from './pane.svelte'
+import { apply, empty, Pane, shows, type PaneState } from './pane.svelte'
 
 const COLOURS: Colours_Serialize = { fg: [220, 220, 220], bg: [16, 16, 16], cursor: null, palette: { '1': [255, 0, 0] } }
 
@@ -103,6 +103,16 @@ describe('apply', () => {
   it('closes with the rows that came with it', () => {
     const state = applied(changed({ 0: 'a' }, { closed: true }))
     expect([state.closed, texts(state)]).toEqual([true, ['a', '', '']])
+  })
+})
+
+describe('shows', () => {
+  it.each<[string, number, number, boolean]>([
+    ['takes an event of its machine and tab', 7, 3, true],
+    ['leaves out an event of another tab', 7, 4, false],
+    ['leaves out an event of another machine', 8, 3, false],
+  ])('%s', (_, machine, tab, expected) => {
+    expect(shows(changed({ 0: 'a' }), machine, tab)).toBe(expected)
   })
 })
 

@@ -58,6 +58,9 @@ export const apply = (state: PaneState, changed: TerminalChanged_Serialize): Pan
   return { pane, size, cursor, colours: steady(state.colours, colours), rows: drawn(state, changed), closed }
 }
 
+export const shows = (changed: TerminalChanged_Serialize, machine: number, tab: number) =>
+  changed.machine === machine && changed.tab === tab
+
 export class Pane {
   #state: PaneState = $state.raw(empty)
 

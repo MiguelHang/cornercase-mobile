@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BASE, clamp, limits, Zooms, type Limits } from './zoom'
+import { BASE, clamp, fit, limits, Zooms, type Limits } from './zoom'
 
 const PLACE = { machine: 7, boot: 'b1', tab: 3 }
 
@@ -16,6 +16,20 @@ describe('limits', () => {
 
   it('counts from the base font it is given', () => {
     expect(limits(100, 400, 8, 10)).toEqual({ min: 5, max: 20 })
+  })
+})
+
+describe('fit', () => {
+  it('asks for the whole cells and lines that fit on the screen at the base font', () => {
+    expect(fit(400, 700, 8)).toEqual({ cols: 50, rows: 41 })
+  })
+
+  it('counts the lines from the base font it is given', () => {
+    expect(fit(100, 135, 10, 10)).toEqual({ cols: 10, rows: 10 })
+  })
+
+  it('asks for at least one cell and one line on a screen not laid out yet', () => {
+    expect(fit(0, 0, 7.8)).toEqual({ cols: 1, rows: 1 })
   })
 })
 

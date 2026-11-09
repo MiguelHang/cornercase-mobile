@@ -93,6 +93,37 @@ describe('describePanes', () => {
   })
 })
 
+describe('agentTabs', () => {
+  const withAgent = (id: number, agents: (string | null)[]): Tab_Serialize => {
+    const plain = tab(id, agents.length)
+    return { ...plain, panes: plain.panes.map((each, index) => ({ ...each, agent: agents[index] })) }
+  }
+
+  it('lists nothing without a session', () => {
+    expect(connection.agentTabs(null)).toEqual([])
+  })
+
+  it('leaves out the tabs where no pane runs an agent', () => {
+    expect(connection.agentTabs(snapshot([workspace(1, [tab(1, 2), withAgent(2, [null])])]))).toEqual([])
+  })
+
+  it('lists every tab with an agent, opening on its first agent pane', () => {
+    const first = [workspace(1, [withAgent(1, [null, 'claude', 'codex']), tab(2, 1)])]
+    const second = [workspace(2, [withAgent(3, ['codex'])])]
+    expect(connection.agentTabs(snapshot(first, second))).toEqual([
+      { tab: 1, pane: 11, name: 'tab 1', agent: 'claude', where: 'project 0 · workspace 1' },
+      { tab: 3, pane: 30, name: 'tab 3', agent: 'codex', where: 'project 1 · workspace 2' },
+    ])
+  })
+
+  it('names the tab, its workspace and its project by the name the user gave them first', () => {
+    const renamed = { ...workspace(1, [{ ...withAgent(1, ['claude']), custom_name: 'fix login' }]), custom_name: 'auth' }
+    const session = snapshot([renamed])
+    session.projects[0].custom_name = 'app'
+    expect(connection.agentTabs(session).map(({ name, where }) => [name, where])).toEqual([['fix login', 'app · auth']])
+  })
+})
+
 describe('firstToConnect', () => {
   const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
   const IDLE = { machine: null, connection: { state: 'none' as const } }

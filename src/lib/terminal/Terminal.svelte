@@ -5,18 +5,24 @@
 </script>
 
 <script lang="ts">
+  import type { Size_Deserialize } from '../bindings'
   import type { PaneState } from './pane.svelte'
   import { Pinch } from './pinch'
   import Row from './Row.svelte'
   import { paneColours, rgb } from './style'
-  import { BASE, clamp, limits, type Place } from './zoom'
+  import { BASE, clamp, fit, limits, LINE, type Place } from './zoom'
 
   const PROBE = 'M'.repeat(100)
   const ADVANCE = 0.6
 
-  let { pane, place }: { pane: PaneState; place: Place } = $props()
+  let {
+    pane,
+    place,
+    onfit,
+  }: { pane: PaneState; place: Place; onfit: (size: Size_Deserialize) => void } = $props()
 
   let width = $state(0)
+  let height = $state(0)
   let measured = $state(0)
   let start = BASE
   let byGesture = false
@@ -27,6 +33,12 @@
   const bounds = $derived(limits(cols, width, cell))
   const ink = $derived(paneColours(pane.colours))
   let size = $derived(zooms.recall(place, bounds))
+
+  $effect(() => {
+    if (measured > 0 && width > 0 && height > 0) {
+      onfit(fit(width, height, measured))
+    }
+  })
 
   const measure = (probe: HTMLElement) => {
     measured = probe.getBoundingClientRect().width / PROBE.length
@@ -80,11 +92,19 @@
     })
 </script>
 
-<div class="terminal" style:background={rgb(ink.bg)} bind:clientWidth={width} {@attach gestures} {@attach pointers}>
+<div
+  class="terminal"
+  style:background={rgb(ink.bg)}
+  bind:clientWidth={width}
+  bind:clientHeight={height}
+  {@attach gestures}
+  {@attach pointers}
+>
   <div
     class="grid"
     style:font-size="{size}px"
     style:--cell="{cell / BASE}em"
+    style:--line="{LINE}em"
     style:width="calc(var(--cell) * {cols})"
     style:color={rgb(ink.fg)}
   >
@@ -120,7 +140,6 @@
   }
 
   .grid {
-    --line: 1.3em;
     position: relative;
     line-height: var(--line);
   }
