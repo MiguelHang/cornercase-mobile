@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::error::Category;
 
-use super::Machine;
+use super::{Machine, MachineId};
 use crate::error::Error;
 
 const VERSION: u32 = 1;
@@ -19,6 +19,7 @@ pub trait MachineStore: Send + Sync {
 pub struct Saved {
     pub next_id: u64,
     pub machines: Vec<Machine>,
+    pub active: Option<MachineId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +32,7 @@ struct Written<'a> {
     version: u32,
     next_id: u64,
     machines: &'a [Machine],
+    active: Option<MachineId>,
 }
 
 #[derive(Deserialize)]
@@ -42,6 +44,8 @@ struct Version {
 struct Read {
     next_id: u64,
     machines: Vec<Machine>,
+    #[serde(default)]
+    active: Option<MachineId>,
 }
 
 impl JsonFileStore {
@@ -65,7 +69,8 @@ impl MachineStore for JsonFileStore {
     }
 
     fn save(&self, saved: &Saved) -> Result<(), Error> {
-        let written = Written { version: VERSION, next_id: saved.next_id, machines: &saved.machines };
+        let written =
+            Written { version: VERSION, next_id: saved.next_id, machines: &saved.machines, active: saved.active };
         let text = serde_json::to_vec_pretty(&written).map_err(|error| unreadable(&error))?;
         if let Some(folder) = self.path.parent() {
             fs::create_dir_all(folder).map_err(|error| io_error("cannot create the folder", &error))?;
@@ -83,8 +88,8 @@ fn parsed(text: &[u8]) -> Result<Saved, Error> {
     if version != VERSION {
         return Err(Error::Store(format!("the file's format version {version} is unknown")));
     }
-    let Read { next_id, machines } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
-    Ok(Saved { next_id, machines })
+    let Read { next_id, machines, active } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
+    Ok(Saved { next_id, machines, active })
 }
 
 fn write(path: &Path, text: &[u8]) -> io::Result<()> {

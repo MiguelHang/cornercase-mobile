@@ -20,8 +20,10 @@ mod view;
 pub fn run() {
     let specta = bindings::specta();
     let (hear, paths) = network::listen();
-    tauri::Builder::default()
-        .plugin(tauri_plugin_network::init(hear))
+    let builder = tauri::Builder::default().plugin(tauri_plugin_network::init(hear));
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    builder
         .invoke_handler(specta.invoke_handler())
         .setup(move |app| {
             specta.mount_events(app);

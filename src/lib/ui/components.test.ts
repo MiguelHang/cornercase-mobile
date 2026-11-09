@@ -5,12 +5,16 @@ import Button from './Button.svelte'
 import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
+import Icon from './Icon.svelte'
 import Spinner from './Spinner.svelte'
+import TextArea from './TextArea.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
+import textAreaSource from './TextArea.svelte?raw'
+import baseSource from '../theme/base.css?raw'
 
 const html = (markup: string) => createRawSnippet(() => ({ render: () => markup }))
 
@@ -40,7 +44,7 @@ describe('Glass', () => {
 })
 
 describe('Button', () => {
-  type Props = { tone?: 'primary' | 'plain'; type?: 'button' | 'submit'; resting?: boolean; busy?: boolean }
+  type Props = { tone?: 'primary' | 'plain' | 'danger'; type?: 'button' | 'submit'; resting?: boolean; busy?: boolean }
   const button = (props: Props, label = 'Add machine') =>
     render(Button, { props: { ...props, children: html(label) } }).body
 
@@ -61,6 +65,10 @@ describe('Button', () => {
     expect(button({ type: 'submit' }, 'Add')).toMatch(/<button class="button primary svelte-[\w-]+" type="submit">/)
   })
 
+  it('takes the danger tone', () => {
+    expect(button({ tone: 'danger' }, 'Remove')).toMatch(/<button class="button danger svelte-[\w-]+" type="button">/)
+  })
+
   it('shows the spinner before its label and stops answering while busy', () => {
     const body = button({ busy: true, type: 'submit' }, 'Adding…')
     expect(body).toMatch(
@@ -75,6 +83,7 @@ describe('Button', () => {
     'border-radius: var(--radius-control);',
     '.primary { border: 1px solid rgb(43 123 255 / 0.7); background: linear-gradient(180deg, var(--brand-light), var(--brand)); box-shadow: 0 0 10px rgb(0 95 255 / 0.28); color: var(--on-brand); font-weight: 500; }',
     '.plain { border: 1px solid var(--border); background: var(--hover); color: var(--soft); }',
+    '.danger { border: 1px solid color-mix(in srgb, var(--failed) 35%, transparent); background: color-mix(in srgb, var(--failed) 10%, transparent); color: var(--failed); }',
   ])('holds %s', (text) => {
     expect(flat(buttonSource)).toContain(text)
   })
@@ -84,6 +93,9 @@ describe('Button', () => {
     expect(flat(buttonSource)).toContain('.primary:not(.resting):active { background: var(--brand-hover); }')
     expect(flat(buttonSource)).toContain(
       '.plain:not(.resting):active { border-color: var(--edge); background: var(--selected); }',
+    )
+    expect(flat(buttonSource)).toContain(
+      '.danger:not(.resting):active { border-color: color-mix(in srgb, var(--failed) 70%, transparent); background: color-mix(in srgb, var(--failed) 18%, transparent); }',
     )
     expect(buttonSource).toMatch(/\.resting \{\s*opacity: 0\.4;\s*pointer-events: none;\s*\}/)
   })
@@ -140,6 +152,45 @@ describe('Field', () => {
   })
 })
 
+describe('TextArea', () => {
+  type Props = { label: string; value?: string; disabled?: boolean; placeholder?: string }
+  const area = (props: Props) => render(TextArea, { props }).body
+
+  it('shows its value, one line high, named for readers', () => {
+    expect(area({ label: 'Message', value: 'two\nlines' })).toMatch(
+      /<div class="grow svelte-[\w-]+" data-value="two\nlines"><textarea class="area svelte-[\w-]+" rows="1" aria-label="Message">two\nlines<\/textarea><\/div>/,
+    )
+  })
+
+  it('passes textarea attributes on', () => {
+    expect(area({ label: 'Reply', placeholder: 'Write to codex', disabled: true })).toMatch(
+      /<textarea [^>]*aria-label="Reply" placeholder="Write to codex" disabled="">/,
+    )
+  })
+
+  it('binds its value', () => {
+    expect(textAreaSource).toContain('value = $bindable(\'\')')
+    expect(textAreaSource).toContain('bind:value></textarea>')
+  })
+
+  it('leaves Return to the textarea, which adds a line, and sends nothing on a key', () => {
+    expect(textAreaSource).not.toMatch(/keydown|keyup|keypress|submit/i)
+  })
+
+  it.each([
+    '.grow { display: grid;',
+    "content: attr(data-value) ' '; visibility: hidden; overflow: hidden; white-space: pre-wrap;",
+    'grid-area: 1 / 1;',
+    'min-height: 44px; max-height: 152px;',
+    'overflow-y: auto; resize: none;',
+    'font-size: 16px;',
+    '-webkit-user-select: text; user-select: text;',
+    '.area:focus { border-color: var(--accent);',
+  ])('holds %s', (text) => {
+    expect(flat(textAreaSource)).toContain(text)
+  })
+})
+
 describe('Emblem', () => {
   const body = render(Emblem, {
     props: { icon: 'server', title: 'No machines yet', lines: ['First line.', 'Second line.'] },
@@ -182,5 +233,30 @@ describe('Spinner', () => {
     '@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }',
   ])('holds %s', (text) => {
     expect(flat(spinnerSource)).toContain(text)
+  })
+})
+
+describe('Icon', () => {
+  it.each([
+    ['scan-qr-code', 'M17 12v4a1 1 0 0 1-1 1h-4', '<rect x="7" y="7" width="5" height="5" rx="1"></rect>'],
+    ['chevron-left', 'm15 18-6-6 6-6', ''],
+    ['chevron-up', 'm18 15-6-6-6 6', ''],
+    ['chevron-down', 'm6 9 6 6 6-6', ''],
+    ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
+  ] as const)('draws %s', (name, path, other) => {
+    const body = render(Icon, { props: { name } }).body
+    expect(body).toContain(`<path d="${path}"></path>`)
+    expect(body).toContain(other)
+  })
+})
+
+describe('scanning', () => {
+  it('lets the camera show through the page and drops the top glow', () => {
+    expect(flat(baseSource)).toContain('html.scanning, html.scanning body { background: transparent; }')
+    expect(flat(baseSource)).toContain('html.scanning body::before { display: none; }')
+  })
+
+  it('hides the app while scanning, so only the layer over the camera shows', () => {
+    expect(flat(baseSource)).toContain('html.scanning #app { visibility: hidden; }')
   })
 })

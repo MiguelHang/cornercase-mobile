@@ -17,7 +17,7 @@ use crate::state::Active;
 use crate::test_util::{
     ADDRESS, BOOT, BRIDGE, Ipc, Recorder, Studio, TOKEN, changed, heard, launcher, released, serving, settle, snapshot,
 };
-use crate::view::RouteView;
+use crate::view::{MachineView, RouteView};
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
 
@@ -34,7 +34,7 @@ fn gated(task: Task) -> JoinHandle<()> {
 }
 
 fn names(state: &AppState) -> Vec<String> {
-    list(state).expect("the machines load").into_iter().map(|machine| machine.name).collect()
+    list(state).expect("the machines load").machines.into_iter().map(|machine| machine.name).collect()
 }
 
 mod adding_a_machine {
@@ -46,7 +46,7 @@ mod adding_a_machine {
     #[case::no_token("ws://studio.lan:9000/", ErrorCode::RouteNoToken)]
     fn says_what_is_wrong_with_the_url_without_repeating_it(#[case] url: &str, #[case] code: ErrorCode) {
         let studio = Studio::new();
-        let error = add(&studio.state, url, "laptop".to_owned()).expect_err("the url is refused");
+        let error = add(&studio.state, url, "laptop").expect_err("the url is refused");
         assert_eq!(error.code, code);
         assert!(!error.message.contains(TOKEN) && !error.message.contains("studio.lan"), "{}", error.message);
         assert_eq!(names(&studio.state), ["studio"]);
@@ -58,23 +58,85 @@ mod adding_a_machine {
         fs::write(dir.path().join("machines.json"), "{ not json").expect("write the machines file");
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets);
-        let error = add(&state, BRIDGE, "studio".to_owned()).expect_err("the machines are not loaded");
+        let error = add(&state, BRIDGE, "studio").expect_err("the machines are not loaded");
         assert_eq!(error.code, ErrorCode::MachinesNotLoaded);
     }
 
     #[test]
     fn lists_it_without_its_token() {
         let studio = Studio::new();
-        let machines = list(&studio.state).expect("the machines load");
+        let machines = list(&studio.state).expect("the machines load").machines;
         let expected = MachineView {
             id: studio.id.0,
             name: "studio".to_owned(),
-            routes: vec![RouteView::Bridge { url: ADDRESS.to_owned() }],
+            routes: vec![RouteView::Bridge { url: ADDRESS.to_owned(), has_token: true }],
             last_route: None,
         };
         assert_eq!(machines, [expected]);
         let json = serde_json::to_string(&machines).expect("the machines serialize");
         assert!(!json.contains(TOKEN), "{json}");
+    }
+}
+
+mod listing_the_machines {
+    use super::*;
+
+    fn active(state: &AppState) -> Option<u64> {
+        list(state).expect("the machines load").active
+    }
+
+    #[test]
+    fn names_the_saved_active_machine() {
+        let studio = Studio::new();
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        studio.state.machines(|machines| machines.activate(laptop).map_err(CommandError::from)).expect("activated");
+        assert_eq!(active(&studio.reloaded()), Some(laptop.0));
+    }
+
+    #[test]
+    fn names_the_first_machine_while_none_was_activated() {
+        let studio = Studio::new();
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        assert_eq!(active(&studio.state), Some(studio.id.0));
+    }
+
+    #[test]
+    fn names_none_without_machines() {
+        let studio = Studio::new();
+        remove(&studio.state, &Recorder::default(), studio.id).expect("removed");
+        assert_eq!(list(&studio.state), Ok(MachineList { machines: vec![], active: None }));
+    }
+}
+
+mod renaming_a_machine {
+    use super::*;
+
+    #[test]
+    fn saves_the_trimmed_name() {
+        let studio = Studio::new();
+        rename(&studio.state, studio.id, "  Studio Mac ").expect("renamed");
+        assert_eq!(names(&studio.reloaded()), ["Studio Mac"]);
+    }
+
+    #[test]
+    fn keeps_its_own_name_in_other_case() {
+        let studio = Studio::new();
+        rename(&studio.state, studio.id, "STUDIO").expect("renamed");
+        assert_eq!(names(&studio.reloaded()), ["STUDIO"]);
+    }
+
+    #[rstest]
+    #[case::empty("   ", 0, ErrorCode::NameEmpty)]
+    #[case::too_long(&"m".repeat(65), 0, ErrorCode::NameTooLong)]
+    #[case::taken(" LAPTOP ", 0, ErrorCode::NameTaken)]
+    #[case::unknown("mini", 99, ErrorCode::UnknownMachine)]
+    fn says_why_it_did_not(#[case] name: &str, #[case] id: u64, #[case] code: ErrorCode) {
+        let studio = Studio::new();
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let id = if id == 0 { studio.id } else { MachineId(id) };
+        let error = rename(&studio.state, id, name).expect_err("refused");
+        assert_eq!(error.code, code);
+        assert_eq!(names(&studio.reloaded()), ["studio", "laptop"]);
     }
 }
 
@@ -99,7 +161,7 @@ mod removing_a_machine {
     #[tokio::test(start_paused = true)]
     async fn keeps_the_store_of_another_machine() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop".to_owned()).expect("the laptop is added");
+        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
         let recorder = Recorder::default();
         let (launcher, _) = launcher(serving(&[snapshot(BOOT, 7, "first")]));
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connected");
@@ -149,9 +211,10 @@ mod over_ipc {
     fn lists_the_machines() {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
-        let machines = ipc.invoke("machines_list", json!({})).expect("the machines load");
-        assert_eq!(machines[0]["name"], "studio");
-        assert_eq!(machines.as_array().map(Vec::len), Some(1));
+        let listed = ipc.invoke("machines_list", json!({})).expect("the machines load");
+        assert_eq!(listed["machines"][0]["name"], "studio");
+        assert_eq!(listed["machines"].as_array().map(Vec::len), Some(1));
+        assert_eq!(listed["active"], studio.id.0);
     }
 
     #[test]
@@ -160,7 +223,17 @@ mod over_ipc {
         let ipc = Ipc::new(studio.reloaded());
         let id = ipc.invoke("machine_add", json!({ "url": LAPTOP, "name": "laptop" })).expect("the machine is added");
         assert_eq!(names(&ipc.state()), ["studio", "laptop"]);
-        assert_eq!(list(&ipc.state()).expect("the machines load")[1].id, id.as_u64().expect("an id"));
+        assert_eq!(list(&ipc.state()).expect("the machines load").machines[1].id, id.as_u64().expect("an id"));
+    }
+
+    #[test]
+    fn renames_a_machine() {
+        let studio = Studio::new();
+        let ipc = Ipc::new(studio.reloaded());
+        assert_eq!(ipc.invoke("machine_rename", json!({ "id": studio.id.0, "name": "mini" })), Ok(Value::Null));
+        assert_eq!(names(&ipc.state()), ["mini"]);
+        let refused = ipc.invoke("machine_rename", json!({ "id": studio.id.0, "name": "" }));
+        assert_eq!(refused.expect_err("the name is refused")["code"], "name_empty");
     }
 
     #[test]

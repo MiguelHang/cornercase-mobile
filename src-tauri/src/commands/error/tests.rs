@@ -35,6 +35,10 @@ mod from_a_core_error {
     #[case::no_token(Error::NoToken, "no_token")]
     #[case::unknown_machine(Error::UnknownMachine, "unknown_machine")]
     #[case::unknown_route(Error::UnknownRoute, "unknown_route")]
+    #[case::last_route(Error::LastRoute, "last_route")]
+    #[case::name_empty(Error::NameEmpty, "name_empty")]
+    #[case::name_too_long(Error::NameTooLong, "name_too_long")]
+    #[case::name_taken(Error::NameTaken, "name_taken")]
     #[case::identity(Error::Identity, "identity")]
     #[case::random(Error::Random, "random")]
     fn carries_its_code_and_its_message(#[case] error: Error, #[case] code: &str) {
@@ -87,7 +91,39 @@ mod of_the_app {
         "the app has no identity: the secret store failed: locked"
     )]
     #[case::not_connected(CommandError::not_connected(), "not_connected", "no machine is connected")]
+    #[case::not_sent(CommandError::not_sent(), "not_sent", "nothing was sent")]
+    #[case::maybe_sent(CommandError::maybe_sent(), "unanswered", "it may have been sent, but no answer came back")]
     fn carries_its_code_and_its_message(#[case] error: CommandError, #[case] code: &str, #[case] message: &str) {
         assert_eq!(json_of(&error), json!({ "code": code, "message": message }));
+    }
+}
+
+mod with_the_reason_of_cornercase {
+    use super::*;
+
+    fn failed(stderr: &str) -> Error {
+        Error::Failed { code: 1, stderr: stderr.to_owned() }
+    }
+
+    #[rstest]
+    #[case::without_its_prefix("Error: pane 543 is waiting\n", "pane 543 is waiting")]
+    #[case::as_it_is("pane 543 is waiting", "pane 543 is waiting")]
+    #[case::trimmed("  pane 543 is waiting  ", "pane 543 is waiting")]
+    fn says_what_cornercase_said(#[case] stderr: &str, #[case] reason: &str) {
+        assert_eq!(json_of(&CommandError::reason(&failed(stderr))), json!({ "code": "failed", "message": reason }));
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::blank(" \n")]
+    #[case::only_the_prefix("Error:")]
+    fn keeps_the_whole_failure_when_cornercase_said_nothing(#[case] stderr: &str) {
+        let error = failed(stderr);
+        assert_eq!(json_of(&CommandError::reason(&error)), json_of(&CommandError::from(&error)));
+    }
+
+    #[test]
+    fn leaves_any_other_error_as_it_is() {
+        assert_eq!(CommandError::reason(&Error::Unanswered), CommandError::from(Error::Unanswered));
     }
 }

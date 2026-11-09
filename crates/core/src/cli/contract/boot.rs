@@ -21,6 +21,10 @@ impl Descriptor {
 }
 
 impl BootWatch {
+    pub fn current(&self) -> Option<&Boot> {
+        self.current.as_ref()
+    }
+
     pub fn observe(&mut self, boot: Boot) -> Observed {
         let restarted = self.current.as_ref().is_some_and(|current| *current != boot);
         self.current = Some(boot);

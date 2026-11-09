@@ -1,16 +1,18 @@
 <script lang="ts">
-  type Face = { shape: 'ring' | 'orbit' | 'disc' | 'pending'; colour: string; name: string; cut?: string }
+  import { statusName } from '../board'
 
-  const IDLE: Face = { shape: 'ring', colour: 'var(--faint)', name: 'Idle' }
+  type Face = { shape: 'ring' | 'orbit' | 'disc' | 'pending'; colour: string; cut?: string }
+
+  const IDLE: Face = { shape: 'ring', colour: 'var(--faint)' }
 
   const FACES: Record<string, Face> = {
     idle: IDLE,
-    working: { shape: 'orbit', colour: 'var(--working)', name: 'Working' },
-    shell: { shape: 'orbit', colour: 'var(--working)', name: 'Shell' },
-    waiting: { shape: 'disc', colour: 'var(--waiting)', name: 'Waiting', cut: 'waiting' },
-    failed: { shape: 'disc', colour: 'var(--failed)', name: 'Failed', cut: 'failed' },
-    done: { shape: 'disc', colour: 'var(--done)', name: 'Done', cut: 'done' },
-    pending: { shape: 'pending', colour: 'var(--brand)', name: 'Pending' },
+    working: { shape: 'orbit', colour: 'var(--working)' },
+    shell: { shape: 'orbit', colour: 'var(--working)' },
+    waiting: { shape: 'disc', colour: 'var(--waiting)', cut: 'waiting' },
+    failed: { shape: 'disc', colour: 'var(--failed)', cut: 'failed' },
+    done: { shape: 'disc', colour: 'var(--done)', cut: 'done' },
+    pending: { shape: 'pending', colour: 'var(--brand)' },
   }
 
   let { status, size = 14 }: { status?: string | null; size?: number } = $props()
@@ -18,12 +20,13 @@
   const id = $props.id()
   const cut = `cut-${id}`
   const face = $derived((status && FACES[status]) || IDLE)
+  const name = $derived(statusName(status))
 </script>
 
 <svg
   class="dot"
   role="img"
-  aria-label={face.name}
+  aria-label={name}
   width={size}
   height={size}
   viewBox="0 0 24 24"

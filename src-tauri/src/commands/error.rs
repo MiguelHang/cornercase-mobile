@@ -34,6 +34,10 @@ pub(crate) enum ErrorCode {
     NoToken,
     UnknownMachine,
     UnknownRoute,
+    LastRoute,
+    NameEmpty,
+    NameTooLong,
+    NameTaken,
     Identity,
     Random,
     RouteNotAUrl,
@@ -50,6 +54,7 @@ pub(crate) enum ErrorCode {
     MachinesNotLoaded,
     NoIdentity,
     NotConnected,
+    NotSent,
 }
 
 impl CommandError {
@@ -72,6 +77,26 @@ impl CommandError {
     pub(crate) fn not_connected() -> Self {
         Self::new(ErrorCode::NotConnected, "no machine is connected")
     }
+
+    pub(crate) fn not_sent() -> Self {
+        Self::new(ErrorCode::NotSent, "nothing was sent")
+    }
+
+    pub(crate) fn maybe_sent() -> Self {
+        Self::new(ErrorCode::Unanswered, "it may have been sent, but no answer came back")
+    }
+
+    pub(crate) fn reason(error: &Error) -> Self {
+        match error {
+            Error::Failed { stderr, .. } if !said(stderr).is_empty() => Self::new(ErrorCode::Failed, said(stderr)),
+            _ => Self::from(error),
+        }
+    }
+}
+
+fn said(stderr: &str) -> &str {
+    let stderr = stderr.trim();
+    stderr.strip_prefix("Error:").map_or(stderr, str::trim_start)
 }
 
 impl From<&Error> for CommandError {
@@ -115,6 +140,10 @@ fn core_code(error: &Error) -> ErrorCode {
         Error::NoToken => ErrorCode::NoToken,
         Error::UnknownMachine => ErrorCode::UnknownMachine,
         Error::UnknownRoute => ErrorCode::UnknownRoute,
+        Error::LastRoute => ErrorCode::LastRoute,
+        Error::NameEmpty => ErrorCode::NameEmpty,
+        Error::NameTooLong => ErrorCode::NameTooLong,
+        Error::NameTaken => ErrorCode::NameTaken,
         Error::Identity => ErrorCode::Identity,
         Error::Random => ErrorCode::Random,
     }
