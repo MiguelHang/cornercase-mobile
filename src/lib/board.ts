@@ -133,7 +133,7 @@ export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES
   return SECTIONS.flatMap((section) => sectionItems(made, section))
 }
 
-const span = (millis: number) => {
+export const span = (millis: number) => {
   if (millis < MINUTE) {
     return 'now'
   }

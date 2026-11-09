@@ -1,18 +1,18 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
-  import { elapsed, label, place, statusName } from '../../lib/board'
-  import type { Chat } from '../../lib/chat.svelte'
+  import { whileShown, type Chat } from '../../lib/chat.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
-  import Markdown from '../../lib/ui/Markdown.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
-  import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
+  import ChatHeader from './ChatHeader.svelte'
   import KeyRow from './KeyRow.svelte'
   import Subagents from './Subagents.svelte'
+  import Thread from './Thread.svelte'
 
-  const TICK_MS = 30_000
+  const TICK_MS = 15_000
 
   let {
     chat,
@@ -38,22 +38,20 @@
     onchanges: (workspace: number, title: string) => void
   } = $props()
 
-  let now = $state(Date.now())
+  let now = $state(untrack(() => chat.now()))
 
   $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), TICK_MS)
+    const told = chat
+    const timer = setInterval(() => (now = told.now()), TICK_MS)
     return () => clearInterval(timer)
   })
 
-  const row = $derived(chat.row)
-  const reading = $derived(chat.reading)
+  $effect(() => {
+    const followed = chat
+    return untrack(() => whileShown(document, () => followed.follow()))
+  })
 
-  const send = async () => {
-    const failed = await chat.send()
-    if (failed !== null) {
-      onfailed(failed)
-    }
-  }
+  const row = $derived(chat.row)
 
   const attach = async () => {
     const failed = await chat.attach()
@@ -69,68 +67,47 @@
     <div class="actions">
       <Button tone="plain" onclick={onback}>Back to the board</Button>
     </div>
-  {:else}
+  {:else if row === null}
     <div class="actions">
       <Button tone="plain" onclick={onback}>Back</Button>
-      {#if row !== null}
-        {@const opened = row}
-        <Button tone="plain" onclick={() => onterminal(opened)}>Terminal</Button>
-        <Button tone="plain" onclick={() => onchanges(opened.workspace, opened.workspace_name)}>Changes</Button>
-      {/if}
     </div>
-    {#if row === null && starting !== null}
+    {#if starting !== null}
       <p class="starting"><Spinner />Starting {starting}…</p>
-    {:else if row === null}
+    {:else}
       <div class="waiting">
         <Mark unit={5} pulsing={connection.state === 'connecting'} />
       </div>
-    {:else}
-      <header class="head">
-        <StatusDot status={row.status} size={20} />
-        <div class="lines">
-          <h1 class="title">{label(row)}</h1>
-          <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
-        </div>
-      </header>
-      {#key row.pane}
-        <Subagents {row} agents={agents ?? []} {onopen} />
-      {/key}
-      <article class="message">
-        {#if reading.kind === 'message'}
-          {@const written = elapsed(reading.message.written, now)}
-          {#if written !== ''}
-            <p class="written">{written}</p>
-          {/if}
-          <Markdown text={reading.message.text} />
-        {:else}
-          <p class="reason">{reading.kind === 'loading' ? 'Reading its last message…' : reading.reason}</p>
-        {/if}
-      </article>
-      <div class="composer">
-        {#if chat.asking}
-          <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
-        {/if}
-        <KeyRow {chat} {onfailed} />
-        {#if chat.attachments.chips.length > 0}
-          <ul class="chips" aria-label="Attached images">
-            {#each chat.attachments.chips as chip (chip)}
-              <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
-            {/each}
-          </ul>
-        {/if}
-        <div class="fields">
-          <div class="field">
-            <TextArea label="Answer" placeholder="Answer {row.agent}" disabled={chat.sending} bind:value={chat.draft} />
-          </div>
-          <Button tone="plain" compact label="Attach image" busy={chat.attachments.attaching} onclick={attach}>
-            {#if !chat.attachments.attaching}
-              <Icon name="image-plus" size={20} />
-            {/if}
-          </Button>
-          <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={send}>Send</Button>
-        </div>
-      </div>
     {/if}
+  {:else}
+    <ChatHeader {row} {below} {onback} {onterminal} {onchanges} />
+    {#key row.pane}
+      <Subagents {row} agents={agents ?? []} {onopen} />
+    {/key}
+    <Thread {chat} {now} />
+    <div class="composer">
+      {#if chat.asking}
+        <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
+      {/if}
+      <KeyRow {chat} {onfailed} />
+      {#if chat.attachments.chips.length > 0}
+        <ul class="chips" aria-label="Attached images">
+          {#each chat.attachments.chips as chip (chip)}
+            <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
+          {/each}
+        </ul>
+      {/if}
+      <div class="fields">
+        <div class="field">
+          <TextArea label="Answer" placeholder="Answer {row.agent}" bind:value={chat.draft} />
+        </div>
+        <Button tone="plain" compact label="Attach image" busy={chat.attachments.attaching} onclick={attach}>
+          {#if !chat.attachments.attaching}
+            <Icon name="image-plus" size={20} />
+          {/if}
+        </Button>
+        <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={() => void chat.send()}>Send</Button>
+      </div>
+    </div>
   {/if}
 </section>
 
@@ -149,50 +126,6 @@
     gap: var(--gap);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    gap: var(--inset);
-  }
-
-  .lines {
-    min-width: 0;
-  }
-
-  .title {
-    margin: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-size: 20px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .place {
-    margin: 0;
-    overflow: hidden;
-    color: var(--muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .status {
-    color: var(--soft);
-  }
-
-  .message {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .written {
-    margin: 0 0 var(--gap);
-    color: var(--faint);
-    font-size: 13px;
-  }
-
-  .reason,
   .note {
     margin: 0;
     color: var(--muted);
