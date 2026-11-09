@@ -56,3 +56,22 @@ mod json {
         assert_eq!(read, expected);
     }
 }
+
+mod tailscale {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::the_first_v4("100.64.0.1", true)]
+    #[case::the_last_v4("100.127.255.254", true)]
+    #[case::below_the_v4_range("100.63.255.255", false)]
+    #[case::above_the_v4_range("100.128.0.1", false)]
+    #[case::a_lan_v4("192.168.1.20", false)]
+    #[case::the_tailnet_v6("fd7a:115c:a1e0::1", true)]
+    #[case::another_v6("fd7a:115c:a1e1::1", false)]
+    #[case::a_name("studio.local", false)]
+    fn knows_the_tailnet_ranges(#[case] host: &str, #[case] expected: bool) {
+        assert_eq!(crate::machines::tailscale(&Address { host: host.to_owned(), port: 8765 }), expected);
+    }
+}

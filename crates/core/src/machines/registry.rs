@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use super::code::MachineCode;
 use super::name::checked_name;
 use super::route::{Address, Route, Token};
 use super::same::{Same, same_machine};
@@ -19,6 +20,20 @@ use crate::secrets::Secrets;
 pub enum Direction {
     Up,
     Down,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Merged {
+    pub added: Vec<Address>,
+    pub token_updated: bool,
+    pub skipped: Vec<Address>,
+}
+
+#[derive(Default)]
+struct Sorted {
+    new: Vec<Route>,
+    changed: Vec<Route>,
+    skipped: Vec<Address>,
 }
 
 pub struct Machines {
@@ -48,35 +63,50 @@ impl Machines {
 
     pub fn same<S: BuildHasher>(
         &self,
-        route: &Route,
+        routes: &[Route],
         name: &str,
         probed_boot: Option<&str>,
         seen_boots: &HashMap<MachineId, String, S>,
     ) -> Option<Same> {
-        same_machine(self.machines(), route, name, probed_boot, seen_boots)
+        same_machine(self.machines(), routes, name, probed_boot, seen_boots)
     }
 
-    pub fn add(&mut self, name: &str, route: Route) -> Result<MachineId, Error> {
+    pub fn add(&mut self, name: &str, code: &MachineCode) -> Result<MachineId, Error> {
         let name = checked_name(name, self.machines(), None)?;
         let id = MachineId(self.saved.next_id);
-        self.write_token(id, &route)?;
+        let routes = code.routes();
+        self.write_tokens(id, &routes)?;
         let mut saved = self.saved.clone();
         saved.next_id += 1;
-        saved.machines.push(Machine { id, name, routes: vec![route], last_route: None });
+        saved.machines.push(Machine { id, name, routes, last_route: None });
         self.commit(saved)?;
         Ok(id)
     }
 
     pub fn add_route(&mut self, id: MachineId, route: Route) -> Result<(), Error> {
         self.machine(id).ok_or(Error::UnknownMachine)?;
-        self.write_token(id, &route)?;
-        let mut saved = self.saved.clone();
-        let routes = &mut find(&mut saved, id)?.routes;
-        match routes.iter_mut().find(|existing| existing.address() == route.address()) {
-            Some(existing) => *existing = route,
-            None => routes.push(route),
+        self.write_tokens(id, std::slice::from_ref(&route))?;
+        self.save_routes(id, vec![route])
+    }
+
+    pub fn merge(&mut self, id: MachineId, code: &MachineCode) -> Result<Merged, Error> {
+        let Sorted { new, changed, skipped } = self.sorted(id, code.routes())?;
+        let merged = Merged { added: addresses(&new), token_updated: !changed.is_empty(), skipped };
+        let routes = [new, changed].concat();
+        if !routes.is_empty() {
+            self.write_tokens(id, &routes)?;
+            self.save_routes(id, routes)?;
         }
-        self.commit(saved)
+        Ok(merged)
+    }
+
+    pub fn learn(&mut self, id: MachineId, routes: &[Route]) -> Result<Vec<Route>, Error> {
+        let new = self.sorted(id, routes.to_vec())?.new;
+        if !new.is_empty() {
+            self.write_tokens(id, &new)?;
+            self.save_routes(id, new.clone())?;
+        }
+        Ok(new)
     }
 
     pub fn rename(&mut self, id: MachineId, name: &str) -> Result<(), Error> {
@@ -161,9 +191,44 @@ impl Machines {
         self.commit(saved)
     }
 
-    fn write_token(&self, id: MachineId, route: &Route) -> Result<(), Error> {
-        let token = route.token().ok_or(Error::NoToken)?;
-        self.secrets.set(&key(id, route.address()), token.as_str().as_bytes())
+    fn sorted(&self, id: MachineId, routes: Vec<Route>) -> Result<Sorted, Error> {
+        let machine = self.machine(id).ok_or(Error::UnknownMachine)?;
+        let elsewhere = |address: &Address| {
+            self.machines()
+                .iter()
+                .any(|other| other.id != id && other.routes.iter().any(|saved| saved.address() == address))
+        };
+        let mut sorted = Sorted::default();
+        for route in routes {
+            match machine.routes.iter().find(|saved| saved.address() == route.address()) {
+                Some(saved) if saved == &route => {}
+                Some(_) => sorted.changed.push(route),
+                None if elsewhere(route.address()) => sorted.skipped.push(route.address().clone()),
+                None if sorted.new.iter().any(|known| known.address() == route.address()) => {}
+                None => sorted.new.push(route),
+            }
+        }
+        Ok(sorted)
+    }
+
+    fn write_tokens(&self, id: MachineId, routes: &[Route]) -> Result<(), Error> {
+        for route in routes {
+            let token = route.token().ok_or(Error::NoToken)?;
+            self.secrets.set(&key(id, route.address()), token.as_str().as_bytes())?;
+        }
+        Ok(())
+    }
+
+    fn save_routes(&mut self, id: MachineId, routes: Vec<Route>) -> Result<(), Error> {
+        let mut saved = self.saved.clone();
+        let saved_routes = &mut find(&mut saved, id)?.routes;
+        for route in routes {
+            match saved_routes.iter_mut().find(|existing| existing.address() == route.address()) {
+                Some(existing) => *existing = route,
+                None => saved_routes.push(route),
+            }
+        }
+        self.commit(saved)
     }
 
     fn commit(&mut self, saved: Saved) -> Result<(), Error> {
@@ -189,6 +254,10 @@ fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error
 
 fn find(saved: &mut Saved, id: MachineId) -> Result<&mut Machine, Error> {
     saved.machines.iter_mut().find(|machine| machine.id == id).ok_or(Error::UnknownMachine)
+}
+
+fn addresses(routes: &[Route]) -> Vec<Address> {
+    routes.iter().map(|route| route.address().clone()).collect()
 }
 
 fn position(routes: &[Route], address: &Address) -> Result<usize, Error> {

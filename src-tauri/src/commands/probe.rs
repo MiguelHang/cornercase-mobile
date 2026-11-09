@@ -63,15 +63,16 @@ fn compare(
     keep: impl FnOnce(&Same) -> bool,
 ) -> Result<Option<MatchFound>, CommandError> {
     let seen = state.seen_boots();
-    state
-        .machines(|machines| Ok(machines.same(route, name, boot, &seen).filter(keep).map(|same| found(machines, same))))
+    state.machines(|machines| {
+        Ok(machines.same(std::slice::from_ref(route), name, boot, &seen).filter(keep).map(|same| found(machines, same)))
+    })
 }
 
 fn found(machines: &Machines, same: Same) -> MatchFound {
     let machine = same.machine.0;
     let why = match same.why {
         Why::AlreadySaved => return MatchFound::AlreadySaved { machine },
-        Why::Address => SameWhy::Address,
+        Why::Address | Why::Tailscale | Why::AllAddresses => SameWhy::Address,
         Why::Token => SameWhy::Token,
         Why::Boot => SameWhy::Boot,
         Why::Name => SameWhy::Name,

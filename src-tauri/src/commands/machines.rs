@@ -1,5 +1,5 @@
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::code::MachineCode;
 use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
@@ -44,8 +44,8 @@ pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
 }
 
 pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {
-    let route = Route::parse(url)?;
-    state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
+    let code = MachineCode::parse(url)?;
+    state.machines(|machines| machines.add(name, &code).map_err(CommandError::from))
 }
 
 pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {

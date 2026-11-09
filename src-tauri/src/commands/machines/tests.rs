@@ -5,6 +5,7 @@ use std::thread;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
+use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
 use rstest::rstest;
 use tauri::async_runtime::{self, JoinHandle};

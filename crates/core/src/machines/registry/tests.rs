@@ -13,6 +13,7 @@ const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const LAN: &str = "192.168.1.20";
 const TAILNET: &str = "fd7a:115c:a1e0::1";
 const GONE: &str = "10.0.0.9";
+const NEW_TAILNET: &str = "100.101.102.103";
 
 struct Phone {
     dir: TempDir,
@@ -43,14 +44,13 @@ impl Phone {
 
     fn studio(&self) -> (Machines, MachineId) {
         let mut machines = self.open();
-        let id = machines.add("studio", route(LAN, TOKEN)).expect("add the studio");
-        machines.add_route(id, route(TAILNET, TOKEN)).expect("add the tailnet route");
+        let id = machines.add("studio", &code(&[LAN, TAILNET], TOKEN)).expect("add the studio");
         (machines, id)
     }
 
     fn studio_and_laptop(&self) -> (Machines, MachineId, MachineId) {
         let (mut machines, studio) = self.studio();
-        let laptop = machines.add("laptop", route(GONE, NEW_TOKEN)).expect("add the laptop");
+        let laptop = machines.add("laptop", &code(&[GONE], NEW_TOKEN)).expect("add the laptop");
         (machines, studio, laptop)
     }
 
@@ -74,6 +74,12 @@ impl Phone {
 
 fn route(host: &str, token: &str) -> Route {
     bridge(host, 8765, Some(token))
+}
+
+fn code(hosts: &[&str], token: &str) -> MachineCode {
+    let (first, also) = hosts.split_first().expect("at least one host");
+    let first = MachineCode::new(first.parse().expect("an ip"), 8765, token).expect("a machine code");
+    also.iter().fold(first, |code, host| code.with_also(host.parse().expect("an ip")))
 }
 
 fn address(host: &str) -> Address {
@@ -113,8 +119,24 @@ mod load {
         let machine = r#"{"id": 3, "name": "studio", "routes": [], "last_route": null}"#;
         fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 0, "machines": [{machine}]}}"#))
             .expect("write the file by hand");
-        let id = phone.open().add("laptop", route(LAN, TOKEN)).expect("add the laptop");
+        let id = phone.open().add("laptop", &code(&[LAN], TOKEN)).expect("add the laptop");
         assert_eq!(id, MachineId(4));
+    }
+
+    #[test]
+    fn takes_the_routes_of_a_code_into_a_machine_saved_before_codes() {
+        let phone = Phone::new();
+        let machine = r#"{"id": 0, "name": "studio", "routes": [{"kind": "bridge", "url": "ws://192.168.1.20:8765/"}], "last_route": null}"#;
+        fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#))
+            .expect("write the file by hand");
+        phone.secrets.set(&key(MachineId(0), &address(LAN)), TOKEN.as_bytes()).expect("keep the token");
+        let merged = phone.open().merge(MachineId(0), &code(&[LAN, NEW_TAILNET], TOKEN)).expect("merge the code");
+        assert_eq!(merged.added, [address(NEW_TAILNET)]);
+        assert_eq!(
+            phone.open().machine(MachineId(0)).expect("the studio").routes,
+            [route(LAN, TOKEN), route(NEW_TAILNET, TOKEN)]
+        );
+        assert!(phone.text().contains(r#""version": 1"#), "{}", phone.text());
     }
 }
 
@@ -124,7 +146,7 @@ mod add {
     #[test]
     fn keeps_the_token_under_the_machine_id_and_the_address() {
         let phone = Phone::new();
-        let id = phone.open().add("studio", route(LAN, TOKEN)).expect("add");
+        let id = phone.open().add("studio", &code(&[LAN], TOKEN)).expect("add");
         let key = format!("route/{}/ws://{LAN}:8765/", id.0);
         assert_eq!(phone.secrets.get(&key).expect("read the secret"), Some(TOKEN.as_bytes().to_vec()));
     }
@@ -134,7 +156,7 @@ mod add {
         let phone = Phone::new();
         let (mut machines, first) = phone.studio();
         machines.remove(first).expect("remove the studio");
-        let second = phone.open().add("laptop", route(LAN, NEW_TOKEN)).expect("add the laptop");
+        let second = phone.open().add("laptop", &code(&[LAN], NEW_TOKEN)).expect("add the laptop");
         assert_eq!((first, second), (MachineId(0), MachineId(1)));
     }
 
@@ -143,7 +165,7 @@ mod add {
         let phone = Phone::new();
         let (mut machines, _) = phone.studio();
         phone.secrets.fail_writes(true);
-        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", route(LAN, NEW_TOKEN)));
+        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", &code(&[LAN], NEW_TOKEN)));
         assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
     }
 
@@ -152,25 +174,29 @@ mod add {
         let phone = Phone::new();
         let (mut machines, studio) = phone.studio();
         phone.block_the_file();
-        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", route(LAN, NEW_TOKEN)));
+        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", &code(&[LAN], NEW_TOKEN)));
         assert!(matches!(result, Err(Error::Store(_))), "{result:?}");
         phone.unblock_the_file();
-        let laptop = machines.add("laptop", route(LAN, NEW_TOKEN)).expect("add the laptop");
+        let laptop = machines.add("laptop", &code(&[LAN], NEW_TOKEN)).expect("add the laptop");
         assert_eq!(laptop, MachineId(studio.0 + 1));
     }
 
     #[test]
-    fn refuses_a_route_without_a_token() {
+    fn keeps_every_route_of_the_code_in_order_with_its_token() {
         let phone = Phone::new();
-        let mut machines = phone.open();
-        assert_eq!(machines.add("studio", bridge(LAN, 8765, None)), Err(Error::NoToken));
-        assert!(!phone.file().exists());
+        let id = phone.open().add("studio", &code(&[TAILNET, LAN, GONE], TOKEN)).expect("add");
+        let routes = phone.open().machine(id).expect("the studio").routes.clone();
+        assert_eq!(routes, [route(TAILNET, TOKEN), route(LAN, TOKEN), route(GONE, TOKEN)]);
+        assert_eq!(
+            [TAILNET, LAN, GONE].map(|host| phone.secret(id, host)),
+            [Some(TOKEN.to_owned()), Some(TOKEN.to_owned()), Some(TOKEN.to_owned())]
+        );
     }
 
     #[test]
     fn keeps_the_name_trimmed() {
         let phone = Phone::new();
-        let id = phone.open().add("  studio ", route(LAN, TOKEN)).expect("add");
+        let id = phone.open().add("  studio ", &code(&[LAN], TOKEN)).expect("add");
         assert_eq!(phone.open().machine(id).expect("the studio").name, "studio");
     }
 
@@ -178,7 +204,7 @@ mod add {
     fn refuses_a_name_another_machine_has_without_saving_its_token() {
         let phone = Phone::new();
         let (mut machines, studio) = phone.studio();
-        let result = phone.unchanged(&mut machines, |machines| machines.add(" Studio", route(LAN, NEW_TOKEN)));
+        let result = phone.unchanged(&mut machines, |machines| machines.add(" Studio", &code(&[LAN], NEW_TOKEN)));
         assert_eq!(result, Err(Error::NameTaken));
         assert_eq!(phone.secret(MachineId(studio.0 + 1), LAN), None);
     }
@@ -219,7 +245,7 @@ mod rename {
     fn refuses_a_name_and_keeps_the_old_one(#[case] name: &str, #[case] error: Error) {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
-        machines.add("laptop", route(GONE, NEW_TOKEN)).expect("add the laptop");
+        machines.add("laptop", &code(&[GONE], NEW_TOKEN)).expect("add the laptop");
         let result = phone.unchanged(&mut machines, |machines| machines.rename(id, name));
         assert_eq!(result, Err(error));
     }
@@ -282,6 +308,163 @@ mod add_route {
         let result = phone.unchanged(&mut machines, |machines| machines.add_route(id, bridge(LAN, 8765, None)));
         assert_eq!(result, Err(Error::NoToken));
         assert_eq!(phone.secret(id, LAN).as_deref(), Some(TOKEN));
+    }
+}
+
+mod merge {
+    use super::*;
+
+    fn routes(phone: &Phone, id: MachineId) -> Vec<Route> {
+        phone.open().machine(id).expect("the machine").routes.clone()
+    }
+
+    fn merged(added: &[&str], token_updated: bool, skipped: &[&str]) -> Merged {
+        let addresses = |hosts: &[&str]| hosts.iter().map(|host| address(host)).collect();
+        Merged { added: addresses(added), token_updated, skipped: addresses(skipped) }
+    }
+
+    #[test]
+    fn adds_the_missing_routes_after_the_saved_ones_with_their_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = machines.merge(id, &code(&[TAILNET, NEW_TAILNET, LAN], TOKEN));
+        assert_eq!(result, Ok(merged(&[NEW_TAILNET], false, &[])));
+        assert_eq!(routes(&phone, id), [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)]);
+        assert_eq!(phone.secret(id, NEW_TAILNET).as_deref(), Some(TOKEN));
+    }
+
+    #[test]
+    fn updates_the_token_of_the_saved_routes_when_it_was_rotated() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = machines.merge(id, &code(&[LAN, TAILNET], NEW_TOKEN));
+        assert_eq!(result, Ok(merged(&[], true, &[])));
+        assert_eq!(
+            machines.machine(id).expect("the studio").routes,
+            [route(LAN, NEW_TOKEN), route(TAILNET, NEW_TOKEN)]
+        );
+        assert_eq!(routes(&phone, id), [route(LAN, NEW_TOKEN), route(TAILNET, NEW_TOKEN)]);
+    }
+
+    #[test]
+    fn fills_the_token_a_saved_route_lost() {
+        let phone = Phone::new();
+        let (_, id) = phone.studio();
+        phone.secrets.delete(&key(id, &address(LAN))).expect("forget the token");
+        let result = phone.open().merge(id, &code(&[LAN], TOKEN));
+        assert_eq!(result, Ok(merged(&[], true, &[])));
+        assert_eq!(routes(&phone, id), [route(LAN, TOKEN), route(TAILNET, TOKEN)]);
+    }
+
+    #[test]
+    fn skips_the_addresses_another_machine_has_and_keeps_both_machines() {
+        let phone = Phone::new();
+        let (mut machines, studio, laptop) = phone.studio_and_laptop();
+        let result = machines.merge(studio, &code(&[LAN, GONE, NEW_TAILNET], TOKEN));
+        assert_eq!(result, Ok(merged(&[NEW_TAILNET], false, &[GONE])));
+        assert_eq!(routes(&phone, studio), [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)]);
+        assert_eq!(routes(&phone, laptop), [route(GONE, NEW_TOKEN)]);
+        assert_eq!((phone.secret(studio, GONE), phone.secret(laptop, GONE).as_deref()), (None, Some(NEW_TOKEN)));
+    }
+
+    #[test]
+    fn writes_nothing_when_there_is_nothing_to_add() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.block_the_file();
+        assert_eq!(machines.merge(id, &code(&[TAILNET, LAN], TOKEN)), Ok(Merged::default()));
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine_without_saving_a_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let other = MachineId(id.0 + 1);
+        let result = phone.unchanged(&mut machines, |machines| machines.merge(other, &code(&[NEW_TAILNET], TOKEN)));
+        assert_eq!(result, Err(Error::UnknownMachine));
+        assert_eq!(phone.secret(other, NEW_TAILNET), None);
+    }
+
+    #[test]
+    fn leaves_the_file_as_it_was_when_a_token_cannot_be_saved() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.secrets.fail_writes(true);
+        let result = phone.unchanged(&mut machines, |machines| machines.merge(id, &code(&[NEW_TAILNET], TOKEN)));
+        assert!(matches!(result, Err(Error::Secrets(_))), "{result:?}");
+    }
+
+    #[test]
+    fn keeps_the_routes_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        phone.block_the_file();
+        let result = machines.merge(id, &code(&[NEW_TAILNET], TOKEN));
+        assert!(matches!(result, Err(Error::Store(_))), "{result:?}");
+        assert_eq!(machines.machine(id).expect("the studio").routes, [route(LAN, TOKEN), route(TAILNET, TOKEN)]);
+    }
+}
+
+mod learn {
+    use super::*;
+
+    fn routes(machines: &Machines, id: MachineId) -> Vec<Route> {
+        machines.machine(id).expect("the machine").routes.clone()
+    }
+
+    #[test]
+    fn adds_only_the_new_addresses_and_keeps_the_saved_tokens() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let learned = machines.learn(id, &[route(TAILNET, NEW_TOKEN), route(NEW_TAILNET, TOKEN)]);
+        assert_eq!(learned, Ok(vec![route(NEW_TAILNET, TOKEN)]));
+        let expected = [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)];
+        assert_eq!(routes(&phone.open(), id), expected);
+        assert_eq!(phone.secret(id, NEW_TAILNET).as_deref(), Some(TOKEN));
+    }
+
+    #[test]
+    fn learns_nothing_the_second_time_and_writes_nothing() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let answer = [route(NEW_TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)];
+        assert_eq!(machines.learn(id, &answer), Ok(vec![route(NEW_TAILNET, TOKEN)]));
+        phone.block_the_file();
+        assert_eq!(machines.learn(id, &answer), Ok(Vec::new()));
+        assert_eq!(routes(&machines, id), [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)]);
+    }
+
+    #[test]
+    fn never_removes_a_route_the_bridge_no_longer_lists() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        assert_eq!(machines.learn(id, &[route(NEW_TAILNET, TOKEN)]), Ok(vec![route(NEW_TAILNET, TOKEN)]));
+        assert_eq!(routes(&phone.open(), id), [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)]);
+    }
+
+    #[test]
+    fn skips_an_address_another_machine_has() {
+        let phone = Phone::new();
+        let (mut machines, studio, _) = phone.studio_and_laptop();
+        let learned = phone.unchanged(&mut machines, |machines| machines.learn(studio, &[route(GONE, TOKEN)]));
+        assert_eq!(learned, Ok(Vec::new()));
+        assert_eq!(phone.secret(studio, GONE), None);
+    }
+
+    #[test]
+    fn refuses_an_unknown_machine() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = machines.learn(MachineId(id.0 + 1), &[route(NEW_TAILNET, TOKEN)]);
+        assert_eq!(result, Err(Error::UnknownMachine));
+    }
+
+    #[test]
+    fn refuses_a_route_without_a_token() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.learn(id, &[bridge(NEW_TAILNET, 8765, None)]));
+        assert_eq!(result, Err(Error::NoToken));
     }
 }
 
@@ -585,7 +768,7 @@ mod same {
     fn compares_the_tokens_read_back_from_the_secrets() {
         let phone = Phone::new();
         let (_, id) = phone.studio();
-        let same = phone.open().same(&route("studio.local", TOKEN), "new", None, &HashMap::new());
+        let same = phone.open().same(&[route("studio.local", TOKEN)], "new", None, &HashMap::new());
         assert_eq!(same, Some(Same { machine: id, why: Why::Token }));
     }
 }
