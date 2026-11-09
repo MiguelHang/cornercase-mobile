@@ -154,6 +154,18 @@ mod a_restart {
         assert!(!changes.contains(&Change::Session));
         assert_eq!(store.session(), Some(serde_json::from_str(WATCH).expect("the watch fixture")));
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn seen_twice_without_a_snapshot_between_waits_out_the_backoff() {
+        let asked = Asked::default();
+        let fake = serving(fine()).answer(CONTRACT, &[&contract_of(RESTARTED)], &[], 0);
+        let (_store, mut changes) = spawned(fake, &asked);
+        let started = Instant::now();
+        let waits = [retrying(&mut changes).await, retrying(&mut changes).await];
+        let disagree = Error::StaleBoot("the server's contract and its snapshots name different boots".to_owned());
+        assert_eq!(waits, [(Duration::from_secs(1), disagree.clone()), (Duration::from_secs(2), disagree)]);
+        assert_eq!((started.elapsed(), contracts(&asked)), (Duration::from_secs(1), 3));
+    }
 }
 
 mod the_queue {

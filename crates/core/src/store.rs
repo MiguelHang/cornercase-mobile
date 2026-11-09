@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::mem;
 use std::pin::pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -27,6 +28,8 @@ use crate::transport::Transport;
 mod backoff;
 mod connect;
 mod streams;
+
+const DISAGREE: &str = "the server's contract and its snapshots name different boots";
 
 type Worker = BoxFuture<'static, ()>;
 
@@ -218,6 +221,7 @@ struct Driver<F> {
     config: PickConfig,
     shared: Arc<Shared>,
     backoff: Backoff,
+    restarted: bool,
     worker: Option<oneshot::Sender<Worker>>,
 }
 
@@ -228,7 +232,7 @@ where
     fn new(machine: Machine, factory: F, config: PickConfig, shared: Arc<Shared>) -> (Self, oneshot::Receiver<Worker>) {
         let (worker, started) = oneshot::channel();
         let backoff = Backoff::default();
-        (Self { machine, factory, config, shared, backoff, worker: Some(worker) }, started)
+        (Self { machine, factory, config, shared, backoff, restarted: false, worker: Some(worker) }, started)
     }
 
     async fn drive(mut self, resumes: mpsc::UnboundedReceiver<()>, worker: oneshot::Receiver<Worker>) {
@@ -272,16 +276,22 @@ where
         let woken = resumes.race(streams::follow(shared, picked), || shared.connected()).await;
         if self.shared.connected() {
             self.backoff.reset();
+            self.restarted = false;
         }
         match woken {
             Woken::Done(Ended::Failed(error)) => Woken::Done(error),
-            Woken::Done(Ended::Restarted) => {
-                self.join(&picked.transport);
-                Woken::Resumed
-            }
+            Woken::Done(Ended::Restarted) => self.restart(&picked.transport),
             Woken::Resumed => Woken::Resumed,
             Woken::Dropped => Woken::Dropped,
         }
+    }
+
+    fn restart(&mut self, transport: &Arc<dyn Transport>) -> Woken<Error> {
+        self.join(transport);
+        if mem::replace(&mut self.restarted, true) {
+            return Woken::Done(Error::StaleBoot(DISAGREE.to_owned()));
+        }
+        Woken::Resumed
     }
 
     async fn stop(&self, connection: Connection, resumes: &mut Resumes) -> bool {
