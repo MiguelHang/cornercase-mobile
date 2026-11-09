@@ -8,6 +8,9 @@ use crate::transport::json_error;
 
 pub const CONTRACT: u32 = 1;
 
+const OLD_SERVER: &str = "has no `contract` command";
+const OLD_CLI: &str = "unrecognized subcommand 'contract'";
+
 pub const REQUIRED: Required = Required {
     operations: &[
         "status",
@@ -129,6 +132,13 @@ fn missing_operation(descriptor: &Descriptor, name: &str) -> Option<Missing> {
         Some(Operation { available: true, .. }) => None,
         Some(operation) => Some(Missing::new(name, Kind::Operation, operation.reason.clone())),
         None => Some(Missing::new(name, Kind::Operation, None)),
+    }
+}
+
+pub fn outdated(error: Error) -> Error {
+    match error {
+        Error::Failed { stderr, .. } if stderr.contains(OLD_SERVER) || stderr.contains(OLD_CLI) => Error::Outdated,
+        other => other,
     }
 }
 

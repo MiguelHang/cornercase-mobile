@@ -195,3 +195,30 @@ mod missing {
         assert_eq!(missing(&descriptor), expected);
     }
 }
+
+mod outdated {
+    use super::*;
+
+    const OLD_SERVER: &str = "Error: the running cornercase server (0.12.0) has no `contract` command; update cornercase and restart the server\n";
+    const OLD_CLI: &str = "error: unrecognized subcommand 'contract'\n\nUsage: cornercase [OPTIONS] [COMMAND]\n\nFor more information, try '--help'.\n";
+    const BRIDGE: &str = "--remote is not allowed through the bridge: the bridge runs commands on this Mac";
+
+    fn failed(code: i32, stderr: &str) -> Error {
+        Error::Failed { code, stderr: stderr.to_owned() }
+    }
+
+    #[rstest]
+    #[case::server_without_the_command(failed(1, OLD_SERVER))]
+    #[case::cli_without_the_subcommand(failed(2, OLD_CLI))]
+    fn says_cornercase_on_the_mac_is_too_old(#[case] error: Error) {
+        assert_eq!(outdated(error), Error::Outdated);
+    }
+
+    #[rstest]
+    #[case::refused_by_the_bridge(failed(2, BRIDGE))]
+    #[case::another_failure(failed(1, "Error: no project at /tmp/x"))]
+    #[case::not_a_failure(Error::Timeout)]
+    fn leaves_any_other_error_as_it_is(#[case] error: Error) {
+        assert_eq!(outdated(error.clone()), error);
+    }
+}
