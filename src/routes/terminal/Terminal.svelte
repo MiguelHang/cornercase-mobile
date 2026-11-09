@@ -57,7 +57,8 @@
         }
       }
     })
-    const open = (size: Size_Deserialize, fit: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit })
+    const open = (size: Size_Deserialize, fitting: boolean) =>
+      commands.terminalOpen(row.tab, row.pane, { size, fit: fitting })
     const close = () => commands.terminalClose(row.tab)
     opening = new Opening(unlisten, { open, close, failed: onfailed })
     const unwatch = keyboard.watch()
@@ -71,8 +72,8 @@
   })
 
   $effect(() => {
-    if (wanted !== null) {
-      opening?.open(wanted, fit.wanted)
+    if (wanted !== null && opening !== null) {
+      fit.ask(opening, wanted)
     }
   })
 </script>

@@ -20,6 +20,7 @@ use crate::transport::{Exit, Output, Transport, json_error, listen, only_stdout,
 const REDRAW: &str = "redraw";
 const SETTLE: Duration = Duration::from_secs(1);
 const REDRAW_AGAIN: Duration = Duration::from_secs(2);
+const LEAVING: Duration = Duration::from_secs(5);
 
 type End = Result<Exit, Error>;
 
@@ -38,7 +39,7 @@ pub enum Step {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Source {
+pub(crate) enum Source {
     Tab { tab: u64, size: Size },
     View { view: u64, tab: u64 },
 }
@@ -56,13 +57,14 @@ pub(crate) struct Followed {
     lines: mpsc::UnboundedReceiver<String>,
     run: Fuse<BoxFuture<'static, End>>,
     ended: Option<Ended>,
+    told: bool,
 }
 
 impl Followed {
     pub(crate) fn open(transport: Arc<dyn Transport>, argv: Vec<String>) -> Self {
         let (out, lines) = listen(only_stdout);
         let run = async move { transport.run(argv, stream::pending().boxed(), out).await }.boxed().fuse();
-        Self { lines, run, ended: None }
+        Self { lines, run, ended: None, told: false }
     }
 
     pub(crate) async fn next(&mut self) -> Either<String, Ended> {
@@ -74,14 +76,18 @@ impl Followed {
             };
             self.ended = Some(ended(end));
         }
-        match self.lines.try_recv() {
-            Ok(line) => Either::Left(line),
-            Err(_) => Either::Right(self.ended.clone().unwrap_or(Ended::Exited)),
+        if let Ok(line) = self.lines.try_recv() {
+            return Either::Left(line);
         }
+        if self.told {
+            return future::pending().await;
+        }
+        self.told = true;
+        Either::Right(self.ended.clone().unwrap_or(Ended::Exited))
     }
 }
 
-pub struct Live {
+pub(crate) struct Live {
     source: Source,
     queue: Queue,
     grid: Grid,
@@ -90,22 +96,20 @@ pub struct Live {
 }
 
 impl Live {
-    #[must_use]
-    pub fn open(transport: Arc<dyn Transport>, queue: Queue, source: Source) -> Self {
+    pub(crate) fn open(transport: Arc<dyn Transport>, queue: Queue, source: Source) -> Self {
         let followed = Followed::open(transport, surface(source));
         Self { source, queue, grid: Grid::default(), redrawing: None, followed }
     }
 
-    #[must_use]
-    pub fn grid(&self) -> &Grid {
+    pub(crate) fn grid(&self) -> &Grid {
         &self.grid
     }
 
-    pub fn saw_projection(&mut self, projection: u64) {
+    pub(crate) fn saw_projection(&mut self, projection: u64) {
         self.grid.saw_projection(projection);
     }
 
-    pub async fn next(&mut self) -> Step {
+    pub(crate) async fn next(&mut self) -> Step {
         loop {
             let line = match self.followed.next().await {
                 Either::Left(line) => line,
@@ -211,7 +215,11 @@ impl Terminal {
                 told.ended(ended, still_on(store, &used));
                 return true;
             }
-            Fitted::Refused(_) | Fitted::MovedAway | Fitted::MovedOn => return true,
+            Fitted::MovedAway => {
+                left(store, self.tab).await;
+                return true;
+            }
+            Fitted::Refused(_) | Fitted::MovedOn => return true,
         };
         told.unfitted(unfitted);
         false
@@ -289,6 +297,18 @@ async fn moved_on(store: &Store, used: &Arc<dyn Transport>) {
             return;
         }
     }
+}
+
+async fn left(store: &Store, tab: u64) {
+    let mut changes = store.changes();
+    let gone = async {
+        while store.session().is_some_and(|session| holds(&session, tab)) {
+            if changes.next().await.is_none() {
+                return;
+            }
+        }
+    };
+    let _ = time::timeout(LEAVING, gone).await;
 }
 
 struct Reached {

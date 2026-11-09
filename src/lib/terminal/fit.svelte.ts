@@ -1,3 +1,8 @@
+import type { Size_Deserialize } from '../bindings'
+import type { Opening } from './opening'
+
+export type Asked = Pick<Opening, 'open' | 'pause'>
+
 export type Page = Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & Pick<Document, 'visibilityState'>
 
 export class Fit {
@@ -12,12 +17,16 @@ export class Fit {
     return this.#visible
   }
 
-  get wanted() {
-    return this.#on && this.#visible
-  }
-
   toggle() {
     this.#on = !this.#on
+  }
+
+  ask(opening: Asked, size: Size_Deserialize) {
+    if (this.#on && !this.#visible) {
+      opening.pause()
+    } else {
+      opening.open(size, this.#on)
+    }
   }
 
   unfitted() {

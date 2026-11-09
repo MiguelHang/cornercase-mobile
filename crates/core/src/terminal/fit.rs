@@ -13,29 +13,30 @@ use crate::queue::Queue;
 use crate::transport::{Transport, json_error};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Verdict {
+pub(crate) enum Verdict {
     Granted { view: u64, projection: u64 },
     Projection(u64),
     TakenBack,
     MovedAway,
     Refused(Error),
+    Ended(Ended),
 }
 
-pub struct Claim {
+pub(crate) struct Claim {
     tab: u64,
     granted: bool,
     followed: Followed,
 }
 
 impl Claim {
-    #[must_use]
-    pub fn open(transport: Arc<dyn Transport>, tab: u64, size: Size) -> Self {
+    pub(crate) fn open(transport: Arc<dyn Transport>, tab: u64, size: Size) -> Self {
         Self { tab, granted: false, followed: Followed::open(transport, view::argv(tab, size)) }
     }
 
-    pub async fn next(&mut self) -> Verdict {
+    pub(crate) async fn next(&mut self) -> Verdict {
         match self.followed.next().await {
             Either::Left(line) => self.judged(&line),
+            Either::Right(ended) if self.granted || passing(&ended) => Verdict::Ended(ended),
             Either::Right(ended) => Verdict::Refused(refusal(ended)),
         }
     }
@@ -60,7 +61,7 @@ impl Claim {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Fitted {
+pub(crate) enum Fitted {
     TakenBack,
     MovedAway,
     Refused(Error),
@@ -89,6 +90,7 @@ impl Fitting {
             Verdict::TakenBack => return Some(Fitted::TakenBack),
             Verdict::MovedAway => return Some(Fitted::MovedAway),
             Verdict::Refused(error) => return Some(Fitted::Refused(error)),
+            Verdict::Ended(ended) => return Some(Fitted::Ended(ended)),
         }
         None
     }
@@ -99,7 +101,7 @@ impl Fitting {
     }
 }
 
-pub async fn follow_fitted(
+pub(crate) async fn follow_fitted(
     mut claim: Claim,
     transport: Arc<dyn Transport>,
     queue: Queue,
@@ -146,6 +148,10 @@ fn painted(grid: &Grid, step: Step, paint: &mut impl FnMut(&Grid, Result<Changes
 fn taken_back(view: &ViewInfo) -> bool {
     let sized = view.cols.is_some() && view.rows.is_some();
     view.active && sized && !view.controls
+}
+
+fn passing(ended: &Ended) -> bool {
+    matches!(ended, Ended::Lost(_) | Ended::Failed(Error::StaleBoot(_)))
 }
 
 fn refusal(ended: Ended) -> Error {

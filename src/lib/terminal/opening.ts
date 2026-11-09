@@ -30,6 +30,14 @@ export class Opening {
     this.#turn = this.#turn.then(() => this.#send(size, fit, key)).catch(this.#calls.failed)
   }
 
+  pause() {
+    if (this.#left || this.#wanted === '') {
+      return
+    }
+    this.#wanted = ''
+    this.#turn = this.#turn.then(() => this.#calls.close()).catch(this.#calls.failed)
+  }
+
   leave() {
     this.#left = true
     this.#calls.close().catch(this.#calls.failed)

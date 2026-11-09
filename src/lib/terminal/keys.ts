@@ -3,10 +3,11 @@ import type { IconName } from '../ui/icons/shapes'
 
 export type InputEvent = InputEvent_Deserialize
 
-export type RowKey =
-  | { kind: 'key'; label: string; event: InputEvent }
-  | { kind: 'ctrl'; label: string }
-  | { kind: 'paste'; label: string; icon: IconName }
+export type RowKey = { label: string; icon?: IconName } & (
+  | { kind: 'key'; event: InputEvent }
+  | { kind: 'ctrl' }
+  | { kind: 'paste'; icon: IconName }
+)
 
 export type Pressed = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>
 
@@ -18,10 +19,10 @@ export const ROW: RowKey[] = [
   { kind: 'key', label: 'Esc', event: key('esc') },
   { kind: 'key', label: 'Tab', event: key('tab') },
   { kind: 'ctrl', label: 'Ctrl' },
-  { kind: 'key', label: '↑', event: key('up') },
-  { kind: 'key', label: '↓', event: key('down') },
-  { kind: 'key', label: '←', event: key('left') },
-  { kind: 'key', label: '→', event: key('right') },
+  { kind: 'key', label: 'Up', icon: 'arrow-up', event: key('up') },
+  { kind: 'key', label: 'Down', icon: 'arrow-down', event: key('down') },
+  { kind: 'key', label: 'Left', icon: 'arrow-left', event: key('left') },
+  { kind: 'key', label: 'Right', icon: 'arrow-right', event: key('right') },
   { kind: 'key', label: '|', event: text('|') },
   { kind: 'key', label: '~', event: text('~') },
   { kind: 'key', label: '/', event: text('/') },

@@ -55,14 +55,16 @@ describe('the terminal screen', () => {
   })
 
   it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
-    expect(source).toContain('const open = (size: Size_Deserialize, fit: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit })')
+    expect(source).toContain(
+      'const open = (size: Size_Deserialize, fitting: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit: fitting })',
+    )
     expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab }}')
   })
 
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
     expect(source).toContain('const close = () => commands.terminalClose(row.tab)')
     expect(source).toContain('new Opening(unlisten, { open, close, failed: onfailed })')
-    expect(source).toContain('opening?.open(wanted, fit.wanted)')
+    expect(source).toContain('if (wanted !== null && opening !== null) { fit.ask(opening, wanted) }')
     expect(source).toContain('opening?.leave()')
   })
 })
@@ -154,8 +156,9 @@ describe('fitting the pane to the phone', () => {
 
   const fitting = () => {
     const open = vi.fn(() => Promise.resolve<Sent>({ status: 'ok' }))
-    const opening = new Opening(Promise.resolve(), { open, close: () => Promise.resolve(), failed: () => {} })
-    return { open, opening, fit: new Fit() }
+    const close = vi.fn(() => Promise.resolve())
+    const opening = new Opening(Promise.resolve(), { open, close, failed: () => {} })
+    return { open, close, opening, fit: new Fit() }
   }
 
   it('shows a toggle in the bar, off and named for what it does', () => {
@@ -169,10 +172,10 @@ describe('fitting the pane to the phone', () => {
 
   it('opens the pane fitted once the toggle is pressed', async () => {
     const { open, opening, fit } = fitting()
-    opening.open(SIZE, fit.wanted)
+    fit.ask(opening, SIZE)
     await settled()
     fit.toggle()
-    opening.open(SIZE, fit.wanted)
+    fit.ask(opening, SIZE)
     await settled()
     expect(open.mock.calls).toEqual([
       [SIZE, false],
@@ -189,21 +192,21 @@ describe('fitting the pane to the phone', () => {
     expect(source).toContain('shown.apply(event.payload) if (event.payload.unfitted) { fit.unfitted() }')
   })
 
-  it('lets the tab go while the app is in the background and claims it again on its return', async () => {
-    const { open, opening, fit } = fitting()
+  it('lets the tab go while the app is in the background, opening nothing, and claims it again on its return', async () => {
+    const { open, close, opening, fit } = fitting()
     fit.watch(page)
     fit.toggle()
-    opening.open(SIZE, fit.wanted)
+    fit.ask(opening, SIZE)
     await settled()
     turn('hidden')
-    opening.open(SIZE, fit.wanted)
+    fit.ask(opening, SIZE)
     await settled()
+    expect([open.mock.calls, close.mock.calls.length]).toEqual([[[SIZE, true]], 1])
     turn('visible')
-    opening.open(SIZE, fit.wanted)
+    fit.ask(opening, SIZE)
     await settled()
     expect(open.mock.calls).toEqual([
       [SIZE, true],
-      [SIZE, false],
       [SIZE, true],
     ])
     expect(source).toContain('const unwatchPage = fit.watch(document)')

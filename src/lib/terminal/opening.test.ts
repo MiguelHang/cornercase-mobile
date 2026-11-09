@@ -109,6 +109,60 @@ describe('Opening', () => {
     ])
   })
 
+  it('closes the terminal on a pause and opens the same size again after it', async () => {
+    const made = calls()
+    const opening = new Opening(Promise.resolve(), made)
+    opening.open({ cols: 80, rows: 24 }, true)
+    await settled()
+    opening.pause()
+    opening.pause()
+    await settled()
+    expect(made.close).toHaveBeenCalledTimes(1)
+    opening.open({ cols: 80, rows: 24 }, true)
+    await settled()
+    expect(made.open.mock.calls).toEqual([
+      [{ cols: 80, rows: 24 }, true],
+      [{ cols: 80, rows: 24 }, true],
+    ])
+  })
+
+  it('closes nothing on a pause before anything opened or once it left', async () => {
+    const made = calls()
+    const opening = new Opening(Promise.resolve(), made)
+    opening.pause()
+    opening.open({ cols: 80, rows: 24 }, true)
+    opening.leave()
+    opening.pause()
+    await settled()
+    expect(made.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes on a pause only after the open on its way, skipping those not sent yet', async () => {
+    const answer = gate<Opened>()
+    const made = calls(() => answer.promise)
+    const opening = new Opening(Promise.resolve(), made)
+    opening.open({ cols: 80, rows: 24 }, true)
+    await settled()
+    opening.open({ cols: 40, rows: 60 }, true)
+    opening.pause()
+    await settled()
+    expect(made.close).not.toHaveBeenCalled()
+    answer.open(OK)
+    await settled()
+    expect(made.open).toHaveBeenCalledTimes(1)
+    expect(made.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('tells a close on a pause that threw', async () => {
+    const made = calls()
+    made.close.mockRejectedValue(new Error('gone'))
+    const opening = new Opening(Promise.resolve(), made)
+    opening.open({ cols: 80, rows: 24 }, true)
+    opening.pause()
+    await settled()
+    expect(made.failed.mock.calls).toEqual([[new Error('gone')]])
+  })
+
   it('tells why the terminal did not open and still opens the next size', async () => {
     const made = calls(() => Promise.resolve({ status: 'error', error: 'not_connected' }))
     const opening = new Opening(Promise.resolve(), made)
