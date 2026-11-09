@@ -1,6 +1,6 @@
 # 015 — Pantalla 1: tablero de agentes
 
-- Estado: hecha, salvo la comprobación en el simulador
+- Estado: hecha
 - Depende de: 014
 - Riesgo: bajo
 - Rama: `feat/015-agents-board` · PR: `feat: show every project's agents with the waiting ones first`
@@ -22,7 +22,8 @@ La pantalla principal: los agentes de todos los proyectos con su estado, los que
   (`design/board.md` › Sections).
 - [x] CA4 — Se actualiza en vivo desde `status --follow` / `events` sin parpadeo (claves estables por panel, animación
   de reordenación). Una sola lista con las cabeceras, para que `flip` mueva una fila de una sección a otra
-  (`design/board.md` › Live, without flicker).
+  (`design/board.md` › Live, without flicker). Comprobado en el simulador contra el cornercase del Mac: un agente que
+  pasa a esperar sube solo a Waiting (`design/board.md` › Checked live).
 - [x] CA5 — Tocar una fila abre la vista de chat del agente (ruta de 016, aunque sea un esqueleto aquí). La ruta
   `agent` y `settle`, que no la pisa con cada cambio (`design/look.md` › Navigation).
 - [x] CA6 — vitest de formato de tiempo y agrupado por sección.

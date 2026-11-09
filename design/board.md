@@ -38,6 +38,11 @@ The active machine's screen, under the connection bar: every agent of its projec
 - **A button of at least 44 px** with an empty `ontouchstart` (Look › Touch and motion): the `StatusDot` (Look › Components), the title, the place under it in `--muted`, and the time on the right in tabular figures, so the digits do not jump as it counts; no time when `since` is `null`.
 - **A tap opens the agent's screen** (`router.go({ name: 'agent', pane })`, Look › Navigation): here a skeleton of 016's chat with its dot, title and place, read by pane from the latest rows, and `Back`. While the agent works its dot keeps changing there too. A pane no longer among the rows says `This agent is no longer running.`; 016 decides the final text.
 
+## Checked live
+
+- **On 2026-11-09** in the iPhone 17 simulator (iOS 27.2, Xcode 27.2, macOS 26.6.2, Tauri 2.12.5), against the bridge on the LAN and cornercase 0.13.19, with Claude Code 2.1.319. A Claude started with `cornercase start` showed under Working, then under Done with `now` once it finished, below the agents that were already done when the app connected, which show no time. Asked to put a question to the user (`AskUserQuestion`, which cornercase reports as `waiting`), its row went on its own to a new Waiting section at the top, in the first screenshot after the Mac's `status` said `waiting`, less than a second later. The screenshots, about two a second, show each state but not the slide, which is shorter.
+- **A real tap** (an XCUITest press) on that row opened the agent's screen with the waiting dot. Answering the question on the Mac turned the dot to working and then done while the screen stayed put, and `Back` returned to the board.
+
 ## Left out
 
 - The agents of the other servers a Mac links (`status`'s `machines`, gpui's `machine_agents.rs`): their ids belong to another server, and the app's `Snapshot` does not read them.
