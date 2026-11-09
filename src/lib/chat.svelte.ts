@@ -148,6 +148,10 @@ export class Chat {
     this.lastNews = clock.now()
   }
 
+  now() {
+    return this.#clock.now()
+  }
+
   get sending() {
     return this.outgoing?.state === 'sending'
   }

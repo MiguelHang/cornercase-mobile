@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
 import type { Reading } from './chat.svelte'
-import { AT_END_MARGIN, STALL_MS, agentLine, atEnd, compactHeader, isAnswer, threadOf } from './thread'
+import { AT_END_MARGIN, STALL_MS, agentLine, atEnd, compactHeader, isAnswer, sendNews, threadOf } from './thread'
 
 const NOW = Date.parse('2026-11-09T21:30:00.000Z')
 
@@ -120,6 +120,21 @@ const BEFORE = said('Which file should I fix?')
 const LOADING: Reading = { kind: 'loading' }
 
 const UNREADABLE: Reading = { kind: 'unreadable', reason: 'no transcript' }
+
+describe('sendNews', () => {
+  it.each([
+    ['sending', null, 'Sending'],
+    ['sent', null, 'Sent'],
+    ['failed', 'the agent is gone', 'Not sent: the agent is gone'],
+    ['failed', null, 'Not sent'],
+  ] as const)('says a message %s with reason %o as %o', (state, reason, news) => {
+    expect(sendNews({ state, reason })).toBe(news)
+  })
+
+  it('says nothing before anything is sent', () => {
+    expect(sendNews(null)).toBe('')
+  })
+})
 
 describe('isAnswer', () => {
   it('takes the message seen when sending for no answer', () => {

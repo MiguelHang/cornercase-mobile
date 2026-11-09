@@ -242,6 +242,13 @@ describe('Chat, its last news', () => {
     expect(fresh(clocked()).lastNews).toBe(1000)
   })
 
+  it('tells the time by the clock it was given', () => {
+    const { clock, tick } = clocked()
+    const chat = fresh({ clock })
+    tick(500)
+    expect(chat.now()).toBe(1500)
+  })
+
   it('comes with a change of status, not with the same one again', () => {
     const { clock, tick } = clocked()
     const chat = seen({ clock }, 'working')

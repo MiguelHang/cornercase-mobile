@@ -1,6 +1,6 @@
 import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
 import { elapsed, span } from './board'
-import type { Reading } from './chat.svelte'
+import type { Outgoing, Reading } from './chat.svelte'
 
 export const STALL_MS = 120_000
 
@@ -34,6 +34,16 @@ export const agentLine = (row: AgentRow, now: number, lastNews: number): AgentLi
   }
   const time = said.timed ? elapsed(row.since, now) : ''
   return { tone: said.tone, phrase: `${row.agent} ${said.doing}`, time, stalled: false }
+}
+
+export const sendNews = (outgoing: Pick<Outgoing, 'state' | 'reason'> | null) => {
+  if (outgoing === null) {
+    return ''
+  }
+  if (outgoing.state === 'failed') {
+    return outgoing.reason === null ? 'Not sent' : `Not sent: ${outgoing.reason}`
+  }
+  return outgoing.state === 'sending' ? 'Sending' : 'Sent'
 }
 
 export type Part = 'agent' | 'you'

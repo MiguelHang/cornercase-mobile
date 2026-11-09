@@ -10,9 +10,10 @@
   import Spinner from '../../lib/ui/Spinner.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
+  import AgentLine from './AgentLine.svelte'
   import KeyRow from './KeyRow.svelte'
 
-  const TICK_MS = 30_000
+  const TICK_MS = 15_000
 
   let {
     chat,
@@ -32,10 +33,11 @@
     onterminal: (row: AgentRow) => void
   } = $props()
 
-  let now = $state(Date.now())
+  let now = $state(untrack(() => chat.now()))
 
   $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), TICK_MS)
+    const told = chat
+    const timer = setInterval(() => (now = told.now()), TICK_MS)
     return () => clearInterval(timer)
   })
 
@@ -94,6 +96,7 @@
           <p class="reason">{reading.kind === 'loading' ? 'Reading its last message…' : reading.reason}</p>
         {/if}
       </article>
+      <AgentLine {chat} {now} />
       <div class="composer">
         {#if chat.asking}
           <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>

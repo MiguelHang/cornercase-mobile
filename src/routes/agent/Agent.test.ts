@@ -2,9 +2,12 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import type { AttachImage } from '../../lib/attach.svelte'
-import { Chat, timers, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
+import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
+import { fakeClock } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
+import AgentLine from './AgentLine.svelte'
+import agentLineSource from './AgentLine.svelte?raw'
 import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
 import Sent from './Sent.svelte'
@@ -534,5 +537,122 @@ describe('Sent', () => {
   it('sits on the right', () => {
     expect(flat(sentSource)).toContain('align-items: flex-end;')
     expect(flat(sentSource)).toContain('align-self: flex-end;')
+  })
+})
+
+const SINCE = Date.parse(ROW.since ?? '')
+
+const LATER = SINCE + 3 * 60_000
+
+const clockAt = (millis: number) => {
+  const { clock, tick } = fakeClock()
+  tick(millis)
+  return { clock, tick }
+}
+
+const lineChat = (status: string | null, since: string | null = ROW.since, clock: Clock = clockAt(LATER).clock) => {
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, clock)
+  chat.see(1, [{ ...ROW, status, since }])
+  return chat
+}
+
+const line = (chat: Chat, now = LATER) => render(AgentLine, { props: { chat, now } }).body
+
+const region = (body: string) => body.match(/<p class="said svelte-[\w-]+" aria-live="polite">([^]*?)<\/p>/)?.[1]
+
+const phrase = (text: string) => `<span class="phrase">${text}</span>`
+
+describe('AgentLine', () => {
+  it('says a working agent works, with its orbit and the time since it started outside the region', () => {
+    const body = line(lineChat('working'))
+    expect(body).toMatch(/<div class="line working svelte-[\w-]+">/)
+    expect(body).toContain('aria-label="Working"')
+    expect(body).toMatch(/<g class="orbit svelte-[\w-]+">/)
+    expect(region(body)).toContain(phrase('claude is working…'))
+    expect(region(body)).not.toContain('3 min')
+    expect(body).toMatch(/<\/p> (?:<!--[^>]*-->)*<span class="time svelte-[\w-]+">· 3 min<\/span>/)
+  })
+
+  it('says a shell agent waits for a background command, timed and orbiting too', () => {
+    const body = line(lineChat('shell'))
+    expect(body).toMatch(/<g class="orbit svelte-[\w-]+">/)
+    expect(region(body)).toContain(phrase('claude is waiting for a background command…'))
+    expect(body).toMatch(/<span class="time svelte-[\w-]+">· 3 min<\/span>/)
+  })
+
+  it('shows no time when the start is not known', () => {
+    const body = line(lineChat('working', null))
+    expect(region(body)).toContain(phrase('claude is working…'))
+    expect(body).not.toContain('class="time')
+  })
+
+  it('says a waiting agent waits for your answer, untimed', () => {
+    const body = line(lineChat('waiting'))
+    expect(body).toMatch(/<div class="line waiting svelte-[\w-]+">/)
+    expect(region(body)).toContain(phrase('claude is waiting for your answer'))
+    expect(body).not.toContain('class="time')
+  })
+
+  it('says a failed agent stopped, in the failure tone', () => {
+    const body = line(lineChat('failed'))
+    expect(body).toMatch(/<div class="line failed svelte-[\w-]+">/)
+    expect(body).toContain('aria-label="Failed"')
+    expect(region(body)).toContain(phrase('claude stopped with an error'))
+    expect(flat(agentLineSource)).toContain('.failed { color: var(--failed); }')
+  })
+
+  it('mutes a working agent with no news for two minutes, and keeps the minutes out of the region', () => {
+    const body = line(lineChat('working', ROW.since, clockAt(SINCE).clock), SINCE + 2 * 60_000)
+    expect(body).toMatch(/<div class="line muted svelte-[\w-]+">/)
+    expect(region(body)).toContain(phrase('claude is working… · no news'))
+    expect(region(body)).not.toContain('min')
+    expect(body).toMatch(/<span class="time svelte-[\w-]+">for 2 min · Ctrl-C interrupts<\/span>/)
+    expect(flat(agentLineSource)).toContain('.muted, .muted .time { color: var(--muted); }')
+  })
+
+  it('keeps working one moment before two minutes without news', () => {
+    expect(line(lineChat('working', ROW.since, clockAt(SINCE).clock), SINCE + 2 * 60_000 - 1)).toMatch(/<div class="line working svelte-[\w-]+">/)
+  })
+
+  it.each(['done', 'idle', 'pending', null])('draws nothing for a %o agent but keeps the region, hidden', (status) => {
+    const body = line(lineChat(status))
+    expect(body).toMatch(/<div class="line {2}svelte-[\w-]+ spoken">/)
+    expect(body).not.toContain('<svg')
+    expect(body).not.toContain('class="phrase"')
+    expect(region(body)).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
+  })
+
+  it('keeps the region while the agent is not seen yet', () => {
+    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers)
+    expect(region(line(chat))).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
+  })
+
+  it.each([
+    [outgoing('sending'), 'Sending'],
+    [outgoing('sent'), 'Sent'],
+    [outgoing('failed', { reason: 'the agent is gone' }), 'Not sent: the agent is gone'],
+  ])('says what happened to your message in the same region', (shown, news) => {
+    const chat = lineChat('working')
+    chat.outgoing = shown
+    expect(region(line(chat))).toContain(`<span class="spoken">${news}</span> <!--[0-->${phrase('claude is working…')}`)
+  })
+})
+
+describe('Agent, its live line', () => {
+  it('draws the line under the message and above the composer', () => {
+    expect(flat(agentSource)).toContain('</article> <AgentLine {chat} {now} /> <div class="composer">')
+  })
+
+  it('tells the time by the chat clock', () => {
+    const body = draw(lineChat('working', ROW.since, clockAt(SINCE + 7 * 60_000).clock))
+    expect(body).toMatch(/<span class="time svelte-[\w-]+">· 7 min<\/span>/)
+  })
+
+  it('ticks with the chat clock every 15 seconds', () => {
+    expect(agentSource).toContain('const TICK_MS = 15_000')
+    expect(flat(agentSource)).toContain('let now = $state(untrack(() => chat.now()))')
+    expect(flat(agentSource)).toContain(
+      '$effect(() => { const told = chat const timer = setInterval(() => (now = told.now()), TICK_MS) return () => clearInterval(timer) })',
+    )
   })
 })
