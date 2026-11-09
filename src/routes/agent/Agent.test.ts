@@ -2,11 +2,13 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import type { AttachImage } from '../../lib/attach.svelte'
-import { Chat, timers, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
+import { Chat, timers, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
+import Sent from './Sent.svelte'
+import sentSource from './Sent.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
@@ -438,5 +440,99 @@ describe('Agent, its keys', () => {
 
   it('wraps the keys onto more lines rather than scroll sideways', () => {
     expect(flat(keyRowSource)).toContain('.row { display: flex; flex-wrap: wrap; gap: var(--gap); }')
+  })
+})
+
+const CHIPS = [
+  { name: 'IMG_0042.jpg', size: '47 KiB' },
+  { name: 'pasted.png', size: '900 B' },
+]
+
+const outgoing = (state: Outgoing['state'], fields: Partial<Outgoing> = {}): Outgoing => ({
+  text: 'what is wrong here?',
+  chips: [],
+  state,
+  reason: state === 'failed' ? 'nothing was sent' : null,
+  answered: null,
+  ...fields,
+})
+
+const bubble = (shown: Outgoing | null, chat = chatWith({ ...ROW, status: 'done' })) => {
+  chat.outgoing = shown
+  return render(Sent, { props: { chat } }).body
+}
+
+const action = (body: string, name: string) =>
+  body.match(new RegExp(`<button class="([^"]*)" type="button"([^>]*)>((?:(?!</button>)[^])*)${name}(?:<!---->|\\s)*</button>`))
+
+describe('Sent', () => {
+  it('shows the text in a bubble while it is sending, named as your message, with no actions', () => {
+    const body = bubble(outgoing('sending'))
+    expect(body).toMatch(/<article class="sent svelte-[\w-]+" aria-label="Your message, sending">/)
+    expect(body).toMatch(/<p class="text svelte-[\w-]+">what is wrong here\?<\/p>/)
+    expect(body).toMatch(/<p class="state svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Sending…<\/p>/)
+    expect(body).not.toContain('Retry')
+    expect(body).not.toContain('Edit')
+    expect(body).not.toContain('<ul')
+  })
+
+  it('says it was sent with a check, and offers nothing', () => {
+    const body = bubble(outgoing('sent'))
+    expect(body).toContain('aria-label="Your message, sent"')
+    expect(body).toMatch(/<p class="state svelte-[\w-]+"><svg[^]*?<path d="M20 6 9 17l-5-5"><\/path>[^]*?<\/svg>(?:<!---->)?Sent<\/p>/)
+    expect(body).not.toContain('class="spinner')
+    expect(body).not.toContain('<button')
+  })
+
+  it('says why it was not sent and offers Retry and Edit, of 44 px, with their icons', () => {
+    const body = bubble(outgoing('failed', { reason: 'it may have been sent, but no answer came back' }))
+    expect(body).toContain('aria-label="Your message, not sent"')
+    expect(body).toMatch(
+      /<p class="state failed svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not sent: it may have been sent, but no answer came back<\/p>/,
+    )
+    expect(action(body, 'Retry')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
+    expect(action(body, 'Retry')?.[2]).toBe('')
+    expect(action(body, 'Retry')?.[3]).toContain('<path d="M3 3v5h5"></path>')
+    expect(action(body, 'Edit')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
+    expect(action(body, 'Edit')?.[3]).toContain('<path d="m15 5 4 4"></path>')
+    expect(body.indexOf('Not sent')).toBeLessThan(body.indexOf('Retry'))
+    expect(body.indexOf('Retry')).toBeLessThan(body.indexOf('Edit'))
+  })
+
+  it('rests Retry while it cannot go, and leaves Edit', () => {
+    const body = bubble(outgoing('failed'), chatWith(ROW))
+    expect(action(body, 'Retry')?.[1]).toMatch(/^button plain svelte-[\w-]+ resting$/)
+    expect(action(body, 'Retry')?.[2]).toBe(' disabled="" aria-disabled="true"')
+    expect(action(body, 'Edit')?.[2]).toBe('')
+  })
+
+  it('shows the names of the images that went with it, without their sizes', () => {
+    const body = bubble(outgoing('sent', { chips: CHIPS }))
+    const names = [...body.matchAll(/<li class="chip svelte-[\w-]+">([^<]*)<\/li>/g)].map((found) => found[1])
+    expect(names).toEqual(['IMG_0042.jpg', 'pasted.png'])
+    expect(body).not.toContain('KiB')
+    expect(body.indexOf('what is wrong here?')).toBeLessThan(body.indexOf('IMG_0042.jpg'))
+  })
+
+  it('shows only the chips when only an image went', () => {
+    const body = bubble(outgoing('sending', { text: '', chips: CHIPS.slice(0, 1) }))
+    expect(body).not.toContain('class="text')
+    expect(body).toMatch(/<div class="bubble svelte-[\w-]+">(?:<!--[^>]*-->|\s)*<ul class="chips svelte-[\w-]+">/)
+    expect(body).toContain('IMG_0042.jpg')
+  })
+
+  it('draws nothing while nothing was sent', () => {
+    expect(bubble(null)).not.toContain('<article')
+  })
+
+  it('retries and edits through the chat, keeping the text as it was written', () => {
+    expect(flat(sentSource)).toContain('resting={!chat.canRetry} onclick={() => void chat.retry()}>')
+    expect(flat(sentSource)).toContain('onclick={() => chat.edit()}>')
+    expect(flat(sentSource)).toContain('.text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }')
+  })
+
+  it('sits on the right', () => {
+    expect(flat(sentSource)).toContain('align-items: flex-end;')
+    expect(flat(sentSource)).toContain('align-self: flex-end;')
   })
 })
