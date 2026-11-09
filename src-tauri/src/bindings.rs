@@ -22,6 +22,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
             identity::identity_fingerprint,
             chat::last_message,
             chat::send,
+            chat::keys,
             terminal::terminal_open::<Wry>,
             terminal::terminal_close,
             terminal::input::terminal_input,

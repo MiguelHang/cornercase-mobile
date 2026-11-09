@@ -7,6 +7,7 @@
   import Markdown from '../../lib/ui/Markdown.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
+  import KeyRow from './KeyRow.svelte'
 
   const TICK_MS = 30_000
 
@@ -85,6 +86,7 @@
         {#if chat.asking}
           <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
         {/if}
+        <KeyRow {chat} {onfailed} />
         <div class="fields">
           <div class="field">
             <TextArea label="Answer" placeholder="Answer {row.agent}" disabled={chat.sending} bind:value={chat.draft} />

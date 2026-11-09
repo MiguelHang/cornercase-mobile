@@ -172,6 +172,9 @@ importers:
       '@tauri-apps/plugin-barcode-scanner':
         specifier: ^2.5.3
         version: 2.5.3
+      '@tauri-apps/plugin-haptics':
+        specifier: ^2.4.2
+        version: 2.4.2
       mdast-util-from-markdown:
         specifier: ^2.1.0
         version: 2.1.0
@@ -510,6 +513,9 @@ packages:
 
   '@tauri-apps/plugin-barcode-scanner@2.5.3':
     resolution: {integrity: sha512-Ienqx/XkIcxkf6oM7CCy5FnWNUtiuWC5mkLtM7GughgrYvd5EIGPGxuISboFhvtgiNSJZF8hSan8+dSznlsdBQ==}
+
+  '@tauri-apps/plugin-haptics@2.4.2':
+    resolution: {integrity: sha512-ddoEZuUWxJORcZE6AzeRUEHx4WljV9X4gXU+r08pTfX5YTwGMTIoJcLzMV9WHZIWJVWthktKAolLVaedbZ4dhA==}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -1646,6 +1652,10 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.12.4
 
   '@tauri-apps/plugin-barcode-scanner@2.5.3':
+    dependencies:
+      '@tauri-apps/api': 2.12.4
+
+  '@tauri-apps/plugin-haptics@2.4.2':
     dependencies:
       '@tauri-apps/api': 2.12.4
 

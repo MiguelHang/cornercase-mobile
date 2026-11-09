@@ -20,6 +20,7 @@ export const commands = {
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
+	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
@@ -161,7 +162,7 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
 
 export type InputEvent = InputEvent_Serialize | InputEvent_Deserialize;
 

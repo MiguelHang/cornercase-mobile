@@ -42,6 +42,7 @@ mod display {
         Error::InputRejected("no pane 14".to_owned()),
         "cornercase input: no pane 14"
     )]
+    #[case::unknown_key(Error::UnknownKey("--force".to_owned()), "the app sends no key named \"--force\"")]
     #[case::json(
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"

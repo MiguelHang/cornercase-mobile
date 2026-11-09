@@ -22,6 +22,22 @@ export const icons = {
     { kind: 'rect', x: 7, y: 7, width: 5, height: 5, rx: 1 },
   ],
   'chevron-left': [{ kind: 'path', d: 'm15 18-6-6 6-6' }],
+  'arrow-up': [
+    { kind: 'path', d: 'm5 12 7-7 7 7' },
+    { kind: 'path', d: 'M12 19V5' },
+  ],
+  'arrow-down': [
+    { kind: 'path', d: 'M12 5v14' },
+    { kind: 'path', d: 'm19 12-7 7-7-7' },
+  ],
+  'arrow-left': [
+    { kind: 'path', d: 'm12 19-7-7 7-7' },
+    { kind: 'path', d: 'M19 12H5' },
+  ],
+  'arrow-right': [
+    { kind: 'path', d: 'M5 12h14' },
+    { kind: 'path', d: 'm12 5 7 7-7 7' },
+  ],
   'chevron-up': [{ kind: 'path', d: 'm18 15-6-6-6 6' }],
   'chevron-down': [{ kind: 'path', d: 'm6 9 6 6 6-6' }],
   'clipboard-paste': [
