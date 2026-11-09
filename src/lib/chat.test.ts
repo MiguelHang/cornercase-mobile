@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
 import {
   Chat,
@@ -548,6 +548,10 @@ describe('Chat, its Ctrl-C', () => {
 })
 
 describe('timers', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('runs a callback once its time has passed, unless cancelled', () => {
     vi.useFakeTimers()
     const kept = vi.fn()
@@ -558,6 +562,5 @@ describe('timers', () => {
     expect(kept).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect([kept.mock.calls.length, cancelled.mock.calls.length]).toEqual([1, 0])
-    vi.useRealTimers()
   })
 })

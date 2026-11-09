@@ -200,8 +200,8 @@ describe('Agent, without its row', () => {
   })
 })
 
-const keys = (chat: Chat, digits = false) =>
-  render(KeyRow, { props: { chat, digits, onfailed: () => {} } }).body
+const keys = (chat: Chat, initialDigits = false) =>
+  render(KeyRow, { props: { chat, initialDigits, onfailed: () => {} } }).body
 
 const group = (body: string, name: string) =>
   body.match(new RegExp(`<div class="row svelte-[\\w-]+" role="group" aria-label="${name}">(.*?)</div>`))?.[1] ?? ''
@@ -230,15 +230,15 @@ describe('Agent, its keys', () => {
     expect(draw(gone)).not.toContain('aria-label="Keys"')
   })
 
-  it.each<[string, string]>([
+  it.each<[string, string | RegExp]>([
     ['Escape', 'Esc'],
     ['Tab', 'Tab'],
     ['Enter', 'Enter'],
-    ['Ctrl-C', '<span aria-live="polite">Ctrl-C</span>'],
+    ['Ctrl-C', /<span class="svelte-[\w-]+ shown">Ctrl-C<\/span>/],
   ])('labels %s with its short name', (name, text) => {
     const found = key(keys(chatWith(ROW)), name)
     expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact$/)
-    expect(found?.[2]).toContain(text)
+    expect(found?.[2]).toMatch(text)
   })
 
   it.each(['Up', 'Down', 'Left', 'Right'])('draws %s as an arrow', (name) => {
@@ -248,7 +248,7 @@ describe('Agent, its keys', () => {
   })
 
   it('presses the key of each button and hands the reason of a failure over, to be told', () => {
-    expect(keyRowSource.match(/onclick=\{\(\) => void press\(key\.key\)\}/g)).toHaveLength(2)
+    expect(keyRowSource.match(/onclick=\{\(\) => void press\(button\.key\)\}/g)).toHaveLength(2)
     expect(flat(keyRowSource)).toContain(
       'const press = async (key: KeyName) => { const failed = await chat.press(key) if (failed !== null) { onfailed(failed) } }',
     )
@@ -268,17 +268,36 @@ describe('Agent, its keys', () => {
   })
 
   it('folds the digits only from their button, so they stay open after one is pressed', () => {
-    expect(keyRowSource.match(/digits = (?!false,)/g)).toEqual(['digits = '])
+    expect(keyRowSource.match(/\bdigits = (?!\$state)/g)).toEqual(['digits = '])
     expect(keyRowSource).toContain('expanded={digits} onclick={() => (digits = !digits)}>0–9</Button>')
   })
 
   it('asks for a second tap in the danger tone once Ctrl-C is armed, and says it aloud', () => {
     const chat = chatWith(ROW)
     void chat.press('ctrl+c')
-    const found = key(keys(chat), 'Tap again to interrupt')
+    const body = keys(chat)
+    const found = key(body, 'Tap again to interrupt')
     expect(found?.[1]).toMatch(/^button danger svelte-[\w-]+ compact$/)
-    expect(found?.[2]).toContain('<span aria-live="polite">Tap again to interrupt</span>')
-    expect(keys(chat)).not.toContain('aria-label="Ctrl-C"')
+    expect(found?.[2]).toMatch(/<span class="svelte-[\w-]+ shown">Again\?<\/span>/)
+    expect(found?.[2]).not.toContain('aria-live')
+    expect(body).toContain('</button><!----></div> <span class="spoken" aria-live="polite">Tap again to interrupt</span></div>')
+    expect(body).not.toContain('aria-label="Ctrl-C"')
+  })
+
+  it('keeps the live region outside the buttons, silent until Ctrl-C is armed', () => {
+    expect(keys(chatWith(ROW))).toContain('</button><!----></div> <span class="spoken" aria-live="polite"></span></div>')
+  })
+
+  it('keeps the width of Ctrl-C when armed, so the row does not move under the second tap', () => {
+    const drawn = (chat: Chat) => (key(keys(chat), chat.interrupting ? 'Tap again to interrupt' : 'Ctrl-C')?.[2] ?? '').replace(/ shown/, '')
+    const chat = chatWith(ROW)
+    const resting = drawn(chat)
+    void chat.press('ctrl+c')
+    expect(drawn(chat)).toEqual(resting)
+    expect(resting).toMatch(/<span class="steady svelte-[\w-]+"><span class="svelte-[\w-]+">Ctrl-C<\/span><span class="svelte-[\w-]+">Again\?<\/span><\/span>/)
+    expect(flat(keyRowSource)).toContain(
+      '.steady { display: grid; } .steady > span { grid-area: 1 / 1; visibility: hidden; } .steady > .shown { visibility: visible; }',
+    )
   })
 
   it('wraps the keys onto more lines rather than scroll sideways', () => {
