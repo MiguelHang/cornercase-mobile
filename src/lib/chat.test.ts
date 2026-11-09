@@ -1,111 +1,42 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AttachImage } from './attach.svelte'
-import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
+import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
 import {
   Chat,
+  FOLLOW_MS,
   INTERRUPT_WINDOW_MS,
   read,
   timers,
   touches,
-  type Clock,
+  whileShown,
+  type Page,
   type PressKey,
   type ReadLast,
   type SendText,
 } from './chat.svelte'
-import type { HapticsApi } from './haptics'
+import {
+  MACHINE,
+  PANE,
+  row,
+  message,
+  ok,
+  refused,
+  gate,
+  noRead,
+  sentOk,
+  pressedOk,
+  attachedOk,
+  still,
+  fakeClock,
+  type Calls,
+  fresh,
+  seen,
+  ready,
+  settle,
+  PASTED,
+  attached,
+} from './chatFakes'
 import type { KeyName } from './keys'
-
-const MACHINE = 1
-const PANE = 12
-
-const row = (pane: number, status: string | null): AgentRow => ({
-  boot: 'b1',
-  project: 4,
-  workspace: 5,
-  tab: 6,
-  pane,
-  project_name: 'mobile',
-  workspace_name: 'chat',
-  tab_name: 'agent',
-  workspace_count: 1,
-  agent: 'codex',
-  title: null,
-  status,
-  since: null,
-})
-
-const message = (text: string): LastMessage => ({ pane: PANE, agent: 'claude', text, written: null, turn_over: true })
-
-const ok = <T>(data: T) => ({ status: 'ok' as const, data })
-
-const refused = (message: string, code: CommandError['code'] = 'failed') => ({
-  status: 'error' as const,
-  error: { code, message },
-})
-
-const gate = <T>() => {
-  let open: (value: T) => void = () => {}
-  const promise = new Promise<T>((resolve) => (open = resolve))
-  return { promise, open }
-}
-
-const noRead: ReadLast = () => Promise.resolve(ok(message('')))
-
-const sentOk: SendText = () => Promise.resolve(ok(null))
-
-const pressedOk: PressKey = () => Promise.resolve(ok(null))
-
-const PASTED_PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
-
-const attachedOk: AttachImage = (pane) => Promise.resolve(ok({ pane, path: PASTED_PATH, bytes: 48213 }))
-
-const still = (): HapticsApi => ({ impactFeedback: vi.fn(() => Promise.resolve(ok(null))) })
-
-const fakeClock = () => {
-  let now = 0
-  const waiting: { at: number; then: () => void; live: boolean }[] = []
-  const clock: Clock = {
-    after: (ms, then) => {
-      const timer = { at: now + ms, then, live: true }
-      waiting.push(timer)
-      return () => (timer.live = false)
-    },
-  }
-  const tick = (ms: number) => {
-    now += ms
-    waiting.filter((timer) => timer.live && timer.at <= now).forEach((timer) => ((timer.live = false), timer.then()))
-  }
-  return { clock, tick }
-}
-
-type Calls = {
-  readLast?: ReadLast
-  sendText?: SendText
-  pressKey?: PressKey
-  attachImage?: AttachImage
-  haptics?: HapticsApi
-  clock?: Clock
-}
-
-const fresh = ({
-  readLast = noRead,
-  sendText = sentOk,
-  pressKey = pressedOk,
-  attachImage = attachedOk,
-  haptics = still(),
-  clock = fakeClock().clock,
-}: Calls = {}) => new Chat(MACHINE, PANE, readLast, sendText, pressKey, attachImage, haptics, clock)
-
-const seen = (calls: Calls = {}, status: string | null = 'done') => {
-  const chat = fresh(calls)
-  chat.see(MACHINE, [row(3, 'working'), row(PANE, status)])
-  return chat
-}
-
-const ready = (sendText: SendText = sentOk, status: string | null = 'done', readLast: ReadLast = noRead) =>
-  seen({ sendText, readLast }, status)
-
-const settle = () => new Promise((resolve) => setTimeout(resolve))
 
 describe('read', () => {
   it('hands the message over', async () => {
@@ -202,30 +133,11 @@ describe('Chat, its field', () => {
     expect(sendText).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the text when the send fails, and gives the reason', async () => {
+  it('empties the field even when the send fails', async () => {
     const chat = ready(() => Promise.resolve(refused('nothing was sent')))
     chat.draft = 'go on'
-    expect(await chat.send()).toBe('nothing was sent')
-    expect([chat.draft, chat.sending]).toEqual(['go on', false])
-  })
-
-  it('gives no reason once sent', async () => {
-    const chat = ready()
-    chat.draft = 'carry on'
-    expect(await chat.send()).toBeNull()
-  })
-
-  it('sends the text kept after a failed send', async () => {
-    const sendText = vi.fn<SendText>().mockResolvedValueOnce(refused('nothing was sent')).mockResolvedValue(ok(null))
-    const chat = ready(sendText)
-    chat.draft = 'go on'
     await chat.send()
-    expect(await chat.send()).toBeNull()
-    expect(sendText.mock.calls).toEqual([
-      [PANE, 'go on', false],
-      [PANE, 'go on', false],
-    ])
-    expect(chat.draft).toBe('')
+    expect([chat.draft, chat.sending]).toEqual(['', false])
   })
 
   it.each([
@@ -235,17 +147,11 @@ describe('Chat, its field', () => {
     const sendText = vi.fn(sentOk)
     const chat = ready(sendText, status)
     chat.draft = draft
-    expect(await chat.send()).toBeNull()
+    await chat.send()
     expect(sendText).not.toHaveBeenCalled()
-    expect(chat.draft).toBe(draft)
+    expect([chat.draft, chat.outgoing]).toEqual([draft, null])
   })
 })
-
-const attached = async (sendText: SendText = sentOk, status: string | null = 'done') => {
-  const chat = ready(sendText, status)
-  await chat.attach()
-  return chat
-}
 
 describe('Chat, its attachments', () => {
   it('attaches an image to its pane and shows its chip', async () => {
@@ -277,7 +183,7 @@ describe('Chat, its attachments', () => {
     const sendText = vi.fn(sentOk)
     const chat = await attached(sendText)
     chat.draft = 'what is wrong here?'
-    expect(await chat.send()).toBeNull()
+    await chat.send()
     expect(sendText.mock.calls).toEqual([[PANE, 'what is wrong here?', true]])
     expect([chat.draft, chat.attachments.chips]).toEqual(['', []])
   })
@@ -290,9 +196,9 @@ describe('Chat, its attachments', () => {
     expect(sendText.mock.calls).toEqual([[PANE, '', true]])
   })
 
-  it('keeps the chip when the send fails', async () => {
+  it('gives the chip back when the send fails', async () => {
     const chat = await attached(() => Promise.resolve(refused('nothing was sent', 'not_sent')))
-    expect(await chat.send()).toBe('nothing was sent')
+    await chat.send()
     expect(chat.attachments.chips.length).toBe(1)
   })
 
@@ -354,6 +260,78 @@ describe('Chat, its attachments under the keys', () => {
     pressed.open(ok(null))
     expect(await entered).toBeNull()
     expect(chat.attachments.chips.length).toBe(1)
+  })
+})
+
+const attachingAnother = async (calls: Calls = {}) => {
+  const picked = gate<typeof PASTED>()
+  const attachImage = vi.fn<AttachImage>().mockResolvedValueOnce(PASTED).mockReturnValueOnce(picked.promise)
+  const chat = seen({ ...calls, attachImage })
+  await chat.attach()
+  const attaching = chat.attach()
+  const attached = async () => {
+    picked.open(PASTED)
+    await attaching
+  }
+  return { chat, attached }
+}
+
+describe('Chat, while an image is being attached', () => {
+  it('cannot send, sends nothing, and keeps the text and every chip', async () => {
+    const sendText = vi.fn(sentOk)
+    const { chat, attached } = await attachingAnother({ sendText })
+    chat.draft = 'what is wrong here?'
+    expect(chat.canSend).toBe(false)
+    await chat.send()
+    expect(sendText).not.toHaveBeenCalled()
+    await attached()
+    expect([chat.draft, chat.attachments.chips.length]).toEqual(['what is wrong here?', 2])
+  })
+
+  it('rests Enter, which sends nothing, taps nothing and keeps every chip', async () => {
+    const pressKey = vi.fn(pressedOk)
+    const haptics = still()
+    const { chat, attached } = await attachingAnother({ pressKey, haptics })
+    expect(chat.canPressKey('enter')).toBe(false)
+    expect(await chat.press('enter')).toBeNull()
+    expect(pressKey).not.toHaveBeenCalled()
+    expect(haptics.impactFeedback).not.toHaveBeenCalled()
+    await attached()
+    expect(chat.attachments.chips.length).toBe(2)
+  })
+
+  it.each<KeyName>(['esc', 'down', '1'])('still sends %s', async (key) => {
+    const pressKey = vi.fn(pressedOk)
+    const { chat } = await attachingAnother({ pressKey })
+    expect(chat.canPressKey(key)).toBe(true)
+    await chat.press(key)
+    expect(pressKey.mock.calls).toEqual([[PANE, key]])
+  })
+
+  it('sends again once the image is attached, with every chip', async () => {
+    const sendText = vi.fn(sentOk)
+    const { chat, attached } = await attachingAnother({ sendText })
+    chat.draft = 'and these?'
+    await attached()
+    expect(chat.canSend).toBe(true)
+    await chat.send()
+    expect(sendText.mock.calls).toEqual([[PANE, 'and these?', true]])
+    expect(chat.attachments.chips).toEqual([])
+  })
+
+  it('presses Enter again once the image is attached, dropping every chip', async () => {
+    const pressKey = vi.fn(pressedOk)
+    const { chat, attached } = await attachingAnother({ pressKey })
+    await attached()
+    expect(chat.canPressKey('enter')).toBe(true)
+    expect(await chat.press('enter')).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, 'enter']])
+    expect(chat.attachments.chips).toEqual([])
+  })
+
+  it('cannot press Enter without its row, attaching or not', () => {
+    expect(fresh().canPressKey('enter')).toBe(false)
+    expect(fresh().canPressKey('esc')).toBe(false)
   })
 })
 
@@ -699,5 +677,187 @@ describe('timers', () => {
     expect(kept).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect([kept.mock.calls.length, cancelled.mock.calls.length]).toEqual([1, 0])
+  })
+
+  it("tells the phone's time", () => {
+    vi.useFakeTimers({ now: Date.parse('2026-11-09T21:30:00.000Z') })
+    expect(timers.now()).toBe(Date.parse('2026-11-09T21:30:00.000Z'))
+  })
+})
+
+const followed = (status: string | null, readLast: ReadLast = vi.fn(noRead)) => {
+  const { clock, tick, pending } = fakeClock()
+  const chat = seen({ readLast, clock }, status)
+  const stop = chat.follow()
+  return { chat, stop, tick, pending, readLast }
+}
+
+describe('Chat, while it is followed', () => {
+  it('reads its last message again every 10 s while the agent works', async () => {
+    const { tick, readLast } = followed('working')
+    tick(FOLLOW_MS - 1)
+    expect(readLast).not.toHaveBeenCalled()
+    tick(1)
+    await settle()
+    tick(FOLLOW_MS)
+    await settle()
+    expect(readLast).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['waiting', 'done', 'shell', null])('reads nothing while the agent is %s', (status) => {
+    const { tick, readLast } = followed(status)
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('reads nothing while it is not followed', () => {
+    const readLast = vi.fn(noRead)
+    const { clock, tick } = fakeClock()
+    seen({ readLast, clock }, 'working')
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('keeps its pace when the same work is seen again', () => {
+    const { chat, tick, readLast } = followed('working')
+    tick(FOLLOW_MS / 2)
+    chat.see(MACHINE, [row(PANE, 'working')])
+    tick(FOLLOW_MS / 2)
+    expect(readLast).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops when the agent stops working, and starts again when it works again', async () => {
+    const { chat, tick, readLast } = followed('working')
+    tick(FOLLOW_MS)
+    await settle()
+    chat.see(MACHINE, [row(PANE, 'done')])
+    tick(FOLLOW_MS * 3)
+    expect(readLast).toHaveBeenCalledTimes(1)
+    chat.see(MACHINE, [row(PANE, 'working')])
+    tick(FOLLOW_MS)
+    expect(readLast).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops when it is told to', () => {
+    const { stop, tick, readLast } = followed('working')
+    stop()
+    tick(FOLLOW_MS * 3)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('stops when the agent is gone', () => {
+    const { chat, tick, readLast } = followed('working')
+    chat.see(MACHINE, [row(3, 'working')])
+    tick(FOLLOW_MS * 3)
+    expect(chat.gone).toBe(true)
+    expect(readLast).not.toHaveBeenCalled()
+  })
+
+  it('leaves no read waiting once the agent is gone', () => {
+    const { chat, pending } = followed('working')
+    expect(pending()).toBe(1)
+    chat.see(MACHINE, [row(3, 'working')])
+    expect(pending()).toBe(0)
+  })
+
+  it('reads once more, not once per beat, behind a slow read', async () => {
+    const first = gate<ReturnType<typeof ok<LastMessage>>>()
+    const readLast = vi.fn<ReadLast>().mockReturnValueOnce(first.promise).mockResolvedValue(ok(message('second')))
+    const { chat, tick } = followed('working', readLast)
+    tick(FOLLOW_MS)
+    tick(FOLLOW_MS)
+    tick(FOLLOW_MS)
+    expect(readLast).toHaveBeenCalledTimes(1)
+    first.open(ok(message('first')))
+    await settle()
+    await settle()
+    expect(readLast).toHaveBeenCalledTimes(2)
+    expect(chat.reading).toEqual({ kind: 'message', message: message('second') })
+  })
+
+  it('keeps the message shown while it reads it again', async () => {
+    const later = gate<ReturnType<typeof ok<LastMessage>>>()
+    const readLast = vi.fn<ReadLast>().mockResolvedValueOnce(ok(message('Half'))).mockReturnValueOnce(later.promise)
+    const { chat, tick } = followed('working', readLast)
+    tick(FOLLOW_MS)
+    await settle()
+    tick(FOLLOW_MS)
+    await settle()
+    expect([readLast.mock.calls.length, chat.reading]).toEqual([2, { kind: 'message', message: message('Half') }])
+    later.open(ok(message('Half, and the rest')))
+    await settle()
+    expect(chat.reading).toEqual({ kind: 'message', message: message('Half, and the rest') })
+  })
+})
+
+class FakePage implements Page {
+  visibilityState: DocumentVisibilityState
+  #listeners = new Set<() => void>()
+
+  constructor(visibilityState: DocumentVisibilityState) {
+    this.visibilityState = visibilityState
+  }
+
+  addEventListener(name: string, listener: () => void) {
+    if (name === 'visibilitychange') this.#listeners.add(listener)
+  }
+
+  removeEventListener(name: string, listener: () => void) {
+    if (name === 'visibilitychange') this.#listeners.delete(listener)
+  }
+
+  turn(visibilityState: DocumentVisibilityState) {
+    this.visibilityState = visibilityState
+    for (const listener of this.#listeners) listener()
+  }
+
+  get listening() {
+    return this.#listeners.size
+  }
+}
+
+const watched = (visibilityState: DocumentVisibilityState) => {
+  const page = new FakePage(visibilityState)
+  const stop = vi.fn()
+  const start = vi.fn(() => stop)
+  const leave = whileShown(page, start)
+  return { page, start, stop, leave }
+}
+
+describe('whileShown', () => {
+  it('starts at once on a page that shows', () => {
+    const { start, stop } = watched('visible')
+    expect([start.mock.calls.length, stop.mock.calls.length]).toEqual([1, 0])
+  })
+
+  it('waits for a hidden page to show', () => {
+    const { page, start } = watched('hidden')
+    expect(start).not.toHaveBeenCalled()
+    page.turn('visible')
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops when the page hides and starts again when it shows', () => {
+    const { page, start, stop } = watched('visible')
+    page.turn('hidden')
+    page.turn('hidden')
+    expect(stop).toHaveBeenCalledTimes(1)
+    page.turn('visible')
+    page.turn('visible')
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops and stops listening when it is left', () => {
+    const { page, start, stop, leave } = watched('visible')
+    leave()
+    page.turn('hidden')
+    page.turn('visible')
+    expect([start.mock.calls.length, stop.mock.calls.length, page.listening]).toEqual([1, 1, 0])
+  })
+
+  it('stops nothing when it is left while the page is hidden', () => {
+    const { stop, leave } = watched('hidden')
+    leave()
+    expect(stop).not.toHaveBeenCalled()
   })
 })

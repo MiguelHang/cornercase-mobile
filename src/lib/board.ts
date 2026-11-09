@@ -45,7 +45,7 @@ const sectionItems = (rows: AgentRow[], section: Section): Item[] => {
 
 export const items = (rows: AgentRow[]): Item[] => SECTIONS.flatMap((section) => sectionItems(rows, section))
 
-const span = (millis: number) => {
+export const span = (millis: number) => {
   if (millis < MINUTE) {
     return 'now'
   }
