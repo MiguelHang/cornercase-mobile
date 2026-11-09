@@ -19,3 +19,21 @@ export const slide = (box: Box, { pan, send, rowsUp }: Scroll, moves: Moves) => 
 export const anchor = (box: Box) => {
   box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight)
 }
+
+export class Tap {
+  #marked = false
+
+  lifted(tapped: boolean) {
+    this.#marked = tapped
+  }
+
+  cancelled() {
+    this.#marked = false
+  }
+
+  clicked() {
+    const tapped = this.#marked
+    this.#marked = false
+    return tapped
+  }
+}

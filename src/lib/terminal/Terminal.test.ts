@@ -16,15 +16,19 @@ describe('the terminal view', () => {
     expect(source).toContain('if (scroll !== null) slide(box, scroll, { send: onsend, scroll: onscroll })')
   })
 
+  it('measures the grid only once a finger swipes, not on every move of a pinch', () => {
+    expect(source).toContain('swipe.move(event.pointerId, pointOf(event), () => gridIn(box))')
+  })
+
   it('takes a tap on the click that follows it, so the focus outlives the tap and the keyboard opens', () => {
-    expect(source).toContain('pinch.lift(event.pointerId) tapped = swipe.lift(event.pointerId)')
-    expect(source).toContain('const clicked = () => { if (tapped) ontap() tapped = false }')
+    expect(source).toContain('pinch.lift(event.pointerId) tap.lifted(swipe.lift(event.pointerId))')
+    expect(source).toContain('const clicked = () => { if (tap.clicked()) ontap() }')
     expect(source).toContain('click: clicked,')
   })
 
   it('never takes a cancelled touch as a tap', () => {
     expect(source).toContain(
-      'const cancelled = (event: PointerEvent) => { pinch.lift(event.pointerId) swipe.lift(event.pointerId) tapped = false }',
+      'const cancelled = (event: PointerEvent) => { pinch.lift(event.pointerId) swipe.lift(event.pointerId) tap.cancelled() }',
     )
     expect(source).toContain('pointercancel: (event) => event instanceof PointerEvent && cancelled(event),')
   })

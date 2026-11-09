@@ -12,7 +12,7 @@
   import Row from './Row.svelte'
   import { paneColours, rgb } from './style'
   import { Swipe, type Grid } from './swipe'
-  import { anchor, roomIn, slide } from './touch'
+  import { anchor, roomIn, slide, Tap } from './touch'
   import { BASE, clamp, fit, limits, LINE, type Place } from './zoom'
 
   const PROBE = 'M'.repeat(100)
@@ -39,7 +39,7 @@
   let measured = $state(0)
   let start = BASE
   let byGesture = false
-  let tapped = false
+  const tap = new Tap()
   const pinch = new Pinch()
   const swipe = new Swipe()
   let drawn: HTMLElement | undefined
@@ -104,24 +104,23 @@
   const moved = (box: HTMLElement, event: PointerEvent) => {
     const scale = pinch.move(event.pointerId, pointOf(event))
     if (scale !== null && !byGesture) zoom(scale)
-    const scroll = swipe.move(event.pointerId, pointOf(event), gridIn(box))
+    const scroll = swipe.move(event.pointerId, pointOf(event), () => gridIn(box))
     if (scroll !== null) slide(box, scroll, { send: onsend, scroll: onscroll })
   }
 
   const lifted = (event: PointerEvent) => {
     pinch.lift(event.pointerId)
-    tapped = swipe.lift(event.pointerId)
+    tap.lifted(swipe.lift(event.pointerId))
   }
 
   const cancelled = (event: PointerEvent) => {
     pinch.lift(event.pointerId)
     swipe.lift(event.pointerId)
-    tapped = false
+    tap.cancelled()
   }
 
   const clicked = () => {
-    if (tapped) ontap()
-    tapped = false
+    if (tap.clicked()) ontap()
   }
 
   const pointers = (element: HTMLElement) =>

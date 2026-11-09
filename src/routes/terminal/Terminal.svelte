@@ -72,9 +72,9 @@
 
 <section
   class="screen"
-  class:keyboard={keyboard.open}
-  style:top={keyboard.open ? `${keyboard.offset}px` : undefined}
-  style:height={keyboard.open ? `${keyboard.height}px` : undefined}
+  class:keyboard={keyboard.covered}
+  style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}
+  style:height={keyboard.covered ? `${keyboard.height}px` : undefined}
 >
   <Typist bind:this={typist} {ctrl} {send} disabled={shown.current.closed} />
   <header class="bar" bind:clientHeight={height}>

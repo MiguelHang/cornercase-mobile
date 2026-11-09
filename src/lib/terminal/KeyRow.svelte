@@ -1,6 +1,7 @@
 <script lang="ts">
+  import Icon from '../ui/Icon.svelte'
   import { ROW, type InputEvent, type RowKey, type StickyCtrl } from './keys'
-  import { press } from './row'
+  import { byKeyboard, press } from './row'
 
   let {
     ctrl,
@@ -26,10 +27,13 @@
       class:armed={key.kind === 'ctrl' && ctrl.armed}
       type="button"
       aria-pressed={key.kind === 'ctrl' ? ctrl.armed : undefined}
+      aria-label={key.kind === 'paste' ? key.label : undefined}
       {disabled}
       onpointerup={() => pressed(key)}
+      onclick={(event) => byKeyboard(event) && pressed(key)}
       ontouchstart={() => {}}
-      ontouchend={(event) => event.preventDefault()}>{key.label}</button
+      ontouchend={(event) => event.preventDefault()}
+      >{#if key.kind === 'paste'}<Icon name={key.icon} size={20} />{:else}{key.label}{/if}</button
     >
   {/each}
 </div>
@@ -44,7 +48,10 @@
   }
 
   .key {
+    display: flex;
     flex: 1 1 0;
+    align-items: center;
+    justify-content: center;
     min-width: 0;
     min-height: 44px;
     padding: 0;

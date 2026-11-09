@@ -66,8 +66,9 @@ export class Swipe {
     this.#rest = 0
   }
 
-  move(id: number, point: Point, grid: Grid): Scroll | null {
+  move(id: number, point: Point, measure: () => Grid): Scroll | null {
     if (this.#spoiled || !this.#fingers.has(id) || !this.#slid(point)) return null
+    const grid = measure()
     const dy = point[1] - this.#last[1]
     this.#last = point
     const pan = panned(dy, grid.room)

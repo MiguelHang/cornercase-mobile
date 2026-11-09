@@ -1,11 +1,12 @@
 import type { InputEvent_Deserialize, Modifier } from '../bindings'
+import type { IconName } from '../ui/icons/shapes'
 
 export type InputEvent = InputEvent_Deserialize
 
 export type RowKey =
   | { kind: 'key'; label: string; event: InputEvent }
   | { kind: 'ctrl'; label: string }
-  | { kind: 'paste'; label: string }
+  | { kind: 'paste'; label: string; icon: IconName }
 
 export type Pressed = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey'>
 
@@ -25,7 +26,7 @@ export const ROW: RowKey[] = [
   { kind: 'key', label: '~', event: text('~') },
   { kind: 'key', label: '/', event: text('/') },
   { kind: 'key', label: '-', event: text('-') },
-  { kind: 'paste', label: 'Paste' },
+  { kind: 'paste', label: 'Paste', icon: 'clipboard-paste' },
 ]
 
 export const pasted = (clipboard: string): InputEvent | null => (clipboard === '' ? null : { paste: clipboard })
@@ -39,6 +40,12 @@ const NAMED = new Map([
   ['Tab', 'tab'],
   ['Enter', 'enter'],
   ['Backspace', 'backspace'],
+  ['Delete', 'delete'],
+  ['Home', 'home'],
+  ['End', 'end'],
+  ['PageUp', 'pageup'],
+  ['PageDown', 'pagedown'],
+  ...Array.from({ length: 12 }, (_, index) => [`F${index + 1}`, `f${index + 1}`] as const),
 ])
 
 const held = ({ ctrlKey, altKey, shiftKey }: Pressed): Modifier[] =>

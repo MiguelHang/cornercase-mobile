@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Modes_Serialize } from '../bindings'
 import { empty } from './pane.svelte'
 import type { Point } from './pinch'
@@ -16,6 +16,11 @@ const grid = (held: Partial<Grid> = {}, modes: Partial<Modes_Serialize> = {}): G
   ...held,
 })
 
+const measured =
+  (held: Partial<Grid> = {}, modes: Partial<Modes_Serialize> = {}) =>
+  () =>
+    grid(held, modes)
+
 const MOUSE = { mouse: 'press' } as const
 
 const ALTERNATE = { alternate_screen: true, alternate_scroll: true }
@@ -27,7 +32,7 @@ const pressed = (at: Point = [100, 100]) => {
 }
 
 const slid = (dy: number, held: Partial<Grid> = {}, modes: Partial<Modes_Serialize> = {}) =>
-  pressed().move(1, [100, 100 + dy], grid(held, modes))
+  pressed().move(1, [100, 100 + dy], measured(held, modes))
 
 describe('Swipe', () => {
   describe('tap', () => {
@@ -37,25 +42,47 @@ describe('Swipe', () => {
 
     it('is a finger that moved less than the threshold', () => {
       const swipe = pressed()
-      const steps = [swipe.move(1, [100, 100 + TAP - 1], grid()), swipe.lift(1)]
+      const steps = [swipe.move(1, [100, 100 + TAP - 1], measured()), swipe.lift(1)]
       expect(steps).toEqual([null, true])
     })
 
     it('is not a finger that moved as far as the threshold', () => {
       const swipe = pressed()
-      swipe.move(1, [100 + TAP, 100], grid())
+      swipe.move(1, [100 + TAP, 100], measured())
       expect(swipe.lift(1)).toBe(false)
     })
 
     it('stays a swipe when the finger comes back to where it touched', () => {
       const swipe = pressed()
-      swipe.move(1, [100, 100 + TAP], grid())
-      swipe.move(1, [100, 100], grid())
+      swipe.move(1, [100, 100 + TAP], measured())
+      swipe.move(1, [100, 100], measured())
       expect(swipe.lift(1)).toBe(false)
     })
 
     it('is not a finger it never saw', () => {
       expect(pressed().lift(9)).toBe(false)
+    })
+  })
+
+  describe('measuring the grid', () => {
+    it('waits until the finger slides', () => {
+      const measure = vi.fn(measured())
+      pressed().move(1, [100, 100 + TAP - 1], measure)
+      expect(measure).not.toHaveBeenCalled()
+    })
+
+    it('never happens for two fingers', () => {
+      const swipe = pressed()
+      swipe.press(2, [200, 100])
+      const measure = vi.fn(measured())
+      swipe.move(1, [100, 300], measure)
+      expect(measure).not.toHaveBeenCalled()
+    })
+
+    it('happens once per move of a swipe', () => {
+      const measure = vi.fn(measured())
+      pressed().move(1, [100, 100 + TAP], measure)
+      expect(measure).toHaveBeenCalledOnce()
     })
   })
 
@@ -73,28 +100,28 @@ describe('Swipe', () => {
 
     it('keep the rest of a line for the next move', () => {
       const swipe = pressed()
-      const moves = [swipe.move(1, [100, 130], grid()), swipe.move(1, [100, 140], grid())]
+      const moves = [swipe.move(1, [100, 130], measured()), swipe.move(1, [100, 140], measured())]
       expect(moves.map((move) => move?.rowsUp)).toEqual([1, 1])
     })
 
     it('take the rest back first when the finger turns', () => {
       const swipe = pressed()
-      swipe.move(1, [100, 130], grid())
-      expect(swipe.move(1, [100, 115], grid())).toEqual({ pan: 0, send: [], rowsUp: 0 })
+      swipe.move(1, [100, 130], measured())
+      expect(swipe.move(1, [100, 115], measured())).toEqual({ pan: 0, send: [], rowsUp: 0 })
     })
 
     it('scroll the other way once the rest is taken back', () => {
       const swipe = pressed()
-      swipe.move(1, [100, 130], grid())
-      expect(swipe.move(1, [100, 95], grid())?.rowsUp).toBe(-1)
+      swipe.move(1, [100, 130], measured())
+      expect(swipe.move(1, [100, 95], measured())?.rowsUp).toBe(-1)
     })
 
     it('start without a rest on the next swipe', () => {
       const swipe = pressed()
-      swipe.move(1, [100, 130], grid())
+      swipe.move(1, [100, 130], measured())
       swipe.lift(1)
       swipe.press(1, [100, 100])
-      expect(swipe.move(1, [100, 110], grid())?.rowsUp).toBe(0)
+      expect(swipe.move(1, [100, 110], measured())?.rowsUp).toBe(0)
     })
 
     it('scroll the history at most a step limit in one move', () => {
@@ -133,7 +160,7 @@ describe('Swipe', () => {
 
     it('are not a swipe', () => {
       const swipe = pinched()
-      expect([swipe.move(1, [100, 200], grid()), swipe.move(2, [200, 200], grid())]).toEqual([null, null])
+      expect([swipe.move(1, [100, 200], measured()), swipe.move(2, [200, 200], measured())]).toEqual([null, null])
     })
 
     it('are not a tap', () => {
@@ -144,7 +171,7 @@ describe('Swipe', () => {
     it('leave no swipe to the finger that stays', () => {
       const swipe = pinched()
       swipe.lift(2)
-      expect(swipe.move(1, [100, 200], grid())).toBeNull()
+      expect(swipe.move(1, [100, 200], measured())).toBeNull()
     })
 
     it('let a new touch swipe once both lift', () => {
@@ -152,12 +179,12 @@ describe('Swipe', () => {
       swipe.lift(2)
       swipe.lift(1)
       swipe.press(3, [100, 100])
-      expect(swipe.move(3, [100, 100 + LINE], grid())?.rowsUp).toBe(1)
+      expect(swipe.move(3, [100, 100 + LINE], measured())?.rowsUp).toBe(1)
     })
   })
 
   it('ignores a finger it never saw', () => {
-    expect(pressed().move(9, [100, 300], grid())).toBeNull()
+    expect(pressed().move(9, [100, 300], measured())).toBeNull()
   })
 })
 

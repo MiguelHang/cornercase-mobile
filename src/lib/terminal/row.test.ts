@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ROW, StickyCtrl, type InputEvent, type RowKey } from './keys'
 import { EMPTY, type Reader } from './paste'
-import { press } from './row'
+import { byKeyboard, press } from './row'
 
 const keyOf = (label: string) => ROW.find((key) => key.label === label) as RowKey
 
@@ -50,5 +50,14 @@ describe('press', () => {
     const row = pressing(undefined, true)
     await press(key, row.with)
     expect([row.sent, row.failed, row.ctrl.armed]).toEqual([[], [], false])
+  })
+})
+
+describe('byKeyboard', () => {
+  it.each([
+    ['a click without a pointer, from a keyboard or assistive technology', 0, true],
+    ['the click of a pointer, already handled as it lifted', 1, false],
+  ])('tells whether to act on %s', (_, detail, taken) => {
+    expect(byKeyboard({ detail })).toBe(taken)
   })
 })

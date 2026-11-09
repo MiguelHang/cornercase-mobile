@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { anchor, roomIn, slide } from './touch'
+import { anchor, roomIn, slide, Tap } from './touch'
 
 const box = (scrollTop: number, scrollHeight = 1000, clientHeight = 600) => ({ scrollTop, scrollHeight, clientHeight })
 
@@ -50,5 +50,42 @@ describe('anchor', () => {
     const anchored = box(30, 500, 600)
     anchor(anchored)
     expect(anchored.scrollTop).toBe(0)
+  })
+})
+
+describe('Tap', () => {
+  const lifted = (tapped: boolean) => {
+    const tap = new Tap()
+    tap.lifted(tapped)
+    return tap
+  }
+
+  it('takes the click that follows a finger lifted as a tap', () => {
+    expect(lifted(true).clicked()).toBe(true)
+  })
+
+  it('takes the click of a swipe or a pinch as nothing', () => {
+    expect(lifted(false).clicked()).toBe(false)
+  })
+
+  it('takes only the first click after a tap', () => {
+    const tap = lifted(true)
+    expect([tap.clicked(), tap.clicked()]).toEqual([true, false])
+  })
+
+  it('takes a click of its own, with no finger lifted, as nothing', () => {
+    expect(new Tap().clicked()).toBe(false)
+  })
+
+  it('drops the tap of a cancelled touch', () => {
+    const tap = lifted(true)
+    tap.cancelled()
+    expect(tap.clicked()).toBe(false)
+  })
+
+  it('forgets an earlier tap once a swipe lifts', () => {
+    const tap = lifted(true)
+    tap.lifted(false)
+    expect(tap.clicked()).toBe(false)
   })
 })

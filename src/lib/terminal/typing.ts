@@ -1,3 +1,4 @@
+import type { Key_Deserialize } from '../bindings'
 import { pasted, physical, type InputEvent, type Pressed, type StickyCtrl } from './keys'
 
 export const SENTINEL = ' '
@@ -14,10 +15,11 @@ const PASSED: Step = { send: [], prevent: false, restore: false }
 
 const SWALLOWED: Step = { send: [], prevent: true, restore: true }
 
-const KEYS = new Map([
-  ['insertLineBreak', 'enter'],
-  ['insertParagraph', 'enter'],
-  ['deleteContentBackward', 'backspace'],
+const KEYS = new Map<string, Key_Deserialize>([
+  ['insertLineBreak', { code: 'enter' }],
+  ['insertParagraph', { code: 'enter' }],
+  ['deleteContentBackward', { code: 'backspace' }],
+  ['deleteWordBackward', { code: 'backspace', mods: ['alt'] }],
 ])
 
 const INSERTS = new Set(['insertText', 'insertReplacementText'])
@@ -51,12 +53,16 @@ export class Typing {
     return this.#sent([event])
   }
 
+  keyup() {
+    this.#pressed = undefined
+  }
+
   beforeinput(typed: Typed): Step {
     const pressed = this.#pressed
     this.#pressed = undefined
     if (this.#composing || composed(typed)) return PASSED
-    const code = KEYS.get(typed.inputType)
-    if (code !== undefined) return code === pressed ? SWALLOWED : this.#sent([{ key: { code } }])
+    const key = KEYS.get(typed.inputType)
+    if (key !== undefined) return key.code === pressed ? SWALLOWED : this.#sent([{ key }])
     const event = inserted(typed)
     return event === null ? SWALLOWED : this.#sent([event])
   }

@@ -31,6 +31,7 @@ describe('Typist', () => {
 
   it.each([
     'onkeydown={(event) => run(event, typing.keydown(event))}',
+    'onkeyup={() => typing.keyup()}',
     'onbeforeinput={(event) => run(event, typing.beforeinput(event))}',
     'oncompositionstart={() => typing.compositionstart()}',
     'oncompositionend={(event) => run(event, typing.compositionend(event.data))}',

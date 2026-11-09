@@ -64,6 +64,11 @@ describe('beforeinput', () => {
     expect(typing().beforeinput(typed(inputType))).toEqual(sent({ key: { code } }))
   })
 
+  it('sends a word delete as Alt+Backspace, which deletes the word before the cursor in a shell', () => {
+    const step = typing().beforeinput(typed('deleteWordBackward'))
+    expect(step).toEqual(sent({ key: { code: 'backspace', mods: ['alt'] } }))
+  })
+
   it('sends a delete with the field left at its sentinel', () => {
     const input = typing()
     input.beforeinput(typed('deleteContentBackward'))
@@ -82,7 +87,6 @@ describe('beforeinput', () => {
     ['an empty paste', typed('insertFromPaste', null, carrying(''))],
     ['an empty insert', typed('insertText', '')],
     ['an insert without data', typed('insertText')],
-    ['a word delete', typed('deleteWordBackward')],
     ['a drop', typed('insertFromDrop', 'file')],
   ])('swallows %s and sends nothing', (_, event) => {
     expect(typing().beforeinput(event)).toEqual(swallowed)
@@ -148,6 +152,19 @@ describe('Enter and delete', () => {
     const input = typing()
     input.keydown(press('Backspace'))
     expect(input.beforeinput(typed('insertLineBreak'))).toEqual(sent({ key: { code: 'enter' } }))
+  })
+
+  it('swallows the word delete of an Alt+Backspace already sent', () => {
+    const input = typing()
+    input.keydown(press('Backspace', { altKey: true }))
+    expect(input.beforeinput(typed('deleteWordBackward'))).toEqual(swallowed)
+  })
+
+  it('sends a line break that follows the key let go, as one the Enter never made', () => {
+    const input = typing()
+    input.keydown(press('Enter'))
+    input.keyup()
+    expect(input.beforeinput(typed('insertParagraph'))).toEqual(sent({ key: { code: 'enter' } }))
   })
 
   it('sends each of two Enters pressed in a row', () => {
@@ -218,7 +235,7 @@ describe('sticky ctrl', () => {
   it('stays armed through keys that send nothing', () => {
     const { ctrl, typing: input } = armed()
     input.keydown(press('Control', { ctrlKey: true }))
-    input.beforeinput(typed('deleteWordBackward'))
+    input.beforeinput(typed('insertFromDrop', 'file'))
     expect(ctrl.armed).toBe(true)
   })
 })

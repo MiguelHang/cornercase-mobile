@@ -46,18 +46,18 @@ const watched = (screen = new FakeScreen()) => {
   return { screen, viewport: screen.visualViewport ?? new FakeViewport(), keyboard, stop }
 }
 
-const shown = ({ height, offset, open }: Keyboard) => ({ height, offset, open })
+const shown = ({ height, offset, covered, open }: Keyboard) => ({ height, offset, covered, open })
 
 describe('Keyboard', () => {
   it('reads the visible height as soon as it watches', () => {
-    expect(shown(watched().keyboard)).toEqual({ height: FULL, offset: 0, open: false })
+    expect(shown(watched().keyboard)).toEqual({ height: FULL, offset: 0, covered: false, open: false })
   })
 
   it('follows the keyboard as it opens', () => {
     const { viewport, keyboard } = watched()
     viewport.height = FULL - KEYBOARD
     viewport.fire('resize')
-    expect(shown(keyboard)).toEqual({ height: FULL - KEYBOARD, offset: 0, open: true })
+    expect(shown(keyboard)).toEqual({ height: FULL - KEYBOARD, offset: 0, covered: true, open: true })
   })
 
   it('follows the offset when the page scrolls under it', () => {
@@ -73,7 +73,7 @@ describe('Keyboard', () => {
     viewport.fire('resize')
     viewport.height = FULL
     viewport.fire('resize')
-    expect(shown(keyboard)).toEqual({ height: FULL, offset: 0, open: false })
+    expect(shown(keyboard)).toEqual({ height: FULL, offset: 0, covered: false, open: false })
   })
 
   it('follows a turn of the screen', () => {
@@ -81,14 +81,14 @@ describe('Keyboard', () => {
     screen.innerHeight = 400
     viewport.height = 400
     screen.fire('resize')
-    expect(shown(keyboard)).toEqual({ height: 400, offset: 0, open: false })
+    expect(shown(keyboard)).toEqual({ height: 400, offset: 0, covered: false, open: false })
   })
 
   it('takes the full height without a visual viewport', () => {
     const { screen, keyboard } = watched(new FakeScreen(null))
     screen.innerHeight = 700
     screen.fire('resize')
-    expect(shown(keyboard)).toEqual({ height: 700, offset: 0, open: false })
+    expect(shown(keyboard)).toEqual({ height: 700, offset: 0, covered: false, open: false })
   })
 
   it('stops listening once it is unmounted', () => {
@@ -118,6 +118,14 @@ describe('seen', () => {
     ['closed while the visible height is short of the screen by the gap', FULL - GAP, false],
   ])('calls the keyboard %s', (_, height, open) => {
     expect(seen(screen(height)).open).toBe(open)
+  })
+
+  it.each([
+    ['covered by a bar shorter than the gap, as a hardware keyboard shows', FULL - GAP, true],
+    ['covered by the keyboard', FULL - GAP - 1, true],
+    ['uncovered at the full height', FULL, false],
+  ])('calls the screen %s', (_, height, covered) => {
+    expect(seen(screen(height)).covered).toBe(covered)
   })
 })
 

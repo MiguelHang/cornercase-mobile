@@ -81,10 +81,11 @@ describe('typing and the keys on the terminal screen', () => {
     expect(source).toContain('input: commands.terminalInput, scroll: commands.terminalScroll,')
   })
 
-  it('follows the keyboard while it watches, and asks for a size only with it closed', () => {
+  it('follows whatever covers the screen while it watches, and asks for a size only with the keyboard closed', () => {
     expect(source).toContain('const unwatch = keyboard.watch() return () => { unwatch()')
-    expect(source).toContain('style:height={keyboard.open ? `${keyboard.height}px` : undefined}')
-    expect(source).toContain('style:top={keyboard.open ? `${keyboard.offset}px` : undefined}')
+    expect(source).toContain('class:keyboard={keyboard.covered}')
+    expect(source).toContain('style:height={keyboard.covered ? `${keyboard.height}px` : undefined}')
+    expect(source).toContain('style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}')
     expect(source).toContain('const fitted = whileClosed(keyboard, (size: Size_Deserialize) => (wanted = size))')
     expect(source).toContain('onfit={fitted}')
     expect(source).toContain('.keyboard { padding-bottom: 0; }')

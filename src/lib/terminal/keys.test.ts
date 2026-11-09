@@ -49,11 +49,12 @@ describe('ROW', () => {
     expect(ROW.find((button) => button.label === label)).toEqual({ kind: 'key', label, event })
   })
 
-  it.each([
-    ['Ctrl', 'ctrl'],
-    ['Paste', 'paste'],
-  ])('leaves %s to its own handling', (label, kind) => {
-    expect(ROW.find((button) => button.label === label)).toEqual({ kind, label })
+  it('leaves Ctrl to its own handling', () => {
+    expect(ROW.find((button) => button.label === 'Ctrl')).toEqual({ kind: 'ctrl', label: 'Ctrl' })
+  })
+
+  it('leaves Paste to its own handling and draws it as an icon, so the row fits a narrow phone', () => {
+    expect(ROW.at(-1)).toEqual({ kind: 'paste', label: 'Paste', icon: 'clipboard-paste' })
   })
 })
 
@@ -77,8 +78,20 @@ describe('physical', () => {
     ['Tab', 'tab'],
     ['Enter', 'enter'],
     ['Backspace', 'backspace'],
+    ['Delete', 'delete'],
+    ['Home', 'home'],
+    ['End', 'end'],
+    ['PageUp', 'pageup'],
+    ['PageDown', 'pagedown'],
+    ['F1', 'f1'],
+    ['F5', 'f5'],
+    ['F12', 'f12'],
   ])('sends %s as the key %s', (key, code) => {
     expect(physical(press(key))).toEqual({ key: { code } })
+  })
+
+  it('keeps the modifiers of a function key', () => {
+    expect(physical(press('F2', { shiftKey: true }))).toEqual({ key: { code: 'f2', mods: ['shift'] } })
   })
 
   it('sends Ctrl+c as c with ctrl', () => {
@@ -100,7 +113,8 @@ describe('physical', () => {
     ['a named key of a shortcut', press('ArrowUp', { metaKey: true })],
     ['a letter of a shortcut with ctrl', press('v', { ctrlKey: true, metaKey: true })],
     ['ctrl alone', press('Control', { ctrlKey: true })],
-    ['a key it does not know', press('F5')],
+    ['a function key past the twelfth', press('F13')],
+    ['a key it does not know', press('Insert')],
   ])('leaves out %s', (_, pressed) => {
     expect(physical(pressed)).toBeNull()
   })

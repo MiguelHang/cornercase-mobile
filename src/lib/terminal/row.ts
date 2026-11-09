@@ -15,3 +15,5 @@ export const press = async (key: RowKey, { ctrl, disabled, send, failed, clipboa
   else if (key.kind === 'key') send(ctrl.apply([key.event]))
   else await fromClipboard(clipboard).then((event) => send(ctrl.apply([event])), failed)
 }
+
+export const byKeyboard = ({ detail }: Pick<MouseEvent, 'detail'>) => detail === 0
