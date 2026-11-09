@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 
 use super::{Change, Connection, Shared};
 use crate::cli::contract::boot::Boot;
-use crate::cli::events::Event;
+use crate::cli::events::{Event, What};
 use crate::cli::status::Snapshot;
 use crate::error::Error;
 use crate::machines::pick::Picked;
@@ -99,7 +99,14 @@ fn ended(end: End) -> Error {
 impl Shared {
     fn event(&self, line: &str) {
         if let Some(event) = self.parsed::<Event>(line) {
+            self.heard(&event);
             self.publish(&Change::Event(Box::new(event)));
+        }
+    }
+
+    fn heard(&self, event: &Event) {
+        if let (What::Status { to, .. }, Some(pane)) = (&event.what, event.pane) {
+            self.state().since.heard(pane, to.as_deref(), &event.time);
         }
     }
 
@@ -126,6 +133,7 @@ impl Shared {
         if state.session.as_ref().is_some_and(|last| snapshot.revision <= last.revision) {
             return Continue(());
         }
+        state.since.reconcile(&snapshot);
         state.session = Some(snapshot);
         drop(state);
         self.publish(&Change::Session);

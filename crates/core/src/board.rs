@@ -29,7 +29,7 @@ pub struct AgentRow {
     pub since: Option<String>,
 }
 
-pub fn agents(snapshot: &Snapshot, since: &Since) -> Vec<AgentRow> {
+pub(crate) fn agents(snapshot: &Snapshot, since: &Since) -> Vec<AgentRow> {
     let mut rows: Vec<AgentRow> = places(snapshot).filter_map(|place| place.row(since)).collect();
     rows.sort_by(|a, b| {
         let ranks = rank(b.status.as_deref()).cmp(&rank(a.status.as_deref()));
@@ -87,7 +87,7 @@ fn shown(name: &str, custom_name: Option<&str>) -> String {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Since {
+pub(crate) struct Since {
     panes: HashMap<u64, Heard>,
 }
 
@@ -98,12 +98,12 @@ struct Heard {
 }
 
 impl Since {
-    pub fn heard(&mut self, pane: u64, to: Option<&str>, time: &str) {
+    pub(crate) fn heard(&mut self, pane: u64, to: Option<&str>, time: &str) {
         let heard = Heard { status: to.map(str::to_owned), time: Some(time.to_owned()) };
         self.panes.insert(pane, heard);
     }
 
-    pub fn reconcile(&mut self, snapshot: &Snapshot) {
+    pub(crate) fn reconcile(&mut self, snapshot: &Snapshot) {
         let present: HashSet<u64> = places(snapshot).map(|place| place.pane.id).collect();
         self.panes.retain(|pane, _| present.contains(pane));
         for place in places(snapshot).filter(|place| place.pane.agent.is_some()) {
@@ -111,11 +111,11 @@ impl Since {
         }
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.panes.clear();
     }
 
-    pub fn of(&self, pane: u64, status: Option<&str>) -> Option<&str> {
+    pub(crate) fn of(&self, pane: u64, status: Option<&str>) -> Option<&str> {
         let heard = self.panes.get(&pane)?;
         if heard.status.as_deref() == status { heard.time.as_deref() } else { None }
     }
