@@ -1,6 +1,7 @@
 import { render } from 'svelte/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
+import { folds } from '../../lib/folds.svelte'
 import Board from './Board.svelte'
 import boardSource from './Board.svelte?raw'
 import rowSource from './AgentRow.svelte?raw'
@@ -37,8 +38,21 @@ const at = (pane: number, status: string | null, more: Partial<Agent> = {}): Age
   ...more,
 })
 
-const draw = (agents: Agent[] | null, connection: ConnectionView_Serialize = CONNECTED, below = 0) =>
-  render(Board, { props: { agents, connection, below, onopen: () => {}, onstart: () => {} } }).body
+const draw = (agents: Agent[] | null, connection: ConnectionView_Serialize = CONNECTED, below = 0, machine: number | null = 1) =>
+  render(Board, { props: { machine, agents, connection, below, onopen: () => {}, onstart: () => {} } }).body
+
+const BRANCH = [
+  at(1, 'working', { title: 'Lead', rank_status: 'waiting' }),
+  at(2, 'waiting', { title: 'Ask', parent: 1, depth: 1 }),
+  at(3, 'working', { title: 'Dig', parent: 2, depth: 2 }),
+]
+
+const titles = (body: string) => [...body.matchAll(/<span class="title svelte-[\w-]+">([^<]+)<\/span>/g)].map((m) => m[1])
+
+const unfolded = (machine: number, ...panes: number[]) => {
+  panes.forEach((pane) => folds.toggle(machine, 'b1', pane))
+  return machine
+}
 
 const START = /<button class="button primary svelte-[\w-]+( resting)?" type="button"([^>]*)>(?:<!--[^>]*-->| )*Start</
 
@@ -117,7 +131,9 @@ describe('Board', () => {
 
   it('keys every item by its section or pane and moves them with flip, still with reduced motion', () => {
     const source = flat(boardSource)
-    expect(source).toContain('{#each items(agents) as item (item.key)} <li class="item" animate:flip={moving}>')
+    expect(source).toContain(
+      '{#each items(agents, opened) as item (item.key)} <li class="item" animate:flip={moving}>',
+    )
     expect(source).toContain('const moving = { duration: prefersReducedMotion() ? 0 : ENTER_MS }')
   })
 
@@ -157,5 +173,68 @@ describe('Board', () => {
   it('starts below the connection bar', () => {
     expect(draw([], CONNECTED, 44)).toMatch(/<section class="board svelte-[\w-]+" style="--below: 44px;">/)
     expect(flat(boardSource)).toContain('padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);')
+  })
+
+  it('folds a branch by default, with the attention and count of what it hides', () => {
+    const body = draw(BRANCH)
+    expect(titles(body)).toEqual(['Lead'])
+    expect(body).toMatch(/<span class="hidden svelte-[\w-]+">\+2<\/span>/)
+    expect(body).toMatch(/aria-label="Waiting" width="10" height="10"/)
+    expect(body).toMatch(/<button class="fold svelte-[\w-]+" type="button" aria-label="Subagents" aria-expanded="false">\s*▸/)
+  })
+
+  it('unfolds the branches the board keeps for its machine and boot', () => {
+    const machine = unfolded(20, 1)
+    expect(titles(draw(BRANCH, CONNECTED, 0, machine))).toEqual(['Lead', 'Ask'])
+    expect(draw(BRANCH, CONNECTED, 0, machine)).toMatch(/aria-expanded="true">\s*▾/)
+    expect(titles(draw(BRANCH, CONNECTED, 0, unfolded(21, 1, 2)))).toEqual(['Lead', 'Ask', 'Dig'])
+    expect(titles(draw(BRANCH, CONNECTED, 0, 22))).toEqual(['Lead'])
+    expect(titles(draw(BRANCH.map((agent) => ({ ...agent, boot: 'b2' })), CONNECTED, 0, machine))).toEqual(['Lead'])
+  })
+
+  it('folds and unfolds from its own button, beside the row and never inside it', () => {
+    const body = draw(BRANCH)
+    const row = body.indexOf('<button class="row')
+    expect(body.indexOf('<button class="fold')).toBeGreaterThan(body.indexOf('</button>', row))
+    expect(body.indexOf('</button>', row)).toBeGreaterThan(row)
+    expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
+    expect(flat(rowSource)).toContain('.fold { flex: none; min-width: 44px;')
+    expect(flat(boardSource)).toContain('<AgentRow {item} {agents} {now} {onopen} onfold={fold} />')
+    expect(flat(boardSource)).toContain('if (machine !== null) { folds.toggle(machine, boot, pane) }')
+  })
+
+  it('opens each shown row, a child too, with its own pane', () => {
+    const body = draw(BRANCH, CONNECTED, 0, unfolded(23, 1, 2))
+    expect(body.match(/<button class="row svelte-[\w-]+"/g)).toHaveLength(3)
+    expect(flat(rowSource)).toContain('const row = $derived(item.row)')
+    expect(flat(rowSource)).toContain('onclick={() => onopen(row.pane)}')
+  })
+
+  it('indents a row by its depth, up to three levels', () => {
+    const deep = [at(1, 'working'), at(2, 'working', { parent: 1, depth: 1 }), at(3, 'idle', { parent: 2, depth: 5 })]
+    const body = draw(deep, CONNECTED, 0, unfolded(24, 1, 2))
+    expect([...body.matchAll(/style="--depth: (\d);"/g)].map((m) => m[1])).toEqual(['0', '1', '3'])
+    expect(flat(rowSource)).toContain('padding-left: calc(var(--depth) * var(--inset-wide));')
+  })
+
+  it('lets the time go before the attention when the row runs out of room', () => {
+    const source = flat(rowSource)
+    expect(source).toContain('.time { flex: 0 1 auto; min-width: 0; overflow: hidden;')
+    expect(source).toContain('.hidden { flex: none;')
+  })
+
+  it('names the members of a flow by their role under its orchestrator', () => {
+    const flow = [
+      at(1, 'working', { title: 'Ship login', role: 'orchestrator' }),
+      at(2, 'working', { title: 'Write the form', role: 'coder', parent: 1, depth: 1 }),
+    ]
+    const body = draw(flow, CONNECTED, 0, unfolded(25, 1))
+    expect(titles(body)).toEqual(['Ship login', 'coder'])
+    expect(body).toMatch(/<span class="place svelte-[\w-]+">shop · orchestrator<\/span>/)
+    expect(body).toMatch(/<span class="place svelte-[\w-]+">Write the form<\/span>/)
+  })
+
+  it('keeps every branch folded without a machine', () => {
+    expect(titles(draw(BRANCH, CONNECTED, 0, null))).toEqual(['Lead'])
   })
 })

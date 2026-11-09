@@ -237,6 +237,7 @@
     />
     {#if route.name === 'home'}
       <Board
+        machine={current.machine}
         agents={current.agents}
         connection={current.connection}
         below={barHeight}

@@ -133,7 +133,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} onstart={start} />",
+      "<Board machine={current.machine} agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} onstart={start} />",
     )
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
