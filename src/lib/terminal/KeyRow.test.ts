@@ -55,12 +55,12 @@ describe('KeyRow', () => {
     expect(keyRowSource).toContain('ontouchend={(event) => event.preventDefault()}')
   })
 
-  it.each(['.key { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 0; min-height: 44px;', '.armed { border-color: var(--accent);'])(
-    'holds %s',
-    (text) => {
-      expect(flat(keyRowSource)).toContain(text)
-    },
-  )
+  it.each([
+    '.key { display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-width: 0; min-height: 44px;',
+    '.armed { border-color: var(--accent);',
+  ])('holds %s', (text) => {
+    expect(flat(keyRowSource)).toContain(text)
+  })
 
   it('gives :active to touches', () => {
     expect(keyRowSource).toContain('ontouchstart={() => {}}')

@@ -18,13 +18,18 @@ historial con el dedo.
 - [x] CA2 — Fila sobre el teclado: `Esc`, `Tab`, `Ctrl` (modificador pegajoso para la siguiente tecla), `↑ ↓ ← →`,
   `|`, `~`, `/`, `-`. Mapeo en `src/lib/terminal/keys.ts` con vitest. Más `Paste` (CA5). Las teclas actúan en
   `pointerup` y cancelan su `touchend`, no en `pointerdown` con `preventDefault` como se planeó: eso cerraba el
-  teclado en iOS y no cuenta como gesto para leer el portapapeles. También el teclado físico (flechas, Esc, Tab,
-  Enter, Backspace, `Ctrl+letra`), sin probar en el simulador. En los 420 pt del iPhone Air `Paste` queda cortado.
+  teclado en iOS y no cuenta como gesto para leer el portapapeles. Un `click` sin puntero (`detail` 0: VoiceOver, o
+  Enter o Espacio de un teclado físico) también actúa. `Paste` se dibuja con el icono `clipboard-paste` de Lucide
+  (`aria-label="Paste"`), porque la palabra no cabía en los 420 pt del iPhone Air. También el teclado físico
+  (flechas, Esc, Tab, Enter, Backspace, Delete, Home, End, Page Up, Page Down y F1–F12, con Ctrl, Alt y Mayús, y
+  `Ctrl+letra`), sin probar en el simulador.
 - [x] CA3 — Con el teclado abierto, la terminal ocupa la altura de `visualViewport` y la última fila queda justo encima
   del teclado (iOS pone el teclado encima sin redimensionar la página). Encima de la fila de teclas, que va sobre la
   barra de accesorios de WKWebView: `visualViewport` la descuenta y se deja, sin plugin Swift (P3 a). El tamaño que se
-  pide se mide sin teclado, así que abrirlo o cerrarlo no reabre el `surface`. Una rejilla más baja que el hueco (50
-  filas al ancho ajustado) queda arriba, con un margen debajo.
+  pide se mide sin teclado, así que abrirlo o cerrarlo no reabre el `surface`. **Desviación**: la barra de atajos de
+  un teclado físico (Bluetooth) no cuenta como teclado, así que el hueco que deja sí se pide y reinicia el `surface`
+  una vez al aparecer y otra al quitarse, sin redimensionar el Mac. Una rejilla más baja que el hueco (50 filas al
+  ancho ajustado) queda arriba, con un margen debajo.
 - [x] CA4 — Deslizar vertical = `scroll --pane P --up/--down N` (coalescido en 011), no el scroll de la página; un
   toque sigue siendo foco/clic. **Desviación**: `scroll` solo fuera de la pantalla alterna y sin ratón, que es lo que
   upstream admite; si no, la rueda en la celda del dedo o flechas según los `modes`, como gpui. Con zoom, la rejilla
