@@ -26,7 +26,6 @@ const NAME = 'Name'
 
 const REASONS: Record<SameWhy, (saved: string) => string> = {
   address: (saved) => `${saved} already has a route at this address.`,
-  token: (saved) => `${saved} uses the same bridge token.`,
   boot: (saved) => `This bridge is the one ${saved} answers from.`,
   name: (saved) => `A machine is already called ${saved}.`,
 }

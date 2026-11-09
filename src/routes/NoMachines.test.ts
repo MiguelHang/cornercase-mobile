@@ -148,9 +148,9 @@ describe('the same machine offer', () => {
     render(SameOffer, { props: { offer: made, busy, onroute: () => {}, onnew: () => {}, onback: () => {} } }).body
 
   it('says why, then offers the route first as the primary, a new machine and Back', () => {
-    const body = shown(offer('token'))
+    const body = shown(offer('boot'))
     expect(body).toMatch(/<div class="offer svelte-[\w-]+" role="group" aria-label="Same machine">/)
-    expect(body).toContain('Studio uses the same bridge token.')
+    expect(body).toContain('This bridge is the one Studio answers from.')
     expect(button(body, 'Add as a route of Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
     expect(button(body, 'Add as a new machine')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
     expect(button(body, 'Back')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)

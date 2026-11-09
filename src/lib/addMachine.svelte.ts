@@ -111,7 +111,7 @@ export class AddMachine {
     this.busy = false
     if (found.kind === 'already_saved') {
       this.formError = ALREADY_SAVED
-    } else {
+    } else if (found.kind === 'same') {
       this.offer = { url, name, machine: found.machine, saved: found.name, why: found.why, checked }
     }
   }

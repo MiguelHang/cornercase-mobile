@@ -184,7 +184,7 @@ describe('AddMachine with a route already saved', () => {
 })
 
 describe('AddMachine offering the same machine', () => {
-  it.each<SameWhy>(['address', 'token', 'boot', 'name'])('offers it when it matches by %s, holding the form', async (why) => {
+  it.each<SameWhy>(['address', 'boot', 'name'])('offers it when it matches by %s, holding the form', async (why) => {
     const { draft, commands } = await offered(why)
     expect(draft.offer).toEqual({ url: URL_TEXT, name: 'studio.lan', machine: 3, saved: 'Studio', why, checked: true })
     expect([draft.busy, draft.held]).toEqual([false, true])
@@ -198,7 +198,7 @@ describe('AddMachine offering the same machine', () => {
   })
 
   it('adds the URL as a route of that machine and says so, without calling it added', async () => {
-    const { draft, onadded, onrouted, commands } = await offered('token')
+    const { draft, onadded, onrouted, commands } = await offered('boot')
     await draft.addRoute()
     expect([commands.machineRouteAdd.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, URL_TEXT]], []])
     expect([onrouted.mock.calls, onadded.mock.calls]).toEqual([[[3]], []])
@@ -228,7 +228,7 @@ describe('AddMachine offering the same machine', () => {
   })
 
   it('goes back to the form on Back, and ignores the choices without an offer', async () => {
-    const { draft, commands } = await offered('token')
+    const { draft, commands } = await offered('boot')
     draft.back()
     await draft.addRoute()
     await draft.addNew()
@@ -251,7 +251,7 @@ describe('AddMachine offering the same machine', () => {
   })
 
   it('ignores a submit or a scan while the offer is up', async () => {
-    const { draft, commands } = await offered('token')
+    const { draft, commands } = await offered('boot')
     await draft.submit()
     await draft.fill('ws://other.lan:9000/?token=xyz')
     expect([draft.url, commands.machineMatch.mock.calls.length]).toEqual([URL_TEXT, 1])

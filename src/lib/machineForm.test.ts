@@ -110,7 +110,6 @@ describe('checkName', () => {
 describe('offerText', () => {
   it.each<[SameWhy, string, string]>([
     ['address', 'Studio already has a route at this address.', 'Update the token of Studio'],
-    ['token', 'Studio uses the same bridge token.', 'Add as a route of Studio'],
     ['boot', 'This bridge is the one Studio answers from.', 'Add as a route of Studio'],
     ['name', 'A machine is already called Studio.', 'Add as a route of Studio'],
   ])('explains a match by %s and names the choice it keeps', (why, reason, keep) => {

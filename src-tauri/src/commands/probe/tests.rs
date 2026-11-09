@@ -19,6 +19,7 @@ use crate::test_util::{
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
 const LAPTOP_ADDRESS: &str = "ws://laptop.lan:9000/";
 const PROBED: &str = "6262-1770000999";
+const TAILSCALE: &str = "ws://100.101.102.103:9000/?token=c3R1ZGlvLXNlY3JldA";
 
 fn answering(studio: FakeTransport, laptop: Result<FakeTransport, Error>) -> Launcher {
     let studio: Arc<dyn Transport> = Arc::new(studio);
@@ -151,7 +152,11 @@ mod matching_a_url {
 
     #[rstest]
     #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", "desk", SameWhy::Address)]
-    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA", "desk", SameWhy::Token)]
+    #[case::by_one_lan_address_of_a_code(
+        "ws://studio.lan:9000/?token=bmV3LXNlY3JldA&also=desk.lan",
+        "desk",
+        SameWhy::Address
+    )]
     #[case::by_name(LAPTOP, " Studio ", SameWhy::Name)]
     #[tokio::test(start_paused = true)]
     async fn finds_the_same_machine(#[case] url: &str, #[case] name: &str, #[case] why: SameWhy) {
@@ -204,13 +209,27 @@ mod matching_a_url {
 
     #[rstest]
     #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", Some(SameWhy::Address))]
-    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA", Some(SameWhy::Token))]
     #[case::already_saved(BRIDGE, None)]
     #[tokio::test(start_paused = true)]
-    async fn answers_an_address_or_a_token_without_asking_the_url(#[case] url: &str, #[case] why: Option<SameWhy>) {
+    async fn answers_an_address_without_asking_the_url(#[case] url: &str, #[case] why: Option<SameWhy>) {
         let studio = Studio::new();
         let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), url, "desk").await;
         let found = why.map_or(MatchFound::AlreadySaved { machine: studio.id.0 }, |why| same(&studio, why));
+        assert_eq!(view, MatchView { found, checked: true });
+    }
+
+    #[rstest]
+    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA")]
+    #[case::by_a_tailscale_address("ws://100.101.102.103:9000/?token=bmV3LXNlY3JldA")]
+    #[case::by_every_address_of_the_code("ws://studio.lan:9000/?token=bmV3LXNlY3JldA&also=laptop.lan")]
+    #[tokio::test(start_paused = true)]
+    async fn merges_into_the_machine_it_surely_is_without_asking_the_url(#[case] code: &str) {
+        let studio = with_the_laptop();
+        let launcher = answering(contracted(BOOT), Err(asleep()));
+        add_route(&studio.state, Recorder::default(), &launcher, studio.id, TAILSCALE)
+            .expect("the tailscale route is added");
+        let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), code, "desk").await;
+        let found = MatchFound::Merge { machine: studio.id.0, name: "studio".to_owned() };
         assert_eq!(view, MatchView { found, checked: true });
     }
 
@@ -282,7 +301,7 @@ mod over_ipc {
     #[test]
     fn refuses_to_match_a_url_without_a_token() {
         let ipc = Ipc::new(Studio::new().state);
-        let answer = ipc.invoke("machine_match", json!({ "url": ADDRESS, "name": "desk" })).expect_err("no token");
+        let answer = ipc.invoke("machine_match", json!({ "code": ADDRESS, "name": "desk" })).expect_err("no token");
         assert_eq!(answer["code"], "route_no_token");
     }
 
