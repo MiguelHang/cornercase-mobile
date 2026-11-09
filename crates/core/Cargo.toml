@@ -21,9 +21,11 @@ zeroize = "1.9.1"
 
 [features]
 specta = ["dep:specta"]
+test-util = []
 
 [dev-dependencies]
 cornercase-bridge = { path = "../../bridge", features = ["test-util"] }
+cornercase-core = { path = ".", features = ["test-util"] }
 rstest = "0.27.0"
 tokio = { version = "1.54.1", features = ["rt", "macros", "test-util"] }
 

@@ -11,12 +11,13 @@ use crate::error::Error;
 type Script = Box<dyn Fn(BoxStream<'static, Stdin>, OutSink) -> BoxFuture<'static, Result<Exit, Error>> + Send + Sync>;
 
 #[derive(Default)]
-pub(crate) struct FakeTransport {
+#[must_use]
+pub struct FakeTransport {
     scripts: HashMap<Vec<String>, Script>,
 }
 
 impl FakeTransport {
-    pub(crate) fn answer(self, argv: &[&str], stdout: &[&str], stderr: &[&str], code: i32) -> Self {
+    pub fn answer(self, argv: &[&str], stdout: &[&str], stderr: &[&str], code: i32) -> Self {
         let lines: Vec<Out> =
             owned(stdout).into_iter().map(Out::Stdout).chain(owned(stderr).into_iter().map(Out::Stderr)).collect();
         let mut tail = StderrTail::default();
@@ -34,7 +35,7 @@ impl FakeTransport {
         })
     }
 
-    pub(crate) fn open(self, argv: &[&str], stdout: &[&str]) -> Self {
+    pub fn open(self, argv: &[&str], stdout: &[&str]) -> Self {
         let lines: Vec<Out> = owned(stdout).into_iter().map(Out::Stdout).collect();
         self.script(argv, move |_, mut out| {
             let lines = lines.clone();
@@ -45,11 +46,11 @@ impl FakeTransport {
         })
     }
 
-    pub(crate) fn fail(self, argv: &[&str], error: Error) -> Self {
+    pub fn fail(self, argv: &[&str], error: Error) -> Self {
         self.script(argv, move |_, _| future::ready(Err(error.clone())))
     }
 
-    pub(crate) fn script<S, F>(mut self, argv: &[&str], script: S) -> Self
+    pub fn script<S, F>(mut self, argv: &[&str], script: S) -> Self
     where
         S: Fn(BoxStream<'static, Stdin>, OutSink) -> F + Send + Sync + 'static,
         F: Future<Output = Result<Exit, Error>> + Send + 'static,
