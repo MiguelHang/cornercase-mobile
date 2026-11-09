@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use crate::cli::surface::{
@@ -39,6 +39,21 @@ pub struct Grid {
     pub rows: u16,
     pub layout: Option<Node>,
     pub panes: Vec<PaneGrid>,
+    changes: Changes,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Changes {
+    pub replaced: bool,
+    pub rows: BTreeMap<u64, BTreeSet<u16>>,
+}
+
+impl Changes {
+    fn mark(&mut self, pane: u64, rows: BTreeSet<u16>) {
+        if !rows.is_empty() {
+            self.rows.entry(pane).or_default().extend(rows);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,7 +109,11 @@ impl PaneGrid {
         }
     }
 
-    fn patch(&mut self, wire: WirePane, tables: &Tables) {
+    fn all_rows(&self) -> BTreeSet<u16> {
+        (0..self.size.rows).collect()
+    }
+
+    fn patch(&mut self, wire: WirePane, tables: &Tables) -> BTreeSet<u16> {
         self.cursor = wire.cursor;
         self.active = wire.active.unwrap_or(self.active);
         self.modes = wire.modes.unwrap_or(self.modes);
@@ -102,37 +121,46 @@ impl PaneGrid {
         if let Some(colours) = wire.colours {
             self.colours = colours;
         }
-        if let Some(copy) = wire.copy {
-            self.copy_lines(copy);
-        }
+        let mut rows = wire.copy.map(|copy| self.copy_lines(copy)).unwrap_or_default();
         match wire.lines {
-            Some(WireLines::Changed(changed)) => self.replace_rows(&changed, tables),
-            Some(WireLines::All(all)) => self.lines = tables.lines(&all, self.size.rows),
+            Some(WireLines::Changed(changed)) => rows.extend(self.replace_rows(&changed, tables)),
+            Some(WireLines::All(all)) => {
+                self.lines = tables.lines(&all, self.size.rows);
+                rows.extend(self.all_rows());
+            }
             None => {}
         }
+        rows
     }
 
-    fn copy_lines(&mut self, copy: Copy) {
+    fn copy_lines(&mut self, copy: Copy) -> BTreeSet<u16> {
         let held = self.lines.clone();
+        let mut copied = BTreeSet::new();
         for i in 0..usize::from(copy.count) {
             let (from, to) = (usize::from(copy.from) + i, usize::from(copy.to) + i);
             if let (Some(source), Some(target)) = (held.get(from), self.lines.get_mut(to)) {
                 target.clone_from(source);
+                copied.extend(u16::try_from(to).ok());
             }
         }
+        copied
     }
 
-    fn replace_rows(&mut self, changed: &HashMap<String, Vec<WireRun>>, tables: &Tables) {
-        for (row, runs) in changed {
-            let Ok(row) = row.parse::<usize>() else { continue };
-            if row >= usize::from(self.size.rows) {
+    fn replace_rows(&mut self, changed: &HashMap<String, Vec<WireRun>>, tables: &Tables) -> BTreeSet<u16> {
+        let mut replaced = BTreeSet::new();
+        for (key, runs) in changed {
+            let Ok(row) = key.parse::<u16>() else { continue };
+            if row >= self.size.rows {
                 continue;
             }
-            if row >= self.lines.len() {
-                self.lines.resize(row + 1, Line::new());
+            let index = usize::from(row);
+            if index >= self.lines.len() {
+                self.lines.resize(index + 1, Line::new());
             }
-            self.lines[row] = tables.line(runs);
+            self.lines[index] = tables.line(runs);
+            replaced.insert(row);
         }
+        replaced
     }
 }
 
@@ -154,7 +182,8 @@ impl Grid {
             let Some(grid) = self.panes.iter_mut().find(|grid| grid.pane == wire.pane) else {
                 return Applied::NeedRedraw;
             };
-            grid.patch(wire, &tables);
+            let rows = grid.patch(wire, &tables);
+            self.changes.mark(grid.pane, rows);
         }
         self.revision = frame.revision;
         self.projection = frame.projection.or(self.projection);
@@ -172,6 +201,14 @@ impl Grid {
         self.rows = frame.rows;
         self.layout = frame.layout;
         self.panes = frame.panes.into_iter().map(|pane| PaneGrid::from_wire(pane, &tables)).collect();
+        self.changes = Changes { replaced: true, ..Changes::default() };
+        for pane in &self.panes {
+            self.changes.mark(pane.pane, pane.all_rows());
+        }
+    }
+
+    pub fn changed_rows(&mut self) -> Changes {
+        std::mem::take(&mut self.changes)
     }
 }
 

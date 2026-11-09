@@ -144,6 +144,7 @@ mod a_later_frame {
             "panes": [{ "pane": 7, "active": true, "size": { "cols": 10, "rows": 2 }, "lines": [[{ "cells": ["a"] }]] }]
         });
         grid.apply_frame(Frame::deserialize(&next).expect("a surface line"));
+        grid.changed_rows();
         let shown = PaneGrid {
             pane: 7,
             active: true,
@@ -380,5 +381,79 @@ mod a_line_of_the_stream {
             json!({ "boot": "b", "surface": 1, "base": base, "panes": [{ "pane": 1, "lines": { "0": line("z") } }] });
         assert_eq!(grid.apply(Frame::deserialize(&wire).expect("a surface line")), outcome);
         assert_eq!(rows(&grid, 1), expected);
+    }
+}
+
+mod what_changed {
+    use super::*;
+
+    fn changes(replaced: bool, panes: &[(u64, &[u16])]) -> Changes {
+        let rows = panes.iter().map(|(pane, rows)| (*pane, rows.iter().copied().collect())).collect();
+        Changes { replaced, rows }
+    }
+
+    fn read(mut grid: Grid) -> Grid {
+        grid.changed_rows();
+        grid
+    }
+
+    #[test]
+    fn after_a_frame_is_every_row_of_every_pane() {
+        let mut grid = lettered();
+        assert_eq!(grid.changed_rows(), changes(true, &[(1, &[0, 1, 2, 3]), (2, &[0, 1, 2])]));
+    }
+
+    #[test]
+    fn after_a_patch_are_the_copied_and_changed_rows_once_and_in_order() {
+        let mut grid = read(lettered());
+        let panes = json!([
+            { "pane": 1, "copy": { "from": 1, "to": 0, "count": 3 }, "lines": { "3": line("e"), "2": line("z") } },
+            { "pane": 2, "lines": { "1": line("y") } }
+        ]);
+        grid.apply_patch(on_lettered(&panes));
+        assert_eq!(grid.changed_rows(), changes(false, &[(1, &[0, 1, 2, 3]), (2, &[1])]));
+    }
+
+    #[test]
+    fn after_a_patch_with_every_line_is_every_row_of_its_pane() {
+        let mut grid = read(lettered());
+        grid.apply_patch(on_lettered(&json!([{ "pane": 2, "lines": [line("x")] }])));
+        assert_eq!(grid.changed_rows(), changes(false, &[(2, &[0, 1, 2])]));
+    }
+
+    #[rstest]
+    #[case::of_a_cursor_alone(json!({ "pane": 1, "cursor": { "x": 1, "y": 1 } }))]
+    #[case::of_a_copy_outside_the_rows(json!({ "pane": 1, "copy": { "from": 7, "to": 9, "count": 2 } }))]
+    #[case::of_rows_beyond_the_size(json!({ "pane": 1, "lines": { "4": line("z"), "x": line("z") } }))]
+    fn leave_out_a_patch(#[case] wire: Value) {
+        let mut grid = read(lettered());
+        assert_eq!(grid.apply_patch(on_lettered(&json!([wire]))), Applied::Applied);
+        assert_eq!(grid.changed_rows(), Changes::default());
+    }
+
+    #[test]
+    fn is_empty_on_the_second_read() {
+        let mut grid = lettered();
+        grid.changed_rows();
+        assert_eq!(grid.changed_rows(), Changes::default());
+    }
+
+    #[test]
+    fn adds_up_two_patches() {
+        let mut grid = read(lettered());
+        grid.apply_patch(on_lettered(&json!([{ "pane": 1, "lines": { "3": line("e") } }])));
+        let next = json!({ "boot": "b", "surface": 1, "revision": 7, "base": 6,
+            "panes": [{ "pane": 1, "lines": { "1": line("f"), "3": line("g") } }] });
+        assert_eq!(grid.apply_patch(Frame::deserialize(&next).expect("a surface line")), Applied::Applied);
+        assert_eq!(grid.changed_rows(), changes(false, &[(1, &[1, 3])]));
+    }
+
+    #[test]
+    fn after_a_patch_and_a_frame_is_only_the_frame() {
+        let mut grid = read(lettered());
+        grid.apply_patch(on_lettered(&json!([{ "pane": 2, "lines": { "1": line("y") } }])));
+        let next = json!({ "boot": "b", "surface": 1, "revision": 8, "panes": [{ "pane": 1, "size": { "rows": 2 } }] });
+        grid.apply(Frame::deserialize(&next).expect("a surface line"));
+        assert_eq!(grid.changed_rows(), changes(true, &[(1, &[0, 1])]));
     }
 }
