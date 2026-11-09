@@ -323,4 +323,41 @@ mod writing {
         let size = Size { cols: 80, rows: 24 };
         assert_eq!(serde_json::to_value(size).expect("JSON"), json!({ "cols": 80, "rows": 24 }));
     }
+
+    #[test]
+    fn writes_the_modes_with_the_names_of_the_contract() {
+        let modes = pane(&parsed(FRAME), 13).modes.expect("the pane's modes");
+        let expected = json!({
+            "mouse": "press_release",
+            "mouse_encoding": "sgr",
+            "alternate_screen": true,
+            "alternate_scroll": true,
+            "bracketed_paste": true,
+            "application_cursor": false,
+            "focus_events": true,
+            "kitty_keyboard": 1,
+        });
+        assert_eq!(serde_json::to_value(modes).expect("JSON"), expected);
+        assert_eq!(round_trip(&modes), modes);
+    }
+
+    #[rstest]
+    #[case::press(MouseMode::Press, "press")]
+    #[case::press_release(MouseMode::PressRelease, "press_release")]
+    #[case::button_motion(MouseMode::ButtonMotion, "button_motion")]
+    #[case::any_motion(MouseMode::AnyMotion, "any_motion")]
+    #[case::none(MouseMode::None, "none")]
+    fn writes_a_mouse_mode_in_snake_case(#[case] mouse: MouseMode, #[case] name: &str) {
+        assert_eq!(serde_json::to_value(mouse).expect("JSON"), json!(name));
+        assert_eq!(round_trip(&mouse), mouse);
+    }
+
+    #[rstest]
+    #[case::utf8(MouseEncoding::Utf8, "utf8")]
+    #[case::sgr(MouseEncoding::Sgr, "sgr")]
+    #[case::default(MouseEncoding::Default, "default")]
+    fn writes_a_mouse_encoding_in_lowercase(#[case] encoding: MouseEncoding, #[case] name: &str) {
+        assert_eq!(serde_json::to_value(encoding).expect("JSON"), json!(name));
+        assert_eq!(round_trip(&encoding), encoding);
+    }
 }

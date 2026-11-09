@@ -1,0 +1,39 @@
+import type { InputEvent } from './keys'
+import type { Room, Scroll } from './swipe'
+
+export type Box = Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>
+
+export type Moves = { send: (events: InputEvent[]) => void; scroll: (rowsUp: number) => void }
+
+export const roomIn = ({ scrollTop, scrollHeight, clientHeight }: Box): Room => ({
+  up: scrollTop,
+  down: Math.max(0, scrollHeight - clientHeight - scrollTop),
+})
+
+export const slide = (box: Box, { pan, send, rowsUp }: Scroll, moves: Moves) => {
+  box.scrollTop += pan
+  if (send.length > 0) moves.send(send)
+  if (rowsUp !== 0) moves.scroll(rowsUp)
+}
+
+export const anchor = (box: Box) => {
+  box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight)
+}
+
+export class Tap {
+  #marked = false
+
+  lifted(tapped: boolean) {
+    this.#marked = tapped
+  }
+
+  cancelled() {
+    this.#marked = false
+  }
+
+  clicked() {
+    const tapped = this.#marked
+    this.#marked = false
+    return tapped
+  }
+}

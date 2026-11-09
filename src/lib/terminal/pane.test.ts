@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import type { Colours_Serialize, Cursor_Serialize, Style_Serialize, TerminalChanged_Serialize } from '../bindings'
+import type {
+  Colours_Serialize,
+  Cursor_Serialize,
+  Modes_Serialize,
+  Style_Serialize,
+  TerminalChanged_Serialize,
+} from '../bindings'
 import { apply, empty, Pane, shows, type PaneState } from './pane.svelte'
 
 const COLOURS: Colours_Serialize = { fg: [220, 220, 220], bg: [16, 16, 16], cursor: null, palette: { '1': [255, 0, 0] } }
 
 const CURSOR: Cursor_Serialize = { x: 2, y: 1, shape: 'bar', blinking: true }
+
+const MOUSE: Modes_Serialize = { ...empty.modes, mouse: 'press_release', mouse_encoding: 'sgr' }
 
 const STYLE: Style_Serialize = {
   fg: null,
@@ -32,6 +40,7 @@ const changed = (rows: Record<number, string>, partial: Partial<TerminalChanged_
     size: { cols: 80, rows: 3 },
     cursor: CURSOR,
     colours: COLOURS,
+    modes: empty.modes,
     replaced: false,
     rows: Object.fromEntries(Object.entries(rows).map(([row, text]) => [row, runs(text)])),
     closed: false,
@@ -87,6 +96,16 @@ describe('apply', () => {
     expect([state.size, state.cursor, state.colours]).toEqual([size, null, empty.colours])
   })
 
+  it('keeps the modes of the latest event', () => {
+    const alternate = { ...empty.modes, alternate_screen: true, alternate_scroll: true }
+    expect(applied(changed({}, { modes: MOUSE }), changed({}, { modes: alternate })).modes).toEqual(alternate)
+  })
+
+  it('keeps the modes it had when an event only says the tab closed', () => {
+    const state = applied(changed({}, { modes: MOUSE }), changed({}, { pane: null, closed: true }))
+    expect(state.modes).toEqual(MOUSE)
+  })
+
   it('keeps the same colours while an event brings equal ones', () => {
     const first = applied(changed({}))
     expect(apply(first, changed({}, { colours: { ...COLOURS, palette: { '1': [255, 0, 0] } } })).colours).toBe(
@@ -119,6 +138,19 @@ describe('shows', () => {
 describe('Pane', () => {
   it('starts empty', () => {
     expect(new Pane().current).toEqual(empty)
+  })
+
+  it('starts with the modes of a plain shell until an event brings others', () => {
+    expect(new Pane().current.modes).toEqual({
+      mouse: 'none',
+      mouse_encoding: 'default',
+      alternate_screen: false,
+      alternate_scroll: false,
+      bracketed_paste: false,
+      application_cursor: false,
+      focus_events: false,
+      kitty_keyboard: 0,
+    })
   })
 
   it('applies each event to what it shows', () => {

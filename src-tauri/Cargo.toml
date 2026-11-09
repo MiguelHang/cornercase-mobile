@@ -17,6 +17,7 @@ tauri-build = { version = "2.7", features = [] }
 cornercase-core = { path = "../crates/core", features = ["specta"] }
 keyring-core = "1.0.1"
 serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 specta = { workspace = true }
 tauri = { version = "2.12", features = ["specta"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive"] }
@@ -34,7 +35,6 @@ cornercase-bridge = { path = "../bridge", features = ["test-util"] }
 cornercase-core = { path = "../crates/core", features = ["test-util"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 rstest = "0.27.0"
-serde_json = "1.0.154"
 specta-typescript = "=0.0.13"
 tauri = { version = "2.12", features = ["test"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["typescript"] }
