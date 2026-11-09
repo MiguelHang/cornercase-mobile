@@ -2,6 +2,7 @@ import type {
   ConnectionChanged_Serialize,
   ConnectionState_Serialize,
   ConnectionView_Serialize,
+  MachineView_Serialize,
   SessionChanged_Serialize,
   Snapshot_Serialize,
 } from './bindings'
@@ -36,6 +37,17 @@ export const countPanes = (session: Snapshot_Serialize | null) =>
     .flatMap((project) => project.workspaces)
     .flatMap((workspace) => workspace.tabs)
     .reduce((panes, tab) => panes + tab.panes.length, 0)
+
+export const describePanes = (session: Snapshot_Serialize | null) => {
+  if (session === null) {
+    return null
+  }
+  const panes = countPanes(session)
+  return panes === 1 ? '1 pane' : `${panes} panes`
+}
+
+export const firstToConnect = (machines: MachineView_Serialize[], state: ConnectionState_Serialize) =>
+  state.machine === null ? (machines[0]?.id ?? null) : null
 
 const seconds = (ms: number) => Math.ceil(ms / 1000)
 

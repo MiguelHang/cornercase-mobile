@@ -1,7 +1,12 @@
 import { render } from 'svelte/server'
-import { describe, expect, it } from 'vitest'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { describe, expect, it, vi } from 'vitest'
 import App from './App.svelte'
 import noMachinesSource from './routes/NoMachines.svelte?raw'
+
+vi.mock('@tauri-apps/api/core', async (actual) => ({ ...(await actual<object>()), invoke: vi.fn() }))
+vi.mock('@tauri-apps/api/event', async (actual) => ({ ...(await actual<object>()), listen: vi.fn() }))
 
 describe('App', () => {
   const body = render(App).body.replaceAll('<!---->', '')
@@ -23,6 +28,18 @@ describe('App', () => {
     expect(body).toMatch(
       /<button class="button svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">Add machine<\/button>/,
     )
+  })
+
+  it('neither calls nor listens to Tauri while rendering on the server', () => {
+    expect(render(App).body).toContain('No machines yet')
+    expect(invoke).not.toHaveBeenCalled()
+    expect(listen).not.toHaveBeenCalled()
+  })
+
+  it('offers the provisional form that adds a machine and connects to it', () => {
+    expect(body).toContain('<input type="url" placeholder="Bridge URL" autocomplete="off" value=""')
+    expect(body).toContain('<input type="text" placeholder="Name" autocomplete="off" value=""')
+    expect(body).toContain('<button type="submit">Add and connect</button>')
   })
 
   it('brings the card in with the shared motion', () => {

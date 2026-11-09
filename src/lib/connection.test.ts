@@ -72,6 +72,37 @@ describe('countPanes', () => {
   })
 })
 
+describe('describePanes', () => {
+  it('says nothing without a session', () => {
+    expect(connection.describePanes(null)).toBeNull()
+  })
+
+  it.each([
+    [0, '0 panes'],
+    [1, '1 pane'],
+    [3, '3 panes'],
+  ])('tells %d panes as %s', (panes, text) => {
+    expect(connection.describePanes(snapshot([workspace(1, [tab(1, panes)])]))).toBe(text)
+  })
+})
+
+describe('firstToConnect', () => {
+  const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
+  const IDLE = { machine: null, connection: { state: 'none' as const } }
+
+  it('picks the first machine while none is active', () => {
+    expect(connection.firstToConnect([machine(4), machine(2)], IDLE)).toBe(4)
+  })
+
+  it('picks nothing without machines', () => {
+    expect(connection.firstToConnect([], IDLE)).toBeNull()
+  })
+
+  it('keeps the store already running', () => {
+    expect(connection.firstToConnect([machine(4), machine(2)], { machine: 2, connection: CONNECTED })).toBeNull()
+  })
+})
+
 describe('describe', () => {
   it.each<[string, ConnectionView_Serialize, string]>([
     ['none', { state: 'none' }, 'Not connected'],
