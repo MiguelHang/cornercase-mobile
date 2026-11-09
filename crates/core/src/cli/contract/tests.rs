@@ -2,9 +2,7 @@ use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
-
-pub(crate) const REAL: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/contract/0.13.19.json"));
+use crate::cli::contract::fixtures::REAL;
 
 const NO_OPERATIONS: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/contract/no-operations.json"));

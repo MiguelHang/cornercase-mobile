@@ -7,6 +7,8 @@ use crate::error::Error;
 use crate::transport::json_error;
 
 pub mod boot;
+#[cfg(test)]
+pub(crate) mod fixtures;
 
 pub const CONTRACT: u32 = 1;
 
@@ -94,7 +96,11 @@ pub struct Stream {
 
 impl Descriptor {
     pub fn from_value(value: Value) -> Result<Self, Error> {
-        Self::deserialize(value).map_err(|error| json_error(&error))?.checked()
+        Self::read(Self::deserialize(value))
+    }
+
+    fn read(result: Result<Self, serde_json::Error>) -> Result<Self, Error> {
+        result.map_err(|error| json_error(&error))?.checked()
     }
 
     fn checked(self) -> Result<Self, Error> {
@@ -103,6 +109,14 @@ impl Descriptor {
             server if server > CONTRACT => Err(Error::ContractTooNew { server, app: CONTRACT }),
             _ => Ok(self),
         }
+    }
+}
+
+impl FromStr for Descriptor {
+    type Err = Error;
+
+    fn from_str(text: &str) -> Result<Self, Error> {
+        Self::read(serde_json::from_str(text))
     }
 }
 
@@ -141,14 +155,6 @@ pub fn outdated(error: Error) -> Error {
     match error {
         Error::Failed { stderr, .. } if stderr.contains(OLD_SERVER) || stderr.contains(OLD_CLI) => Error::Outdated,
         other => other,
-    }
-}
-
-impl FromStr for Descriptor {
-    type Err = Error;
-
-    fn from_str(text: &str) -> Result<Self, Error> {
-        serde_json::from_str::<Self>(text).map_err(|error| json_error(&error))?.checked()
     }
 }
 

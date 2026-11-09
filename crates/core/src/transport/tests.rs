@@ -163,6 +163,7 @@ mod json {
 
     #[rstest]
     #[case::one(1)]
+    #[case::usage(2)]
     #[case::three(3)]
     #[case::five(5)]
     #[case::killed(-1)]
@@ -170,12 +171,6 @@ mod json {
     async fn keeps_other_exit_codes_as_failures(#[case] code: i32) {
         let fake = FakeTransport::default().answer(&["contract", "--json"], &["{}"], &["error: other"], code);
         assert_eq!(contract(&fake).await, Err(Error::Failed { code, stderr: "error: other".to_owned() }));
-    }
-
-    #[tokio::test]
-    async fn fails_with_the_code_and_the_stderr() {
-        let fake = FakeTransport::default().answer(&["contract", "--json"], &["{}"], &["error: no server"], 2);
-        assert_eq!(contract(&fake).await, Err(Error::Failed { code: 2, stderr: "error: no server".to_owned() }));
     }
 
     #[tokio::test]

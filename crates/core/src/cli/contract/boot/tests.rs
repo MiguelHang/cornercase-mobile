@@ -1,5 +1,5 @@
 use super::*;
-use crate::cli::contract::tests::REAL;
+use crate::cli::contract::fixtures::REAL;
 
 fn boot(text: &str) -> Boot {
     Boot(text.to_owned())
