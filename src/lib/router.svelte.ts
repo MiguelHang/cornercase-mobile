@@ -1,6 +1,6 @@
 import type { Screen } from './connection'
 
-export type Route = { name: 'no-machines' } | { name: 'home' }
+export type Route = { name: 'no-machines' } | { name: 'home' } | { name: 'agent'; pane: number }
 
 export const routeFor = (screen: Screen): Route => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
 
@@ -24,6 +24,13 @@ export class Router {
       return
     }
     this.#stack = [...this.#stack.slice(0, -1), route]
+  }
+
+  settle(route: Route) {
+    if (this.#stack[0].name === route.name) {
+      return
+    }
+    this.#stack = [route]
   }
 
   back() {
