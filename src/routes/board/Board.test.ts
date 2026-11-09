@@ -29,7 +29,13 @@ const BASE: Agent = {
   workspace_count: 1,
 }
 
-const at = (pane: number, status: string | null, more: Partial<Agent> = {}): Agent => ({ ...BASE, pane, status, ...more })
+const at = (pane: number, status: string | null, more: Partial<Agent> = {}): Agent => ({
+  ...BASE,
+  pane,
+  status,
+  rank_status: status,
+  ...more,
+})
 
 const draw = (agents: Agent[] | null, connection: ConnectionView_Serialize = CONNECTED, below = 0) =>
   render(Board, { props: { agents, connection, below, onopen: () => {}, onstart: () => {} } }).body

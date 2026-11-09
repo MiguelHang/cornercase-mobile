@@ -33,7 +33,31 @@ const agent = (pane: number, status: string | null, more: Partial<AgentRow> = {}
 
 const ago = (millis: number) => new Date(NOW - millis).toISOString()
 
-const keys = (rows: AgentRow[]) => board.items(rows).map((item) => item.key)
+const keys = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
+  board.items(rows, expanded).map((item) => item.key)
+
+const under = (pane: number, status: string | null, parent: number, depth: number) =>
+  agent(pane, status, { parent, depth })
+
+const TEAM = [
+  agent(5, 'working', { rank_status: 'waiting' }),
+  { ...under(7, 'done', 5, 1), rank_status: 'waiting' },
+  under(9, 'waiting', 7, 2),
+  under(12, 'working', 5, 1),
+  agent(16, 'working'),
+  under(17, 'working', 16, 1),
+  under(18, 'pending', 16, 1),
+  agent(20, 'idle'),
+]
+
+const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
+  board
+    .items(rows, expanded)
+    .flatMap((item) =>
+      item.kind === 'row'
+        ? [[item.row.pane, item.depth, item.hasChildren, item.folded, item.hidden, item.attention]]
+        : [],
+    )
 
 describe('sectionOf', () => {
   it.each([
@@ -91,8 +115,92 @@ describe('items', () => {
     const row = agent(1, 'working')
     expect(board.items([row])).toEqual([
       { kind: 'header', key: 'section:Working', section: 'Working' },
-      { kind: 'row', key: 'pane:1', row },
+      {
+        kind: 'row',
+        key: 'pane:1',
+        row,
+        depth: 0,
+        hasChildren: false,
+        folded: false,
+        hidden: 0,
+        attention: null,
+      },
     ])
+  })
+})
+
+describe('items of a tree', () => {
+  it('folds every agent with children until it is unfolded', () => {
+    expect(keys(TEAM)).toEqual(['section:Waiting', 'pane:5', 'section:Working', 'pane:16', 'section:Idle', 'pane:20'])
+  })
+
+  it('counts the hidden agents of every level and shows the loudest of them', () => {
+    expect(shown(TEAM)).toEqual([
+      [5, 0, true, true, 3, 'waiting'],
+      [16, 0, true, true, 2, 'pending'],
+      [20, 0, false, false, 0, null],
+    ])
+  })
+
+  it.each([
+    [['failed', 'done', 'pending'], 'failed'],
+    [['pending', 'done'], 'done'],
+    [['failed', 'waiting'], 'waiting'],
+    [['working', 'pending'], 'pending'],
+  ])('shows %o hidden as %s', (statuses, attention) => {
+    const rows = [agent(1, 'working'), ...statuses.map((status, index) => under(index + 2, status, 1, 1))]
+    expect(shown(rows)[0]).toEqual([1, 0, true, true, statuses.length, attention])
+  })
+
+  it('says nothing but the count when the hidden agents only work or idle', () => {
+    const rows = [agent(1, 'done'), under(2, 'working', 1, 1), under(3, 'shell', 2, 2), under(4, 'idle', 1, 1)]
+    expect(shown(rows)).toEqual([[1, 0, true, true, 3, null]])
+  })
+
+  it('puts the whole branch in the section of its root', () => {
+    expect(keys(TEAM, new Set([5, 7, 16]))).toEqual([
+      'section:Waiting',
+      'pane:5',
+      'pane:7',
+      'pane:9',
+      'pane:12',
+      'section:Working',
+      'pane:16',
+      'pane:17',
+      'pane:18',
+      'section:Idle',
+      'pane:20',
+    ])
+  })
+
+  it('keeps a folded child folded under an unfolded root', () => {
+    expect(shown(TEAM, new Set([5]))).toEqual([
+      [5, 0, true, false, 0, null],
+      [7, 1, true, true, 1, 'waiting'],
+      [12, 1, false, false, 0, null],
+      [16, 0, true, true, 2, 'pending'],
+      [20, 0, false, false, 0, null],
+    ])
+  })
+
+  it('keeps the order whether a branch is folded or not', () => {
+    const unfolded = keys(TEAM, new Set([5, 7, 16]))
+    const gone = ['pane:9', 'pane:17', 'pane:18']
+    expect(keys(TEAM, new Set([5]))).toEqual(unfolded.filter((key) => !gone.includes(key)))
+  })
+
+  it('hides a new child under a folded parent and only raises its count', () => {
+    const grown = [...TEAM, under(21, 'done', 16, 1)]
+    expect([keys(grown), shown(grown)[1]]).toEqual([keys(TEAM), [16, 0, true, true, 3, 'done']])
+  })
+
+  it('stops indenting after three levels', () => {
+    const chain = [agent(1, 'working'), ...[2, 3, 4, 5].map((pane) => under(pane, 'working', pane - 1, pane - 1))]
+    expect(shown(chain, new Set([1, 2, 3, 4])).map(([, depth]) => depth)).toEqual([0, 1, 2, 3, 3])
+  })
+
+  it('lists an agent whose parent is not listed as a root', () => {
+    expect(keys([under(3, 'working', 99, 1)])).toEqual(['section:Working', 'pane:3'])
   })
 })
 

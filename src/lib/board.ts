@@ -4,7 +4,20 @@ export const SECTIONS = ['Waiting', 'Done', 'Working', 'Idle'] as const
 
 export type Section = (typeof SECTIONS)[number]
 
-export type Item = { kind: 'header'; key: string; section: Section } | { kind: 'row'; key: string; row: AgentRow }
+export type Row = {
+  kind: 'row'
+  key: string
+  row: AgentRow
+  depth: number
+  hasChildren: boolean
+  folded: boolean
+  hidden: number
+  attention: string | null
+}
+
+export type Item = { kind: 'header'; key: string; section: Section } | Row
+
+type Tree = { roots: AgentRow[]; children: Map<number, AgentRow[]>; expanded: ReadonlySet<number> }
 
 const SECTION_OF: Record<string, Section> = {
   waiting: 'Waiting',
@@ -30,20 +43,67 @@ const HOUR = 60 * MINUTE
 
 const DAY = 24 * HOUR
 
+const MAX_DEPTH = 3
+
+const ATTENTION = ['waiting', 'failed', 'done', 'pending']
+
+const NO_PANES: ReadonlySet<number> = new Set()
+
 export const sectionOf = (status: string | null): Section => SECTION_OF[status ?? ''] ?? 'Idle'
 
 export const statusName = (status: string | null | undefined) => NAMES[status ?? ''] ?? 'Idle'
 
 const header = (section: Section): Item => ({ kind: 'header', key: `section:${section}`, section })
 
-const row = (agent: AgentRow): Item => ({ kind: 'row', key: `pane:${agent.pane}`, row: agent })
-
-const sectionItems = (rows: AgentRow[], section: Section): Item[] => {
-  const inside = rows.filter((agent) => sectionOf(agent.status) === section)
-  return inside.length === 0 ? [] : [header(section), ...inside.map(row)]
+const tree = (rows: AgentRow[], expanded: ReadonlySet<number>): Tree => {
+  const listed = new Set(rows.map((agent) => agent.pane))
+  const children = new Map<number, AgentRow[]>()
+  const roots: AgentRow[] = []
+  for (const agent of rows) {
+    if (agent.parent === null || !listed.has(agent.parent)) {
+      roots.push(agent)
+    } else {
+      children.set(agent.parent, [...(children.get(agent.parent) ?? []), agent])
+    }
+  }
+  return { roots, children, expanded }
 }
 
-export const items = (rows: AgentRow[]): Item[] => SECTIONS.flatMap((section) => sectionItems(rows, section))
+const below = (made: Tree, agent: AgentRow) => made.children.get(agent.pane) ?? []
+
+const descendants = (made: Tree, agent: AgentRow): AgentRow[] =>
+  below(made, agent).flatMap((child) => [child, ...descendants(made, child)])
+
+const loudest = (agents: AgentRow[]) =>
+  ATTENTION.find((status) => agents.some((agent) => agent.status === status)) ?? null
+
+const row = (agent: AgentRow, hasChildren: boolean, folded: boolean, hidden: AgentRow[]): Row => ({
+  kind: 'row',
+  key: `pane:${agent.pane}`,
+  row: agent,
+  depth: Math.min(agent.depth, MAX_DEPTH),
+  hasChildren,
+  folded,
+  hidden: hidden.length,
+  attention: loudest(hidden),
+})
+
+const branch = (made: Tree, agent: AgentRow): Item[] => {
+  const children = below(made, agent)
+  const folded = children.length > 0 && !made.expanded.has(agent.pane)
+  const shown = folded ? [] : children.flatMap((child) => branch(made, child))
+  return [row(agent, children.length > 0, folded, folded ? descendants(made, agent) : []), ...shown]
+}
+
+const sectionItems = (made: Tree, section: Section): Item[] => {
+  const inside = made.roots.filter((agent) => sectionOf(agent.rank_status) === section)
+  return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => branch(made, agent))]
+}
+
+export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES): Item[] => {
+  const made = tree(rows, expanded)
+  return SECTIONS.flatMap((section) => sectionItems(made, section))
+}
 
 const span = (millis: number) => {
   if (millis < MINUTE) {
