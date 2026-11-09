@@ -75,3 +75,40 @@ export const describe = (connection: ConnectionView_Serialize): string => {
       return `Incompatible: ${connection.error.message}`
   }
 }
+
+export type Tone = 'working' | 'done' | 'failed'
+
+export type Status = { text: string; detail?: string; tone: Tone; pulsing: boolean }
+
+const parsed = (route: string) => {
+  try {
+    return new URL(route)
+  } catch {
+    return null
+  }
+}
+
+export const routeAddress = (route: string) => parsed(route)?.host || route.replace(/\?.*$/s, '')
+
+export const retryLeft = (in_ms: number, since: number, now: number) => Math.max(1, seconds(in_ms - (now - since)))
+
+const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
+
+export const status = (connection: ConnectionView_Serialize, machineName: string, elapsed = 0): Status => {
+  switch (connection.state) {
+    case 'none':
+      return failed('Not connected')
+    case 'connecting':
+      return { text: 'Connecting…', tone: 'working', pulsing: true }
+    case 'connected':
+      return { text: `${machineName} · via ${routeAddress(connection.route)}`, tone: 'done', pulsing: false }
+    case 'retrying':
+      return { ...failed(`Retrying in ${retryLeft(connection.in_ms, 0, elapsed)} s`), detail: connection.error.message }
+    case 'missing':
+      return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
+    case 'unauthorized':
+      return failed("The bridge rejected this phone's token")
+    case 'incompatible':
+      return failed(`Incompatible: ${connection.error.message}`)
+  }
+}

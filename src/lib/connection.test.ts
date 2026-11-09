@@ -53,6 +53,13 @@ const error = (message: string) => ({ code: 'timeout' as const, message })
 
 const RETRYING: ConnectionView_Serialize = { state: 'retrying', in_ms: 2000, error: error('timed out') }
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://127.0.0.1:7000' }
+const MISSING: ConnectionView_Serialize = {
+  state: 'missing',
+  missing: [
+    { name: 'watch', kind: 'stream', reason: null },
+    { name: 'input', kind: 'operation', reason: 'too old' },
+  ],
+}
 const SESSION = snapshot([workspace(1, [tab(1, 2)])])
 const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, SESSION)
 
@@ -116,11 +123,7 @@ describe('describe', () => {
   })
 
   it('names every request cornercase lacks', () => {
-    const missing = [
-      { name: 'watch', kind: 'stream' as const, reason: null },
-      { name: 'input', kind: 'operation' as const, reason: 'too old' },
-    ]
-    expect(connection.describe({ state: 'missing', missing })).toBe('cornercase lacks watch, input: update it on the Mac')
+    expect(connection.describe(MISSING)).toBe('cornercase lacks watch, input: update it on the Mac')
   })
 
   it.each([
@@ -130,6 +133,54 @@ describe('describe', () => {
     [32000, 32],
   ])('rounds %d ms up to %d s', (in_ms, seconds) => {
     expect(connection.describe({ ...RETRYING, in_ms })).toBe(`Retrying in ${seconds} s: timed out`)
+  })
+})
+
+describe('status', () => {
+  const failing = (text: string): connection.Status => ({ text, tone: 'failed', pulsing: false })
+
+  it.each<[string, ConnectionView_Serialize, connection.Status]>([
+    ['none', { state: 'none' }, failing('Not connected')],
+    ['connecting', { state: 'connecting' }, { text: 'Connecting…', tone: 'working', pulsing: true }],
+    ['connected', CONNECTED, { text: 'MacBook · via 127.0.0.1:7000', tone: 'done', pulsing: false }],
+    ['retrying', RETRYING, { ...failing('Retrying in 2 s'), detail: 'timed out' }],
+    ['missing', MISSING, failing('cornercase on the Mac lacks watch, input: update it')],
+    ['unauthorized', { state: 'unauthorized' }, failing("The bridge rejected this phone's token")],
+    ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
+  ])('shows %s', (_, view, shown) => {
+    expect(connection.status(view, 'MacBook')).toEqual(shown)
+  })
+
+  it('counts down while retrying', () => {
+    expect(connection.status({ ...RETRYING, in_ms: 5000 }, 'MacBook', 2500).text).toBe('Retrying in 3 s')
+  })
+
+  it('never sends the user to a code to scan', () => {
+    expect(connection.status({ state: 'unauthorized' }, 'MacBook').text).not.toMatch(/scan|QR/i)
+  })
+})
+
+describe('routeAddress', () => {
+  it.each([
+    ['ws://192.168.1.20:7000/?token=secret', '192.168.1.20:7000'],
+    ['wss://mac.tail1234.ts.net:7443/bridge?token=secret', 'mac.tail1234.ts.net:7443'],
+    ['wss://mac.local/?token=secret', 'mac.local'],
+    ['ws://[fe80::1]:7000/?token=secret', '[fe80::1]:7000'],
+    ['not a route?token=secret', 'not a route'],
+  ])('shows %s as %s', (route, address) => {
+    expect(connection.routeAddress(route)).toBe(address)
+  })
+})
+
+describe('retryLeft', () => {
+  it.each([
+    [1001, 0, 2],
+    [1000, 0, 1],
+    [4000, 1500, 3],
+    [4000, 4000, 1],
+    [4000, 9000, 1],
+  ])('waits %d ms after %d ms gone as %d s', (in_ms, gone, left) => {
+    expect(connection.retryLeft(in_ms, 100, 100 + gone)).toBe(left)
   })
 })
 
