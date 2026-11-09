@@ -1,59 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type {
-  AgentRow_Serialize,
-  ConnectionView_Serialize,
-  Snapshot_Serialize,
-  Tab_Serialize,
-  Workspace_Serialize,
-} from './bindings'
+import type { AgentRow_Serialize, ConnectionView_Serialize } from './bindings'
 import * as connection from './connection'
-
-const pane = (id: number) => ({
-  id,
-  agent: null,
-  status: null,
-  program: null,
-  title: null,
-  path: null,
-  parent: null,
-  active: false,
-  dialog: false,
-  at_prompt: null,
-})
-
-const tab = (id: number, panes: number): Tab_Serialize => ({
-  id,
-  name: `tab ${id}`,
-  custom_name: null,
-  status: null,
-  active: false,
-  panes: Array.from({ length: panes }, (_, index) => pane(id * 10 + index)),
-})
-
-const workspace = (id: number, tabs: Tab_Serialize[]): Workspace_Serialize => ({
-  id,
-  name: `workspace ${id}`,
-  custom_name: null,
-  path: null,
-  branch: null,
-  worktree: false,
-  tabs,
-})
-
-const snapshot = (...workspaces: Workspace_Serialize[][]): Snapshot_Serialize => ({
-  boot: 'boot',
-  revision: 1,
-  version: '0.1.0',
-  groups: [],
-  projects: workspaces.map((list, index) => ({
-    id: index,
-    name: `project ${index}`,
-    custom_name: null,
-    path: null,
-    group: null,
-    workspaces: list,
-  })),
-})
 
 const error = (message: string) => ({ code: 'timeout' as const, message })
 
@@ -66,7 +13,6 @@ const MISSING: ConnectionView_Serialize = {
     { name: 'input', kind: 'operation', reason: 'too old' },
   ],
 }
-const SESSION = snapshot([workspace(1, [tab(1, 2)])])
 const RUNNING: AgentRow_Serialize[] = [
   {
     pane: 31,
@@ -83,7 +29,7 @@ const RUNNING: AgentRow_Serialize[] = [
     workspace_count: 1,
   },
 ]
-const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, SESSION, RUNNING)
+const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, RUNNING)
 
 describe('firstToConnect', () => {
   const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
@@ -156,17 +102,12 @@ describe('retryLeft', () => {
 })
 
 describe('screen', () => {
-  it('starts from the state, the session and the agents the commands return', () => {
-    expect(ON_FIRST).toEqual({ machine: 1, connection: CONNECTED, session: SESSION, agents: RUNNING })
+  it('starts from the state and the agents the commands return', () => {
+    expect(ON_FIRST).toEqual({ machine: 1, connection: CONNECTED, agents: RUNNING })
   })
 
-  it('starts connecting to a machine without a session or agents', () => {
-    expect(connection.connecting(2)).toEqual({
-      machine: 2,
-      connection: { state: 'connecting' },
-      session: null,
-      agents: null,
-    })
+  it('starts connecting to a machine without agents', () => {
+    expect(connection.connecting(2)).toEqual({ machine: 2, connection: { state: 'connecting' }, agents: null })
   })
 })
 
@@ -175,43 +116,32 @@ describe('apply', () => {
     expect(connection.apply(ON_FIRST, { machine: 1, connection: RETRYING })).toEqual({ ...ON_FIRST, connection: RETRYING })
   })
 
-  it('takes the session of the active machine', () => {
-    const later = snapshot([workspace(1, [tab(1, 3)])])
-    expect(connection.apply(ON_FIRST, { machine: 1, session: later })).toEqual({ ...ON_FIRST, session: later })
-  })
-
-  it('empties the session when the server restarts', () => {
-    expect(connection.apply(ON_FIRST, { machine: 1, session: null }).session).toBeNull()
-  })
-
   it('takes the agents of the active machine', () => {
     const later = [{ ...RUNNING[0], status: 'waiting' }]
     expect(connection.apply(ON_FIRST, { machine: 1, agents: later })).toEqual({ ...ON_FIRST, agents: later })
   })
 
-  it('empties the agents when the session is gone', () => {
+  it('empties the agents when the server restarts', () => {
     expect(connection.apply(ON_FIRST, { machine: 1, agents: null }).agents).toBeNull()
   })
 
   it.each([
     ['a connection', { machine: 2, connection: RETRYING }],
-    ['a session', { machine: 2, session: null }],
     ['its agents', { machine: 2, agents: [] }],
   ])('drops %s from a store already let go', (_, event) => {
     expect(connection.apply(ON_FIRST, event)).toBe(ON_FIRST)
   })
 
-  it('forgets the machine, its session and its agents when it is removed', () => {
+  it('forgets the machine and its agents when it is removed', () => {
     expect(connection.apply(ON_FIRST, { machine: 1, connection: { state: 'none' } })).toEqual({
       machine: null,
       connection: { state: 'none' },
-      session: null,
       agents: null,
     })
   })
 
   it('drops every event while no machine is active', () => {
-    const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null, null)
+    const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null)
     expect(connection.apply(idle, { machine: 1, connection: CONNECTED })).toBe(idle)
   })
 })

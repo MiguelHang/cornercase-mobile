@@ -79,9 +79,10 @@ describe('App wiring', () => {
     expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed)')
   })
 
-  it('loads the agents with the state and the session', () => {
-    expect(source).toContain('commands.session(), commands.agents(), ])')
-    expect(source).toContain('show(screen(state, session, agents))')
+  it('loads the agents with the state, and never the session', () => {
+    expect(source).toContain('commands.connectionState(), commands.agents(), ])')
+    expect(source).toContain('show(screen(state, agents))')
+    expect(source).not.toMatch(/session/i)
   })
 
   it('shows the connection bar with a machine, and puts the board, an agent and the toasts below it', () => {

@@ -5,29 +5,24 @@ import type {
   ConnectionState_Serialize,
   ConnectionView_Serialize,
   MachineView_Serialize,
-  SessionChanged_Serialize,
-  Snapshot_Serialize,
 } from './bindings'
 
 export type Screen = {
   machine: number | null
   connection: ConnectionView_Serialize
-  session: Snapshot_Serialize | null
   agents: AgentRow_Serialize[] | null
 }
 
-export type Changed = ConnectionChanged_Serialize | SessionChanged_Serialize | AgentsChanged_Serialize
+export type Changed = ConnectionChanged_Serialize | AgentsChanged_Serialize
 
-export const screen = (
-  state: ConnectionState_Serialize,
-  session: Snapshot_Serialize | null,
-  agents: AgentRow_Serialize[] | null,
-): Screen => ({ ...state, session, agents })
+export const screen = (state: ConnectionState_Serialize, agents: AgentRow_Serialize[] | null): Screen => ({
+  ...state,
+  agents,
+})
 
 export const connecting = (machine: number): Screen => ({
   machine,
   connection: { state: 'connecting' },
-  session: null,
   agents: null,
 })
 
@@ -35,16 +30,13 @@ export const apply = (current: Screen, event: Changed): Screen => {
   if (event.machine !== current.machine) {
     return current
   }
-  if ('connection' in event && event.connection.state === 'none') {
-    return { machine: null, connection: event.connection, session: null, agents: null }
-  }
-  if ('connection' in event) {
-    return { ...current, connection: event.connection }
-  }
   if ('agents' in event) {
     return { ...current, agents: event.agents }
   }
-  return { ...current, session: event.session }
+  if (event.connection.state === 'none') {
+    return { machine: null, connection: event.connection, agents: null }
+  }
+  return { ...current, connection: event.connection }
 }
 
 export const firstToConnect = (machines: MachineView_Serialize[], state: ConnectionState_Serialize) =>

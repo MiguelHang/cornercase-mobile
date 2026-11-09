@@ -14,7 +14,7 @@
 
   type Listed = Awaited<ReturnType<typeof commands.machinesList>>
 
-  const idle = screen({ machine: null, connection: { state: 'none' } }, null, null)
+  const idle = screen({ machine: null, connection: { state: 'none' } }, null)
 
   let current = $state(idle)
   let machines = $state<MachineView_Serialize[]>([])
@@ -57,13 +57,12 @@
   }
 
   const load = async () => {
-    const [listed, state, session, agents] = await Promise.all([
+    const [listed, state, agents] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
-      commands.session(),
       commands.agents(),
     ])
-    show(screen(state, session, agents))
+    show(screen(state, agents))
     const first = firstToConnect(remember(listed), state)
     if (first !== null) {
       await join(first)
@@ -76,7 +75,6 @@
     }
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
-      events.sessionChanged.listen((event) => show(apply(current, event.payload))),
       events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]

@@ -93,15 +93,15 @@ fn forwarding(id: MachineId, store: &Store, changes: Changes, machines: SharedMa
     recorder
 }
 
-fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {
+fn watching(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> (Store, Recorder) {
     let (store, driver) = store_of(id, fake);
     let recorder = forwarding(id, &store, store.changes(), machines);
     tokio::spawn(driver);
-    recorder
+    (store, recorder)
 }
 
-fn versions(recorder: &Recorder) -> Vec<(u64, Option<String>)> {
-    recorder.sessions().into_iter().map(|changed| (changed.machine, changed.session.map(|it| it.version))).collect()
+fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {
+    watching(id, fake, machines).1
 }
 
 fn rows(recorder: &Recorder) -> Vec<Option<Vec<Row>>> {
@@ -129,41 +129,27 @@ mod the_forwarder {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn sends_only_the_connection_the_session_and_the_agents() {
+    async fn sends_only_the_connection_and_the_agents() {
         let studio = Studio::new();
         let recorder = watched(studio.id, serving(&[snapshot(BOOT, 7, "first")]), studio.state.shared_machines());
         settle().await;
-        let session =
-            SessionChanged { machine: studio.id.0, session: serde_json::from_str(&snapshot(BOOT, 7, "first")).ok() };
-        assert!(recorder.all().contains(&Emitted::Session(session)), "{:?}", recorder.all());
         assert!(recorder.toasts().is_empty(), "{:?}", recorder.toasts());
         let agents = AgentsChanged { machine: studio.id.0, agents: Some(Vec::new()) };
         assert_eq!(recorder.agents(), [agents]);
-        let sent = recorder.connections().len() + recorder.sessions().len() + recorder.agents().len();
-        assert_eq!(recorder.all().len(), sent);
+        assert_eq!(recorder.all().len(), recorder.connections().len() + recorder.agents().len());
     }
 
     #[tokio::test(start_paused = true)]
-    async fn sends_one_session_for_a_burst_nobody_read_yet() {
+    async fn sends_the_agents_once_for_a_burst_nobody_read_yet() {
         let studio = Studio::new();
-        let burst = [snapshot(BOOT, 7, "first"), snapshot(BOOT, 8, "second"), snapshot(BOOT, 9, "third")];
+        let burst = [with_claude(7, "working"), with_claude(8, "waiting"), with_claude(9, "done")];
         let (store, driver) = store_of(studio.id, serving(&burst));
         let changes = store.changes();
         tokio::spawn(driver);
         settle().await;
         let recorder = forwarding(studio.id, &store, changes, studio.state.shared_machines());
         settle().await;
-        assert_eq!(versions(&recorder), [(studio.id.0, Some("third".to_owned()))]);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn sends_no_session_after_a_restart() {
-        let studio = Studio::new();
-        let recorder = watched(studio.id, restarting(), studio.state.shared_machines());
-        settle().await;
-        let seen = versions(&recorder);
-        assert_eq!(seen.first(), Some(&(studio.id.0, Some("first".to_owned()))), "{seen:?}");
-        assert_eq!(seen.last(), Some(&(studio.id.0, None)), "{seen:?}");
+        assert_eq!(rows(&recorder), [Some(claude("done", None))]);
     }
 
     #[tokio::test(start_paused = true)]
@@ -196,9 +182,9 @@ mod the_agents {
     async fn are_sent_once_while_the_snapshots_keep_the_same_rows() {
         let studio = Studio::new();
         let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "working")]);
-        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        let (store, recorder) = watching(studio.id, fake, studio.state.shared_machines());
         settle().await;
-        assert_eq!(recorder.sessions().len(), 2, "{:?}", recorder.sessions());
+        assert_eq!(store.session().map(|session| session.revision), Some(8));
         assert_eq!(rows(&recorder), [Some(claude("working", None))]);
     }
 
@@ -253,10 +239,6 @@ mod an_event {
         Emitted::Connection(changed(MachineId(7), ConnectionView::Connecting)),
         json!({ "machine": 7, "connection": { "state": "connecting" } })
     )]
-    #[case::session_changed_after_a_restart(
-        Emitted::Session(SessionChanged { machine: 7, session: None }),
-        json!({ "machine": 7, "session": null })
-    )]
     #[case::agents_changed_after_a_restart(
         Emitted::Agents(AgentsChanged { machine: 7, agents: None }),
         json!({ "machine": 7, "agents": null })
@@ -272,7 +254,6 @@ mod an_event {
     fn carries_its_fields(#[case] event: Emitted, #[case] expected: Value) {
         let json = match event {
             Emitted::Connection(changed) => serde_json::to_value(changed),
-            Emitted::Session(changed) => serde_json::to_value(changed),
             Emitted::Agents(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
@@ -282,8 +263,8 @@ mod an_event {
     #[test]
     fn is_named_in_kebab_case() {
         assert_eq!(
-            [ConnectionChanged::NAME, SessionChanged::NAME, AgentsChanged::NAME, Toast::NAME],
-            ["connection-changed", "session-changed", "agents-changed", "toast"]
+            [ConnectionChanged::NAME, AgentsChanged::NAME, Toast::NAME],
+            ["connection-changed", "agents-changed", "toast"]
         );
     }
 }
@@ -296,11 +277,6 @@ mod the_app {
         Emitted::Connection(changed(MachineId(7), ConnectionView::Connecting)),
         "connection-changed",
         json!({ "machine": 7, "connection": { "state": "connecting" } })
-    )]
-    #[case::session_changed(
-        Emitted::Session(SessionChanged { machine: 7, session: None }),
-        "session-changed",
-        json!({ "machine": 7, "session": null })
     )]
     #[case::agents_changed(
         Emitted::Agents(AgentsChanged { machine: 7, agents: Some(Vec::new()) }),

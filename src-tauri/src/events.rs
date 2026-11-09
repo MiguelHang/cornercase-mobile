@@ -1,6 +1,5 @@
 use cornercase_core::board::AgentRow;
 use cornercase_core::cli::events::What;
-use cornercase_core::cli::status::Snapshot;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::{Change, Changes, Connection, Store};
@@ -17,13 +16,6 @@ pub(crate) struct ConnectionChanged {
     #[specta(type = u32)]
     pub(crate) machine: u64,
     pub(crate) connection: ConnectionView,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
-pub(crate) struct SessionChanged {
-    #[specta(type = u32)]
-    pub(crate) machine: u64,
-    pub(crate) session: Option<Snapshot>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
@@ -50,7 +42,6 @@ pub(crate) enum ToastLevel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Emitted {
     Connection(ConnectionChanged),
-    Session(SessionChanged),
     Agents(AgentsChanged),
     Toast(Toast),
 }
@@ -63,7 +54,6 @@ impl<R: Runtime> Emit for AppHandle<R> {
     fn emit(&self, event: Emitted) {
         let sent = match event {
             Emitted::Connection(changed) => changed.emit(self),
-            Emitted::Session(changed) => changed.emit(self),
             Emitted::Agents(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
@@ -87,7 +77,7 @@ pub(crate) async fn forward(
     let mut sent = None;
     while let Some(change) = changes.next().await {
         let agents = if touches_agents(&change) { agents_changed(machine, &store, &mut sent) } else { None };
-        for event in translated(machine, &store, &machines, change).into_iter().chain(agents) {
+        for event in translated(machine, &machines, change).into_iter().chain(agents) {
             emit.emit(event);
         }
     }
@@ -110,12 +100,11 @@ fn agents_changed(machine: MachineId, store: &Store, sent: &mut Option<Vec<Agent
     Some(Emitted::Agents(AgentsChanged { machine: machine.0, agents }))
 }
 
-fn translated(machine: MachineId, store: &Store, machines: &SharedMachines, change: Change) -> Vec<Emitted> {
+fn translated(machine: MachineId, machines: &SharedMachines, change: Change) -> Vec<Emitted> {
     match change {
         Change::Connection(connection) => connection_changed(machine, machines, &connection),
-        Change::Session => vec![Emitted::Session(SessionChanged { machine: machine.0, session: store.session() })],
         Change::Warning(error) => vec![warned(&error)],
-        Change::Event(_) | Change::App => Vec::new(),
+        Change::Session | Change::Event(_) | Change::App => Vec::new(),
     }
 }
 

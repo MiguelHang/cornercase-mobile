@@ -41,7 +41,7 @@ describe('Router', () => {
 })
 
 describe('Router.settle', () => {
-  it('stays on an agent while the session settles on home', () => {
+  it('stays on an agent while the connection settles on home', () => {
     const router = new Router(HOME)
     router.go(AGENT)
     router.settle(HOME)
@@ -77,7 +77,7 @@ describe('Router.settle', () => {
 
 describe('routeFor', () => {
   it('shows home with a machine', () => {
-    expect(routeFor(connection.screen({ machine: 1, connection: CONNECTED }, null, null))).toEqual(HOME)
+    expect(routeFor(connection.screen({ machine: 1, connection: CONNECTED }, null))).toEqual(HOME)
   })
 
   it('shows home while connecting to a machine just added', () => {
@@ -85,11 +85,11 @@ describe('routeFor', () => {
   })
 
   it('shows the empty screen without a machine', () => {
-    expect(routeFor(connection.screen({ machine: null, connection: { state: 'none' } }, null, null))).toEqual(NO_MACHINES)
+    expect(routeFor(connection.screen({ machine: null, connection: { state: 'none' } }, null))).toEqual(NO_MACHINES)
   })
 
   it('goes back to the empty screen once the active machine is removed', () => {
-    const current = connection.screen({ machine: 1, connection: CONNECTED }, null, null)
+    const current = connection.screen({ machine: 1, connection: CONNECTED }, null)
     const removed = connection.apply(current, { machine: 1, connection: { state: 'none' } })
     expect(routeFor(removed)).toEqual(NO_MACHINES)
   })
