@@ -180,6 +180,42 @@ export type Missing_Serialize = {
 	reason: string | null,
 };
 
+export type Modes = Modes_Serialize | Modes_Deserialize;
+
+export type Modes_Deserialize = {
+	mouse?: MouseMode_Deserialize,
+	mouse_encoding?: MouseEncoding_Deserialize,
+	alternate_screen?: boolean,
+	alternate_scroll?: boolean,
+	bracketed_paste?: boolean,
+	application_cursor?: boolean,
+	focus_events?: boolean,
+	kitty_keyboard?: number,
+};
+
+export type Modes_Serialize = {
+	mouse: MouseMode_Serialize,
+	mouse_encoding: MouseEncoding_Serialize,
+	alternate_screen: boolean,
+	alternate_scroll: boolean,
+	bracketed_paste: boolean,
+	application_cursor: boolean,
+	focus_events: boolean,
+	kitty_keyboard: number,
+};
+
+export type MouseEncoding = MouseEncoding_Serialize | MouseEncoding_Deserialize;
+
+export type MouseEncoding_Deserialize = "utf8" | "sgr" | string;
+
+export type MouseEncoding_Serialize = "utf8" | "sgr" | "default";
+
+export type MouseMode = MouseMode_Serialize | MouseMode_Deserialize;
+
+export type MouseMode_Deserialize = "press" | "press_release" | "button_motion" | "any_motion" | string;
+
+export type MouseMode_Serialize = "press" | "press_release" | "button_motion" | "any_motion" | "none";
+
 export type RouteView = { kind: "bridge"; url: string };
 
 export type Run = Run_Serialize | Run_Deserialize;
@@ -251,6 +287,7 @@ export type TerminalChanged_Deserialize = {
 	size: Size_Deserialize,
 	cursor?: Cursor_Deserialize | null,
 	colours: Colours_Deserialize,
+	modes: Modes_Deserialize,
 	replaced: boolean,
 	rows: { [key in number]: Run_Deserialize[] },
 	closed: boolean,
@@ -263,6 +300,7 @@ export type TerminalChanged_Serialize = {
 	size: Size_Serialize,
 	cursor: Cursor_Serialize | null,
 	colours: Colours_Serialize,
+	modes: Modes_Serialize,
 	replaced: boolean,
 	rows: { [key in number]: Run_Serialize[] },
 	closed: boolean,

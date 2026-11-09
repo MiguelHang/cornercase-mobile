@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use cornercase_core::cli::surface::{Colours, Size};
+use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
@@ -110,6 +110,7 @@ fn closed_terminal() -> Emitted {
         size: Size::default(),
         cursor: None,
         colours: Colours::default(),
+        modes: Modes::default(),
         replaced: false,
         rows: BTreeMap::new(),
         closed: true,
@@ -119,8 +120,11 @@ fn closed_terminal() -> Emitted {
 fn closed_terminal_json() -> Value {
     let colours = json!({ "fg": null, "bg": null, "cursor": null, "palette": {} });
     let size = json!({ "cols": 0, "rows": 0 });
+    let modes = json!({ "mouse": "none", "mouse_encoding": "default", "alternate_screen": false,
+        "alternate_scroll": false, "bracketed_paste": false, "application_cursor": false, "focus_events": false,
+        "kitty_keyboard": 0 });
     json!({ "machine": 7, "tab": 3, "pane": null, "size": size, "cursor": null, "colours": colours,
-        "replaced": false, "rows": {}, "closed": true })
+        "modes": modes, "replaced": false, "rows": {}, "closed": true })
 }
 
 fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {

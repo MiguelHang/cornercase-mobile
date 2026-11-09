@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use cornercase_core::cli::surface::{Colours, Size};
+use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::Store;
 use cornercase_core::terminal::live::{Screen, Terminal};
@@ -114,6 +114,7 @@ impl Batch {
         held.size = update.size;
         held.cursor = update.cursor;
         held.colours = update.colours;
+        held.modes = update.modes;
     }
 
     fn held(&mut self) -> &mut TerminalChanged {
@@ -125,6 +126,7 @@ impl Batch {
             size: Size::default(),
             cursor: None,
             colours: Colours::default(),
+            modes: Modes::default(),
             replaced: false,
             rows: BTreeMap::new(),
             closed: false,

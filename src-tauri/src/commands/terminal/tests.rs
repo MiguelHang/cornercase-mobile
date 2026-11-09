@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use cornercase_core::cli::surface::{Modes, Style};
+use cornercase_core::cli::surface::{Modes, MouseMode, Style};
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::{Line, Run};
 use cornercase_core::transport::Transport;
@@ -28,18 +28,18 @@ fn line(text: &str) -> Line {
     vec![Run { text: text.to_owned(), width, style: Style::default(), link: None }]
 }
 
-fn update(pane: u64, replaced: bool, rows: &[(u16, &str)]) -> Screen {
+fn shown(pane: u64, replaced: bool, rows: &[(u16, &str)]) -> Update {
     let rows = rows.iter().map(|(row, text)| (*row, line(text))).collect();
     let size = Size { cols: 80, rows: 24 };
-    Screen::Update(Update {
-        pane,
-        size,
-        cursor: None,
-        colours: Colours::default(),
-        modes: Modes::default(),
-        replaced,
-        rows,
-    })
+    Update { pane, size, cursor: None, colours: Colours::default(), modes: Modes::default(), replaced, rows }
+}
+
+fn update(pane: u64, replaced: bool, rows: &[(u16, &str)]) -> Screen {
+    Screen::Update(shown(pane, replaced, rows))
+}
+
+fn moded(modes: Modes) -> Screen {
+    Screen::Update(Update { modes, ..shown(1, false, &[]) })
 }
 
 fn texts(changed: &TerminalChanged) -> Vec<(u16, String)> {
@@ -151,6 +151,14 @@ mod a_batch {
     fn closes_without_a_pane_when_it_showed_nothing() {
         let changed = batched(vec![Screen::Closed]);
         assert_eq!((changed.machine, changed.tab, changed.closed, changed.pane), (7, 3, true, None));
+        assert_eq!(changed.modes, Modes::default());
+    }
+
+    #[test]
+    fn keeps_the_modes_of_its_latest_update() {
+        let mouse = Modes { mouse: MouseMode::PressRelease, ..Modes::default() };
+        let alternate = Modes { alternate_screen: true, alternate_scroll: true, ..Modes::default() };
+        assert_eq!(batched(vec![moded(mouse), moded(alternate)]).modes, alternate);
     }
 
     #[test]
