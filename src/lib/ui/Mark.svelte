@@ -1,7 +1,7 @@
 <script lang="ts">
   const GRID = 12
 
-  let { unit = 4 }: { unit?: number } = $props()
+  let { unit = 4, pulsing = false }: { unit?: number; pulsing?: boolean } = $props()
 
   const size = $derived(`${GRID * unit}px`)
 </script>
@@ -9,7 +9,7 @@
 <div class="mark" style:--unit="{unit}px" style:width={size} style:height={size} aria-hidden="true">
   <span class="cell corner top"></span>
   <span class="cell corner side"></span>
-  <span class="cell cursor"></span>
+  <span class="cell cursor" class:pulsing></span>
 </div>
 
 <style>

@@ -5,6 +5,11 @@
   import Mark from '../lib/ui/Mark.svelte'
   import Wordmark from '../lib/ui/Wordmark.svelte'
   import { fadeOut, riseIn } from '../lib/ui/motion'
+  import MachineForm from './MachineForm.svelte'
+
+  let { onadded }: { onadded: (machine: number) => void } = $props()
+
+  let open = $state(false)
 
   const LINES = [
     'A machine is a computer running cornercase whose agents you follow from here.',
@@ -20,9 +25,13 @@
   <div class="card" in:riseIn out:fadeOut>
     <Glass>
       <Emblem icon="server" title="No machines yet" lines={LINES} />
-      <div class="actions">
-        <Button resting>Add machine</Button>
-      </div>
+      {#if open}
+        <MachineForm {onadded} oncancel={() => (open = false)} />
+      {:else}
+        <div class="actions">
+          <Button onclick={() => (open = true)}>Add machine</Button>
+        </div>
+      {/if}
     </Glass>
   </div>
 </section>

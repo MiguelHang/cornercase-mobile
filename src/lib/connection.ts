@@ -35,9 +35,6 @@ export const apply = (current: Screen, event: Changed): Screen => {
   return { ...current, session: event.session }
 }
 
-export const noticeAfter = (notice: string | null, current: Screen) =>
-  current.connection.state === 'connected' ? null : notice
-
 export const countPanes = (session: Snapshot_Serialize | null) =>
   (session?.projects ?? [])
     .flatMap((project) => project.workspaces)
@@ -57,21 +54,42 @@ export const firstToConnect = (machines: MachineView_Serialize[], state: Connect
 
 const seconds = (ms: number) => Math.ceil(ms / 1000)
 
-export const describe = (connection: ConnectionView_Serialize): string => {
+export type Tone = 'working' | 'done' | 'failed'
+
+export type Status = { text: string; detail?: string; tone: Tone; pulsing: boolean }
+
+const parsed = (route: string) => {
+  try {
+    return new URL(route)
+  } catch {
+    return null
+  }
+}
+
+export const routeAddress = (route: string) => parsed(route)?.host || route.replace(/\?.*$/s, '')
+
+export const retryLeft = (in_ms: number, elapsed: number) => Math.max(1, seconds(in_ms - elapsed))
+
+const connectedTo = (machineName: string, route: string) =>
+  machineName ? `${machineName} · via ${routeAddress(route)}` : `via ${routeAddress(route)}`
+
+const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
+
+export const status = (connection: ConnectionView_Serialize, machineName: string, elapsed = 0): Status => {
   switch (connection.state) {
     case 'none':
-      return 'Not connected'
+      return failed('Not connected')
     case 'connecting':
-      return 'Connecting…'
+      return { text: 'Connecting…', tone: 'working', pulsing: true }
     case 'connected':
-      return `Connected through ${connection.route}`
+      return { text: connectedTo(machineName, connection.route), tone: 'done', pulsing: false }
     case 'retrying':
-      return `Retrying in ${seconds(connection.in_ms)} s: ${connection.error.message}`
+      return { ...failed(`Retrying in ${retryLeft(connection.in_ms, elapsed)} s`), detail: connection.error.message }
     case 'missing':
-      return `cornercase lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it on the Mac`
+      return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
     case 'unauthorized':
-      return "Not authorized: scan the bridge's code again"
+      return failed("The bridge rejected this phone's token")
     case 'incompatible':
-      return `Incompatible: ${connection.error.message}`
+      return failed(`Incompatible: ${connection.error.message}`)
   }
 }

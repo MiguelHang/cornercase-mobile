@@ -1,35 +1,64 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
-  import { commands, events } from './lib/bindings'
-  import { apply, connecting, firstToConnect, noticeAfter, screen } from './lib/connection'
-  import AddMachine from './routes/AddMachine.svelte'
-  import Connection from './routes/Connection.svelte'
+  import { commands, events, type MachineView_Serialize } from './lib/bindings'
+  import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
+  import { oneAtATime } from './lib/join'
+  import { Router, routeFor } from './lib/router.svelte'
+  import { Toasts } from './lib/toasts.svelte'
+  import ConnectionBar from './lib/ui/ConnectionBar.svelte'
+  import ToastStack from './lib/ui/Toasts.svelte'
+  import Home from './routes/Home.svelte'
   import NoMachines from './routes/NoMachines.svelte'
 
-  let current = $state(screen({ machine: null, connection: { state: 'none' } }, null))
-  let notice = $state<string | null>(null)
+  type Listed = Awaited<ReturnType<typeof commands.machinesList>>
 
-  const join = async (machine: number) => {
-    current = connecting(machine)
+  const idle = screen({ machine: null, connection: { state: 'none' } }, null)
+
+  let current = $state(idle)
+  let machines = $state<MachineView_Serialize[]>([])
+  let barHeight = $state(0)
+  const router = new Router(routeFor(idle))
+  const toasts = new Toasts()
+
+  const home = $derived(router.current.name === 'home')
+  const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
+
+  const show = (next: Screen) => {
+    current = next
+    router.replace(routeFor(next))
+  }
+
+  const remember = (listed: Listed) => {
+    if (listed.status === 'error') {
+      toasts.failed(listed.error)
+      return []
+    }
+    machines = listed.data
+    return listed.data
+  }
+
+  const join = oneAtATime(async (machine: number) => {
+    show(connecting(machine))
     const connected = await commands.connect(machine)
     if (connected.status === 'error') {
-      notice = connected.error.message
+      toasts.failed(connected.error)
     }
+  })
+
+  const added = (machine: number) => {
+    show(connecting(machine))
+    Promise.all([commands.machinesList().then(remember), join(machine)]).catch(toasts.failed)
   }
 
   const load = async () => {
-    const [machines, state, session] = await Promise.all([
+    const [listed, state, session] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
       commands.session(),
     ])
-    current = screen(state, session)
-    if (machines.status === 'error') {
-      notice = machines.error.message
-      return
-    }
-    const first = firstToConnect(machines.data, state)
+    show(screen(state, session))
+    const first = firstToConnect(remember(listed), state)
     if (first !== null) {
       await join(first)
     }
@@ -40,37 +69,21 @@
       return
     }
     const listening = [
-      events.connectionChanged.listen((event) => {
-        current = apply(current, event.payload)
-        notice = noticeAfter(notice, current)
-      }),
-      events.sessionChanged.listen((event) => (current = apply(current, event.payload))),
-      events.toast.listen((event) => (notice = event.payload.message)),
+      events.connectionChanged.listen((event) => show(apply(current, event.payload))),
+      events.sessionChanged.listen((event) => show(apply(current, event.payload))),
+      events.toast.listen((event) => toasts.push(event.payload)),
     ]
-    Promise.all(listening)
-      .then(load)
-      .catch((error: unknown) => (notice = String(error)))
+    Promise.all(listening).then(load).catch(toasts.failed)
     return () => listening.forEach((stop) => stop.then((unlisten) => unlisten()))
   })
 </script>
 
 <main>
-  {#if current.machine === null}
-    <NoMachines />
+  {#if home}
+    <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
+    <Home screen={current} below={barHeight} />
   {:else}
-    <Connection screen={current} />
+    <NoMachines onadded={added} />
   {/if}
-  {#if notice !== null}
-    <p class="notice">{notice}</p>
-  {/if}
-  <AddMachine onadded={(machine) => (current = connecting(machine))} />
+  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={home ? barHeight : 0} />
 </main>
-
-<style>
-  .notice {
-    margin: 0;
-    padding: 0 var(--inset-wide);
-    color: var(--muted);
-    text-align: center;
-  }
-</style>

@@ -104,6 +104,14 @@ describe('base styles', () => {
     expect(base.replace(/\s+/g, ' ')).toContain(text)
   })
 
+  it('pulses from 1 to 0.3 and back over --pulse, for every component, and not with reduced motion', () => {
+    const style = base.replace(/\s+/g, ' ')
+    expect(style).toContain('.pulsing { animation: pulse var(--pulse) ease-in-out infinite; }')
+    expect(style).toContain('@keyframes pulse { 50% { opacity: 0.3; } }')
+    expect(style).toContain('@media (prefers-reduced-motion: reduce) { .pulsing { animation: none; } }')
+    expect(Object.values(sources).filter((text) => text.includes('@keyframes pulse'))).toHaveLength(1)
+  })
+
   it('keeps the brand wash fixed, 180 px tall, fading from 12 % to 0', () => {
     const wash = base.match(/body::before \{([^}]*)\}/)?.[1].replace(/\s+/g, ' ')
     expect(wash).toContain('position: fixed;')
