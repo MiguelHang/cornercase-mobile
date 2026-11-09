@@ -6,6 +6,7 @@ use futures_util::future::Either;
 use serde_json::Value;
 use tokio::time;
 
+use super::OnError;
 use super::follow::{End, Follow, Gone};
 use crate::error::Error;
 use crate::transport::{Exit, Transport, json_error};
@@ -13,8 +14,6 @@ use crate::transport::{Exit, Transport, json_error};
 const FOLLOW: [&str; 4] = ["input", "--follow", "--json", "-"];
 const SETTLE: Duration = Duration::from_secs(10);
 const UNANSWERED: usize = 256;
-
-pub(crate) type OnError = Arc<dyn Fn(Error) + Send + Sync>;
 
 pub(crate) type Event = (u64, Value);
 

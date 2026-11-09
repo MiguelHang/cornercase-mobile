@@ -55,6 +55,10 @@ impl Requests {
         let _ = self.follow.end().await;
     }
 
+    pub(crate) fn is_over(&self) -> bool {
+        self.follow.is_over()
+    }
+
     fn unsent(&self, end: &End) -> Asked {
         match self.lost(end) {
             Asked::Answered(_) => Asked::Unsent,
