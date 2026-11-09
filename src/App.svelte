@@ -8,12 +8,13 @@
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
-  import Home from './routes/Home.svelte'
+  import Agent from './routes/agent/Agent.svelte'
+  import Board from './routes/board/Board.svelte'
   import NoMachines from './routes/NoMachines.svelte'
 
   type Listed = Awaited<ReturnType<typeof commands.machinesList>>
 
-  const idle = screen({ machine: null, connection: { state: 'none' } }, null)
+  const idle = screen({ machine: null, connection: { state: 'none' } }, null, null)
 
   let current = $state(idle)
   let machines = $state<MachineView_Serialize[]>([])
@@ -21,12 +22,16 @@
   const router = new Router(routeFor(idle))
   const toasts = new Toasts()
 
-  const home = $derived(router.current.name === 'home')
+  const route = $derived(router.current)
+  const machine = $derived(route.name !== 'no-machines')
+  const opened = $derived(
+    route.name === 'agent' ? current.agents?.find((agent) => agent.pane === route.pane) : undefined,
+  )
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
   const show = (next: Screen) => {
     current = next
-    router.replace(routeFor(next))
+    router.settle(routeFor(next))
   }
 
   const remember = (listed: Listed) => {
@@ -52,12 +57,13 @@
   }
 
   const load = async () => {
-    const [listed, state, session] = await Promise.all([
+    const [listed, state, session, agents] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
       commands.session(),
+      commands.agents(),
     ])
-    show(screen(state, session))
+    show(screen(state, session, agents))
     const first = firstToConnect(remember(listed), state)
     if (first !== null) {
       await join(first)
@@ -71,6 +77,7 @@
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
       events.sessionChanged.listen((event) => show(apply(current, event.payload))),
+      events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
     Promise.all(listening).then(load).catch(toasts.failed)
@@ -79,11 +86,20 @@
 </script>
 
 <main>
-  {#if home}
+  {#if machine}
     <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
-    <Home screen={current} below={barHeight} />
+    {#if route.name === 'agent'}
+      <Agent row={opened} below={barHeight} onback={() => router.back()} />
+    {:else}
+      <Board
+        agents={current.agents}
+        connection={current.connection}
+        below={barHeight}
+        onopen={(pane) => router.go({ name: 'agent', pane })}
+      />
+    {/if}
   {:else}
     <NoMachines onadded={added} />
   {/if}
-  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={home ? barHeight : 0} />
+  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={machine ? barHeight : 0} />
 </main>

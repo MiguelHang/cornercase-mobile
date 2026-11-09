@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { ConnectionView_Serialize, Snapshot_Serialize, Tab_Serialize, Workspace_Serialize } from './bindings'
+import type {
+  AgentRow_Serialize,
+  ConnectionView_Serialize,
+  Snapshot_Serialize,
+  Tab_Serialize,
+  Workspace_Serialize,
+} from './bindings'
 import * as connection from './connection'
 
 const pane = (id: number) => ({
@@ -61,37 +67,23 @@ const MISSING: ConnectionView_Serialize = {
   ],
 }
 const SESSION = snapshot([workspace(1, [tab(1, 2)])])
-const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, SESSION)
-
-describe('countPanes', () => {
-  it('counts nothing without a session', () => {
-    expect(connection.countPanes(null)).toBe(0)
-  })
-
-  it('counts nothing in a session without projects', () => {
-    expect(connection.countPanes(snapshot())).toBe(0)
-  })
-
-  it('adds the panes of every tab of every workspace of every project', () => {
-    const first = [workspace(1, [tab(1, 2), tab(2, 1)]), workspace(2, [])]
-    const second = [workspace(3, [tab(3, 3), tab(4, 0)])]
-    expect(connection.countPanes(snapshot(first, second))).toBe(6)
-  })
-})
-
-describe('describePanes', () => {
-  it('says nothing without a session', () => {
-    expect(connection.describePanes(null)).toBeNull()
-  })
-
-  it.each([
-    [0, '0 panes'],
-    [1, '1 pane'],
-    [3, '3 panes'],
-  ])('tells %d panes as %s', (panes, text) => {
-    expect(connection.describePanes(snapshot([workspace(1, [tab(1, panes)])]))).toBe(text)
-  })
-})
+const RUNNING: AgentRow_Serialize[] = [
+  {
+    pane: 31,
+    status: 'working',
+    agent: 'codex',
+    since: null,
+    title: null,
+    project_name: 'api',
+    workspace_name: 'main',
+    tab_name: 'shell',
+    project: 2,
+    workspace: 6,
+    tab: 3,
+    workspace_count: 1,
+  },
+]
+const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, SESSION, RUNNING)
 
 describe('firstToConnect', () => {
   const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
@@ -164,12 +156,17 @@ describe('retryLeft', () => {
 })
 
 describe('screen', () => {
-  it('starts from the state and the session the commands return', () => {
-    expect(ON_FIRST).toEqual({ machine: 1, connection: CONNECTED, session: SESSION })
+  it('starts from the state, the session and the agents the commands return', () => {
+    expect(ON_FIRST).toEqual({ machine: 1, connection: CONNECTED, session: SESSION, agents: RUNNING })
   })
 
-  it('starts connecting to a machine without a session', () => {
-    expect(connection.connecting(2)).toEqual({ machine: 2, connection: { state: 'connecting' }, session: null })
+  it('starts connecting to a machine without a session or agents', () => {
+    expect(connection.connecting(2)).toEqual({
+      machine: 2,
+      connection: { state: 'connecting' },
+      session: null,
+      agents: null,
+    })
   })
 })
 
@@ -187,23 +184,34 @@ describe('apply', () => {
     expect(connection.apply(ON_FIRST, { machine: 1, session: null }).session).toBeNull()
   })
 
+  it('takes the agents of the active machine', () => {
+    const later = [{ ...RUNNING[0], status: 'waiting' }]
+    expect(connection.apply(ON_FIRST, { machine: 1, agents: later })).toEqual({ ...ON_FIRST, agents: later })
+  })
+
+  it('empties the agents when the session is gone', () => {
+    expect(connection.apply(ON_FIRST, { machine: 1, agents: null }).agents).toBeNull()
+  })
+
   it.each([
     ['a connection', { machine: 2, connection: RETRYING }],
     ['a session', { machine: 2, session: null }],
+    ['its agents', { machine: 2, agents: [] }],
   ])('drops %s from a store already let go', (_, event) => {
     expect(connection.apply(ON_FIRST, event)).toBe(ON_FIRST)
   })
 
-  it('forgets the machine and its session when it is removed', () => {
+  it('forgets the machine, its session and its agents when it is removed', () => {
     expect(connection.apply(ON_FIRST, { machine: 1, connection: { state: 'none' } })).toEqual({
       machine: null,
       connection: { state: 'none' },
       session: null,
+      agents: null,
     })
   })
 
   it('drops every event while no machine is active', () => {
-    const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null)
+    const idle = connection.screen({ machine: null, connection: { state: 'none' } }, null, null)
     expect(connection.apply(idle, { machine: 1, connection: CONNECTED })).toBe(idle)
   })
 })

@@ -19,13 +19,6 @@ export class Router {
     this.#stack = [...this.#stack, route]
   }
 
-  replace(route: Route) {
-    if (this.current.name === route.name) {
-      return
-    }
-    this.#stack = [...this.#stack.slice(0, -1), route]
-  }
-
   settle(route: Route) {
     if (this.#stack[0].name === route.name) {
       return
