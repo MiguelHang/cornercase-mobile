@@ -528,6 +528,7 @@ dependencies = [
  "tauri-plugin-barcode-scanner",
  "tauri-plugin-haptics",
  "tauri-plugin-network",
+ "tauri-plugin-photos",
  "tauri-specta",
  "tokio",
 ]
@@ -3633,6 +3634,15 @@ version = "0.1.0"
 dependencies = [
  "cornercase-core",
  "serde",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-photos"
+version = "0.1.0"
+dependencies = [
+ "cornercase-core",
  "tauri",
  "tauri-plugin",
 ]

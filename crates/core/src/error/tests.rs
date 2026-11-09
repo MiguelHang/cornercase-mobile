@@ -45,6 +45,10 @@ mod display {
     #[case::unknown_key(Error::UnknownKey("--force".to_owned()), "the app sends no key named \"--force\"")]
     #[case::image_empty(Error::ImageEmpty, "the image is empty: there is nothing to paste")]
     #[case::image_too_large(Error::ImageTooLarge, "the image is over 32 MiB, the most cornercase pastes")]
+    #[case::picker(
+        Error::Picker("only the iOS app has a photo picker".to_owned()),
+        "cannot pick a photo: only the iOS app has a photo picker"
+    )]
     #[case::json(
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"

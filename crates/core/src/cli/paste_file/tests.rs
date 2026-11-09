@@ -37,6 +37,41 @@ mod reading {
     }
 }
 
+mod picking {
+    use super::*;
+
+    #[test]
+    fn reads_the_photo_the_picker_wrote() {
+        let answer = json!({ "path": "/tmp/7F3A.jpg", "name": "IMG_0042.HEIC", "kind": "jpeg" });
+        let picked = Picking::deserialize(answer).expect("an answer").picked();
+        let expected =
+            Picked { path: "/tmp/7F3A.jpg".to_owned(), name: Some("IMG_0042.HEIC".to_owned()), kind: Kind::Jpeg };
+        assert_eq!(picked, Some(expected));
+    }
+
+    #[test]
+    fn takes_a_photo_without_a_name() {
+        let picked =
+            Picking::deserialize(json!({ "path": "/tmp/7F3A.png", "kind": "png" })).expect("an answer").picked();
+        assert_eq!(picked, Some(Picked { path: "/tmp/7F3A.png".to_owned(), name: None, kind: Kind::Png }));
+    }
+
+    #[test]
+    fn reads_a_cancel_as_no_photo() {
+        assert_eq!(Picking::deserialize(json!({ "cancelled": true })).expect("an answer").picked(), None);
+    }
+
+    #[rstest]
+    #[case::nothing(json!({}))]
+    #[case::no_path(json!({ "name": "IMG_0042.HEIC", "kind": "jpeg" }))]
+    #[case::no_kind(json!({ "path": "/tmp/7F3A.jpg" }))]
+    #[case::a_kind_it_does_not_encode(json!({ "path": "/tmp/7F3A.heic", "kind": "heic" }))]
+    #[case::not_an_object(json!(null))]
+    fn refuses_an_answer_that_is_neither(#[case] answer: serde_json::Value) {
+        assert!(Picking::deserialize(answer).is_err());
+    }
+}
+
 mod argv {
     use super::*;
 

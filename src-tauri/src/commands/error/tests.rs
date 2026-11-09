@@ -32,6 +32,7 @@ mod from_a_core_error {
     #[case::unknown_key(Error::UnknownKey("--force".into()), "unknown_key")]
     #[case::image_empty(Error::ImageEmpty, "image_empty")]
     #[case::image_too_large(Error::ImageTooLarge, "image_too_large")]
+    #[case::picker(Error::Picker("cancelled by the system".into()), "picker")]
     #[case::json(Error::Json("expected a value".into()), "json")]
     #[case::store(Error::Store("read-only".into()), "store")]
     #[case::secrets(Error::Secrets("locked".into()), "secrets")]

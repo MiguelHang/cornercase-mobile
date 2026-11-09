@@ -26,6 +26,30 @@ pub enum Kind {
     Jpeg,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Picked {
+    pub path: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    pub kind: Kind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum Picking {
+    Picked(Picked),
+    Cancelled { cancelled: bool },
+}
+
+impl Picking {
+    pub fn picked(self) -> Option<Picked> {
+        match self {
+            Self::Picked(picked) => Some(picked),
+            Self::Cancelled { .. } => None,
+        }
+    }
+}
+
 impl Kind {
     fn extension(self) -> &'static str {
         match self {
