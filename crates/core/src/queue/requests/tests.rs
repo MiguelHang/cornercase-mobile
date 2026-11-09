@@ -206,6 +206,16 @@ mod ask {
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
         let unanswered = requests.ask(&line(&words(&["focus", "--pane", "5"]), None)).await;
         assert_eq!(unanswered, Asked::Answered(Err(Error::Unanswered)));
+        assert_eq!(requests.ended().await, None);
+    }
+
+    #[tokio::test]
+    async fn leaves_the_line_unsent_and_keeps_why_when_the_process_ended_after_an_answer() {
+        let mut requests = answering_once(Ok(exit(1, "Error: the server stopped")), Then::EndsLater);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+        assert_eq!(requests.ask(&line(&words(&["focus"]), None)).await, Asked::Unsent);
+        let stopped = Error::Failed { code: 1, stderr: "Error: the server stopped".to_owned() };
+        assert_eq!(requests.ended().await, Some(stopped));
     }
 
     #[rstest]
@@ -244,6 +254,7 @@ mod ask {
             Ok(exit(0, ""))
         });
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Unsent);
+        assert_eq!(requests.ended().await, None);
     }
 }
 
@@ -265,8 +276,20 @@ mod ended {
     async fn comes_once_the_process_is_over_and_nothing_is_written_after(#[case] then: Then) {
         let mut requests = answering_once(Ok(exit(1, "Error: the server stopped")), then);
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
-        requests.ended().await;
+        let stopped = Error::Failed { code: 1, stderr: "Error: the server stopped".to_owned() };
+        assert_eq!(requests.ended().await, Some(stopped));
         assert_eq!(requests.ask(&line(&words(&["focus"]), None)).await, Asked::Unsent);
-        assert_eq!(requests.ended().now_or_never(), Some(()));
+        assert_eq!(requests.ended().now_or_never(), Some(None));
+    }
+
+    #[rstest]
+    #[case::said_nothing(Ok(exit(0, "")), Some(Error::Failed { code: 0, stderr: ENDED.to_owned() }))]
+    #[case::dropped(Err(Error::Dropped), Some(Error::Dropped))]
+    #[case::unopened(Err(Error::Timeout), None)]
+    #[tokio::test]
+    async fn tells_why_the_process_ended_unless_it_never_opened(#[case] end: End, #[case] stopped: Option<Error>) {
+        let mut requests = answering_once(end, Then::EndsLater);
+        assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, answered(r#"["status"]"#));
+        assert_eq!(requests.ended().await, stopped);
     }
 }

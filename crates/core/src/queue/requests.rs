@@ -4,11 +4,12 @@ use futures_util::future::Either;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::follow::{End, Follow, Gone};
+use super::follow::{End, Follow, Gone, stopped};
 use crate::error::Error;
 use crate::transport::{STALE_BOOT, Transport, json_error};
 
 const FOLLOW: [&str; 3] = ["requests", "--follow", "-"];
+const ENDED: &str = "`cornercase requests --follow` ended";
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -29,34 +30,50 @@ pub(crate) enum Asked {
 
 pub(crate) struct Requests {
     follow: Follow,
+    stopped: Option<Error>,
 }
 
 impl Requests {
     pub(crate) fn start(transport: Arc<dyn Transport>) -> Self {
-        Self { follow: Follow::start(transport, &FOLLOW) }
+        Self { follow: Follow::start(transport, &FOLLOW), stopped: None }
     }
 
     pub(crate) async fn ask(&mut self, line: &str) -> Asked {
         match self.follow.write(line).await {
             Ok(()) => {}
             Err(None) => return Asked::Unsent,
-            Err(Some(end)) => return self.unsent(&end),
+            Err(Some(end)) => {
+                self.stop(&end);
+                return self.unsent(&end);
+            }
         }
         match self.follow.next().await {
             Either::Left(line) => Asked::Answered(answer(&line)),
             Either::Right(end) => match self.follow.ready() {
-                Some(line) => Asked::Answered(answer(&line)),
+                Some(line) => {
+                    self.stop(&end);
+                    Asked::Answered(answer(&line))
+                }
                 None => self.lost(&end),
             },
         }
     }
 
-    pub(crate) async fn ended(&mut self) {
-        let _ = self.follow.end().await;
+    pub(crate) async fn ended(&mut self) -> Option<Error> {
+        if let Some(end) = self.follow.end().await {
+            self.stop(&end);
+        }
+        self.stopped.take()
     }
 
     pub(crate) fn is_over(&self) -> bool {
         self.follow.is_over()
+    }
+
+    fn stop(&mut self, end: &End) {
+        if self.follow.answered() && self.follow.gone(end) == Gone::Lost {
+            self.stopped = Some(stopped(end, ENDED));
+        }
     }
 
     fn unsent(&self, end: &End) -> Asked {

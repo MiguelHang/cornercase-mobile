@@ -16,6 +16,7 @@ use crate::transport::{Closed, Exit, Out, OutSink, Stdin};
 
 mod batch;
 mod commands;
+mod drops;
 mod input;
 
 const REQUESTS: [&str; 3] = ["requests", "--follow", "-"];
@@ -125,16 +126,20 @@ async fn answer_lines(
     Ok(exit(0, ""))
 }
 
-async fn say(log: &mpsc::UnboundedSender<String>, out: &mut OutSink, line: &str) -> Result<(), Error> {
+fn said(line: &str) -> String {
     let line: Value = serde_json::from_str(line).expect("a requests line");
     let args: Vec<&str> = line["args"].as_array().expect("its args").iter().filter_map(Value::as_str).collect();
-    let said = match line["stdin"].as_str() {
+    match line["stdin"].as_str() {
         Some(stdin) => format!("{} < {stdin}", args.join(" ")),
         None => args.join(" "),
-    };
+    }
+}
+
+async fn say(log: &mpsc::UnboundedSender<String>, out: &mut OutSink, line: &str) -> Result<(), Error> {
+    let said = said(line);
     log.send(said.clone()).expect("the test reads the log");
-    let answer = match args.first() {
-        Some(&"fail") => json!({ "status": 1, "error": "it failed" }),
+    let answer = match said.split(' ').next() {
+        Some("fail") => json!({ "status": 1, "error": "it failed" }),
         _ => json!({ "status": 0, "text": said }),
     };
     out.send(Out::Stdout(answer.to_string())).await.map_err(|Closed| Error::OutputClosed)

@@ -11,7 +11,7 @@ use tokio::time::Instant;
 
 use super::*;
 use crate::transport::fake::FakeTransport;
-use crate::transport::{Closed, Out, OutSink, Stdin};
+use crate::transport::{Closed, Exit, Out, OutSink, Stdin};
 
 const NO_FOLLOW_FLAG: &str = "error: unexpected argument '--follow' found\n\nUsage: cornercase input [OPTIONS]";
 const NO_SERVER: &str = "warning: slow\nError: no cornercase server is running\n\n";
@@ -155,18 +155,6 @@ mod answer {
         let (events, error) = answer("oops secret");
         assert_eq!((events, error.clone()), (1, Some(Error::Json("not JSON at line 1 column 1".to_owned()))));
         assert!(!error.expect("an error").to_string().contains("secret"));
-    }
-}
-
-mod stopped {
-    use super::*;
-
-    #[rstest]
-    #[case::its_last_line(exit(1, NO_SERVER), crashed(1, "Error: no cornercase server is running"))]
-    #[case::nothing_said(exit(0, ""), crashed(0, "`cornercase input --follow` ended"))]
-    #[case::only_blank_lines(exit(0, "  \n\n"), crashed(0, "`cornercase input --follow` ended"))]
-    fn says_the_last_thing_the_typist_wrote(#[case] exit: Exit, #[case] error: Error) {
-        assert_eq!(stopped(&exit), error);
     }
 }
 

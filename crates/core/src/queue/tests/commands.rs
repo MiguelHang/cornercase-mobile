@@ -2,30 +2,6 @@ use super::*;
 
 fn shareable<T: Send + Sync>(_: &T) {}
 
-fn ending_once_idle(fake: FakeTransport, log: &mpsc::UnboundedSender<String>, starts: &Starts) -> FakeTransport {
-    let (log, starts) = (log.clone(), starts.clone());
-    fake.script(&REQUESTS, move |stdin, out| {
-        let first = starts.add() == 0;
-        answer_then_end(first, log.clone(), stdin, out)
-    })
-}
-
-async fn answer_then_end(
-    first: bool,
-    log: mpsc::UnboundedSender<String>,
-    mut stdin: BoxStream<'static, Stdin>,
-    mut out: OutSink,
-) -> End {
-    if !first {
-        return answer_lines(log, stdin, out).await;
-    }
-    if let Some(Stdin::Text(line)) = stdin.next().await {
-        say(&log, &mut out, &line).await?;
-    }
-    tokio::task::yield_now().await;
-    Ok(exit(1, "Error: the server stopped"))
-}
-
 mod queue {
     use super::*;
 
@@ -78,34 +54,6 @@ mod ask {
         let Started { queue, .. } = start(fake);
         let sent = queue.ask(words(&["send", "--pane", "5", "-"]), Some(Stdin::Text("ls".to_owned()))).await;
         assert_eq!(sent, Ok(done("once read ls")));
-    }
-
-    #[rstest]
-    #[case::unreachable(Err(Error::Connect("connection refused".to_owned())), 3)]
-    #[case::an_old_cli(Ok(exit(2, NO_REQUESTS_COMMAND)), 1)]
-    #[tokio::test]
-    async fn tries_the_process_again_unless_the_cli_lacks_it(#[case] end: End, #[case] tries: usize) {
-        let starts = Starts::default();
-        let fake = FakeTransport::default().answer(&["status"], &["once"], &[], 0);
-        let Started { queue, .. } = start(refusing(fake, end, &starts));
-        for _ in 0..3 {
-            assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("once")));
-        }
-        assert_eq!(starts.count(), tries);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn starts_a_new_process_after_one_ended_while_idle() {
-        let (log, mut said) = heard();
-        let starts = Starts::default();
-        let Started { queue, mut notices, .. } = start(ending_once_idle(FakeTransport::default(), &log, &starts));
-        assert_eq!(queue.ask(words(&["status"]), None).await, Ok(done("status")));
-        settled().await;
-        assert_eq!(starts.count(), 1);
-        assert_eq!(queue.ask(words(&["focus"]), None).await, Ok(done("focus")));
-        assert_eq!(said.taken(), ["status", "focus"]);
-        assert_eq!(starts.count(), 2);
-        assert_eq!(notices.taken(), []);
     }
 
     #[tokio::test]

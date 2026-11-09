@@ -7,13 +7,14 @@ use serde_json::Value;
 use tokio::time;
 
 use super::OnError;
-use super::follow::{End, Follow, Gone};
+use super::follow::{End, Follow, Gone, stopped};
 use crate::error::Error;
-use crate::transport::{Exit, Transport, json_error};
+use crate::transport::{Transport, json_error};
 
 const FOLLOW: [&str; 4] = ["input", "--follow", "--json", "-"];
 const SETTLE: Duration = Duration::from_secs(10);
 const UNANSWERED: usize = 256;
+const ENDED: &str = "`cornercase input --follow` ended";
 
 pub(crate) type Event = (u64, Value);
 
@@ -111,11 +112,10 @@ impl Typist {
 
     fn gone(&mut self, end: &End) -> Typed {
         self.read_ready();
-        match (self.follow.gone(end), end) {
-            (Gone::Absent, _) => Typed::Absent(mem::take(&mut self.unconfirmed)),
-            (Gone::Unopened, _) => Typed::Unsent(mem::take(&mut self.unconfirmed)),
-            (Gone::Lost, Ok(exit)) => self.warn(stopped(exit)),
-            (Gone::Lost, Err(error)) => self.warn(error.clone()),
+        match self.follow.gone(end) {
+            Gone::Absent => Typed::Absent(mem::take(&mut self.unconfirmed)),
+            Gone::Unopened => Typed::Unsent(mem::take(&mut self.unconfirmed)),
+            Gone::Lost => self.warn(stopped(end, ENDED)),
         }
     }
 
@@ -140,12 +140,6 @@ fn answer(line: &str) -> (usize, Option<Error>) {
     };
     let events = answer["events"].as_u64().and_then(|events| usize::try_from(events).ok()).unwrap_or(1);
     (events, answer["error"].as_str().map(|error| Error::InputRejected(error.to_owned())))
-}
-
-fn stopped(exit: &Exit) -> Error {
-    let why = exit.stderr.lines().map(str::trim).rfind(|line| !line.is_empty());
-    let why = why.unwrap_or("`cornercase input --follow` ended");
-    Error::Failed { code: exit.code, stderr: why.to_owned() }
 }
 
 #[cfg(test)]

@@ -73,6 +73,10 @@ impl Follow {
         line
     }
 
+    pub(crate) fn answered(&self) -> bool {
+        self.answered
+    }
+
     pub(crate) fn is_over(&self) -> bool {
         self.run.is_terminated()
     }
@@ -92,6 +96,15 @@ impl Follow {
 
 pub(crate) fn absent(exit: &Exit) -> bool {
     exit.code == USAGE_EXIT && [NO_REQUESTS, NO_FOLLOW].iter().any(|refusal| exit.stderr.contains(refusal))
+}
+
+pub(crate) fn stopped(end: &End, ended: &str) -> Error {
+    let exit = match end {
+        Ok(exit) => exit,
+        Err(error) => return error.clone(),
+    };
+    let why = exit.stderr.lines().map(str::trim).rfind(|line| !line.is_empty());
+    Error::Failed { code: exit.code, stderr: why.unwrap_or(ended).to_owned() }
 }
 
 fn unopened(error: &Error) -> bool {

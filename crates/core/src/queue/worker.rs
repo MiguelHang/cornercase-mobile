@@ -31,7 +31,7 @@ pub(crate) struct Command {
 
 enum Next {
     Job(Option<Job>),
-    RequestsEnded,
+    RequestsEnded(Option<Error>),
     TypistEnded(Typed),
 }
 
@@ -86,12 +86,19 @@ impl Worker {
         loop {
             match waited(&mut self.jobs, self.requests.as_mut(), self.typist.as_mut()).await {
                 Next::Job(job) => return job,
-                Next::RequestsEnded => self.requests = None,
+                Next::RequestsEnded(stopped) => self.requests_ended(stopped),
                 Next::TypistEnded(typed) => {
                     let events = self.dropped(typed);
                     self.type_once(events).await;
                 }
             }
+        }
+    }
+
+    fn requests_ended(&mut self, stopped: Option<Error>) {
+        self.requests = None;
+        if let Some(error) = stopped {
+            (self.on_error)(error);
         }
     }
 
@@ -132,7 +139,8 @@ impl Worker {
         let requests = self.requests.get_or_insert_with(|| Requests::start(Arc::clone(&self.transport)));
         let asked = requests.ask(line).await;
         if requests.is_over() {
-            self.requests = None;
+            let stopped = requests.ended().await;
+            self.requests_ended(stopped);
         }
         self.no_requests = asked == Asked::Absent;
         asked
@@ -212,7 +220,7 @@ async fn waited(
     let typist = pin!(or_never(typist.map(Typist::ended)));
     match future::select(job, future::select(requests, typist)).await {
         Either::Left((job, _)) => Next::Job(job),
-        Either::Right((Either::Left(((), _)), _)) => Next::RequestsEnded,
+        Either::Right((Either::Left((stopped, _)), _)) => Next::RequestsEnded(stopped),
         Either::Right((Either::Right((typed, _)), _)) => Next::TypistEnded(typed),
     }
 }
