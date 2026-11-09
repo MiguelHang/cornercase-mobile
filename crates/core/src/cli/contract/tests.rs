@@ -6,6 +6,9 @@ use super::*;
 pub(crate) const REAL: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/contract/0.13.19.json"));
 
+const NO_OPERATIONS: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/contract/no-operations.json"));
+
 fn real() -> Value {
     serde_json::from_str(REAL).expect("the fixture is JSON")
 }
@@ -106,5 +109,89 @@ mod contract {
     #[case::newer("{\"contract\": 2}", Err(Error::ContractTooNew { server: 2, app: 1 }))]
     fn checks_the_contract_of_text_too(#[case] text: &str, #[case] expected: Result<u32, Error>) {
         assert_eq!(text.parse::<Descriptor>().map(|descriptor| descriptor.contract), expected);
+    }
+}
+
+mod missing {
+    use super::*;
+
+    fn real_but(edit: impl FnOnce(&mut Value)) -> Descriptor {
+        let mut value = real();
+        edit(&mut value);
+        Descriptor::from_value(value).expect("a descriptor")
+    }
+
+    fn entry<'a>(value: &'a mut Value, list: &str, name: &str) -> &'a mut Value {
+        let entries = value[list].as_array_mut().expect("a list");
+        entries.iter_mut().find(|entry| entry["name"] == name).expect("the entry")
+    }
+
+    fn unavailable(value: &mut Value, name: &str, reason: &str) {
+        *entry(value, "operations", name) = json!({ "name": name, "available": false, "reason": reason });
+    }
+
+    fn without(value: &mut Value, list: &str, name: &str) {
+        value[list].as_array_mut().expect("a list").retain(|entry| entry != name && entry["name"] != name);
+    }
+
+    fn one(name: &str, kind: Kind, reason: Option<&str>) -> Missing {
+        Missing { name: name.to_owned(), kind, reason: reason.map(str::to_owned) }
+    }
+
+    #[test]
+    fn nothing_is_missing_from_cornercase_0_13_19() {
+        assert_eq!(missing(&Descriptor::from_value(real()).expect("the real contract")), []);
+    }
+
+    #[test]
+    fn ignores_updates_a_dev_build_cannot_do() {
+        let descriptor = real_but(|value| {
+            unavailable(value, "update-check", "a development build");
+            unavailable(value, "update-install", "a development build");
+        });
+        assert_eq!(missing(&descriptor), []);
+    }
+
+    #[test]
+    fn lists_every_required_operation_in_order_when_there_are_none() {
+        let descriptor: Descriptor = NO_OPERATIONS.parse().expect("a descriptor");
+        let expected: Vec<Missing> = REQUIRED.operations.iter().map(|name| one(name, Kind::Operation, None)).collect();
+        assert_eq!(missing(&descriptor), expected);
+    }
+
+    #[test]
+    fn says_why_the_server_cannot_do_an_operation() {
+        let descriptor = real_but(|value| unavailable(value, "send", "no project is open"));
+        assert_eq!(missing(&descriptor), [one("send", Kind::Operation, Some("no project is open"))]);
+    }
+
+    #[test]
+    fn reports_a_feature_the_server_lacks() {
+        let descriptor = real_but(|value| without(value, "features", "views"));
+        assert_eq!(missing(&descriptor), [one("views", Kind::Feature, None)]);
+    }
+
+    #[rstest]
+    #[case::absent(|value: &mut Value| without(value, "streams", "surface"))]
+    #[case::another_version(|value: &mut Value| entry(value, "streams", "surface")["version"] = json!(2))]
+    fn reports_a_stream_it_cannot_read(#[case] edit: fn(&mut Value)) {
+        assert_eq!(missing(&real_but(edit)), [one("surface", Kind::Stream, None)]);
+    }
+
+    #[test]
+    fn lists_operations_then_features_then_streams() {
+        let descriptor = real_but(|value| {
+            without(value, "streams", "events");
+            without(value, "features", "boot");
+            without(value, "operations", "files-search");
+            without(value, "operations", "status");
+        });
+        let expected = [
+            one("status", Kind::Operation, None),
+            one("files-search", Kind::Operation, None),
+            one("boot", Kind::Feature, None),
+            one("events", Kind::Stream, None),
+        ];
+        assert_eq!(missing(&descriptor), expected);
     }
 }

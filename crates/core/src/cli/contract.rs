@@ -8,6 +8,59 @@ use crate::transport::json_error;
 
 pub const CONTRACT: u32 = 1;
 
+pub const REQUIRED: Required = Required {
+    operations: &[
+        "status",
+        "watch",
+        "app",
+        "events",
+        "last-message",
+        "send",
+        "keys",
+        "paste-file",
+        "view",
+        "surface",
+        "redraw",
+        "input",
+        "scroll",
+        "view-set",
+        "start",
+        "new-workspace",
+        "issue-sources",
+        "issue-list",
+        "issue-read",
+        "changes",
+        "changes-file",
+        "changes-viewed",
+        "files-list",
+        "files-read",
+        "files-search",
+    ],
+    features: &["boot", "views", "surface-patches", "machine-start", "issues", "changes", "files"],
+    streams: &[("events", 1), ("watch", 1), ("app", 1), ("surface", 1), ("view", 1), ("changes", 1), ("files", 1)],
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Required {
+    pub operations: &'static [&'static str],
+    pub features: &'static [&'static str],
+    pub streams: &'static [(&'static str, u32)],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    Operation,
+    Feature,
+    Stream,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Missing {
+    pub name: String,
+    pub kind: Kind,
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
 pub struct Descriptor {
@@ -45,6 +98,37 @@ impl Descriptor {
             server if server > CONTRACT => Err(Error::ContractTooNew { server, app: CONTRACT }),
             _ => Ok(self),
         }
+    }
+}
+
+impl Missing {
+    fn new(name: &str, kind: Kind, reason: Option<String>) -> Self {
+        Self { name: name.to_owned(), kind, reason }
+    }
+}
+
+pub fn missing(descriptor: &Descriptor) -> Vec<Missing> {
+    let operations = REQUIRED.operations.iter().filter_map(|name| missing_operation(descriptor, name));
+    let features = REQUIRED
+        .features
+        .iter()
+        .filter(|name| !descriptor.features.iter().any(|feature| feature == *name))
+        .map(|name| Missing::new(name, Kind::Feature, None));
+    let streams = REQUIRED
+        .streams
+        .iter()
+        .filter(|(name, version)| {
+            !descriptor.streams.iter().any(|stream| stream.name == *name && stream.version == *version)
+        })
+        .map(|(name, _)| Missing::new(name, Kind::Stream, None));
+    operations.chain(features).chain(streams).collect()
+}
+
+fn missing_operation(descriptor: &Descriptor, name: &str) -> Option<Missing> {
+    match descriptor.operations.iter().find(|operation| operation.name == name) {
+        Some(Operation { available: true, .. }) => None,
+        Some(operation) => Some(Missing::new(name, Kind::Operation, operation.reason.clone())),
+        None => Some(Missing::new(name, Kind::Operation, None)),
     }
 }
 
