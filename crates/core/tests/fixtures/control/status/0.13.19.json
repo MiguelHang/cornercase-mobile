@@ -1,0 +1,292 @@
+{
+  "boot": "62924-1794204195277384000",
+  "caller": null,
+  "config": {
+    "revision": 1
+  },
+  "groups": [
+    {
+      "collapsed": false,
+      "colour": 12,
+      "icon": "●",
+      "id": 5,
+      "name": "work"
+    }
+  ],
+  "home": "/home/me",
+  "projects": [
+    {
+      "active": true,
+      "collapsed": false,
+      "custom_name": null,
+      "group": null,
+      "id": 4,
+      "name": "notes",
+      "path": "/home/me/src/notes",
+      "workspaces": [
+        {
+          "active": true,
+          "behind": 0,
+          "branch": null,
+          "collapsed": false,
+          "custom_name": null,
+          "id": 3,
+          "name": "default",
+          "path": "/home/me/src/notes",
+          "pull_request": null,
+          "run_dir": null,
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": null,
+              "id": 2,
+              "layout": {
+                "leaf": 1
+              },
+              "name": "bash",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 1,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/src/notes",
+                  "pid": 62925,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": null
+            }
+          ],
+          "worktree": false
+        }
+      ]
+    },
+    {
+      "active": false,
+      "collapsed": false,
+      "custom_name": null,
+      "group": 5,
+      "id": 9,
+      "name": "web-shop",
+      "path": "/home/me/src/web-shop",
+      "workspaces": [
+        {
+          "active": true,
+          "behind": 0,
+          "branch": "main",
+          "collapsed": false,
+          "custom_name": null,
+          "id": 8,
+          "name": "main",
+          "path": "/home/me/src/web-shop",
+          "pull_request": null,
+          "run_dir": null,
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": null,
+              "id": 7,
+              "layout": {
+                "leaf": 6
+              },
+              "name": "bash",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 6,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/src/web-shop",
+                  "pid": 62930,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": null
+            }
+          ],
+          "worktree": false
+        },
+        {
+          "active": false,
+          "behind": 0,
+          "branch": "feat/dark-mode",
+          "collapsed": false,
+          "custom_name": null,
+          "id": 10,
+          "name": "feat/dark-mode",
+          "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+          "pull_request": null,
+          "run_dir": null,
+          "setup": null,
+          "tabs": [
+            {
+              "active": true,
+              "custom_name": null,
+              "id": 12,
+              "layout": {
+                "leaf": 11
+              },
+              "name": "bash",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 11,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+                  "pid": 62939,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": null
+            },
+            {
+              "active": false,
+              "custom_name": "agents",
+              "id": 14,
+              "layout": {
+                "split": {
+                  "dir": "right",
+                  "first": {
+                    "leaf": 13
+                  },
+                  "ratio": 0.5,
+                  "second": {
+                    "leaf": 15
+                  }
+                }
+              },
+              "name": "agents",
+              "panes": [
+                {
+                  "active": true,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 13,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+                  "pid": 62942,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                },
+                {
+                  "active": false,
+                  "agent": null,
+                  "at_prompt": true,
+                  "background_shell": false,
+                  "caller": false,
+                  "context": null,
+                  "conversation": null,
+                  "dialog": false,
+                  "draft": false,
+                  "held_from": null,
+                  "held_queued": false,
+                  "held_sends": 0,
+                  "id": 15,
+                  "model": null,
+                  "parent": null,
+                  "path": "/home/me/.cornercase/worktrees/web-shop/feat-dark-mode",
+                  "pid": 62944,
+                  "program": "bash",
+                  "resumes": false,
+                  "resuming": false,
+                  "role": null,
+                  "status": null,
+                  "subagents": 0,
+                  "survey": false,
+                  "title": null
+                }
+              ],
+              "status": null
+            }
+          ],
+          "worktree": true
+        }
+      ]
+    }
+  ],
+  "shown": {
+    "pane": 1,
+    "project": 4,
+    "tab": 2,
+    "workspace": 3
+  },
+  "theme": {
+    "from": "default",
+    "scheme": null
+  },
+  "version": "0.13.19"
+}

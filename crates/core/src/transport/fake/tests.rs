@@ -71,6 +71,20 @@ mod answer {
     }
 }
 
+mod open {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn sends_its_lines_and_stays_open() {
+        let fake = FakeTransport::default().open(&["status", "--follow"], &["one", "two"]);
+        let (out, receiver) = listen(Some);
+        let running = fake.run(words(&["status", "--follow"]), no_stdin(), out);
+        let waited = tokio::time::timeout(std::time::Duration::from_secs(3600), running).await;
+        assert!(waited.is_err());
+        assert_eq!(received(receiver), [Out::Stdout("one".to_owned()), Out::Stdout("two".to_owned())]);
+    }
+}
+
 mod script {
     use super::*;
 

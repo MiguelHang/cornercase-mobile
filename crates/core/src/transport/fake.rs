@@ -28,9 +28,19 @@ impl FakeTransport {
             let lines = lines.clone();
             let stderr = stderr.clone();
             async move {
-                let mut lines = stream::iter(lines.into_iter().map(Ok));
-                out.send_all(&mut lines).await.map_err(|Closed| Error::OutputClosed)?;
+                emit(&mut out, lines).await?;
                 Ok(Exit { code, stderr })
+            }
+        })
+    }
+
+    pub(crate) fn open(self, argv: &[&str], stdout: &[&str]) -> Self {
+        let lines: Vec<Out> = owned(stdout).into_iter().map(Out::Stdout).collect();
+        self.script(argv, move |_, mut out| {
+            let lines = lines.clone();
+            async move {
+                emit(&mut out, lines).await?;
+                future::pending().await
             }
         })
     }
@@ -61,6 +71,11 @@ impl Transport for FakeTransport {
             None => future::ready(Err(unscripted(&argv))).boxed(),
         }
     }
+}
+
+async fn emit(out: &mut OutSink, lines: Vec<Out>) -> Result<(), Error> {
+    let mut lines = stream::iter(lines.into_iter().map(Ok));
+    out.send_all(&mut lines).await.map_err(|Closed| Error::OutputClosed)
 }
 
 fn unscripted(argv: &[String]) -> Error {

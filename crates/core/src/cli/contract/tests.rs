@@ -163,10 +163,12 @@ mod missing {
         assert_eq!(missing(&descriptor), [one("send", Kind::Operation, Some("no project is open"))]);
     }
 
-    #[test]
-    fn reports_a_feature_the_server_lacks() {
-        let descriptor = real_but(|value| without(value, "features", "views"));
-        assert_eq!(missing(&descriptor), [one("views", Kind::Feature, None)]);
+    #[rstest]
+    #[case::views("views")]
+    #[case::notices("notices")]
+    fn reports_a_feature_the_server_lacks(#[case] name: &str) {
+        let descriptor = real_but(|value| without(value, "features", name));
+        assert_eq!(missing(&descriptor), [one(name, Kind::Feature, None)]);
     }
 
     #[rstest]

@@ -18,6 +18,8 @@ pub enum Error {
     Failed { code: i32, stderr: String },
     #[error("the cornercase server restarted since the command was prepared: {0}")]
     StaleBoot(String),
+    #[error("cornercase ended a stream the app was following")]
+    StreamEnded,
     #[error("cornercase on the Mac is too old for this app; update cornercase on the Mac and restart its server")]
     Outdated,
     #[error("cornercase speaks contract {server} but this app knows up to {app}; update the app")]
