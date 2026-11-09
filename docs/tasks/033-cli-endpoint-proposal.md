@@ -1,9 +1,16 @@
 # 033 — Propuesta de `/cli` para cornercase-terminal
 
 - Estado: pendiente
-- Depende de: 003–006 (puede empezar en cuanto el puente esté hecho); se cierra con lo aprendido en 029
+- Depende de: 029 (se hace al final del roadmap, con todo lo aprendido; decidido el 2026-11-09)
 - Riesgo: bajo
 - Rama: `docs/033-cli-proposal` · PR: `docs: propose the bridge's format as /cli for cornercase`
+
+## Decisión (2026-11-09)
+No se guarda en el repo ni lleva PR. El resultado son borradores de issues para cornercase-terminal, agrupadas en
+una épica (issue padre con sub-issues nativas de GitHub), cada una autocontenida para que un agente la coja y la lance en
+su worktree. Entran la propuesta de `/cli` y los huecos de `design/upstream-gaps.md`. No se crea nada sin el OK del
+usuario. Los requisitos del primer análisis están aparcados en `.harness/parked/t033/` (sin versionar). Los criterios de
+abajo describen el contenido; donde dicen fichero o enlaces en `design/`, vale el borrador de la issue.
 
 ## Objetivo
 Documentar el formato del puente como propuesta para que cornercase-terminal sirva `/cli` en `src/web/`, y la app deje

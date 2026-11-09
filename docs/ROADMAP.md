@@ -70,13 +70,13 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 ## Hito 5 — Upstream
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
-| 033 | [Propuesta de `/cli` para cornercase-terminal](tasks/033-cli-endpoint-proposal.md) | 003–006 (se puede adelantar), 029 | ~250 (docs) |
+| 033 | [Propuesta de `/cli` para cornercase-terminal](tasks/033-cli-endpoint-proposal.md) | 029 (al final; issues en una épica de upstream, sin PR) | — |
 
 ## Camino crítico
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
-· `028` (tras 013) · `030 → 031, 032` (tras 029) · `033` (tras 006; se cierra tras 029).
+· `028` (tras 013) · `030 → 031, 032` (tras 029) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
 - 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
