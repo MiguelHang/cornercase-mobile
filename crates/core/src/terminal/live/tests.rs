@@ -2,15 +2,18 @@ use std::future;
 use std::time::Duration;
 
 use futures_util::SinkExt;
+use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use rstest::rstest;
 use serde_json::Value;
+use tokio::sync::mpsc;
 use tokio::time;
 
 use super::*;
 use crate::cli::surface::fixtures::{FRAME, PATCH};
+use crate::follow::{End, Ended};
 use crate::transport::fake::FakeTransport;
-use crate::transport::{Out, OutSink, Stdin};
+use crate::transport::{Exit, Out, OutSink, Stdin};
 
 const ARGV: [&str; 8] = ["surface", "--tab", "12", "--cols", "80", "--rows", "24", "--patches"];
 const SIZE: Size = Size { cols: 80, rows: 24 };

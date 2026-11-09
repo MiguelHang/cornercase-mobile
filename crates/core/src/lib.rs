@@ -1,6 +1,7 @@
 pub mod board;
 pub mod cli;
 pub mod error;
+pub mod follow;
 pub mod identity;
 pub mod machines;
 pub mod network;
