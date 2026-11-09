@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use super::*;
-use crate::cli::status::fixtures::{VIEW, WATCH};
+use crate::cli::status::fixtures::{STATUS, VIEW, WATCH};
 
 fn parsed(text: &str) -> Snapshot {
     serde_json::from_str(text).expect("a status line")
@@ -117,5 +117,61 @@ mod reading {
     #[test]
     fn leaves_what_is_missing_empty() {
         assert_eq!(parsed("{}"), Snapshot::default());
+    }
+}
+
+mod the_real_server {
+    use super::*;
+
+    #[test]
+    fn reads_its_version_and_groups() {
+        let snapshot = parsed(STATUS);
+        let group = Group { id: 5, name: "work".to_owned(), icon: "●".to_owned(), colour: 12, collapsed: false };
+        assert_eq!(snapshot.version, "0.13.19");
+        assert_eq!(snapshot.boot, "62924-1794204195277384000");
+        assert_eq!(snapshot.groups, vec![group]);
+    }
+
+    #[test]
+    fn has_no_revision_outside_a_stream() {
+        assert_eq!(parsed(STATUS).revision, 0);
+    }
+
+    #[test]
+    fn reads_its_projects_and_their_groups() {
+        let snapshot = parsed(STATUS);
+        let projects: Vec<_> =
+            snapshot.projects.iter().map(|project| (project.id, project.name.as_str(), project.group)).collect();
+        assert_eq!(projects, vec![(4, "notes", None), (9, "web-shop", Some(5))]);
+        assert_eq!(snapshot.projects[1].path.as_deref(), Some("/home/me/src/web-shop"));
+    }
+
+    #[test]
+    fn reads_the_worktree_and_its_split_tab() {
+        let snapshot = parsed(STATUS);
+        let worktree = &snapshot.projects[1].workspaces[1];
+        assert_eq!((worktree.id, worktree.branch.as_deref(), worktree.worktree), (10, Some("feat/dark-mode"), true));
+        let tab = &worktree.tabs[1];
+        assert_eq!(
+            (tab.id, tab.custom_name.as_deref(), tab.active, tab.status.as_deref()),
+            (14, Some("agents"), false, None)
+        );
+        let panes: Vec<_> = tab.panes.iter().map(|pane| (pane.id, pane.active, pane.at_prompt, pane.parent)).collect();
+        assert_eq!(panes, vec![(13, true, Some(true), None), (15, false, Some(true), None)]);
+    }
+
+    #[test]
+    fn reads_every_pane_as_a_shell() {
+        let snapshot = parsed(STATUS);
+        let panes: Vec<_> = snapshot
+            .projects
+            .iter()
+            .flat_map(|project| &project.workspaces)
+            .flat_map(|workspace| &workspace.tabs)
+            .flat_map(|tab| &tab.panes)
+            .map(|pane| (pane.id, pane.program.as_deref(), pane.agent.as_deref()))
+            .collect();
+        let shell = |id| (id, Some("bash"), None);
+        assert_eq!(panes, vec![shell(1), shell(6), shell(11), shell(13), shell(15)]);
     }
 }
