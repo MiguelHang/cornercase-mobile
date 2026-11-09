@@ -153,8 +153,9 @@ describe('Field', () => {
 })
 
 describe('TextArea', () => {
-  type Props = { label: string; value?: string; disabled?: boolean; placeholder?: string }
+  type Props = { label: string; value?: string; error?: string | null; disabled?: boolean; placeholder?: string }
   const area = (props: Props) => render(TextArea, { props }).body
+  const textarea = (body: string) => body.match(/<textarea [^>]*>/)?.[0] ?? ''
 
   it('shows its value, one line high, named for readers', () => {
     expect(area({ label: 'Message', value: 'two\nlines' })).toMatch(
@@ -170,7 +171,26 @@ describe('TextArea', () => {
 
   it('binds its value', () => {
     expect(textAreaSource).toContain('value = $bindable(\'\')')
-    expect(textAreaSource).toContain('bind:value></textarea>')
+    expect(flat(textAreaSource)).toContain('bind:value ></textarea>')
+  })
+
+  it('shows its label above it and keeps an empty slot for the error in a form', () => {
+    const body = area({ label: 'Prompt', value: 'fix it', error: null })
+    const id = body.match(/<label class="label svelte-[\w-]+" for="([\w-]+)">Prompt<\/label>/)?.[1]
+    expect(textarea(body)).toContain(`id="${id}"`)
+    expect(textarea(body)).not.toMatch(/aria-label|aria-invalid|aria-describedby/)
+    expect(body).toMatch(/data-value="fix it"><textarea [^>]*>fix it<\/textarea>/)
+    expect(body).toMatch(/<\/div><!----> <p class="error svelte-[\w-]+" id="[\w-]+"><\/p><\/div>/)
+  })
+
+  it('points the textarea at the error it shows', () => {
+    const body = area({ label: 'Prompt', error: 'Write what the agent should do' })
+    const id = body.match(/<p class="error svelte-[\w-]+" id="([\w-]+)">Write what the agent should do<\/p>/)?.[1]
+    expect(textarea(body)).toContain(`aria-invalid="true" aria-describedby="${id}"`)
+  })
+
+  it('shows no label and no error outside a form', () => {
+    expect(area({ label: 'Answer' })).not.toMatch(/<label|<p class="error/)
   })
 
   it('leaves Return to the textarea, which adds a line, and sends nothing on a key', () => {
@@ -186,6 +206,8 @@ describe('TextArea', () => {
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
     '.area:focus { border-color: var(--accent);',
+    '.label { color: var(--soft); font-size: 13px;',
+    '.error { min-height: 16px; margin: 0; color: var(--failed);',
   ])('holds %s', (text) => {
     expect(flat(textAreaSource)).toContain(text)
   })

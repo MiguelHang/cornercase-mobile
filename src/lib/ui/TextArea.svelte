@@ -4,18 +4,56 @@
   let {
     label,
     value = $bindable(''),
+    error,
     ...rest
   }: {
     label: string
     value?: string
+    error?: string | null
   } & Omit<HTMLTextareaAttributes, 'value'> = $props()
+
+  const id = $props.id()
+  const field = $derived(error !== undefined)
 </script>
 
-<div class="grow" data-value={value}>
-  <textarea class="area" rows="1" aria-label={label} {...rest} bind:value></textarea>
-</div>
+{#snippet area()}
+  <div class="grow" data-value={value}>
+    <textarea
+      id={field ? `${id}-input` : undefined}
+      class="area"
+      rows="1"
+      aria-label={field ? undefined : label}
+      {...rest}
+      aria-invalid={error ? 'true' : undefined}
+      aria-describedby={error ? `${id}-error` : undefined}
+      bind:value
+    ></textarea>
+  </div>
+{/snippet}
+
+{#if field}
+  <div class="field">
+    <label class="label" for="{id}-input">{label}</label>
+    {@render area()}
+    <p class="error" id="{id}-error">{error ?? ''}</p>
+  </div>
+{:else}
+  {@render area()}
+{/if}
 
 <style>
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .label {
+    color: var(--soft);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
   .grow {
     display: grid;
     min-width: 0;
@@ -64,5 +102,13 @@
 
   .area::placeholder {
     color: var(--faint);
+  }
+
+  .error {
+    min-height: 16px;
+    margin: 0;
+    color: var(--failed);
+    font-size: 13px;
+    line-height: 16px;
   }
 </style>
