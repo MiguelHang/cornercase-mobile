@@ -22,6 +22,7 @@ specta = { workspace = true }
 tauri = { version = "2.12", features = ["specta"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 tauri-plugin-network = { path = "plugins/network" }
+tauri-plugin-photos = { path = "plugins/photos" }
 tokio = { version = "1.54.1", features = ["macros", "sync", "time"] }
 
 [target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]

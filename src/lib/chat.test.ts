@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AttachImage } from './attach.svelte'
 import type { AgentRow_Serialize as AgentRow, CommandError, LastMessage_Serialize as LastMessage } from './bindings'
 import {
   Chat,
@@ -55,6 +56,10 @@ const sentOk: SendText = () => Promise.resolve(ok(null))
 
 const pressedOk: PressKey = () => Promise.resolve(ok(null))
 
+const PASTED_PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
+
+const attachedOk: AttachImage = (pane) => Promise.resolve(ok({ pane, path: PASTED_PATH, bytes: 48213 }))
+
 const still = (): HapticsApi => ({ impactFeedback: vi.fn(() => Promise.resolve(ok(null))) })
 
 const fakeClock = () => {
@@ -74,15 +79,23 @@ const fakeClock = () => {
   return { clock, tick }
 }
 
-type Calls = { readLast?: ReadLast; sendText?: SendText; pressKey?: PressKey; haptics?: HapticsApi; clock?: Clock }
+type Calls = {
+  readLast?: ReadLast
+  sendText?: SendText
+  pressKey?: PressKey
+  attachImage?: AttachImage
+  haptics?: HapticsApi
+  clock?: Clock
+}
 
 const fresh = ({
   readLast = noRead,
   sendText = sentOk,
   pressKey = pressedOk,
+  attachImage = attachedOk,
   haptics = still(),
   clock = fakeClock().clock,
-}: Calls = {}) => new Chat(MACHINE, PANE, readLast, sendText, pressKey, haptics, clock)
+}: Calls = {}) => new Chat(MACHINE, PANE, readLast, sendText, pressKey, attachImage, haptics, clock)
 
 const seen = (calls: Calls = {}, status: string | null = 'done') => {
   const chat = fresh(calls)
@@ -131,7 +144,7 @@ describe('deliver', () => {
     ['the reason of a refusal', () => Promise.resolve(refused('the agent is asking a question')), 'the agent is asking a question'],
     ['the message of a rejected call', () => Promise.reject(new Error('no window')), 'no window'],
   ])('gives %s', async (_, sendText, failed) => {
-    expect(await deliver(() => sendText(PANE, 'hi'))).toBe(failed)
+    expect(await deliver(() => sendText(PANE, 'hi', false))).toBe(failed)
   })
 })
 
@@ -183,7 +196,7 @@ describe('Chat, its field', () => {
     const chat = ready(sendText)
     chat.draft = '- not a flag\n'
     await chat.send()
-    expect(sendText.mock.calls).toEqual([[PANE, '- not a flag\n']])
+    expect(sendText.mock.calls).toEqual([[PANE, '- not a flag\n', false]])
     expect([chat.draft, chat.sending]).toEqual(['', false])
   })
 
@@ -220,8 +233,8 @@ describe('Chat, its field', () => {
     await chat.send()
     expect(await chat.send()).toBeNull()
     expect(sendText.mock.calls).toEqual([
-      [PANE, 'go on'],
-      [PANE, 'go on'],
+      [PANE, 'go on', false],
+      [PANE, 'go on', false],
     ])
     expect(chat.draft).toBe('')
   })
@@ -236,6 +249,122 @@ describe('Chat, its field', () => {
     expect(await chat.send()).toBeNull()
     expect(sendText).not.toHaveBeenCalled()
     expect(chat.draft).toBe(draft)
+  })
+})
+
+const attached = async (sendText: SendText = sentOk, status: string | null = 'done') => {
+  const chat = ready(sendText, status)
+  await chat.attach()
+  return chat
+}
+
+describe('Chat, its attachments', () => {
+  it('attaches an image to its pane and shows its chip', async () => {
+    const attachImage = vi.fn(attachedOk)
+    const chat = seen({ attachImage })
+    expect(await chat.attach()).toBeNull()
+    expect(attachImage.mock.calls).toEqual([[PANE]])
+    expect(chat.attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KiB' }])
+  })
+
+  it('gives the reason the image was not attached', async () => {
+    const chat = seen({ attachImage: () => Promise.resolve(refused('no machine is connected', 'not_connected')) })
+    expect(await chat.attach()).toBe('no machine is connected')
+    expect(chat.attachments.chips).toEqual([])
+  })
+
+  it.each<[string, (chat: Chat) => void]>([
+    ['before its row is seen', () => {}],
+    ['once gone', (chat) => chat.see(MACHINE, [row(3, 'working')])],
+  ])('attaches nothing %s', async (_, leave) => {
+    const attachImage = vi.fn(attachedOk)
+    const chat = fresh({ attachImage })
+    leave(chat)
+    expect(await chat.attach()).toBeNull()
+    expect(attachImage).not.toHaveBeenCalled()
+  })
+
+  it('forces the text past the pasted image, and drops the chip once sent', async () => {
+    const sendText = vi.fn(sentOk)
+    const chat = await attached(sendText)
+    chat.draft = 'what is wrong here?'
+    expect(await chat.send()).toBeNull()
+    expect(sendText.mock.calls).toEqual([[PANE, 'what is wrong here?', true]])
+    expect([chat.draft, chat.attachments.chips]).toEqual(['', []])
+  })
+
+  it('can send the image alone with an empty field', async () => {
+    const sendText = vi.fn(sentOk)
+    const chat = await attached(sendText)
+    expect(chat.canSend).toBe(true)
+    await chat.send()
+    expect(sendText.mock.calls).toEqual([[PANE, '', true]])
+  })
+
+  it('keeps the chip when the send fails', async () => {
+    const chat = await attached(() => Promise.resolve(refused('nothing was sent', 'not_sent')))
+    expect(await chat.send()).toBe('nothing was sent')
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it('keeps a chip attached while the send was on its way', async () => {
+    const answer = gate<{ status: 'ok'; data: null }>()
+    const chat = await attached(() => answer.promise)
+    const sent = chat.send()
+    await chat.attach()
+    answer.open(ok(null))
+    await sent
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it('cannot send an image to an agent asking on its screen', async () => {
+    expect((await attached(sentOk, 'waiting')).canSend).toBe(false)
+  })
+
+  it('drops its chips once gone', async () => {
+    const chat = await attached()
+    chat.see(MACHINE, null)
+    expect(chat.attachments.chips).toEqual([])
+  })
+})
+
+const pastedThenPressing = async (pressKey: PressKey, sendText: SendText = sentOk) => {
+  const chat = seen({ pressKey, sendText })
+  await chat.attach()
+  return chat
+}
+
+describe('Chat, its attachments under the keys', () => {
+  it('drops the chips once Enter submits them, and sends plain again', async () => {
+    const sendText = vi.fn(sentOk)
+    const chat = await pastedThenPressing(pressedOk, sendText)
+    expect(await chat.press('enter')).toBeNull()
+    expect(chat.attachments.chips).toEqual([])
+    chat.draft = 'and now?'
+    await chat.send()
+    expect(sendText.mock.calls).toEqual([[PANE, 'and now?', false]])
+  })
+
+  it('keeps the chips when Enter fails', async () => {
+    const chat = await pastedThenPressing(() => Promise.resolve(refused('nothing was sent', 'not_sent')))
+    expect(await chat.press('enter')).toBe('nothing was sent')
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it.each<KeyName>(['esc', 'down', 'tab', '1'])('keeps the chips after %s', async (key) => {
+    const chat = await pastedThenPressing(pressedOk)
+    expect(await chat.press(key)).toBeNull()
+    expect(chat.attachments.chips.length).toBe(1)
+  })
+
+  it('keeps an image attached while Enter was on its way', async () => {
+    const pressed = gate<{ status: 'ok'; data: null }>()
+    const chat = await pastedThenPressing(() => pressed.promise)
+    const entered = chat.press('enter')
+    await chat.attach()
+    pressed.open(ok(null))
+    expect(await entered).toBeNull()
+    expect(chat.attachments.chips.length).toBe(1)
   })
 })
 
