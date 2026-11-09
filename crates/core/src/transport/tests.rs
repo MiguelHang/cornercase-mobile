@@ -113,6 +113,23 @@ mod output {
     }
 }
 
+mod fed {
+    use super::*;
+    use crate::transport::fake::FakeTransport;
+
+    #[tokio::test]
+    async fn hands_its_input_to_the_command_and_then_ends_it() {
+        let fake = FakeTransport::default().script(&["todo", "add", "-"], async |stdin, mut out| {
+            let inputs: Vec<Stdin> = stdin.collect().await;
+            out.send(Out::Stdout(format!("{inputs:?}"))).await.map_err(|Closed| Error::OutputClosed)?;
+            Ok(Exit { code: 0, stderr: String::new() })
+        });
+        let stdin = stream::iter([Stdin::Text("milk".to_owned())]).boxed();
+        let output = fed(&fake, words(&["todo", "add", "-"]), stdin).await.expect("an answer");
+        assert_eq!(output.stdout, r#"[Text("milk")]"#);
+    }
+}
+
 mod listen {
     use super::*;
 

@@ -53,23 +53,34 @@ pub trait Transport: Send + Sync {
     ) -> BoxFuture<'_, Result<Exit, Error>>;
 }
 
-const STALE_BOOT: i32 = 4;
+pub(crate) const STALE_BOOT: i32 = 4;
 
 pub async fn output(transport: &dyn Transport, argv: Vec<String>) -> Result<Output, Error> {
+    fed(transport, argv, stream::empty().boxed()).await
+}
+
+pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
+    let stdout = printed(output(transport, argv).await?)?;
+    serde_json::from_str(&stdout).map_err(|error| json_error(&error))
+}
+
+pub(crate) async fn fed(
+    transport: &dyn Transport,
+    argv: Vec<String>,
+    stdin: BoxStream<'static, Stdin>,
+) -> Result<Output, Error> {
     let (out, mut receiver) = listen(only_stdout);
-    let exit = transport.run(argv, stream::empty().boxed(), out).await?;
+    let exit = transport.run(argv, stdin, out).await?;
     let stdout: Vec<String> = iter::from_fn(|| receiver.try_recv().ok()).collect();
     Ok(Output { stdout: stdout.join("\n"), stderr: exit.stderr, code: exit.code })
 }
 
-pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
-    let output = output(transport, argv).await?;
+pub(crate) fn printed(output: Output) -> Result<String, Error> {
     match output.code {
-        0 => {}
-        STALE_BOOT => return Err(Error::StaleBoot(output.stderr)),
-        code => return Err(Error::Failed { code, stderr: output.stderr }),
+        0 => Ok(output.stdout),
+        STALE_BOOT => Err(Error::StaleBoot(output.stderr)),
+        code => Err(Error::Failed { code, stderr: output.stderr }),
     }
-    serde_json::from_str(&output.stdout).map_err(|error| json_error(&error))
 }
 
 pub(crate) fn listen<T: Send + 'static>(keep: fn(Out) -> Option<T>) -> (OutSink, mpsc::UnboundedReceiver<T>) {
@@ -83,7 +94,7 @@ pub(crate) fn listen<T: Send + 'static>(keep: fn(Out) -> Option<T>) -> (OutSink,
     (Box::pin(sink), receiver)
 }
 
-fn only_stdout(out: Out) -> Option<String> {
+pub(crate) fn only_stdout(out: Out) -> Option<String> {
     match out {
         Out::Stdout(line) => Some(line),
         Out::Stderr(_) => None,

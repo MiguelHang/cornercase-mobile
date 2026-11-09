@@ -32,6 +32,15 @@ mod display {
         Error::ContractTooNew { server: 2, app: 1 },
         "cornercase speaks contract 2 but this app knows up to 1; update the app"
     )]
+    #[case::unanswered(Error::Unanswered, "the command may have run but its answer was lost")]
+    #[case::settle_timeout(
+        Error::SettleTimeout,
+        "the terminal input got no answer in time, so the next command did not wait for it"
+    )]
+    #[case::input_rejected(
+        Error::InputRejected("no pane 14".to_owned()),
+        "cornercase input: no pane 14"
+    )]
     #[case::json(
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"
