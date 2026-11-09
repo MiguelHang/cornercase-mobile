@@ -6,8 +6,9 @@ use rstest::rstest;
 
 use super::resume::{contracts, once};
 use super::retry::{answered, exit, held};
-use super::streams::{Lines, connected, connections, contract_of, fine, line, served, serving, snapshot};
+use super::streams::{BOOT, Lines, connected, connections, contract_of, fine, line, served, serving, snapshot};
 use super::*;
+use crate::board::Since;
 use crate::cli::status::fixtures::{APP as APP_SNAPSHOT, WATCH};
 use crate::queue::Outcome;
 use crate::store::streams::{APP, EVENTS, STATUS};
@@ -118,10 +119,19 @@ mod a_restart {
         let changes = unread(&mut changes);
         assert_eq!(connections(&changes), expected);
         assert!(changes.contains(&Change::Session) && changes.contains(&Change::App));
-        assert_eq!((store.session(), store.app()), (None, None));
+        assert_eq!((store.session(), store.agents(), store.app()), (None, None, None));
         let replies = (hung.now_or_never(), queued.now_or_never());
         assert_eq!(replies, (Some(Err(Error::Unanswered)), Some(Ok(Outcome::Skipped))));
         assert_eq!(contracts(&asked), 2);
+    }
+
+    #[test]
+    fn forgets_since_when_each_pane_was_in_its_status() {
+        let shared = Shared::default();
+        shared.restarted(Boot(BOOT.to_owned()));
+        shared.state().since.heard(4, Some("waiting"), "2026-10-16T09:30:00.123Z");
+        assert!(shared.restarted(Boot(RESTARTED.to_owned())));
+        assert_eq!(shared.state().since, Since::default());
     }
 
     #[tokio::test(start_paused = true)]

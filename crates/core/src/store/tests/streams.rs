@@ -1,3 +1,6 @@
+use std::future;
+
+use futures_util::SinkExt;
 use rstest::rstest;
 use serde_json::{Value, json};
 
@@ -7,6 +10,7 @@ use crate::cli::events::Event;
 use crate::cli::events::fixtures as events;
 use crate::cli::status::fixtures as snapshots;
 use crate::store::streams::{APP, EVENTS, STATUS};
+use crate::transport::Out;
 
 const SECRET: &str = "c2VjcmV0";
 pub(super) const BOOT: &str = "4242-1760600000";
@@ -70,6 +74,41 @@ pub(super) fn connected() -> Vec<Connection> {
 
 pub(super) fn snapshot(boot: &str, revision: u64, version: &str) -> String {
     json!({"boot": boot, "revision": revision, "version": version}).to_string()
+}
+
+pub(super) fn status_event(to: &str) -> String {
+    let mut event: Value = serde_json::from_str(events::STATUS).expect("the status event fixture");
+    event["to"] = to.into();
+    event.to_string()
+}
+
+pub(super) fn watched(revision: u64, status: &str) -> String {
+    let mut watch: Value = serde_json::from_str(snapshots::WATCH).expect("the watch fixture");
+    watch["revision"] = revision.into();
+    watch["projects"][0]["workspaces"][0]["tabs"][0]["panes"][0]["status"] = status.into();
+    watch.to_string()
+}
+
+fn later(fake: FakeTransport, argv: &[&str], lines: Vec<String>) -> FakeTransport {
+    fake.script(argv, move |_, mut out| {
+        let lines = lines.clone();
+        async move {
+            time::sleep(Duration::from_secs(5)).await;
+            for line in lines {
+                out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?;
+            }
+            future::pending().await
+        }
+    })
+}
+
+async fn agents_once(lines: Lines, late: usize) -> Vec<(u64, Option<String>, Option<String>)> {
+    let argv = [EVENTS, STATUS, APP][late];
+    let fake = later(serving(lines.clone()), argv, lines[late].clone());
+    let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, fake)], &Asked::default());
+    settled(&store, driver).await;
+    let agents = store.agents().expect("the agents once there is a session");
+    agents.into_iter().map(|row| (row.pane, row.status, row.since)).collect()
 }
 
 fn assert_fine(store: &Store, changes: &[Change]) {
@@ -151,5 +190,54 @@ mod a_line_that_does_not_parse {
         let (store, changes) = started(lines).await;
         assert!(matches!(&warnings(&changes)[..], [Error::Json(reason)] if !reason.contains(SECRET)));
         assert_fine(&store, &changes);
+    }
+}
+
+mod the_agents {
+    use super::*;
+
+    const TIME: &str = "2026-10-16T09:30:00.123Z";
+
+    fn agent(pane: u64, status: &str, since: Option<&str>) -> (u64, Option<String>, Option<String>) {
+        (pane, Some(status.to_owned()), since.map(str::to_owned))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_none_before_the_first_snapshot() {
+        let [events, _, app] = fine();
+        let (store, _) = started([events, Vec::new(), app]).await;
+        assert_eq!(store.agents(), None);
+    }
+
+    #[rstest]
+    #[case::before_the_snapshot(1)]
+    #[case::after_the_snapshot(0)]
+    #[tokio::test(start_paused = true)]
+    async fn take_the_time_of_a_status_event_heard(#[case] late: usize) {
+        let lines = [vec![status_event("working")], vec![line(snapshots::WATCH)], vec![line(snapshots::APP)]];
+        assert_eq!(agents_once(lines, late).await, [agent(5, "working", None), agent(4, "working", Some(TIME))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keep_the_time_of_a_status_event_through_a_late_snapshot_of_the_status_before() {
+        let snapshots = vec![watched(7, "working"), watched(8, "waiting")];
+        let lines = [vec![status_event("waiting")], snapshots, vec![line(snapshots::APP)]];
+        assert_eq!(agents_once(lines, 1).await, [agent(4, "waiting", Some(TIME)), agent(5, "working", None)]);
+    }
+
+    #[rstest]
+    #[case::before_the_snapshot(1)]
+    #[case::after_the_snapshot(0)]
+    #[tokio::test(start_paused = true)]
+    async fn have_no_time_once_some_events_were_dropped(#[case] late: usize) {
+        let events = vec![status_event("waiting"), line(events::DROPPED)];
+        let lines = [events, vec![watched(7, "waiting")], vec![line(snapshots::APP)]];
+        assert_eq!(agents_once(lines, late).await, [agent(4, "waiting", None), agent(5, "working", None)]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn have_no_time_for_a_status_event_of_another_status() {
+        let lines = [vec![status_event("waiting")], vec![line(snapshots::WATCH)], vec![line(snapshots::APP)]];
+        assert_eq!(agents_once(lines, 1).await, [agent(4, "working", None), agent(5, "working", None)]);
     }
 }

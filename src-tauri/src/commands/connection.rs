@@ -1,7 +1,7 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
-use cornercase_core::cli::status::Snapshot;
+use cornercase_core::board::AgentRow;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::pick::{PickConfig, bridge_transports};
@@ -56,8 +56,8 @@ pub(crate) fn connection_state(state: State<'_, AppState>) -> ConnectionState {
 #[tauri::command]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn session(state: State<'_, AppState>) -> Option<Snapshot> {
-    latest_session(&state)
+pub(crate) fn agents(state: State<'_, AppState>) -> Option<Vec<AgentRow>> {
+    latest_agents(&state)
 }
 
 pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: MachineId) -> Result<(), CommandError> {
@@ -83,8 +83,8 @@ pub(crate) fn current(state: &AppState) -> ConnectionState {
     }
 }
 
-pub(crate) fn latest_session(state: &AppState) -> Option<Snapshot> {
-    state.active().as_ref().and_then(|active| active.store().session())
+pub(crate) fn latest_agents(state: &AppState) -> Option<Vec<AgentRow>> {
+    state.active().as_ref().and_then(|active| active.store().agents())
 }
 
 #[cfg(test)]

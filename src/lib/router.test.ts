@@ -4,6 +4,7 @@ import { Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
+const AGENT = { name: 'agent', pane: 7 } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -24,36 +25,53 @@ describe('Router', () => {
     expect(router.current).toEqual(NO_MACHINES)
   })
 
-  it('replaces the route on top and keeps the one below', () => {
-    const router = new Router(NO_MACHINES)
-    router.go(NO_MACHINES)
-    router.replace(HOME)
-    expect(router.current).toEqual(HOME)
-    router.back()
-    expect(router.current).toEqual(NO_MACHINES)
-  })
-
-  it('replaces the only route without leaving one below', () => {
-    const router = new Router(NO_MACHINES)
-    router.replace(HOME)
-    router.back()
-    expect(router.current).toEqual(HOME)
-  })
-
-  it('keeps the route on top when it is replaced by the same one', () => {
-    const top = { name: 'home' } as const
-    const router = new Router(NO_MACHINES)
-    router.go(top)
-    router.replace({ name: 'home' })
-    expect(router.current).toBe(top)
-    router.back()
-    expect(router.current).toEqual(NO_MACHINES)
-  })
-
   it('stays on the only route when going back', () => {
     const router = new Router(HOME)
     router.back()
     expect(router.current).toEqual(HOME)
+  })
+
+  it('goes to an agent from home and back', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    expect(router.current).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+})
+
+describe('Router.settle', () => {
+  it('stays on an agent while the connection settles on home', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.settle(HOME)
+    expect(router.current).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('leaves only the empty screen once the machine is gone', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.settle(NO_MACHINES)
+    expect(router.current).toEqual(NO_MACHINES)
+    router.back()
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+
+  it('leaves only home once a machine is added', () => {
+    const router = new Router(NO_MACHINES)
+    router.settle(HOME)
+    expect(router.current).toEqual(HOME)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the route it settles on when it is already there', () => {
+    const first = { name: 'home' } as const
+    const router = new Router(first)
+    router.settle({ name: 'home' })
+    expect(router.current).toBe(first)
   })
 })
 
