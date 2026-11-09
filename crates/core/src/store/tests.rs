@@ -13,6 +13,7 @@ use crate::transport::fake::FakeTransport;
 use crate::transport::{Exit, OutSink, Stdin};
 
 mod connect;
+mod retry;
 mod streams;
 
 const CONTRACT: &[&str] = &["contract", "--json"];
@@ -96,12 +97,24 @@ fn unread(changes: &mut Changes) -> Vec<Change> {
     iter::from_fn(|| changes.next().now_or_never().flatten()).collect()
 }
 
-async fn next_wait(changes: &mut Changes) -> Duration {
+async fn next_connection(changes: &mut Changes) -> Connection {
     loop {
-        if let Some(Change::Connection(Connection::Retrying { r#in, .. })) = changes.next().await {
-            return r#in;
+        if let Some(Change::Connection(connection)) = changes.next().await {
+            return connection;
         }
     }
+}
+
+async fn retrying(changes: &mut Changes) -> (Duration, Error) {
+    loop {
+        if let Connection::Retrying { r#in, error } = next_connection(changes).await {
+            return (r#in, error);
+        }
+    }
+}
+
+async fn next_wait(changes: &mut Changes) -> Duration {
+    retrying(changes).await.0
 }
 
 async fn drain(changes: &mut Changes) {

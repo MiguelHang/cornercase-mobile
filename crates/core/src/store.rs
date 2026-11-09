@@ -169,6 +169,10 @@ impl Shared {
         self.state().subscribers.retain(|subscriber| subscriber.send(change));
     }
 
+    fn connected(&self) -> bool {
+        matches!(self.state().connection, Connection::Connected { .. })
+    }
+
     fn set_connection(&self, connection: Connection) {
         self.state().connection = connection.clone();
         self.publish(&Change::Connection(connection));
@@ -211,6 +215,9 @@ where
     }
 
     async fn retry(&mut self, error: Error) {
+        if self.shared.connected() {
+            self.backoff.reset();
+        }
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
         time::sleep(wait).await;

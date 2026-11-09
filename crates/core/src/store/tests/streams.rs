@@ -10,17 +10,17 @@ use crate::store::streams::{APP, EVENTS, STATUS};
 
 const SECRET: &str = "c2VjcmV0";
 
-type Lines = [Vec<String>; 3];
+pub(super) type Lines = [Vec<String>; 3];
 
-fn line(json: &str) -> String {
+pub(super) fn line(json: &str) -> String {
     serde_json::from_str::<Value>(json).expect("a fixture is JSON").to_string()
 }
 
-fn fine() -> Lines {
+pub(super) fn fine() -> Lines {
     [vec![line(events::OPENED), line(events::EXITED)], vec![line(snapshots::WATCH)], vec![line(snapshots::APP)]]
 }
 
-fn serving(lines: Lines) -> FakeTransport {
+pub(super) fn serving(lines: Lines) -> FakeTransport {
     let fake = FakeTransport::default().answer(CONTRACT, &[REAL], &[], 0);
     [EVENTS, STATUS, APP].into_iter().zip(lines).fold(fake, |fake, (argv, lines)| {
         let lines: Vec<&str> = lines.iter().map(String::as_str).collect();

@@ -19,6 +19,10 @@ impl Backoff {
         self.failures = (self.failures + 1).min(WAITS.len() - 1);
         wait
     }
+
+    pub(crate) fn reset(&mut self) {
+        self.failures = 0;
+    }
 }
 
 #[cfg(test)]

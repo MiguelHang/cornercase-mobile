@@ -88,7 +88,7 @@ impl Shared {
             return;
         };
         self.snapshot(snapshot);
-        if !matches!(self.state().connection, Connection::Connected { .. }) {
+        if !self.connected() {
             self.set_connection(Connection::Connected { route: route.clone() });
         }
     }
