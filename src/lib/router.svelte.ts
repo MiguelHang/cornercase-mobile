@@ -15,15 +15,19 @@ type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 export const routeFor = (screen: Screen, known: number): Base =>
   screen.machine === null && known === 0 ? { name: 'no-machines' } : { name: 'home' }
 
-export const openedAgent = (route: Route, screen: Screen) => {
-  if (route.name !== 'agent' || route.machine !== screen.machine) {
-    return undefined
-  }
-  return screen.agents === null ? null : screen.agents.find((agent) => agent.pane === route.pane)
-}
-
 export const openedTerminal = (route: Route, screen: Screen) =>
   route.name === 'terminal' && route.machine === screen.machine ? route : undefined
+
+export type ChatOf = { machine: number | null; pane: number }
+
+export const chatOf = (route: Route): ChatOf | null => {
+  if (route.name === 'agent') {
+    return { machine: route.machine, pane: route.pane }
+  }
+  return route.name === 'terminal' ? { machine: route.machine, pane: route.row.pane } : null
+}
+
+const overMachines = (route: Route) => route.name === 'machines' || route.name === 'machine'
 
 export class Router {
   #stack: Route[] = $state([])
@@ -34,6 +38,11 @@ export class Router {
 
   get current(): Route {
     return this.#stack[this.#stack.length - 1]
+  }
+
+  get opened(): ChatOf | null {
+    const under = this.#stack.findLast((route) => !overMachines(route))
+    return under === undefined ? null : chatOf(under)
   }
 
   go(route: Route) {

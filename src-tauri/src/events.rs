@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use cornercase_core::board::AgentRow;
-use cornercase_core::cli::events::What;
+use cornercase_core::cli::events::{Event as CliEvent, What};
 use cornercase_core::cli::surface::{Colours, Cursor, Size};
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
@@ -27,6 +27,14 @@ pub(crate) struct AgentsChanged {
     #[specta(type = u32)]
     pub(crate) machine: u64,
     pub(crate) agents: Option<Vec<AgentRow>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct PaneStatusChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    #[specta(type = Option<u32>)]
+    pub(crate) pane: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
@@ -63,6 +71,7 @@ pub(crate) enum ToastLevel {
 pub(crate) enum Emitted {
     Connection(ConnectionChanged),
     Agents(AgentsChanged),
+    PaneStatus(PaneStatusChanged),
     Terminal(TerminalChanged),
     Toast(Toast),
 }
@@ -76,6 +85,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
         let sent = match event {
             Emitted::Connection(changed) => changed.emit(self),
             Emitted::Agents(changed) => changed.emit(self),
+            Emitted::PaneStatus(changed) => changed.emit(self),
             Emitted::Terminal(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
@@ -109,7 +119,7 @@ fn touches_agents(change: &Change) -> bool {
     match change {
         Change::Session => true,
         Change::Event(event) => matches!(event.what, What::Status { .. } | What::Dropped { .. }),
-        Change::Connection(_) | Change::App | Change::Warning(_) => false,
+        Change::Connection(_) | Change::App | Change::Reopened | Change::Warning(_) => false,
     }
 }
 
@@ -126,8 +136,21 @@ fn translated(machine: MachineId, machines: &SharedMachines, change: Change) -> 
     match change {
         Change::Connection(connection) => connection_changed(machine, machines, &connection),
         Change::Warning(error) => vec![warned(&error)],
-        Change::Session | Change::Event(_) | Change::App => Vec::new(),
+        Change::Event(event) => pane_status_changed(machine, &event).into_iter().collect(),
+        Change::Reopened => vec![Emitted::PaneStatus(PaneStatusChanged { machine: machine.0, pane: None })],
+        Change::Session | Change::App => Vec::new(),
     }
+}
+
+fn pane_status_changed(machine: MachineId, event: &CliEvent) -> Option<Emitted> {
+    let pane = match event.what {
+        What::Status { .. } => Some(event.pane?),
+        What::Dropped { .. } => None,
+        What::Opened { .. } | What::Closed { .. } | What::Exited { .. } | What::Notice { .. } | What::Other(_) => {
+            return None;
+        }
+    };
+    Some(Emitted::PaneStatus(PaneStatusChanged { machine: machine.0, pane }))
 }
 
 fn connection_changed(machine: MachineId, machines: &SharedMachines, connection: &Connection) -> Vec<Emitted> {

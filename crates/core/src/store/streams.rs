@@ -1,3 +1,4 @@
+use std::mem;
 use std::ops::ControlFlow::{self, Break, Continue};
 use std::pin::pin;
 
@@ -36,7 +37,7 @@ struct Opened<'a> {
 pub(super) async fn follow(shared: &Shared, picked: &Picked) -> Ended {
     let transport = picked.transport.as_ref();
     let route = picked.route.address();
-    shared.doubt();
+    shared.reopen();
     let streams = [
         pump(open(transport, EVENTS), going(|line| shared.event(line))).boxed(),
         pump(open(transport, STATUS), |line| shared.status(line, route)).boxed(),
@@ -115,10 +116,16 @@ impl Shared {
         }
     }
 
-    fn doubt(&self) {
-        let doubted = self.state().since.doubt();
+    fn reopen(&self) {
+        let mut state = self.state();
+        let again = mem::replace(&mut state.followed, true);
+        let doubted = state.since.doubt();
+        drop(state);
         if doubted {
             self.publish(&Change::Session);
+        }
+        if again {
+            self.publish(&Change::Reopened);
         }
     }
 

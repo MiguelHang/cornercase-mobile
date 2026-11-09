@@ -59,6 +59,7 @@ pub enum Change {
     Session,
     App,
     Event(Box<Event>),
+    Reopened,
     Warning(Error),
 }
 
@@ -153,7 +154,7 @@ impl Unread {
         match change {
             Change::Session => Some(&self.session),
             Change::App => Some(&self.app),
-            Change::Connection(_) | Change::Event(_) | Change::Warning(_) => None,
+            Change::Connection(_) | Change::Event(_) | Change::Reopened | Change::Warning(_) => None,
         }
     }
 
@@ -195,6 +196,7 @@ struct State {
     app: Option<Value>,
     queue: Option<Queue>,
     transport: Option<Arc<dyn Transport>>,
+    followed: bool,
     subscribers: Vec<Subscriber>,
     boots: BootWatch,
 }

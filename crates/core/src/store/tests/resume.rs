@@ -114,6 +114,20 @@ mod resuming {
     }
 
     #[rstest]
+    #[tokio::test(start_paused = true)]
+    async fn says_some_events_may_be_lost_only_when_it_opens_them_again(
+        #[values(Resume::Foreground, Resume::Network)] resume: Resume,
+    ) {
+        let reopened = |changes: &[Change]| changes.iter().filter(|&change| *change == Change::Reopened).count();
+        let (store, mut changes) = spawned(serving(fine()), &Asked::default());
+        time::sleep(Duration::from_secs(60)).await;
+        assert_eq!(reopened(&unread(&mut changes)), 0);
+        poke(&store, resume);
+        time::sleep(Duration::from_secs(60)).await;
+        assert_eq!(reopened(&unread(&mut changes)), 1);
+    }
+
+    #[rstest]
     #[case::missing_something(contract(&without_notices()), notices())]
     #[case::unauthorized(refusing(Error::Unauthorized), Connection::Unauthorized)]
     #[case::incompatible(

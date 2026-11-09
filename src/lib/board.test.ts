@@ -131,3 +131,20 @@ describe('label', () => {
     expect(board.label(agent(1, null, { title, agent: 'codex' }))).toBe('codex')
   })
 })
+
+describe('statusName', () => {
+  it.each<[string | null | undefined, string]>([
+    ['working', 'Working'],
+    ['shell', 'Shell'],
+    ['waiting', 'Waiting'],
+    ['failed', 'Failed'],
+    ['done', 'Done'],
+    ['pending', 'Pending'],
+    ['idle', 'Idle'],
+    ['thinking', 'Idle'],
+    [null, 'Idle'],
+    [undefined, 'Idle'],
+  ])('calls %o %s', (status, name) => {
+    expect(board.statusName(status)).toBe(name)
+  })
+})
