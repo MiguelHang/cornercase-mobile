@@ -197,3 +197,179 @@ mod a_patch_on_another_base {
         assert!(redraws.try_recv().is_err());
     }
 }
+
+mod a_terminal {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use tokio::task::JoinHandle;
+    use tokio::time::Instant;
+
+    use super::*;
+    use crate::cli::contract::fixtures::REAL;
+    use crate::cli::status::fixtures::WATCH;
+    use crate::machines::pick::PickConfig;
+    use crate::machines::route::Route;
+    use crate::machines::{Machine, MachineId};
+
+    const BOOT: &str = "4242-1760600000";
+    const RESTARTED: &str = "4243-1760600100";
+    const TAB: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
+
+    #[derive(Clone)]
+    enum Said {
+        Line(String),
+        After(u64),
+        Ends(End),
+    }
+
+    fn exits() -> Said {
+        Said::Ends(Ok(Exit { code: 0, stderr: String::new() }))
+    }
+
+    fn contract(boot: &str) -> Vec<Said> {
+        let mut contract: Value = serde_json::from_str(REAL).expect("the real contract");
+        contract["boot"] = boot.into();
+        vec![Said::Line(contract.to_string()), exits()]
+    }
+
+    fn session(boot: &str, revision: u64, tabs: bool) -> Said {
+        let mut session: Value = serde_json::from_str(WATCH).expect("the watch fixture");
+        (session["boot"], session["revision"]) = (boot.into(), revision.into());
+        if !tabs {
+            session["projects"] = Value::Array(Vec::new());
+        }
+        Said::Line(session.to_string())
+    }
+
+    fn drawn() -> Said {
+        Said::Line(one_line(FRAME))
+    }
+
+    async fn played(mut out: OutSink, said: Vec<Said>) -> End {
+        for said in said {
+            match said {
+                Said::Line(line) => out.send(Out::Stdout(line)).await.map_err(|_| Error::OutputClosed)?,
+                Said::After(seconds) => time::sleep(Duration::from_secs(seconds)).await,
+                Said::Ends(end) => return end,
+            }
+        }
+        future::pending().await
+    }
+
+    fn in_turn(fake: FakeTransport, argv: &[&str], turns: Vec<Vec<Said>>) -> FakeTransport {
+        let call = AtomicUsize::new(0);
+        fake.script(argv, move |_, out| {
+            let turn = turns.get(call.fetch_add(1, Ordering::SeqCst)).or(turns.last());
+            played(out, turn.cloned().unwrap_or_default())
+        })
+    }
+
+    struct Mac {
+        contracts: Vec<Vec<Said>>,
+        sessions: Vec<Vec<Said>>,
+        surfaces: Vec<Vec<Said>>,
+    }
+
+    impl Mac {
+        fn of(sessions: Vec<Vec<Said>>, surfaces: Vec<Vec<Said>>) -> Self {
+            Self { contracts: vec![contract(BOOT)], sessions, surfaces }
+        }
+
+        fn fake(self) -> FakeTransport {
+            let fake = FakeTransport::default().open(&["events", "--json", "--notices"], &[]);
+            let fake = in_turn(fake.open(&["status", "--app", "--follow", "--json"], &[]), &TAB, self.surfaces);
+            let fake = in_turn(fake, &["contract", "--json"], self.contracts);
+            in_turn(fake, &["status", "--follow", "--json"], self.sessions)
+        }
+    }
+
+    struct Watched {
+        screens: mpsc::UnboundedReceiver<(Duration, Screen)>,
+        launched: mpsc::UnboundedReceiver<String>,
+        running: JoinHandle<()>,
+    }
+
+    impl Watched {
+        async fn after_a_minute(mac: Mac) -> Self {
+            let (transport, launched) = launched(mac.fake());
+            let studio = Route::parse("ws://studio.local:8765/?token=c2VjcmV0").expect("a bridge url");
+            let machine =
+                Machine { id: MachineId(1), name: "studio".to_owned(), routes: vec![studio], last_route: None };
+            let (store, driver) = Store::new(machine, move |_: &Route| Ok(transport.clone()), PickConfig::default());
+            tokio::spawn(driver);
+            let (sender, screens) = mpsc::unbounded_channel();
+            let started = Instant::now();
+            let terminal = Terminal { tab: 3, pane: None, size: SIZE };
+            let running = tokio::spawn(terminal.run(store, move |screen| {
+                sender.send((started.elapsed(), screen)).expect("the test reads every screen");
+            }));
+            time::sleep(Duration::from_secs(60)).await;
+            Self { screens, launched, running }
+        }
+
+        fn seen(&mut self) -> Vec<(u64, &'static str)> {
+            let mut seen = Vec::new();
+            while let Ok((at, screen)) = self.screens.try_recv() {
+                let what = match screen {
+                    Screen::Update(update) if update.replaced => "replaced",
+                    Screen::Update(_) => "patched",
+                    Screen::Closed => "closed",
+                };
+                seen.push((at.as_secs(), what));
+            }
+            seen
+        }
+
+        fn surfaces(&mut self) -> Vec<String> {
+            let mut surfaces = Vec::new();
+            while let Ok(argv) = self.launched.try_recv() {
+                surfaces.extend(argv.starts_with("surface").then_some(argv));
+            }
+            surfaces
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn opens_the_same_surface_again_when_it_ends_with_the_tab_still_there() {
+        let surfaces = vec![vec![drawn(), Said::After(5), exits()], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(vec![vec![session(BOOT, 7, true)]], surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (6, "replaced")]);
+        assert_eq!(watched.surfaces(), [TAB.join(" "), TAB.join(" ")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn says_the_tab_closed_and_stops_when_it_is_gone_from_the_session() {
+        let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), session(BOOT, 8, false)]];
+        let surfaces = vec![vec![drawn(), Said::After(5), exits()], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(sessions, surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (6, "closed")]);
+        assert_eq!((watched.surfaces().len(), watched.running.is_finished()), (1, true));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn says_the_tab_closed_without_opening_it_when_the_session_lacks_it() {
+        let mut watched = Watched::after_a_minute(Mac::of(vec![vec![session(BOOT, 7, false)]], Vec::new())).await;
+        assert_eq!((watched.seen(), watched.surfaces()), (vec![(0, "closed")], Vec::new()));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn opens_it_again_once_connected_after_the_transport_was_lost() {
+        let sessions =
+            vec![vec![session(BOOT, 7, true), Said::After(5), exits()], vec![Said::After(20), session(BOOT, 7, true)]];
+        let surfaces = vec![vec![drawn(), Said::After(5), Said::Ends(Err(Error::Dropped))], vec![drawn()]];
+        let mut watched = Watched::after_a_minute(Mac::of(sessions, surfaces)).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn waits_out_a_restart_and_starts_over_from_the_new_boot_s_first_frame() {
+        let restart = vec![session(BOOT, 7, true), Said::After(5), session(RESTARTED, 1, true)];
+        let sessions = vec![restart, vec![Said::After(10), session(RESTARTED, 1, true)]];
+        let mut rebooted: Value = serde_json::from_str(FRAME).expect("the frame fixture");
+        rebooted["boot"] = "another-boot".into();
+        let surfaces = vec![vec![drawn(), Said::After(5), exits()], vec![Said::Line(rebooted.to_string())]];
+        let mac = Mac { contracts: vec![contract(BOOT), contract(RESTARTED)], ..Mac::of(sessions, surfaces) };
+        let mut watched = Watched::after_a_minute(mac).await;
+        assert_eq!(watched.seen(), [(0, "replaced"), (15, "replaced")]);
+    }
+}
