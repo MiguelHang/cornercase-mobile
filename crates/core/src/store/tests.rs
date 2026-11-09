@@ -250,4 +250,14 @@ mod changes {
         store.shared.publish(&Change::App);
         assert_eq!(store.shared.state().subscribers.len(), 1);
     }
+
+    #[test]
+    fn forget_a_subscriber_that_stopped_listening_with_a_change_unread() {
+        let (store, _driver) = unreachable();
+        let changes = store.changes();
+        store.shared.publish(&Change::Session);
+        drop(changes);
+        store.shared.publish(&Change::Session);
+        assert_eq!(store.shared.state().subscribers.len(), 0);
+    }
 }
