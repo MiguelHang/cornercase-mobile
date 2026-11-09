@@ -78,7 +78,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onedit={(machine) => router.go({ name: 'machine', id: machine })} />",
+      "{:else if router.current.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} onback={() => router.back()} onpick={(machine) => void join(machine)} onadded={added} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
     )
   })
 
@@ -91,7 +91,13 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} onremoved={removed} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} onback={() => router.back()} onchanged={reload} onremoved={removed} adding={rescanning} />',
+    )
+  })
+
+  it('opens a machine with Add route open when Machines asks to scan it again', () => {
+    expect(source).toContain(
+      "const rescanning = $derived(router.current.name === 'machine' && router.current.adding === true)",
     )
   })
 

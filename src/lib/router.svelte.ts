@@ -1,6 +1,6 @@
 import type { Screen } from './connection'
 
-export type Route = { name: 'no-machines' } | { name: 'home' } | { name: 'machines' } | { name: 'machine'; id: number }
+export type Route = { name: 'no-machines' } | { name: 'home' } | { name: 'machines' } | { name: 'machine'; id: number; adding?: boolean }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 

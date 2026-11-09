@@ -9,16 +9,20 @@
     shown,
     active,
     checking,
+    rejected,
     onpick,
     oncheck,
+    onrescan,
     onedit,
   }: {
     name: string
     shown: RowStatus
     active: boolean
     checking: boolean
+    rejected: boolean
     onpick: () => void
     oncheck: () => void
+    onrescan: () => void
     onedit: () => void
   } = $props()
 </script>
@@ -42,6 +46,9 @@
   <div class="head">
     {#if active}
       <div class="pick" aria-current="true">{@render about()}</div>
+      {#if rejected}
+        <Button tone="plain" onclick={onrescan}>Scan again</Button>
+      {/if}
     {:else}
       <button class="pick" type="button" onclick={onpick} ontouchstart={() => {}}>{@render about()}</button>
       <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button>

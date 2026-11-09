@@ -122,6 +122,22 @@ describe('Machine', () => {
     expect(body).toContain('Bridge URL')
   })
 
+  it('opens with Add route open when asked to scan again', () => {
+    const body = render(Machine, {
+      props: {
+        machine: studio(),
+        taken: [],
+        connection: { state: 'unauthorized' },
+        onback: () => {},
+        onchanged: nothing,
+        onremoved: nothing,
+        adding: true,
+      },
+    }).body
+    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Add route<\/h2>/)
+    expect(body).toContain('Scan QR code')
+  })
+
   it('offers deleting the machine in the tone of danger', () => {
     expect(screen()).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete machine/)
     expect(screen()).not.toContain('Delete Studio?')
@@ -168,6 +184,10 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => edit.askToDelete()}>Delete machine</Button>')
     expect(script).toContain('onclick={() => edit.keep()}>Cancel</Button>')
     expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
+  })
+
+  it('opens Add route once, on arriving to scan again', () => {
+    expect(script).toContain('untrack(() => { if (adding) { edit.open() } })')
   })
 
   it('reloads the machines after each change, leaves once deleted and goes back on Back', () => {

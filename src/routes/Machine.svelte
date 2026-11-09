@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { commands, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
   import { routeAddress } from '../lib/connection'
   import { EditMachine } from '../lib/editMachine.svelte'
@@ -15,6 +16,7 @@
     onback,
     onchanged,
     onremoved,
+    adding = false,
     edit = new EditMachine(
       commands,
       () => machine,
@@ -28,8 +30,15 @@
     onback: () => void
     onchanged: () => Promise<unknown>
     onremoved: () => Promise<unknown>
+    adding?: boolean
     edit?: EditMachine
   } = $props()
+
+  untrack(() => {
+    if (adding) {
+      edit.open()
+    }
+  })
 
   const connected = $derived(connection?.state === 'connected' ? connection.route : null)
 

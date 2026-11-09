@@ -28,7 +28,12 @@ describe('ConnectionBar', () => {
     ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/?token=abc' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
     ['missing', MISSING, 'cornercase on the Mac lacks watch: update it', 'failed'],
-    ['unauthorized', { state: 'unauthorized' }, "The bridge rejected this phone's token", 'failed'],
+    [
+      'unauthorized',
+      { state: 'unauthorized' },
+      "The bridge rejected this phone's token: scan its code again in Machines",
+      'failed',
+    ],
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
     const body = bar(connection)
     expect(body).toMatch(new RegExp(`<span class="dot ${tone} svelte-[\\w-]+( pulsing)?"></span>`))

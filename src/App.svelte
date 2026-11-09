@@ -28,6 +28,7 @@
     const route = router.current
     return route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined
   })
+  const rescanning = $derived(router.current.name === 'machine' && router.current.adding === true)
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
@@ -111,6 +112,7 @@
       onpick={(machine) => void join(machine)}
       onadded={added}
       onedit={(machine) => router.go({ name: 'machine', id: machine })}
+      onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
     />
   {:else if editing !== undefined}
     <Machine
@@ -120,6 +122,7 @@
       onback={() => router.back()}
       onchanged={reload}
       onremoved={removed}
+      adding={rescanning}
     />
   {:else}
     <NoMachines onadded={added} />

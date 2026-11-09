@@ -19,6 +19,7 @@
     onpick,
     onadded,
     onedit,
+    onrescan,
     probes = new Probes(commands),
     device = new ThisDevice(commands),
   }: {
@@ -29,6 +30,7 @@
     onpick: (machine: number) => void
     onadded: (machine: number) => void
     onedit: (machine: number) => void
+    onrescan: (machine: number) => void
     probes?: Probes
     device?: ThisDevice
   } = $props()
@@ -74,8 +76,10 @@
           shown={shownFor(machine)}
           active={machine.id === active}
           checking={machine.id !== active && probes.of(machine.id).state === 'checking'}
+          rejected={machine.id === active && connection.state === 'unauthorized'}
           onpick={() => onpick(machine.id)}
           oncheck={() => void probes.check([machine.id])}
+          onrescan={() => onrescan(machine.id)}
           onedit={() => onedit(machine.id)}
         />
       {/each}

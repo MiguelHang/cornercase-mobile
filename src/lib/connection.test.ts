@@ -128,7 +128,11 @@ describe('status', () => {
     ['connected', CONNECTED, { text: 'MacBook · via 127.0.0.1:7000', tone: 'done', pulsing: false }],
     ['retrying', RETRYING, { ...failing('Retrying in 2 s'), detail: 'timed out' }],
     ['missing', MISSING, failing('cornercase on the Mac lacks watch, input: update it')],
-    ['unauthorized', { state: 'unauthorized' }, failing("The bridge rejected this phone's token")],
+    [
+      'unauthorized',
+      { state: 'unauthorized' },
+      failing("The bridge rejected this phone's token: scan its code again in Machines"),
+    ],
     ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
     ['offline', { state: 'offline' }, failing('No network')],
   ])('shows %s', (_, view, shown) => {
@@ -143,8 +147,10 @@ describe('status', () => {
     expect(connection.status({ ...RETRYING, in_ms: 5000 }, 'MacBook', 2500).text).toBe('Retrying in 3 s')
   })
 
-  it('never sends the user to a code to scan', () => {
-    expect(connection.status({ state: 'unauthorized' }, 'MacBook').text).not.toMatch(/scan|QR/i)
+  it('sends the user to scan the code again only when the token is rejected', () => {
+    const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
+    expect(views.map((view) => connection.status(view, 'MacBook').text).filter((text) => /scan/i.test(text))).toEqual([])
+    expect(connection.status({ state: 'unauthorized' }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
   })
 })
 

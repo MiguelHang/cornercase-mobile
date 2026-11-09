@@ -92,7 +92,7 @@ export const status = (connection: ConnectionView_Serialize, machineName: string
     case 'missing':
       return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
     case 'unauthorized':
-      return failed("The bridge rejected this phone's token")
+      return failed("The bridge rejected this phone's token: scan its code again in Machines")
     case 'incompatible':
       return failed(`Incompatible: ${connection.error.message}`)
     case 'offline':

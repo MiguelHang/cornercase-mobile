@@ -46,16 +46,17 @@ const loaded = async (identityFingerprint: DeviceCalls['identityFingerprint']) =
 
 const FINGERPRINT = () => Promise.resolve({ status: 'ok' as const, data: '0a1b2c3d4e' })
 
-const screen = async (device = loaded(FINGERPRINT)) =>
+const screen = async (device = loaded(FINGERPRINT), connection: ConnectionView_Serialize = CONNECTED) =>
   render(Machines, {
     props: {
       machines: MACHINES,
       active: 1,
-      connection: CONNECTED,
+      connection,
       onback: () => {},
       onpick: () => {},
       onadded: () => {},
       onedit: () => {},
+      onrescan: () => {},
       probes: await probed(),
       device: await device,
     },
@@ -135,6 +136,15 @@ describe('Machines', () => {
     }
   })
 
+  it('offers Scan again on the active one only while the bridge rejects its token', async () => {
+    const scanAgain = /<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Scan again/
+    const [active, ...others] = rows(await screen(loaded(FINGERPRINT), { state: 'unauthorized' }))
+    expect(active).toMatch(scanAgain)
+    expect(active).toContain("The bridge rejected this phone's token: scan its code again in Machines")
+    expect(others.filter((row) => scanAgain.test(row))).toEqual([])
+    expect(rows(await screen()).filter((row) => scanAgain.test(row))).toEqual([])
+  })
+
   it('offers adding a machine and shows no form yet', async () => {
     const body = await screen()
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
@@ -161,6 +171,14 @@ describe('Machines wiring', () => {
   it('opens the machine edited', () => {
     expect(script).toContain('onedit={() => onedit(machine.id)}')
     expect(flat(rowSource)).toContain('{/if} <Button tone="plain" onclick={onedit}>Edit</Button>')
+  })
+
+  it('opens Add route of the active one on Scan again', () => {
+    expect(script).toContain("rejected={machine.id === active && connection.state === 'unauthorized'}")
+    expect(script).toContain('onrescan={() => onrescan(machine.id)}')
+    expect(flat(rowSource)).toContain(
+      '{#if rejected} <Button tone="plain" onclick={onrescan}>Scan again</Button> {/if}',
+    )
   })
 
   it('counts down a retry of the active one like the bar', () => {
