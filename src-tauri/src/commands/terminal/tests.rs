@@ -252,4 +252,20 @@ mod over_ipc {
         let ipc = Ipc::new(Studio::new().reloaded());
         assert_eq!(ipc.invoke("terminal_close", json!({})), Ok(Value::Null));
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn cuts_the_surface_it_showed_when_closing() {
+        let studio = Studio::new();
+        let state = studio.reloaded();
+        let surfaces = Surfaces::default();
+        let (launcher, _) = launcher(surfaces.on(serving(&[with_tabs(&[3])])));
+        start(&state, Recorder::default(), &launcher, studio.id).expect("connected");
+        open(&state, Recorder::default(), spawned, TAB).expect("the terminal opens");
+        settle().await;
+        assert_eq!(surfaces.running(), 1);
+        let ipc = Ipc::new(state);
+        assert_eq!(ipc.invoke("terminal_close", json!({})), Ok(Value::Null));
+        settle().await;
+        assert_eq!(surfaces.running(), 0);
+    }
 }
