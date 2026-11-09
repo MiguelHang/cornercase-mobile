@@ -1,17 +1,16 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
-  import { elapsed, label, place, statusName } from '../../lib/board'
+  import { label, place, statusName } from '../../lib/board'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
-  import Markdown from '../../lib/ui/Markdown.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
-  import AgentLine from './AgentLine.svelte'
   import KeyRow from './KeyRow.svelte'
+  import Thread from './Thread.svelte'
 
   const TICK_MS = 15_000
 
@@ -47,7 +46,6 @@
   })
 
   const row = $derived(chat.row)
-  const reading = $derived(chat.reading)
 
   const attach = async () => {
     const failed = await chat.attach()
@@ -85,18 +83,7 @@
           <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
         </div>
       </header>
-      <article class="message">
-        {#if reading.kind === 'message'}
-          {@const written = elapsed(reading.message.written, now)}
-          {#if written !== ''}
-            <p class="written">{written}</p>
-          {/if}
-          <Markdown text={reading.message.text} />
-        {:else}
-          <p class="reason">{reading.kind === 'loading' ? 'Reading its last message…' : reading.reason}</p>
-        {/if}
-      </article>
-      <AgentLine {chat} {now} />
+      <Thread {chat} {now} />
       <div class="composer">
         {#if chat.asking}
           <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
@@ -172,18 +159,6 @@
     color: var(--soft);
   }
 
-  .message {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .written {
-    margin: 0 0 var(--gap);
-    color: var(--faint);
-    font-size: 13px;
-  }
-
-  .reason,
   .note {
     margin: 0;
     color: var(--muted);

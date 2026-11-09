@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import type { AttachImage } from '../../lib/attach.svelte'
 import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
-import { fakeClock } from '../../lib/chatFakes'
+import { fakeClock, message, ok } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import AgentLine from './AgentLine.svelte'
@@ -12,6 +12,8 @@ import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
 import Sent from './Sent.svelte'
 import sentSource from './Sent.svelte?raw'
+import Thread from './Thread.svelte'
+import threadSource from './Thread.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
@@ -121,7 +123,8 @@ describe('Agent, its message', () => {
   })
 
   it('mutes the reason and the note', () => {
-    expect(flat(agentSource)).toContain('.reason, .note { margin: 0; color: var(--muted); }')
+    expect(flat(threadSource)).toContain('.reason { margin: 0; color: var(--muted); }')
+    expect(flat(agentSource)).toContain('.note { margin: 0; color: var(--muted); }')
   })
 
   it('reads it again while the screen shows, and stops when it goes', () => {
@@ -639,8 +642,9 @@ describe('AgentLine', () => {
 })
 
 describe('Agent, its live line', () => {
-  it('draws the line under the message and above the composer', () => {
-    expect(flat(agentSource)).toContain('</article> <AgentLine {chat} {now} /> <div class="composer">')
+  it('draws the line at the end of the thread, above the composer', () => {
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <div class="composer">')
+    expect(flat(threadSource)).toContain('{/each} <AgentLine {chat} {now} /> </div>')
   })
 
   it('tells the time by the chat clock', () => {
@@ -654,5 +658,103 @@ describe('Agent, its live line', () => {
     expect(flat(agentSource)).toContain(
       '$effect(() => { const told = chat const timer = setInterval(() => (now = told.now()), TICK_MS) return () => clearInterval(timer) })',
     )
+  })
+})
+
+const BEFORE = message('Shall I run the migration?')
+
+const threadChat = (shown: Chat['reading'], sent: Outgoing | null = outgoing('sent', { answered: BEFORE })) => {
+  const chat = lineChat('working')
+  chat.reading = shown
+  chat.outgoing = sent
+  return chat
+}
+
+const thread = (chat: Chat) => render(Thread, { props: { chat, now: LATER } }).body
+
+const at = (body: string, mark: string) => {
+  expect(body).toContain(mark)
+  return body.indexOf(mark)
+}
+
+const order = (body: string) => [
+  at(body, '<article class="message'),
+  at(body, '<article class="sent'),
+  at(body, '<p class="said'),
+]
+
+const count = (body: string, mark: string) => body.split(mark).length - 1
+
+describe('Thread', () => {
+  it('shows the message you answered, then your bubble, then the line, before the answer comes', () => {
+    const body = thread(threadChat({ kind: 'message', message: BEFORE }))
+    const [agent, you, line] = order(body)
+    expect(agent).toBeLessThan(you)
+    expect(you).toBeLessThan(line)
+    expect(body).toContain('Shall I run the migration?')
+  })
+
+  it.each([
+    ['its text', { ...BEFORE, text: 'Migrated.' }],
+    ['the time it was written', { ...BEFORE, written: '2026-11-09T11:43:00.000Z' }],
+  ])('shows your bubble, then the answer, then the line, once %s changes', (_, answer) => {
+    const body = thread(threadChat({ kind: 'message', message: answer }))
+    const [agent, you, line] = order(body)
+    expect(you).toBeLessThan(agent)
+    expect(agent).toBeLessThan(line)
+  })
+
+  it('keeps a single message of the agent and a single bubble', () => {
+    const body = thread(threadChat({ kind: 'message', message: message('Migrated.') }))
+    expect(count(body, '<article class="message')).toBe(1)
+    expect(count(body, '<article class="sent')).toBe(1)
+    expect(body).not.toContain('Shall I run the migration?')
+  })
+
+  it('shows only the message and the line while nothing was sent', () => {
+    const body = thread(threadChat({ kind: 'message', message: BEFORE }, null))
+    expect(body).not.toContain('<article class="sent')
+    expect(at(body, '<article class="message')).toBeLessThan(at(body, '<p class="said'))
+  })
+
+  it('keeps your bubble below the reading until a message comes', () => {
+    const body = thread(threadChat({ kind: 'loading' }))
+    expect(at(body, 'Reading its last message…')).toBeLessThan(at(body, '<article class="sent'))
+  })
+
+  it('marks a message whose turn is not over, faintly, after its text', () => {
+    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: false } }, null))
+    expect(body).toMatch(/<p class="going svelte-[\w-]+">More to come…<\/p>/)
+    expect(at(body, 'Shall I run the migration?')).toBeLessThan(at(body, 'More to come…'))
+    expect(flat(threadSource)).toContain('.written, .going { color: var(--faint); font-size: 13px; }')
+  })
+
+  it.each([true, null])('leaves the mark out when the turn is %o', (turnOver) => {
+    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: turnOver } }, null))
+    expect(body).not.toContain('More to come')
+  })
+
+  it('replaces a growing message in its place, without reading it again from the start', async () => {
+    const said = ['Reading thread.ts', 'Reading thread.ts and chat.svelte.ts']
+    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unattached, still, timers)
+    chat.see(1, [{ ...ROW, status: 'working' }])
+    await chat.refresh()
+    expect(thread(chat)).toContain('Reading thread.ts')
+    await chat.refresh()
+    const body = thread(chat)
+    expect(body).toContain('Reading thread.ts and chat.svelte.ts')
+    expect(body).not.toContain('Reading its last message…')
+    expect(threadSource).not.toContain('{#key')
+  })
+
+  it('goes down to the end after a reading only when the page was there before it', () => {
+    expect(flat(threadSource)).toContain(
+      '$effect.pre(() => { const was = read read = chat.reading.kind === \'message\' void chat.outgoing if (was && atEnd(window.scrollY, window.innerHeight, document.documentElement.scrollHeight)) { void tick().then(toEnd) } })',
+    )
+    expect(flat(threadSource)).toContain('const toEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight })')
+  })
+
+  it('stacks your bubble on the right of the column', () => {
+    expect(flat(threadSource)).toContain('.thread { display: flex; flex: 1; flex-direction: column;')
   })
 })
