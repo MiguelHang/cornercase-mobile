@@ -1,6 +1,90 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::cli::status::{Pane, Snapshot};
+use serde::Serialize;
+
+use crate::cli::status::{Pane, Project, Snapshot, Tab, Workspace};
+
+#[cfg(test)]
+pub(crate) mod fixtures;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct AgentRow {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub project: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub workspace: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub tab: u64,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub pane: u64,
+    pub project_name: String,
+    pub workspace_name: String,
+    pub tab_name: String,
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub workspace_count: usize,
+    pub agent: String,
+    pub title: Option<String>,
+    pub status: Option<String>,
+    pub since: Option<String>,
+}
+
+pub fn agents(snapshot: &Snapshot, since: &Since) -> Vec<AgentRow> {
+    let mut rows: Vec<AgentRow> = places(snapshot).filter_map(|place| place.row(since)).collect();
+    rows.sort_by(|a, b| {
+        let ranks = rank(b.status.as_deref()).cmp(&rank(a.status.as_deref()));
+        ranks.then_with(|| a.since.cmp(&b.since))
+    });
+    rows
+}
+
+fn agent_title(title: Option<&str>) -> Option<String> {
+    let title = title?.trim_start_matches(|c: char| !c.is_alphanumeric()).trim();
+    (!title.is_empty()).then(|| title.to_owned())
+}
+
+fn rank(status: Option<&str>) -> u8 {
+    match status {
+        Some("waiting") => 5,
+        Some("failed") => 4,
+        Some("done") => 3,
+        Some("pending") => 2,
+        Some("working" | "shell") => 1,
+        _ => 0,
+    }
+}
+
+struct Place<'a> {
+    project: &'a Project,
+    workspace: &'a Workspace,
+    tab: &'a Tab,
+    pane: &'a Pane,
+}
+
+impl Place<'_> {
+    fn row(&self, since: &Since) -> Option<AgentRow> {
+        let agent = self.pane.agent.clone()?;
+        let status = self.pane.status.clone();
+        Some(AgentRow {
+            project: self.project.id,
+            workspace: self.workspace.id,
+            tab: self.tab.id,
+            pane: self.pane.id,
+            project_name: shown(&self.project.name, self.project.custom_name.as_deref()),
+            workspace_name: shown(&self.workspace.name, self.workspace.custom_name.as_deref()),
+            tab_name: shown(&self.tab.name, self.tab.custom_name.as_deref()),
+            workspace_count: self.project.workspaces.len(),
+            agent,
+            title: agent_title(self.pane.title.as_deref()),
+            since: since.of(self.pane.id, status.as_deref()).map(str::to_owned),
+            status,
+        })
+    }
+}
+
+fn shown(name: &str, custom_name: Option<&str>) -> String {
+    custom_name.unwrap_or(name).to_owned()
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Since {
@@ -20,10 +104,10 @@ impl Since {
     }
 
     pub fn reconcile(&mut self, snapshot: &Snapshot) {
-        let present: HashSet<u64> = panes(snapshot).map(|pane| pane.id).collect();
+        let present: HashSet<u64> = places(snapshot).map(|place| place.pane.id).collect();
         self.panes.retain(|pane, _| present.contains(pane));
-        for pane in panes(snapshot).filter(|pane| pane.agent.is_some()) {
-            self.see(pane);
+        for place in places(snapshot).filter(|place| place.pane.agent.is_some()) {
+            self.see(place.pane);
         }
     }
 
@@ -44,13 +128,13 @@ impl Since {
     }
 }
 
-fn panes(snapshot: &Snapshot) -> impl Iterator<Item = &Pane> {
+fn places(snapshot: &Snapshot) -> impl Iterator<Item = Place<'_>> {
     snapshot
         .projects
         .iter()
-        .flat_map(|project| &project.workspaces)
-        .flat_map(|workspace| &workspace.tabs)
-        .flat_map(|tab| &tab.panes)
+        .flat_map(|project| project.workspaces.iter().map(move |workspace| (project, workspace)))
+        .flat_map(|(project, workspace)| workspace.tabs.iter().map(move |tab| (project, workspace, tab)))
+        .flat_map(|(project, workspace, tab)| tab.panes.iter().map(move |pane| Place { project, workspace, tab, pane }))
 }
 
 #[cfg(test)]
