@@ -7,8 +7,7 @@ import type {
   Summary_Serialize as Summary,
   Toast,
 } from './bindings'
-import { deliver } from './chat.svelte'
-import { messageOf } from './toasts'
+import { deliver, messageOf } from './toasts'
 
 export type Calls = {
   follow: typeof commands.changesFollow
@@ -54,6 +53,7 @@ export class ChangesState {
   #calls: Calls
   #tell: (toast: Toast) => void
   #left = false
+  #turn: Promise<void> = Promise.resolve()
   #nextMark = 0
   #generation = 0
   #readFor: string | null = null
@@ -87,7 +87,7 @@ export class ChangesState {
   }
 
   start() {
-    return this.#follow()
+    return this.#queue(this.mode)
   }
 
   async show(mode: Mode) {
@@ -98,13 +98,13 @@ export class ChangesState {
     this.summary = null
     this.#marks = {}
     this.closeDiff()
-    await this.#follow()
+    await this.#queue(mode)
   }
 
   stop() {
     this.#left = true
     this.#generation += 1
-    this.#calls.unfollow(this.workspace).catch((error: unknown) => this.#failed(messageOf(error)))
+    void this.#unfollow()
   }
 
   see(changed: ChangesChanged) {
@@ -151,15 +151,29 @@ export class ChangesState {
     return changed.machine === this.machine && changed.workspace === this.workspace && changed.mode === this.mode
   }
 
-  async #follow() {
+  #queue(mode: Mode) {
+    this.#turn = this.#turn.then(() => this.#follow(mode))
+    return this.#turn
+  }
+
+  async #follow(mode: Mode) {
+    if (this.#left || mode !== this.mode) {
+      return
+    }
     try {
-      const followed = await this.#calls.follow(this.workspace, this.mode)
-      if (followed.status === 'error') {
+      const followed = await this.#calls.follow(this.workspace, mode)
+      if (this.#left) {
+        await this.#unfollow()
+      } else if (followed.status === 'error') {
         this.#failed(followed.error.message)
       }
     } catch (error) {
       this.#failed(messageOf(error))
     }
+  }
+
+  #unfollow() {
+    return this.#calls.unfollow(this.workspace).catch((error: unknown) => this.#failed(messageOf(error)))
   }
 
   #close() {

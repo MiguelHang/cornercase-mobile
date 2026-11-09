@@ -215,7 +215,7 @@ describe('App wiring', () => {
 
   it("reads a file of the list and opens its diff in the list's mode", () => {
     expect(source).toContain(
-      "const change = (path: string) => { if (changes !== null) { void changes.open(path) router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path, mode: changes.mode }) } }",
+      "const change = (path: string) => { if (changes !== null) { void changes.open(path) router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path }) } }",
     )
   })
 

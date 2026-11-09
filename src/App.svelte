@@ -121,7 +121,7 @@
   const change = (path: string) => {
     if (changes !== null) {
       void changes.open(path)
-      router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path, mode: changes.mode })
+      router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path })
     }
   }
 

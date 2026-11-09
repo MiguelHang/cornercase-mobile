@@ -1,4 +1,4 @@
-import type { AgentRow_Serialize as AgentRow, Mode } from './bindings'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import type { Screen } from './connection'
 
 export type Route =
@@ -10,7 +10,7 @@ export type Route =
   | { name: 'machine'; id: number; adding?: boolean }
   | { name: 'start'; machine: number }
   | { name: 'changes'; machine: number; workspace: number; title: string }
-  | { name: 'change'; machine: number; workspace: number; path: string; mode: Mode }
+  | { name: 'change'; machine: number; workspace: number; path: string }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 

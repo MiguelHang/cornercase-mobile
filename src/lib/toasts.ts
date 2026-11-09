@@ -41,3 +41,14 @@ const hasMessage = (error: unknown): error is { message: string } =>
   typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
 
 export const messageOf = (error: unknown) => (hasMessage(error) ? error.message : String(error))
+
+type Answer = { status: 'ok' } | { status: 'error'; error: { message: string } }
+
+export const deliver = async (call: () => Promise<Answer>): Promise<string | null> => {
+  try {
+    const sent = await call()
+    return sent.status === 'ok' ? null : sent.error.message
+  } catch (error) {
+    return messageOf(error)
+  }
+}

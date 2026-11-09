@@ -27,7 +27,7 @@ const ROW: AgentRow = {
 }
 const TERMINAL = { name: 'terminal', machine: 1, row: ROW } as const
 const CHANGES = { name: 'changes', machine: 1, workspace: 2, title: 'main' } as const
-const CHANGE = { name: 'change', machine: 1, workspace: 2, path: 'src/app.rs', mode: 'commits' } as const
+const CHANGE = { name: 'change', machine: 1, workspace: 2, path: 'src/app.rs' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
