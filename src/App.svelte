@@ -118,6 +118,13 @@
     }
   }
 
+  const change = (path: string) => {
+    if (changes !== null) {
+      void changes.open(path)
+      router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path, mode: changes.mode })
+    }
+  }
+
   const start = () => {
     if (current.machine !== null) {
       router.go({ name: 'start', machine: current.machine })
@@ -244,7 +251,9 @@
       />
     {/if}
   {:else if route.name === 'changes'}
-    <Changes title={route.title} onback={() => router.back()} />
+    {#if changes !== null}
+      <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} />
+    {/if}
   {:else if route.name === 'change'}
     <Diff path={route.path} onback={() => router.back()} />
   {:else if route.name === 'start'}

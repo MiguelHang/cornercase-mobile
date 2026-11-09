@@ -302,6 +302,7 @@ describe('Icon', () => {
     ['chevron-up', 'm18 15-6-6-6 6', ''],
     ['chevron-down', 'm6 9 6 6 6-6', ''],
     ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
+    ['square-check', 'm9 12 2 2 4-4', '<rect x="3" y="3" width="18" height="18" rx="2"></rect>'],
   ] as const)('draws %s', (name, path, other) => {
     const body = render(Icon, { props: { name } }).body
     expect(body).toContain(`<path d="${path}"></path>`)

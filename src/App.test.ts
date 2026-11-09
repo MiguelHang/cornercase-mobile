@@ -209,7 +209,13 @@ describe('App wiring', () => {
       "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'changes'} <Changes title={route.title} onback={() => router.back()} /> {:else if route.name === 'change'} <Diff path={route.path} onback={() => router.back()} /> {:else if route.name === 'start'}",
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} <Diff path={route.path} onback={() => router.back()} /> {:else if route.name === 'start'}",
+    )
+  })
+
+  it("reads a file of the list and opens its diff in the list's mode", () => {
+    expect(source).toContain(
+      "const change = (path: string) => { if (changes !== null) { void changes.open(path) router.go({ name: 'change', machine: changes.machine, workspace: changes.workspace, path, mode: changes.mode }) } }",
     )
   })
 
