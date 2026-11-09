@@ -55,6 +55,24 @@ describe('AddMachine', () => {
     ])
   })
 
+  it('sends a URL filled in from a scan the same way as a pasted one', async () => {
+    const add = vi.fn(() => added(2))
+    const { draft, onadded } = form(add, '', 'Studio')
+    await draft.fill(URL_TEXT)
+    expect([draft.url, add.mock.calls, onadded.mock.calls]).toEqual([URL_TEXT, [[URL_TEXT, 'Studio']], [[2]]])
+  })
+
+  it('leaves the URL alone when a scan ends while adding', async () => {
+    const pending = gate()
+    const add = vi.fn(() => pending.promise)
+    const { draft } = form(add)
+    const sent = draft.submit()
+    await draft.fill('ws://other.lan:9000/?token=xyz')
+    pending.open(3)
+    await sent
+    expect([draft.url, add.mock.calls]).toEqual([URL_TEXT, [[URL_TEXT, 'studio.lan']]])
+  })
+
   it.each([
     ['empty', '', EMPTY],
     ['without its token', 'ws://studio.lan:9000/', NO_TOKEN],

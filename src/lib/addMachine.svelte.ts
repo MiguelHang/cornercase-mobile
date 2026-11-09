@@ -44,6 +44,14 @@ export class AddMachine {
     }
   }
 
+  async fill(url: string) {
+    if (this.busy) {
+      return
+    }
+    this.url = url
+    await this.submit()
+  }
+
   #settle(outcome: Outcome) {
     if (outcome.kind === 'added') {
       this.#onadded(outcome.machine)

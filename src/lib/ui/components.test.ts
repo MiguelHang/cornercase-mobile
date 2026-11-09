@@ -214,4 +214,8 @@ describe('scanning', () => {
     expect(flat(baseSource)).toContain('html.scanning, html.scanning body { background: transparent; }')
     expect(flat(baseSource)).toContain('html.scanning body::before { display: none; }')
   })
+
+  it('hides the app while scanning, so only the layer over the camera shows', () => {
+    expect(flat(baseSource)).toContain('html.scanning #app { visibility: hidden; }')
+  })
 })

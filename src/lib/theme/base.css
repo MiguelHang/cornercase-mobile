@@ -38,6 +38,10 @@ html.scanning body::before {
   display: none;
 }
 
+html.scanning #app {
+  visibility: hidden;
+}
+
 #app {
   position: relative;
 }

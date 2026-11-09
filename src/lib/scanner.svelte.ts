@@ -13,6 +13,11 @@ export type ScanState = 'idle' | 'scanning' | 'denied' | 'failed'
 
 const SCANNING = 'scanning'
 
+export const pageClasses: Classes = {
+  add: (token) => document.documentElement.classList.add(token),
+  remove: (token) => document.documentElement.classList.remove(token),
+}
+
 type Permission = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
 const granted = (state: Permission) => state === 'granted'

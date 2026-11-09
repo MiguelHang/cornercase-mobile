@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Format, type Scanned } from '@tauri-apps/plugin-barcode-scanner'
-import { Scanner, type ScannerApi } from './scanner.svelte'
+import { pageClasses, Scanner, type ScannerApi } from './scanner.svelte'
 
 type PermissionState = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
@@ -188,5 +188,17 @@ describe('Scanner', () => {
     await scanned
     expect(api.cancel).toHaveBeenCalled()
     expect(classes.has('scanning')).toBe(false)
+  })
+})
+
+describe('pageClasses', () => {
+  it('marks the root of the page, looked up only when used', () => {
+    const { classes, root } = fakeRoot()
+    vi.stubGlobal('document', { documentElement: { classList: root } })
+    pageClasses.add('scanning')
+    expect(classes.has('scanning')).toBe(true)
+    pageClasses.remove('scanning')
+    expect(classes.has('scanning')).toBe(false)
+    vi.unstubAllGlobals()
   })
 })

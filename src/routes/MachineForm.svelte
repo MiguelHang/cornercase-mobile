@@ -4,6 +4,7 @@
   import { placeholderName } from '../lib/machineForm'
   import Button from '../lib/ui/Button.svelte'
   import Field from '../lib/ui/Field.svelte'
+  import UrlField from '../lib/ui/UrlField.svelte'
 
   let { onadded, oncancel }: { onadded: (machine: number) => void; oncancel: () => void } = $props()
 
@@ -16,7 +17,7 @@
 </script>
 
 <form class="form" onsubmit={submit}>
-  <Field label="Bridge URL" url bind:value={form.url} error={form.urlError} disabled={form.busy} />
+  <UrlField bind:value={form.url} error={form.urlError} disabled={form.busy} onscanned={(url) => void form.fill(url)} />
   <Field label="Name" bind:value={form.name} placeholder={placeholderName(form.url)} disabled={form.busy} />
   {#if form.formError !== null}
     <p class="problem" role="alert">{form.formError}</p>
