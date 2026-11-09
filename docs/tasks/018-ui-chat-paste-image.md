@@ -1,6 +1,6 @@
 # 018 — Pantalla 2: chat — adjuntar imágenes con `paste-file` ⚠
 
-- Estado: hecha, salvo la prueba en vivo (T9)
+- Estado: hecha
 - Depende de: 017 · decisión **D1** aplicada en 003/004
 - Riesgo: medio (selector de fotos en iOS desde Tauri; bytes por el puente)
 - Rama: `feat/018-paste-image` · PR: `feat: attach a photo to an agent's pane`
@@ -19,7 +19,7 @@ Mandar una imagen del móvil (foto o captura) al agente: cornercase la guarda en
   (`design/chat.md` › Attaching an image).
 - [x] CA3 — `paste-file --pane P --name <nombre> -` por la cola con los bytes como fije D1; la respuesta (`path`,
   `bytes`) se muestra como chip en el chat; el agente recibe la ruta en su entrada.
-  Que el agente la recibe y lee la imagen queda para la prueba en vivo (Verificación).
+  En el simulador, Claude Code recibió la ruta (`[Image #1]`) y leyó la imagen (Verificación).
 - [x] CA4 — Errores (demasiado grande, servidor viejo sin `paste-file`) en un aviso.
   Un servidor sin `paste-file` no llega a conectar (está en `REQUIRED`); lo que sí sale es el rechazo de un CLI más
   viejo que su servidor.
@@ -40,3 +40,6 @@ Si no hay selector de fotos usable: plugin propio mínimo en Swift con `PHPicker
 
 ## Verificación
 En un iPhone real: adjuntar una captura a Claude Code, que la lee (criterio de éxito 2, parte imagen).
+Hecha el 2026-11-09 en el simulador iPhone 17 con una PNG y una HEIC grande, contra el puente y cornercase 0.13.19
+con Claude Code 2.1.321: chips, reducción a 2.048 px, un turno con imagen y texto, la imagen sola y cancelar
+(`design/chat.md` › Checked live). El iPhone real queda pendiente de un equipo de firma.
