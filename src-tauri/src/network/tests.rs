@@ -3,10 +3,15 @@ use std::time::Duration;
 use rstest::rstest;
 use tokio::time;
 
+use cornercase_core::transport::fake::FakeTransport;
+
 use super::*;
 use crate::commands::connection::start;
 use crate::events::ConnectionChanged;
-use crate::test_util::{BOOT, Ipc, Recorder, Studio, changed, connected, launcher, serving, settle, snapshot};
+use crate::test_util::{
+    APP, BOOT, EVENTS, Ipc, Recorder, STATUS, Studio, changed, connected, contracted, launcher, serving, settle,
+    snapshot,
+};
 use crate::view::ConnectionView;
 
 const WIFI: Network = Network { kind: Kind::Wifi, expensive: false };
@@ -21,10 +26,14 @@ struct Following {
 
 impl Following {
     fn new() -> Self {
+        Self::on(serving(&[snapshot(BOOT, 1, "first")]))
+    }
+
+    fn on(fake: FakeTransport) -> Self {
         let studio = Studio::new();
         let state = studio.reloaded();
         let recorder = Recorder::default();
-        let (launcher, _) = launcher(serving(&[snapshot(BOOT, 1, "first")]));
+        let (launcher, _) = launcher(fake);
         start(&state, recorder.clone(), &launcher, studio.id).expect("connecting");
         let ipc = Ipc::new(state);
         let (hear, paths) = listen();
@@ -98,6 +107,18 @@ mod a_change {
         let connections = following.connections();
         assert_eq!(connections.last().map(|it| &it.connection), Some(&connected()), "{connections:?}");
         assert_eq!(connecting_count(&connections), 2, "{connections:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn while_connecting_abandons_the_attempt_for_another() {
+        let hanging = contracted(BOOT).open(EVENTS, &[]).open(STATUS, &[]).open(APP, &[]);
+        let following = Following::on(hanging);
+        following.heard(&[WIFI]).await;
+        settle().await;
+        assert_eq!(connecting_count(&following.connections()), 1);
+        following.heard(&[CELLULAR]).await;
+        settle().await;
+        assert_eq!(connecting_count(&following.connections()), 2, "{:?}", following.connections());
     }
 
     #[tokio::test(start_paused = true)]
