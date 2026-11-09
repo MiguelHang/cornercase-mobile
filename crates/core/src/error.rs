@@ -28,6 +28,8 @@ pub enum Error {
     UnknownMachine,
     #[error("the machine has no route at that address")]
     UnknownRoute,
+    #[error("the saved identity is not a 32-byte Ed25519 seed")]
+    Identity,
 }
 
 #[cfg(test)]
