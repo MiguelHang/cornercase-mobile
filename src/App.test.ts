@@ -129,7 +129,10 @@ describe('App wiring', () => {
       "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
     )
     expect(source).toContain(
-      "{:else if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {#if route.name === 'home'}",
+      "{:else} {#if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {/if}",
+    )
+    expect(source).toContain(
+      'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
@@ -207,7 +210,7 @@ describe('App wiring', () => {
   it('shows the terminal on top of everything only on its own machine, going back from it and putting the toasts below its bar', () => {
     expect(source).toContain('const viewed = $derived(openedTerminal(route, current))')
     expect(source).toContain(
-      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} {backTo} onback={goBack} onfailed={toasts.failed} bind:height={barHeight} />',
+      '{#if viewed !== undefined} <Terminal machine={viewed.machine} row={viewed.row} {backTo} {shift} onback={goBack} onfailed={toasts.failed} bind:height={barHeight} />',
     )
   })
 
@@ -246,9 +249,26 @@ describe('App wiring', () => {
     )
   })
 
+  it('goes back with the edge swipe only on iOS over another screen, and never while the scanner is open', () => {
+    expect(source).toContain('const swipeable = $derived(backSwipes(platform, router.below))')
+    expect(source).toContain(
+      "$effect(() => { if (!swipeable) { return } return watchBackSwipe(document, { enabled: () => !document.documentElement.classList.contains('scanning'), width: () => innerWidth, reduced: prefersReducedMotion, onshift: (next) => (shift = next), onback: goBack, }) })",
+    )
+    expect(source.match(/watchBackSwipe\(/g)).toHaveLength(1)
+  })
+
+  it('slides every screen but the connection bar and the toasts, and the terminal on its own', () => {
+    expect(source).toContain('let shift = $state<Shift>(RESTING)')
+    expect(source).toContain(
+      "onmachines={() => router.go({ name: 'machines' })} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
+    )
+    expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} <ToastStack')
+    expect(source.match(/translated\(shift\)/g)).toHaveLength(1)
+  })
+
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

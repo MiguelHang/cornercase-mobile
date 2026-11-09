@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { RESTING, translated, type Shift } from '../../lib/backSwipe'
   import {
     commands,
     events,
@@ -24,6 +25,7 @@
     machine,
     row,
     backTo,
+    shift = RESTING,
     onback,
     onfailed,
     height = $bindable(0),
@@ -31,6 +33,7 @@
     machine: number
     row: AgentRow
     backTo: string | null
+    shift?: Shift
     onback: () => void
     onfailed: (error: unknown) => void
     height?: number
@@ -84,6 +87,9 @@
 <section
   class="screen"
   class:keyboard={keyboard.covered}
+  class:sliding={shift.x > 0}
+  class:settling={shift.eased}
+  style:transform={translated(shift)}
   style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}
   style:height={keyboard.covered ? `${keyboard.height}px` : undefined}
 >

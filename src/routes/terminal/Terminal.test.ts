@@ -41,6 +41,13 @@ describe('the terminal screen', () => {
     expect(body).not.toContain('<header')
   })
 
+  it('slides with the edge swipe back, resting when nothing shifts it', () => {
+    expect(source).toContain('shift = RESTING,')
+    expect(source).toContain(
+      'class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}',
+    )
+  })
+
   it('names its agent as the title, with the tab and place under it, in the middle of the bar', () => {
     expect(body).toMatch(
       /<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>(<!--[^>]*-->| )*<p class="where svelte-[\w-]+">fix login · app › main<\/p><\/div>/,

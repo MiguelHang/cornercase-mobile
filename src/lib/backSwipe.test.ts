@@ -1,5 +1,20 @@
-import { describe, expect, it } from 'vitest'
-import { BackSwipe, CLAIM, EDGE, FLING, HOLD, SHARE } from './backSwipe'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  BackSwipe,
+  backSwipes,
+  CLAIM,
+  EDGE,
+  FLING,
+  HOLD,
+  RESTING,
+  SHARE,
+  translated,
+  watchBackSwipe,
+  type Watching,
+} from './backSwipe'
+import { edge } from './edge.svelte'
+import type { Route } from './router.svelte'
+import { LEAVE_MS } from './ui/motion'
 
 const WIDTH = 400
 
@@ -216,5 +231,245 @@ describe('BackSwipe', () => {
       { state: 'pending', shift: 0 },
       { state: 'claimed', shift: CLAIM },
     ])
+  })
+})
+
+type Options = AddEventListenerOptions
+
+class Target {
+  listeners = new Map<string, { listener: EventListener; options: Options }>()
+
+  addEventListener(name: string, listener: EventListener, options: Options) {
+    this.listeners.set(name, { listener, options })
+  }
+
+  removeEventListener(name: string, listener: EventListener) {
+    if (this.listeners.get(name)?.listener === listener) this.listeners.delete(name)
+  }
+
+  fire(name: string, event: object) {
+    this.listeners.get(name)?.listener(event as Event)
+  }
+}
+
+const watched = (options: Partial<Watching> = {}) => {
+  const target = new Target()
+  const seen: unknown[] = []
+  let prevented = 0
+  const stop = watchBackSwipe(target, {
+    enabled: () => true,
+    width: () => WIDTH,
+    reduced: () => false,
+    onshift: (shift) => seen.push(shift),
+    onback: () => seen.push('back'),
+    ...options,
+  })
+  const touch = (name: string, x: number, at: number, id = 1) =>
+    target.fire(name, {
+      changedTouches: [{ identifier: id, clientX: x, clientY: Y }],
+      timeStamp: at,
+      preventDefault: () => prevented++,
+    })
+  return { target, seen, stop, touch, prevented: () => prevented }
+}
+
+const dragged = (dx: number, options: Partial<Watching> = {}) => {
+  const watch = watched(options)
+  watch.touch('touchstart', X, 0)
+  watch.touch('touchmove', X + CLAIM, 20)
+  watch.touch('touchmove', X + dx, 2000)
+  return watch
+}
+
+const lifted = (dx: number, options: Partial<Watching> = {}) => {
+  const watch = dragged(dx, options)
+  watch.seen.length = 0
+  watch.touch('touchend', X + dx, 4000)
+  return watch
+}
+
+const SETTLED = { x: 0, eased: true }
+
+const LEFT = { x: WIDTH, eased: true }
+
+describe('watchBackSwipe', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    edge.state = 'idle'
+  })
+
+  describe('listening', () => {
+    it('listens to the touches in capture, holding the moves as not passive', () => {
+      const { target } = watched()
+      expect(Object.fromEntries([...target.listeners].map(([name, { options }]) => [name, options]))).toEqual({
+        touchstart: { capture: true },
+        touchmove: { capture: true, passive: false },
+        touchend: { capture: true },
+        touchcancel: { capture: true },
+        pointercancel: { capture: true },
+      })
+    })
+
+    it('stops listening when stopped', () => {
+      const { target, stop } = watched()
+      stop()
+      expect(target.listeners.size).toBe(0)
+    })
+  })
+
+  describe('the shared edge', () => {
+    it.each([
+      ['waits on a touch at the edge', EDGE, 'pending'],
+      ['stays idle on a touch past the edge', EDGE + 1, 'idle'],
+    ])('%s', (_, x, state) => {
+      watched().touch('touchstart', x, 0)
+      expect(edge.state).toBe(state)
+    })
+
+    it('is claimed once the finger moves right far enough', () => {
+      dragged(CLAIM)
+      expect(edge.state).toBe('claimed')
+    })
+
+    it('goes back to idle when a still touch lifts as a tap, moving nothing', () => {
+      const { touch, seen } = watched()
+      touch('touchstart', X, 0)
+      touch('touchend', X, 50)
+      expect([edge.state, seen]).toEqual(['idle', []])
+    })
+
+    it('stays idle while it is not enabled, moving nothing', () => {
+      const { touch, seen, prevented } = dragged(60, { enabled: () => false })
+      touch('touchend', X + 60, 4000)
+      expect([edge.state, seen, prevented()]).toEqual(['idle', [], 0])
+    })
+  })
+
+  describe('the page', () => {
+    it('stops scrolling only once the finger is claimed', () => {
+      const { touch, prevented } = watched()
+      touch('touchstart', X, 0)
+      touch('touchmove', X + CLAIM - 1, 10)
+      const waiting = prevented()
+      touch('touchmove', X + CLAIM, 20)
+      expect([waiting, prevented()]).toEqual([0, 1])
+    })
+
+    it('never stops scrolling for a touch past the edge', () => {
+      const { touch, prevented } = watched()
+      touch('touchstart', EDGE + 1, 0)
+      touch('touchmove', EDGE + 100, 20)
+      expect(prevented()).toBe(0)
+    })
+
+    it('follows the claimed finger without easing', () => {
+      expect(dragged(60).seen).toEqual([
+        { x: CLAIM, eased: false },
+        { x: 60, eased: false },
+      ])
+    })
+  })
+
+  describe('lifting', () => {
+    it('finishes leaving with the motion and then goes back once', () => {
+      const { seen } = lifted(FAR)
+      const leaving = [...seen]
+      vi.advanceTimersByTime(LEAVE_MS)
+      vi.runAllTimers()
+      expect([leaving, seen, edge.state]).toEqual([[LEFT], [LEFT, RESTING, 'back'], 'idle'])
+    })
+
+    it('waits for the motion before going back', () => {
+      const { seen } = lifted(FAR)
+      vi.advanceTimersByTime(LEAVE_MS - 1)
+      expect(seen).toEqual([LEFT])
+    })
+
+    it('settles back with the motion short of the threshold', () => {
+      const { seen } = lifted(FAR - 1)
+      vi.runAllTimers()
+      expect([seen, edge.state]).toEqual([[SETTLED], 'idle'])
+    })
+
+    it('takes no new touch while it leaves', () => {
+      const { touch } = lifted(FAR)
+      touch('touchstart', X, 4010, 2)
+      expect(edge.state).toBe('idle')
+    })
+  })
+
+  describe('with Reduce Motion', () => {
+    const reduced = { reduced: () => true }
+
+    it('moves nothing while the finger drags', () => {
+      expect(dragged(60, reduced).seen).toEqual([])
+    })
+
+    it('goes back at once past the threshold', () => {
+      expect(lifted(FAR, reduced).seen).toEqual(['back'])
+    })
+
+    it('does nothing short of the threshold', () => {
+      const { seen } = lifted(FAR - 1, reduced)
+      vi.runAllTimers()
+      expect(seen).toEqual([])
+    })
+  })
+
+  describe('cancelling', () => {
+    it.each(['touchcancel', 'pointercancel'])('settles back on a %s, going back never', (name) => {
+      const { touch, seen } = dragged(60)
+      seen.length = 0
+      touch(name, X + 60, 2010)
+      touch('touchend', X + FAR, 2020)
+      vi.runAllTimers()
+      expect([seen, edge.state]).toEqual([[SETTLED], 'idle'])
+    })
+
+    it('settles back when a second finger comes', () => {
+      const { touch, seen } = dragged(60)
+      seen.length = 0
+      touch('touchstart', 200, 2010, 2)
+      expect([seen, edge.state]).toEqual([[SETTLED], 'idle'])
+    })
+
+    it('puts the page back at once when stopped mid-drag', () => {
+      const { stop, seen } = dragged(60)
+      seen.length = 0
+      stop()
+      expect([seen, edge.state]).toEqual([[RESTING], 'idle'])
+    })
+
+    it('never goes back when stopped while leaving', () => {
+      const { stop, seen } = lifted(FAR)
+      stop()
+      vi.runAllTimers()
+      expect(seen).toEqual([LEFT, RESTING])
+    })
+  })
+})
+
+describe('backSwipes', () => {
+  const below: Route = { name: 'home' }
+
+  it.each([
+    ['on iOS over another screen', 'ios', below, true],
+    ['on iOS on the first screen', 'ios', null, false],
+    ['on Android', 'android', below, false],
+  ] as const)('%s', (_, on, under, swipes) => {
+    expect(backSwipes(on, under)).toBe(swipes)
+  })
+})
+
+describe('translated', () => {
+  it.each([
+    ['moves a shifted page right', { x: 12, eased: false }, 'translateX(12px)'],
+    ['leaves a page at rest alone', RESTING, undefined],
+  ])('%s', (_, shift, transform) => {
+    expect(translated(shift)).toBe(transform)
   })
 })
