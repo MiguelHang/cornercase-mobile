@@ -47,12 +47,15 @@ const drawn = (state: PaneState, changed: TerminalChanged_Serialize): Row[] => {
   return rows
 }
 
+const steady = (before: Colours_Serialize, after: Colours_Serialize) =>
+  JSON.stringify(before) === JSON.stringify(after) ? before : after
+
 export const apply = (state: PaneState, changed: TerminalChanged_Serialize): PaneState => {
   if (changed.pane === null) {
     return { ...state, closed: changed.closed }
   }
   const { pane, size, cursor, colours, closed } = changed
-  return { pane, size, cursor, colours, rows: drawn(state, changed), closed }
+  return { pane, size, cursor, colours: steady(state.colours, colours), rows: drawn(state, changed), closed }
 }
 
 export class Pane {

@@ -87,6 +87,13 @@ describe('apply', () => {
     expect([state.size, state.cursor, state.colours]).toEqual([size, null, empty.colours])
   })
 
+  it('keeps the same colours while an event brings equal ones', () => {
+    const first = applied(changed({}))
+    expect(apply(first, changed({}, { colours: { ...COLOURS, palette: { '1': [255, 0, 0] } } })).colours).toBe(
+      first.colours,
+    )
+  })
+
   it('keeps the screen it showed when an event only says the tab closed', () => {
     const shown = applied(changed({ 0: 'a' }))
     const closed = apply(shown, changed({}, { pane: null, size: { cols: 0, rows: 0 }, cursor: null, closed: true }))
