@@ -8,6 +8,8 @@ const NO_MACHINES = { name: 'no-machines' } as const
 const MACHINES = { name: 'machines' } as const
 const MACHINE = { name: 'machine', id: 2 } as const
 const AGENT = { name: 'agent', machine: 1, pane: 7 } as const
+const START = { name: 'start', machine: 1 } as const
+const STARTING = { name: 'agent', machine: 1, pane: 7, starting: true } as const
 const ROW: AgentRow = {
   boot: 'b1',
   agent: 'claude',
@@ -130,6 +132,40 @@ describe('Router', () => {
   })
 })
 
+describe('Router.replace', () => {
+  it('puts the started agent in place of the start screen', () => {
+    const router = new Router(HOME)
+    router.go(START)
+    router.replace(STARTING)
+    expect(router.current).toEqual(STARTING)
+  })
+
+  it('goes back from the started agent to home, not to the start screen', () => {
+    const router = new Router(HOME)
+    router.go(START)
+    router.replace(STARTING)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the base and goes on top of it when nothing is above it', () => {
+    const router = new Router(HOME)
+    router.replace(STARTING)
+    expect(router.current).toEqual(STARTING)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the routes below the one it replaces', () => {
+    const router = new Router(HOME)
+    router.go(MACHINES)
+    router.go(START)
+    router.replace(STARTING)
+    router.back()
+    expect(router.current).toEqual(MACHINES)
+  })
+})
+
 describe('Router.setBase with an agent or its terminal open', () => {
   it('stays on an agent while the connection settles on home', () => {
     const router = new Router(HOME)
@@ -239,6 +275,17 @@ describe('openedAgent', () => {
 
   it('opens nothing on another route', () => {
     expect(openedAgent(HOME, on(1, [row(7)]))).toBeUndefined()
+    expect(openedAgent(START, on(1, [row(7)]))).toBeUndefined()
+  })
+
+  it('finds the row of an agent that was starting once its pane is listed', () => {
+    const rows = [row(3), row(7)]
+    expect(openedAgent(STARTING, on(1, rows))).toBe(rows[1])
+  })
+
+  it('says an agent that is starting is not listed yet like any other agent', () => {
+    expect(openedAgent(STARTING, on(1, [row(3)]))).toBeUndefined()
+    expect(openedAgent(STARTING, on(1, null))).toBeNull()
   })
 
   it('shows no agent of the new machine on Back from Machines after switching', () => {
