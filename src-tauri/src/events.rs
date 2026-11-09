@@ -1,8 +1,12 @@
+use std::collections::BTreeMap;
+
 use cornercase_core::board::AgentRow;
 use cornercase_core::cli::events::What;
+use cornercase_core::cli::surface::{Colours, Cursor, Size};
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::{Change, Changes, Connection, Store};
+use cornercase_core::terminal::grid::Line;
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
@@ -26,6 +30,22 @@ pub(crate) struct AgentsChanged {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct TerminalChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    #[specta(type = u32)]
+    pub(crate) tab: u64,
+    #[specta(type = Option<u32>)]
+    pub(crate) pane: Option<u64>,
+    pub(crate) size: Size,
+    pub(crate) cursor: Option<Cursor>,
+    pub(crate) colours: Colours,
+    pub(crate) replaced: bool,
+    pub(crate) rows: BTreeMap<u16, Line>,
+    pub(crate) closed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
 pub(crate) struct Toast {
     pub(crate) level: ToastLevel,
     pub(crate) message: String,
@@ -43,6 +63,7 @@ pub(crate) enum ToastLevel {
 pub(crate) enum Emitted {
     Connection(ConnectionChanged),
     Agents(AgentsChanged),
+    Terminal(TerminalChanged),
     Toast(Toast),
 }
 
@@ -55,6 +76,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
         let sent = match event {
             Emitted::Connection(changed) => changed.emit(self),
             Emitted::Agents(changed) => changed.emit(self),
+            Emitted::Terminal(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };
         sent.ok();
@@ -119,7 +141,7 @@ fn connection_changed(machine: MachineId, machines: &SharedMachines, connection:
     }
 }
 
-fn warned(error: &Error) -> Emitted {
+pub(crate) fn warned(error: &Error) -> Emitted {
     Emitted::Toast(Toast::error(error.to_string()))
 }
 

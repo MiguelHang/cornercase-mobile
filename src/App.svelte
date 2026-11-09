@@ -1,7 +1,12 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
-  import { commands, events, type MachineView_Serialize } from './lib/bindings'
+  import {
+    commands,
+    events,
+    type AgentRow_Serialize as AgentRow,
+    type MachineView_Serialize,
+  } from './lib/bindings'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { oneAtATime } from './lib/join'
   import { Router, routeFor } from './lib/router.svelte'
@@ -11,6 +16,7 @@
   import Agent from './routes/agent/Agent.svelte'
   import Board from './routes/board/Board.svelte'
   import NoMachines from './routes/NoMachines.svelte'
+  import Terminal from './routes/terminal/Terminal.svelte'
 
   type Listed = Awaited<ReturnType<typeof commands.machinesList>>
 
@@ -34,6 +40,12 @@
   const show = (next: Screen) => {
     current = next
     router.settle(routeFor(next))
+  }
+
+  const terminal = (row: AgentRow) => {
+    if (current.machine !== null) {
+      router.go({ name: 'terminal', machine: current.machine, row })
+    }
   }
 
   const remember = (listed: Listed) => {
@@ -86,10 +98,24 @@
 </script>
 
 <main>
-  {#if machine}
+  {#if route.name === 'terminal'}
+    <Terminal
+      machine={route.machine}
+      row={route.row}
+      onback={() => router.back()}
+      onfailed={toasts.failed}
+      bind:height={barHeight}
+    />
+  {:else if machine}
     <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
     {#if route.name === 'agent'}
-      <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />
+      <Agent
+        row={opened}
+        connection={current.connection}
+        below={barHeight}
+        onback={() => router.back()}
+        onterminal={terminal}
+      />
     {:else}
       <Board
         agents={current.agents}

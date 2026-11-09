@@ -2,10 +2,12 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import Agent from './Agent.svelte'
+import agentSource from './Agent.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
 const ROW: AgentRow = {
+  boot: 'b1',
   agent: 'claude',
   title: 'Fix the login flow',
   status: 'waiting',
@@ -21,7 +23,9 @@ const ROW: AgentRow = {
 }
 
 const draw = (row: AgentRow | null | undefined, below = 0, connection: ConnectionView_Serialize = CONNECTED) =>
-  render(Agent, { props: { row, connection, below, onback: () => {} } }).body
+  render(Agent, { props: { row, connection, below, onback: () => {}, onterminal: () => {} } }).body
+
+const TERMINAL = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Terminal/
 
 describe('Agent', () => {
   it('shows the status, title and place of its agent', () => {
@@ -58,6 +62,15 @@ describe('Agent', () => {
 
   it.each([ROW, null, undefined])('offers going back, with or without its agent', (row) => {
     expect(draw(row)).toMatch(/<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back/)
+  })
+
+  it('offers opening the terminal of its agent', () => {
+    expect(draw(ROW)).toMatch(TERMINAL)
+    expect(agentSource).toContain('onclick={() => onterminal(opened)}')
+  })
+
+  it.each([null, undefined])('offers no terminal without its agent', (row) => {
+    expect(draw(row)).not.toMatch(TERMINAL)
   })
 
   it('sits below the connection bar', () => {

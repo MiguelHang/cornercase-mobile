@@ -87,7 +87,7 @@ describe('App wiring', () => {
 
   it('shows the connection bar with a machine, and puts the board, an agent and the toasts below it', () => {
     expect(source).toContain(
-      "{#if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if route.name === 'agent'}",
+      "{:else if machine} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} /> {#if route.name === 'agent'}",
     )
     expect(source).toContain(
       "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', pane })} />",
@@ -102,7 +102,19 @@ describe('App wiring', () => {
       "route.name === 'agent' && current.agents !== null ? current.agents.find((agent) => agent.pane === route.pane) : null",
     )
     expect(source).toContain(
-      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} />',
+      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} onterminal={terminal} />',
+    )
+  })
+
+  it("opens an agent's terminal on top of it, on the machine the agent runs on", () => {
+    expect(source).toContain(
+      "const terminal = (row: AgentRow) => { if (current.machine !== null) { router.go({ name: 'terminal', machine: current.machine, row }) } }",
+    )
+  })
+
+  it('shows the terminal on top of everything, going back from it and putting the toasts below its bar', () => {
+    expect(source).toContain(
+      "{#if route.name === 'terminal'} <Terminal machine={route.machine} row={route.row} onback={() => router.back()} onfailed={toasts.failed} bind:height={barHeight} />",
     )
   })
 })
