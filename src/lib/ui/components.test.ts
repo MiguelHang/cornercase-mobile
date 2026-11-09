@@ -3,10 +3,12 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import Button from './Button.svelte'
 import Emblem from './Emblem.svelte'
+import Field from './Field.svelte'
 import Glass from './Glass.svelte'
 import Spinner from './Spinner.svelte'
 import buttonSource from './Button.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
+import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 
@@ -38,40 +40,103 @@ describe('Glass', () => {
 })
 
 describe('Button', () => {
-  const button = (props: { resting?: boolean }) =>
-    render(Button, { props: { ...props, children: html('Add machine') } }).body
+  type Props = { tone?: 'primary' | 'plain'; type?: 'button' | 'submit'; resting?: boolean; busy?: boolean }
+  const button = (props: Props, label = 'Add machine') =>
+    render(Button, { props: { ...props, children: html(label) } }).body
 
   it('is disabled for every reader while resting', () => {
     expect(button({ resting: true })).toMatch(
-      /<button class="button svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">Add machine/,
+      /<button class="button primary svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">(<!--[^>]*-->)* Add machine/,
     )
   })
 
-  it('is enabled otherwise', () => {
+  it('is an enabled primary button otherwise', () => {
     const body = button({})
-    expect(body).toMatch(/<button class="button svelte-[\w-]+" type="button">Add machine/)
-    expect(body).not.toMatch(/disabled/)
+    expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(<!--[^>]*-->)* Add machine/)
+    expect(body).not.toMatch(/disabled|aria-busy|spinner/)
+  })
+
+  it('takes the plain tone and the submit type', () => {
+    expect(button({ tone: 'plain' }, 'Cancel')).toMatch(/<button class="button plain svelte-[\w-]+" type="button">/)
+    expect(button({ type: 'submit' }, 'Add')).toMatch(/<button class="button primary svelte-[\w-]+" type="submit">/)
+  })
+
+  it('shows the spinner before its label and stops answering while busy', () => {
+    const body = button({ busy: true, type: 'submit' }, 'Adding…')
+    expect(body).toMatch(
+      /<button class="button primary svelte-[\w-]+ busy" type="submit" disabled="" aria-busy="true">(<!--[^>]*-->)*<span class="spinner [^>]*>.*<\/span>(<!--[^>]*-->)* Adding…/,
+    )
+    expect(body).not.toMatch(/aria-disabled|resting/)
+    expect(buttonSource).toMatch(/\.busy \{\s*pointer-events: none;\s*\}/)
   })
 
   it.each([
-    'border: 1px solid rgb(43 123 255 / 0.7);',
+    'gap: 6px;',
     'border-radius: var(--radius-control);',
-    'background: linear-gradient(180deg, var(--brand-light), var(--brand));',
-    'box-shadow: 0 0 10px rgb(0 95 255 / 0.28);',
-    'color: var(--on-brand);',
-    'font-weight: 500;',
+    '.primary { border: 1px solid rgb(43 123 255 / 0.7); background: linear-gradient(180deg, var(--brand-light), var(--brand)); box-shadow: 0 0 10px rgb(0 95 255 / 0.28); color: var(--on-brand); font-weight: 500; }',
+    '.plain { border: 1px solid var(--border); background: var(--hover); color: var(--soft); }',
   ])('holds %s', (text) => {
     expect(flat(buttonSource)).toContain(text)
   })
 
   it('is big enough to touch and shows a press only when it can be pressed', () => {
     expect(buttonSource).toContain('min-height: 44px;')
-    expect(buttonSource).toContain('.button:not(.resting):active {\n    background: var(--brand-hover);')
+    expect(flat(buttonSource)).toContain('.primary:not(.resting):active { background: var(--brand-hover); }')
+    expect(flat(buttonSource)).toContain(
+      '.plain:not(.resting):active { border-color: var(--edge); background: var(--selected); }',
+    )
     expect(buttonSource).toMatch(/\.resting \{\s*opacity: 0\.4;\s*pointer-events: none;\s*\}/)
   })
 
-  it('listens to touches so that WebKit on iOS shows the press', () => {
+  it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
+    expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
+  })
+})
+
+describe('Field', () => {
+  type Props = { label: string; value?: string; error?: string | null; url?: boolean; disabled?: boolean }
+  const field = (props: Props) => render(Field, { props }).body
+  const input = (body: string) => body.match(/<input [^>]*>/)?.[0] ?? ''
+
+  it('labels its input and keeps an empty slot for the error', () => {
+    const body = field({ label: 'Name', value: 'studio' })
+    const id = body.match(/<label class="label svelte-[\w-]+" for="([\w-]+)">Name<\/label>/)?.[1]
+    expect(input(body)).toContain(`id="${id}"`)
+    expect(input(body)).toContain('value="studio"')
+    expect(input(body)).not.toMatch(/aria-invalid|aria-describedby|inputmode|disabled/)
+    expect(body).toMatch(/<p class="error svelte-[\w-]+" id="[\w-]+"><\/p>/)
+  })
+
+  it('points its input at the error it shows', () => {
+    const body = field({ label: 'Bridge URL', error: 'Start it with ws://' })
+    const id = body.match(/<p class="error svelte-[\w-]+" id="([\w-]+)">Start it with ws:\/\/<\/p>/)?.[1]
+    expect(input(body)).toContain(`aria-invalid="true" aria-describedby="${id}"`)
+  })
+
+  it('passes input attributes on', () => {
+    expect(input(render(Field, { props: { label: 'Name', placeholder: 'studio', disabled: true } }).body)).toMatch(
+      /placeholder="studio" disabled=""/,
+    )
+  })
+
+  it('stops iOS from correcting a URL', () => {
+    expect(input(field({ label: 'Bridge URL', url: true }))).toContain(
+      'autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url"',
+    )
+  })
+
+  it.each([
+    'min-height: 44px;',
+    'border: 1px solid var(--edge);',
+    'border-radius: var(--radius-control);',
+    'background: var(--field);',
+    'font-size: 16px;',
+    '-webkit-user-select: text; user-select: text;',
+    '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgb(0 95 255 / 0.32); }',
+    'color: var(--failed);',
+  ])('holds %s', (text) => {
+    expect(flat(fieldSource)).toContain(text)
   })
 })
 

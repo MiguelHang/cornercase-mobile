@@ -26,7 +26,7 @@ describe('App', () => {
 
   it('offers adding a machine, not yet pressable', () => {
     expect(body).toMatch(
-      /<button class="button svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">Add machine<\/button>/,
+      /<button class="button primary svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">(<!--[^>]*-->)* Add machine<\/button>/,
     )
   })
 
