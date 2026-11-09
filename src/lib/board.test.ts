@@ -24,6 +24,10 @@ const agent = (pane: number, status: string | null, more: Partial<AgentRow> = {}
   title: `Agent ${pane}`,
   status,
   since: null,
+  parent: null,
+  depth: 0,
+  role: null,
+  rank_status: status,
   ...more,
 })
 
