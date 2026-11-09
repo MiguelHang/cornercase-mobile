@@ -35,17 +35,26 @@ const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, RUNNIN
 describe('firstToConnect', () => {
   const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
   const IDLE = { machine: null, connection: { state: 'none' as const } }
+  const listed = (active: number | null) => ({ machines: [machine(4), machine(2)], active })
 
-  it('picks the first machine while none is active', () => {
-    expect(connection.firstToConnect([machine(4), machine(2)], IDLE)).toBe(4)
+  it('picks the saved active machine while none is connected', () => {
+    expect(connection.firstToConnect(listed(2), IDLE)).toBe(2)
+  })
+
+  it('picks the first machine once the saved one is gone', () => {
+    expect(connection.firstToConnect(listed(9), IDLE)).toBe(4)
+  })
+
+  it('picks the first machine while none was saved', () => {
+    expect(connection.firstToConnect(listed(null), IDLE)).toBe(4)
   })
 
   it('picks nothing without machines', () => {
-    expect(connection.firstToConnect([], IDLE)).toBeNull()
+    expect(connection.firstToConnect({ machines: [], active: null }, IDLE)).toBeNull()
   })
 
   it('keeps the store already running', () => {
-    expect(connection.firstToConnect([machine(4), machine(2)], { machine: 2, connection: CONNECTED })).toBeNull()
+    expect(connection.firstToConnect(listed(4), { machine: 2, connection: CONNECTED })).toBeNull()
   })
 })
 
@@ -58,7 +67,11 @@ describe('status', () => {
     ['connected', CONNECTED, { text: 'MacBook · via 127.0.0.1:7000', tone: 'done', pulsing: false }],
     ['retrying', RETRYING, { ...failing('Retrying in 2 s'), detail: 'timed out' }],
     ['missing', MISSING, failing('cornercase on the Mac lacks watch, input: update it')],
-    ['unauthorized', { state: 'unauthorized' }, failing("The bridge rejected this phone's token")],
+    [
+      'unauthorized',
+      { state: 'unauthorized' },
+      failing("The bridge rejected this phone's token: scan its code again in Machines"),
+    ],
     ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
     ['offline', { state: 'offline' }, failing('No network')],
   ])('shows %s', (_, view, shown) => {
@@ -73,8 +86,10 @@ describe('status', () => {
     expect(connection.status({ ...RETRYING, in_ms: 5000 }, 'MacBook', 2500).text).toBe('Retrying in 3 s')
   })
 
-  it('never sends the user to a code to scan', () => {
-    expect(connection.status({ state: 'unauthorized' }, 'MacBook').text).not.toMatch(/scan|QR/i)
+  it('sends the user to scan the code again only when the token is rejected', () => {
+    const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
+    expect(views.map((view) => connection.status(view, 'MacBook').text).filter((text) => /scan/i.test(text))).toEqual([])
+    expect(connection.status({ state: 'unauthorized' }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
   })
 })
 

@@ -54,6 +54,7 @@ mod display {
     #[case::no_token(Error::NoToken, "the route has no saved token; scan the bridge's code again")]
     #[case::unknown_machine(Error::UnknownMachine, "no saved machine has that id")]
     #[case::unknown_route(Error::UnknownRoute, "the machine has no route at that address")]
+    #[case::last_route(Error::LastRoute, "a machine keeps at least one route; remove the machine instead")]
     #[case::identity(Error::Identity, "the saved identity is not a 32-byte Ed25519 seed")]
     #[case::random(Error::Random, "the system gave no random bytes for the identity")]
     fn says_what_failed(#[case] error: Error, #[case] message: &str) {

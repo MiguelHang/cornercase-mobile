@@ -2,8 +2,10 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { ConnectionView_Serialize } from '../bindings'
 import type { Tone } from '../connection'
+import clockSource from '../retryClock.svelte.ts?raw'
 import ConnectionBar from './ConnectionBar.svelte'
 import barSource from './ConnectionBar.svelte?raw'
+import dotSource from './ToneDot.svelte?raw'
 
 const RETRYING: ConnectionView_Serialize = {
   state: 'retrying',
@@ -16,7 +18,7 @@ const MISSING: ConnectionView_Serialize = {
 }
 
 const bar = (connection: ConnectionView_Serialize) =>
-  render(ConnectionBar, { props: { connection, machineName: 'MacBook' } }).body
+  render(ConnectionBar, { props: { connection, machineName: 'MacBook', onmachines: () => {} } }).body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -26,7 +28,12 @@ describe('ConnectionBar', () => {
     ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/?token=abc' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
     ['missing', MISSING, 'cornercase on the Mac lacks watch: update it', 'failed'],
-    ['unauthorized', { state: 'unauthorized' }, "The bridge rejected this phone's token", 'failed'],
+    [
+      'unauthorized',
+      { state: 'unauthorized' },
+      "The bridge rejected this phone's token: scan its code again in Machines",
+      'failed',
+    ],
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
     const body = bar(connection)
     expect(body).toMatch(new RegExp(`<span class="dot ${tone} svelte-[\\w-]+( pulsing)?"></span>`))
@@ -60,17 +67,26 @@ describe('ConnectionBar', () => {
     'reads its text aloud as shown when $state',
     (connection) => {
       const body = bar(connection)
-      expect(body).not.toMatch(/aria-hidden|class="spoken/)
+      expect(body).not.toMatch(/class="line text[^>]*aria-hidden|class="spoken/)
     },
   )
 
   it('counts down every second only while retrying, and stops when it leaves', () => {
-    const script = flat(barSource)
-    expect(script).toContain('const TICK_MS = 1000')
-    expect(script).toContain(
-      "$effect(() => { elapsed = 0 if (connection.state !== 'retrying') { return } const since = Date.now() const timer = setInterval(() => (elapsed = Date.now() - since), TICK_MS) return () => clearInterval(timer) })",
+    const clock = flat(clockSource)
+    expect(clock).toContain('const TICK_MS = 1000')
+    expect(clock).toContain(
+      "$effect(() => { elapsed = 0 if (connection().state !== 'retrying') { return } const since = Date.now() const timer = setInterval(() => (elapsed = Date.now() - since), TICK_MS) return () => clearInterval(timer) })",
     )
-    expect(script).toContain('status(connection, machineName, elapsed)')
+    expect(flat(barSource)).toContain(
+      'const clock = retryClock(() => connection) const shown = $derived(status(connection, machineName, clock.elapsed))',
+    )
+  })
+
+  it('ends with a button to the machines, with the server icon and its name for readers', () => {
+    expect(bar({ state: 'connecting' })).toMatch(
+      /<button class="machines svelte-[\w-]+" type="button" aria-label="Machines"><svg[^>]*width="20"[^]*?<rect x="2" y="2" width="20" height="8" rx="2"><\/rect>[^]*?<\/svg><!----><\/button><\/div><\/div>/,
+    )
+    expect(flat(barSource)).toContain('onclick={onmachines}')
   })
 
   it('tells its height below the safe area, for the toasts', () => {
@@ -81,12 +97,18 @@ describe('ConnectionBar', () => {
     'position: fixed; top: 0; left: 0; right: 0;',
     'padding-top: env(safe-area-inset-top);',
     'min-height: 44px;',
+    'width: 44px; height: 44px;',
+    'overflow: hidden; white-space: nowrap; text-overflow: ellipsis;',
+  ])('holds %s', (text) => {
+    expect(flat(barSource)).toContain(text)
+  })
+
+  it.each([
     'width: 8px; height: 8px; border-radius: 999px;',
     '.working { background: var(--working); }',
     '.done { background: var(--done); }',
     '.failed { background: var(--failed); }',
-    'overflow: hidden; white-space: nowrap; text-overflow: ellipsis;',
-  ])('holds %s', (text) => {
-    expect(flat(barSource)).toContain(text)
+  ])('draws its dot with %s', (text) => {
+    expect(flat(dotSource)).toContain(text)
   })
 })

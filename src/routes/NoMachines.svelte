@@ -26,7 +26,7 @@
     <Glass>
       <Emblem icon="server" title="No machines yet" lines={LINES} />
       {#if open}
-        <MachineForm {onadded} oncancel={() => (open = false)} />
+        <MachineForm {onadded} onrouted={onadded} oncancel={() => (open = false)} />
       {:else}
         <div class="actions">
           <Button onclick={() => (open = true)}>Add machine</Button>

@@ -139,6 +139,17 @@ mod connection_url {
     }
 }
 
+mod has_token {
+    use super::*;
+
+    #[rstest]
+    #[case::with_one(Some(TOKEN), true)]
+    #[case::without_one(None, false)]
+    fn says_whether_the_route_carries_its_token(#[case] token: Option<&str>, #[case] has: bool) {
+        assert_eq!(bridge("mac.local", 8765, token).has_token(), has);
+    }
+}
+
 mod debug {
     use super::*;
 

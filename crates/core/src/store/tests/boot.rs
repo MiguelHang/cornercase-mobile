@@ -178,6 +178,26 @@ mod a_restart {
     }
 }
 
+mod the_boot {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn is_the_one_the_contract_names_once_connected() {
+        let (store, mut changes) = spawned(serving(fine()), &Asked::default());
+        until_connected(&mut changes).await;
+        assert_eq!(store.boot(), Some(BOOT.to_owned()));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_the_new_one_after_a_restart() {
+        let (store, mut changes) =
+            spawned(restarting(rebooting(serving(fine())), Some(restarted()), false), &Asked::default());
+        until_connected(&mut changes).await;
+        time::sleep(Duration::from_secs(60)).await;
+        assert_eq!(store.boot(), Some(RESTARTED.to_owned()));
+    }
+}
+
 mod the_queue {
     use super::*;
 

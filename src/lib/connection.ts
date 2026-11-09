@@ -4,7 +4,7 @@ import type {
   ConnectionChanged_Serialize,
   ConnectionState_Serialize,
   ConnectionView_Serialize,
-  MachineView_Serialize,
+  MachineList_Serialize,
 } from './bindings'
 
 export type Screen = {
@@ -39,8 +39,12 @@ export const apply = (current: Screen, event: Changed): Screen => {
   return { ...current, connection: event.connection }
 }
 
-export const firstToConnect = (machines: MachineView_Serialize[], state: ConnectionState_Serialize) =>
-  state.machine === null ? (machines[0]?.id ?? null) : null
+export const firstToConnect = ({ machines, active }: MachineList_Serialize, state: ConnectionState_Serialize) => {
+  if (state.machine !== null) {
+    return null
+  }
+  return machines.some((machine) => machine.id === active) ? active : (machines[0]?.id ?? null)
+}
 
 const seconds = (ms: number) => Math.ceil(ms / 1000)
 
@@ -78,7 +82,7 @@ export const status = (connection: ConnectionView_Serialize, machineName: string
     case 'missing':
       return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
     case 'unauthorized':
-      return failed("The bridge rejected this phone's token")
+      return failed("The bridge rejected this phone's token: scan its code again in Machines")
     case 'incompatible':
       return failed(`Incompatible: ${connection.error.message}`)
     case 'offline':

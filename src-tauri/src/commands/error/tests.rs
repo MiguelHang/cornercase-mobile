@@ -35,6 +35,10 @@ mod from_a_core_error {
     #[case::no_token(Error::NoToken, "no_token")]
     #[case::unknown_machine(Error::UnknownMachine, "unknown_machine")]
     #[case::unknown_route(Error::UnknownRoute, "unknown_route")]
+    #[case::last_route(Error::LastRoute, "last_route")]
+    #[case::name_empty(Error::NameEmpty, "name_empty")]
+    #[case::name_too_long(Error::NameTooLong, "name_too_long")]
+    #[case::name_taken(Error::NameTaken, "name_taken")]
     #[case::identity(Error::Identity, "identity")]
     #[case::random(Error::Random, "random")]
     fn carries_its_code_and_its_message(#[case] error: Error, #[case] code: &str) {

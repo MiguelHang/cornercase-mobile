@@ -45,6 +45,7 @@ targets:
       path: cornercase-mobile_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        NSCameraUsageDescription: The camera scans the QR code of a machine to add.
         UILaunchStoryboardName: LaunchScreen
         UIUserInterfaceStyle: Dark
         UIRequiredDeviceCapabilities: [arm64, metal]

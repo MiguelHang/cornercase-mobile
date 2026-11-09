@@ -59,6 +59,10 @@ impl Route {
         }
     }
 
+    pub fn has_token(&self) -> bool {
+        self.token().is_some()
+    }
+
     pub(crate) fn token(&self) -> Option<&Token> {
         match self {
             Self::Bridge { url } => url.token.as_ref(),

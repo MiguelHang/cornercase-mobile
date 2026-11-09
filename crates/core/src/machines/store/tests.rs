@@ -6,7 +6,6 @@ use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
-use crate::machines::MachineId;
 use crate::machines::route::Address;
 use crate::machines::tests::{TOKEN, bridge};
 
@@ -48,7 +47,7 @@ fn studio(id: u64, token: Option<&str>) -> Machine {
 }
 
 fn saved(next_id: u64) -> Saved {
-    Saved { next_id, machines: (0..next_id).map(|id| studio(id, None)).collect() }
+    Saved { next_id, machines: (0..next_id).map(|id| studio(id, None)).collect(), active: None }
 }
 
 fn store_error<T: Debug>(result: Result<T, Error>) -> String {
@@ -64,7 +63,7 @@ mod load {
     #[test]
     fn gives_an_empty_list_when_the_file_does_not_exist() {
         let folder = Folder::new();
-        assert_eq!(folder.store().load().expect("load"), Saved { next_id: 0, machines: Vec::new() });
+        assert_eq!(folder.store().load().expect("load"), Saved::default());
         assert!(!folder.file().exists());
     }
 
@@ -76,11 +75,27 @@ mod load {
     }
 
     #[test]
+    fn reads_back_the_active_machine() {
+        let folder = Folder::new();
+        let with_active = Saved { active: Some(MachineId(1)), ..saved(2) };
+        folder.store().save(&with_active).expect("save");
+        assert_eq!(folder.store().load().expect("load"), with_active);
+    }
+
+    #[test]
+    fn reads_a_file_written_before_the_active_machine_was_kept() {
+        let folder = Folder::new();
+        let machine = serde_json::to_string(&studio(0, None)).expect("serialize the machine");
+        folder.write(&format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#));
+        assert_eq!(folder.store().load().expect("load"), saved(1));
+    }
+
+    #[test]
     fn reads_the_routes_without_their_tokens() {
         let folder = Folder::new();
-        let with_tokens = Saved { next_id: 4, machines: vec![studio(3, Some(TOKEN))] };
+        let with_tokens = Saved { next_id: 4, machines: vec![studio(3, Some(TOKEN))], active: None };
         folder.store().save(&with_tokens).expect("save");
-        let without = Saved { next_id: 4, machines: vec![studio(3, None)] };
+        let without = Saved { next_id: 4, machines: vec![studio(3, None)], active: None };
         assert_eq!(folder.store().load().expect("load"), without);
         assert!(!folder.text().contains(TOKEN), "{}", folder.text());
     }
@@ -123,12 +138,12 @@ mod save {
     use super::*;
 
     #[test]
-    fn writes_the_version_the_next_id_and_the_machines() {
+    fn writes_the_version_the_next_id_the_machines_and_the_active_one() {
         let folder = Folder::new();
-        folder.store().save(&saved(1)).expect("save");
+        folder.store().save(&Saved { active: Some(MachineId(0)), ..saved(1) }).expect("save");
         let written: serde_json::Value = serde_json::from_str(&folder.text()).expect("the file is JSON");
         let machine = serde_json::to_value(studio(0, None)).expect("serialize the machine");
-        assert_eq!(written, serde_json::json!({ "version": 1, "next_id": 1, "machines": [machine] }));
+        assert_eq!(written, serde_json::json!({ "version": 1, "next_id": 1, "machines": [machine], "active": 0 }));
     }
 
     #[test]
