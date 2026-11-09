@@ -24,6 +24,12 @@ mod display {
         Error::Json("expected value at line 1 column 1".to_owned()),
         "cornercase's output is not the expected JSON: expected value at line 1 column 1"
     )]
+    #[case::store(
+        Error::Store("permission denied".to_owned()),
+        "cannot read or write the saved machines: permission denied"
+    )]
+    #[case::secrets(Error::Secrets("item not found".to_owned()), "the secret store failed: item not found")]
+    #[case::no_token(Error::NoToken, "the route has no saved token; scan the bridge's code again")]
     fn says_what_failed(#[case] error: Error, #[case] message: &str) {
         assert_eq!(error.to_string(), message);
     }
