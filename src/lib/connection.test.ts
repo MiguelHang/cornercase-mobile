@@ -121,6 +121,7 @@ describe('status', () => {
     ['missing', MISSING, failing('cornercase on the Mac lacks watch, input: update it')],
     ['unauthorized', { state: 'unauthorized' }, failing("The bridge rejected this phone's token")],
     ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
+    ['offline', { state: 'offline' }, failing('No network')],
   ])('shows %s', (_, view, shown) => {
     expect(connection.status(view, 'MacBook')).toEqual(shown)
   })

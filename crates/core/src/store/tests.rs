@@ -14,6 +14,7 @@ use crate::transport::{Exit, OutSink, Stdin};
 
 mod boot;
 mod connect;
+mod offline;
 mod resume;
 mod retry;
 mod streams;
@@ -110,6 +111,8 @@ fn poke(store: &Store, resume: Resume) {
     match resume {
         Resume::Foreground => store.resume_now(),
         Resume::Network => store.network_changed(),
+        Resume::Offline => store.offline(),
+        Resume::Online => store.online(),
     }
 }
 

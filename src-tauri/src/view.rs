@@ -43,6 +43,7 @@ pub(crate) enum ConnectionView {
     Incompatible {
         error: CommandError,
     },
+    Offline,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -80,6 +81,7 @@ impl From<&Connection> for ConnectionView {
             Connection::Missing(missing) => Self::Missing { missing: missing.clone() },
             Connection::Unauthorized => Self::Unauthorized,
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
+            Connection::Offline => Self::Offline,
         }
     }
 }

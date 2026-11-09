@@ -49,6 +49,7 @@ pub enum Connection {
     Missing(Vec<Missing>),
     Unauthorized,
     Incompatible(Error),
+    Offline,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +104,14 @@ impl Store {
 
     pub fn network_changed(&self) {
         let _ = self.resumes.send(Resume::Network);
+    }
+
+    pub fn offline(&self) {
+        let _ = self.resumes.send(Resume::Offline);
+    }
+
+    pub fn online(&self) {
+        let _ = self.resumes.send(Resume::Online);
     }
 }
 
@@ -261,19 +270,19 @@ where
     }
 
     async fn attempt(&mut self, resumes: &mut Resumes) -> bool {
-        resumes.forget();
+        if resumes.forget() {
+            return self.offline(resumes).await;
+        }
         self.shared.set_connection(Connection::Connecting);
-        let woken = match resumes.race(self.connect(), Resume::interrupts).await {
-            Woken::Done(Ok(picked)) => self.follow(&picked, resumes).await,
-            Woken::Done(Err(Failure::Retry(error))) => Woken::Done(error),
+        let picked = match resumes.race(self.connect(), Resume::interrupts).await {
+            Woken::Done(Ok(picked)) => picked,
+            Woken::Done(Err(Failure::Retry(error))) => return self.retry(error, resumes).await,
             Woken::Done(Err(Failure::Stop(connection))) => return self.stop(connection, resumes).await,
-            Woken::Resumed => return true,
-            Woken::Dropped => return false,
+            woken => return self.woke(woken, resumes).await,
         };
-        match woken {
+        match self.follow(&picked, resumes).await {
             Woken::Done(error) => self.retry(error, resumes).await,
-            Woken::Resumed => true,
-            Woken::Dropped => false,
+            woken => self.woke(woken, resumes).await,
         }
     }
 
@@ -289,6 +298,7 @@ where
             Woken::Done(Ended::Failed(error)) => Woken::Done(error),
             Woken::Done(Ended::Restarted) => self.restart(&picked.transport),
             Woken::Resumed => Woken::Resumed,
+            Woken::Offline => Woken::Offline,
             Woken::Dropped => Woken::Dropped,
         }
     }
@@ -301,15 +311,32 @@ where
         Woken::Resumed
     }
 
-    async fn stop(&self, connection: Connection, resumes: &mut Resumes) -> bool {
+    async fn stop(&mut self, connection: Connection, resumes: &mut Resumes) -> bool {
         self.shared.set_connection(connection);
-        resumes.asked(|_| true).await
+        let woken = resumes.asked::<()>(|_| true).await;
+        self.woke(woken, resumes).await
     }
 
     async fn retry(&mut self, error: Error, resumes: &mut Resumes) -> bool {
         let wait = self.backoff.failed();
         self.shared.set_connection(Connection::Retrying { r#in: wait, error });
-        !matches!(resumes.race(time::sleep(wait), |_| true).await, Woken::Dropped)
+        let woken = resumes.race(time::sleep(wait), |_| true).await;
+        self.woke(woken, resumes).await
+    }
+
+    async fn woke<T>(&mut self, woken: Woken<T>, resumes: &mut Resumes) -> bool {
+        match woken {
+            Woken::Done(_) | Woken::Resumed => true,
+            Woken::Offline => self.offline(resumes).await,
+            Woken::Dropped => false,
+        }
+    }
+
+    async fn offline(&mut self, resumes: &mut Resumes) -> bool {
+        self.shared.set_connection(Connection::Offline);
+        let woken = resumes.asked::<()>(|resume| resume == Resume::Online).await;
+        self.backoff.reset();
+        !matches!(woken, Woken::Dropped)
     }
 }
 
