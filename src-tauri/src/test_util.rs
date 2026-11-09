@@ -1,13 +1,16 @@
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use cornercase_bridge::test_util::TempDir;
+use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
-use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
+use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
+use futures_util::stream::BoxStream;
+use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
 use tauri::async_runtime::JoinHandle;
 use tauri::http::HeaderMap;
@@ -18,7 +21,7 @@ use tauri::{App, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuil
 use tokio::time;
 
 use crate::bindings;
-use crate::commands::connection::Launcher;
+use crate::commands::connection::{Launcher, start};
 use crate::commands::error::CommandError;
 use crate::events::{AgentsChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast};
 use crate::secrets::{mock_store, on_mock};
@@ -33,6 +36,7 @@ pub(crate) const CONTRACT: &[&str] = &["contract", "--json"];
 pub(crate) const EVENTS: &[&str] = &["events", "--json", "--notices"];
 pub(crate) const STATUS: &[&str] = &["status", "--follow", "--json"];
 pub(crate) const APP: &[&str] = &["status", "--app", "--follow", "--json"];
+const REQUESTS: &[&str] = &["requests", "--follow", "-"];
 const REAL_CONTRACT: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/contract/0.13.19.json"));
 
@@ -201,4 +205,40 @@ pub(crate) fn launcher(fake: FakeTransport) -> (Launcher, Arc<FakeTransport>) {
         |task| JoinHandle::Tokio(tokio::spawn(task)),
     );
     (launcher, transport)
+}
+
+pub(crate) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeTransport) -> Ipc {
+    let studio = Studio::new();
+    let state = studio.reloaded();
+    let (launcher, _) = launcher(scripted(serving(&[snapshot(BOOT, 7, "first")])));
+    start(&state, Recorder::default(), &launcher, studio.id).expect("connecting");
+    settle().await;
+    Ipc::new(state)
+}
+fn requests(fake: FakeTransport, answer: Option<Value>, lines: &Sender<String>) -> FakeTransport {
+    let lines = lines.clone();
+    fake.script(REQUESTS, move |stdin, out| answer_lines(lines.clone(), answer.clone(), stdin, out))
+}
+
+async fn answer_lines(
+    lines: Sender<String>,
+    answer: Option<Value>,
+    mut stdin: BoxStream<'static, Stdin>,
+    mut out: OutSink,
+) -> Result<Exit, Error> {
+    while let Some(Stdin::Text(line)) = stdin.next().await {
+        lines.send(line).expect("the test reads the lines");
+        let Some(answer) = &answer else { break };
+        out.send(Out::Stdout(answer.to_string())).await.map_err(|Closed| Error::OutputClosed)?;
+    }
+    Ok(Exit { code: 0, stderr: String::new() })
+}
+
+pub(crate) async fn queueing(answer: Option<Value>) -> (Ipc, Receiver<String>) {
+    let (lines, written) = mpsc::channel();
+    (connected_with(|fake| requests(fake, answer, &lines)).await, written)
+}
+
+pub(crate) fn written(lines: &Receiver<String>) -> Vec<Value> {
+    lines.try_iter().map(|line| serde_json::from_str(&line).expect("a requests line")).collect()
 }

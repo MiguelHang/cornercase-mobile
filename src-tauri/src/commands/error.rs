@@ -56,6 +56,7 @@ pub(crate) enum ErrorCode {
     NoIdentity,
     NotConnected,
     NotSent,
+    NoDigest,
 }
 
 impl CommandError {
@@ -81,6 +82,10 @@ impl CommandError {
 
     pub(crate) fn not_sent() -> Self {
         Self::new(ErrorCode::NotSent, "nothing was sent")
+    }
+
+    pub(crate) fn no_digest() -> Self {
+        Self::new(ErrorCode::NoDigest, "marking a file viewed needs the digest of the version shown")
     }
 
     pub(crate) fn maybe_sent() -> Self {
