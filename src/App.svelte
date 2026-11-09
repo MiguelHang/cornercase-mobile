@@ -1,15 +1,16 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import {
     commands,
     events,
     type AgentRow_Serialize as AgentRow,
     type MachineView_Serialize,
   } from './lib/bindings'
+  import { Chat, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
-  import { openedAgent, openedTerminal, Router, routeFor } from './lib/router.svelte'
+  import { openedTerminal, Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
@@ -32,12 +33,29 @@
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
-  const opened = $derived(openedAgent(route, current))
+  const opening = $derived(router.opened)
+  const pane = $derived(opening?.pane ?? null)
+  const owner = $derived(opening?.machine ?? null)
+  const chat = $derived(pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send))
+  const seen = $derived(chat?.row != null)
   const viewed = $derived(openedTerminal(route, current))
   const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)
   const rescanning = $derived(route.name === 'machine' && route.adding === true)
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
+
+  $effect(() => {
+    const { machine, agents } = current
+    if (chat !== null) {
+      untrack(() => chat.see(machine, agents))
+    }
+  })
+
+  $effect(() => {
+    if (chat !== null && seen) {
+      untrack(() => chat.refresh())
+    }
+  })
 
   const show = (next: Screen) => {
     current = next
@@ -101,6 +119,11 @@
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
       events.agentsChanged.listen((event) => show(apply(current, event.payload))),
+      events.paneStatusChanged.listen((event) => {
+        if (chat !== null && touches(event.payload, chat.machine, chat.pane)) {
+          void chat.refresh()
+        }
+      }),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
     Promise.all(listening).then(load).catch(toasts.failed)
@@ -131,12 +154,13 @@
         below={barHeight}
         onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })}
       />
-    {:else}
+    {:else if chat !== null}
       <Agent
-        row={opened}
+        {chat}
         connection={current.connection}
         below={barHeight}
         onback={() => router.back()}
+        onfailed={(message) => toasts.push({ level: 'error', message })}
         onterminal={terminal}
       />
     {/if}

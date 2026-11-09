@@ -18,6 +18,8 @@ export const commands = {
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
+	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
+	send: (pane: number, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text })),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 };
@@ -26,6 +28,7 @@ export const commands = {
 export const events = {
 	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
+	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
@@ -154,9 +157,27 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent";
 
 export type Kind = "operation" | "feature" | "stream";
+
+export type LastMessage = LastMessage_Serialize | LastMessage_Deserialize;
+
+export type LastMessage_Deserialize = {
+	pane?: number,
+	agent?: string,
+	text?: string,
+	written?: string | null,
+	turn_over?: boolean | null,
+};
+
+export type LastMessage_Serialize = {
+	pane: number,
+	agent: string,
+	text: string,
+	written: string | null,
+	turn_over: boolean | null,
+};
 
 export type MachineList = MachineList_Serialize | MachineList_Deserialize;
 
@@ -205,6 +226,18 @@ export type Missing_Serialize = {
 	name: string,
 	kind: Kind,
 	reason: string | null,
+};
+
+export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;
+
+export type PaneStatusChanged_Deserialize = {
+	machine: number,
+	pane?: number | null,
+};
+
+export type PaneStatusChanged_Serialize = {
+	machine: number,
+	pane: number | null,
 };
 
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };

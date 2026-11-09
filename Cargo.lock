@@ -516,6 +516,7 @@ dependencies = [
  "apple-native-keyring-store",
  "cornercase-bridge",
  "cornercase-core",
+ "futures-util",
  "keyring-core",
  "rstest",
  "serde",

@@ -140,10 +140,29 @@ describe('App wiring', () => {
     )
   })
 
-  it('opens the agent of the tapped pane on its own machine, and goes back from it', () => {
-    expect(source).toContain('const opened = $derived(openedAgent(route, current))')
+  it('opens a chat for the tapped pane on its own machine, kept alive under its terminal and under Machines, and goes back from it', () => {
+    expect(source).toContain('const opening = $derived(router.opened)')
+    expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
+    expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      '<Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} onterminal={terminal} />',
+      'const chat = $derived(pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send))',
+    )
+    expect(source).toContain(
+      "<Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} />",
+    )
+  })
+
+  it('gives the chat every list of agents, and reads once its row is seen', () => {
+    expect(source).toContain(
+      '$effect(() => { const { machine, agents } = current if (chat !== null) { untrack(() => chat.see(machine, agents)) } })',
+    )
+    expect(source).toContain('const seen = $derived(chat?.row != null)')
+    expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
+  })
+
+  it('reads again on a status change of its pane on its machine', () => {
+    expect(source).toContain(
+      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, chat.machine, chat.pane)) { void chat.refresh() } }),',
     )
   })
 
@@ -162,7 +181,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      '{:else} <Agent row={opened} connection={current.connection} below={barHeight} onback={() => router.back()} onterminal={terminal} /> {/if}',
+      "{:else if chat !== null} <Agent {chat} connection={current.connection} below={barHeight} onback={() => router.back()} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} /> {/if}",
     )
   })
 })

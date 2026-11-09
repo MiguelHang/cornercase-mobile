@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as connection from './connection'
-import { openedAgent, openedTerminal, Router, routeFor } from './router.svelte'
+import { chatOf, openedTerminal, type Route, Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
@@ -209,47 +209,10 @@ describe('routeFor', () => {
   })
 })
 
-const row = (pane: number) => ({ pane }) as AgentRow
-
 const on = (machine: number | null, agents: AgentRow[] | null): connection.Screen => ({
   machine,
   connection: CONNECTED,
   agents,
-})
-
-describe('openedAgent', () => {
-  it('finds the row of its pane on the machine it was opened on', () => {
-    const rows = [row(3), row(7)]
-    expect(openedAgent(AGENT, on(1, rows))).toBe(rows[1])
-  })
-
-  it('waits while that machine has not sent its agents yet', () => {
-    expect(openedAgent(AGENT, on(1, null))).toBeNull()
-  })
-
-  it('says the agent is gone once its pane is not listed', () => {
-    expect(openedAgent(AGENT, on(1, [row(3)]))).toBeUndefined()
-  })
-
-  it('says the agent is gone on another machine, even one with a pane of the same id', () => {
-    expect(openedAgent(AGENT, on(2, [row(7)]))).toBeUndefined()
-    expect(openedAgent(AGENT, on(2, null))).toBeUndefined()
-    expect(openedAgent(AGENT, on(null, null))).toBeUndefined()
-  })
-
-  it('opens nothing on another route', () => {
-    expect(openedAgent(HOME, on(1, [row(7)]))).toBeUndefined()
-  })
-
-  it('shows no agent of the new machine on Back from Machines after switching', () => {
-    const router = new Router(HOME)
-    router.go(AGENT)
-    router.go(MACHINES)
-    router.setBase(HOME)
-    router.back()
-    expect(router.current).toEqual(AGENT)
-    expect(openedAgent(router.current, on(2, [row(7)]))).toBeUndefined()
-  })
 })
 
 describe('openedTerminal', () => {
@@ -273,5 +236,52 @@ describe('openedTerminal', () => {
     router.setBase(HOME)
     expect(router.current).toBe(TERMINAL)
     expect(openedTerminal(router.current, on(2, [ROW]))).toBeUndefined()
+  })
+})
+
+describe('chatOf', () => {
+  it("is the agent's pane and machine on its screen and under its terminal", () => {
+    expect(chatOf(AGENT)).toEqual({ machine: 1, pane: 7 })
+    expect(chatOf({ ...TERMINAL, machine: 2, row: { ...ROW, pane: 9 } })).toEqual({ machine: 2, pane: 9 })
+  })
+
+  it.each([HOME, NO_MACHINES, MACHINES, MACHINE])('is none elsewhere', (route) => {
+    expect(chatOf(route)).toBeNull()
+  })
+
+  it('keeps the machine the agent was opened on, after switching from Machines and going back', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(MACHINES)
+    router.setBase(HOME)
+    router.back()
+    expect(chatOf(router.current)).toEqual({ machine: 1, pane: 7 })
+  })
+})
+
+const opened = (...routes: Route[]) => {
+  const router = new Router(HOME)
+  routes.forEach((route) => router.go(route))
+  return router.opened
+}
+
+describe('Router, the opened chat', () => {
+  it('is none on the board', () => {
+    expect(opened()).toBeNull()
+    expect(new Router(NO_MACHINES).opened).toBeNull()
+  })
+
+  it("is the agent's on its screen and under its terminal", () => {
+    expect(opened(AGENT)).toEqual({ machine: 1, pane: 7 })
+    expect(opened(AGENT, { ...TERMINAL, row: { ...ROW, pane: 9 } })).toEqual({ machine: 1, pane: 9 })
+  })
+
+  it("stays the agent's under Machines and a machine opened from it, so the chat lives on", () => {
+    expect(opened(AGENT, MACHINES)).toEqual({ machine: 1, pane: 7 })
+    expect(opened(AGENT, MACHINES, MACHINE)).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it('is none under Machines opened from the board', () => {
+    expect(opened(MACHINES, MACHINE)).toBeNull()
   })
 })
