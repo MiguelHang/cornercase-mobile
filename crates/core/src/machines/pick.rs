@@ -11,6 +11,7 @@ use tokio::time::{self, Instant};
 use super::Machine;
 use super::route::{Address, Route};
 use crate::error::Error;
+use crate::transport::bridge::{BridgeConfig, BridgeTransport};
 use crate::transport::{self, Transport};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +79,13 @@ where
     match race(&mut racing, deadline, &mut failures).await {
         Some(picked) => Ok(picked),
         None => Err(PickError::AllFailed(timed_out(machine, failures))),
+    }
+}
+
+pub fn bridge_transports(config: BridgeConfig) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> {
+    move |route| {
+        let transport: Arc<dyn Transport> = Arc::new(BridgeTransport::new(route.connection_url()?, config));
+        Ok(transport)
     }
 }
 

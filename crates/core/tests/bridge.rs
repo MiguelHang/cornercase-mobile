@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use futures_util::{StreamExt, sink, stream};
 use rstest::rstest;
+use serde_json::json;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tokio::task::JoinHandle;
@@ -11,6 +12,9 @@ use cornercase_bridge::test_util::{
     HUNG, Served, TOKEN, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until,
 };
 use cornercase_core::error::Error;
+use cornercase_core::machines::pick::{PickConfig, bridge_transports, pick_route};
+use cornercase_core::machines::route::Route;
+use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::protocol::{LARGEST_MESSAGE, LONGEST_LINE};
 use cornercase_core::transport::bridge::{BridgeConfig, BridgeTransport};
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
@@ -149,5 +153,31 @@ mod run {
         running.abort();
         assert!(in_time(running).await.expect_err("the run is dropped").is_cancelled());
         wait_until(async || reaped(pid)).await;
+    }
+}
+
+mod pick_route {
+    use super::*;
+
+    fn route(url: &str) -> Route {
+        Route::parse(url).expect("a route")
+    }
+
+    #[tokio::test]
+    async fn skips_a_closed_port_and_takes_the_contract_of_the_bridge_that_answers() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("a listener");
+        let closed = format!("ws://{}/?token={TOKEN}", listener.local_addr().expect("its address"));
+        drop(listener);
+        let bridge = Bridge::start(r#"[ "$*" = "contract --json" ] && echo '{"version":1}'"#).await;
+        let live = route(&bridge.served.url(&format!("/?token={TOKEN}")));
+        let machine = Machine {
+            id: MachineId(1),
+            name: "studio".to_owned(),
+            routes: vec![route(&closed), live.clone()],
+            last_route: None,
+        };
+        let factory = bridge_transports(BridgeConfig::default());
+        let picked = in_time(pick_route(&machine, factory, PickConfig::default())).await.expect("the live route wins");
+        assert_eq!((picked.route, picked.contract), (live, json!({ "version": 1 })));
     }
 }
