@@ -10,7 +10,7 @@ export const commands = {
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
-	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
+	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
@@ -18,13 +18,59 @@ export const commands = {
 
 /** Events */
 export const events = {
+	agentsChanged: makeEvent<AgentsChanged_Serialize, AgentsChanged_Deserialize>("agents-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
-	sessionChanged: makeEvent<SessionChanged_Serialize, SessionChanged_Deserialize>("session-changed"),
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
 
 /* Types */
+export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
+
+export type AgentRow_Deserialize = {
+	boot: string,
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	project_name: string,
+	workspace_name: string,
+	tab_name: string,
+	workspace_count: number,
+	agent: string,
+	title?: string | null,
+	status?: string | null,
+	since?: string | null,
+};
+
+export type AgentRow_Serialize = {
+	boot: string,
+	project: number,
+	workspace: number,
+	tab: number,
+	pane: number,
+	project_name: string,
+	workspace_name: string,
+	tab_name: string,
+	workspace_count: number,
+	agent: string,
+	title: string | null,
+	status: string | null,
+	since: string | null,
+};
+
+export type AgentsChanged = AgentsChanged_Serialize | AgentsChanged_Deserialize;
+
+export type AgentsChanged_Deserialize = {
+	machine: number,
+	agents?: AgentRow_Deserialize[] | null,
+};
+
+export type AgentsChanged_Serialize = {
+	machine: number,
+	agents: AgentRow_Serialize[] | null,
+};
+
 export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
 
 export type Colours = Colours_Serialize | Colours_Deserialize;
@@ -102,24 +148,6 @@ export type Cursor_Serialize = {
 
 export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected";
 
-export type Group = Group_Serialize | Group_Deserialize;
-
-export type Group_Deserialize = {
-	id?: number,
-	name?: string,
-	icon?: string,
-	colour?: number,
-	collapsed?: boolean,
-};
-
-export type Group_Serialize = {
-	id: number,
-	name: string,
-	icon: string,
-	colour: number,
-	collapsed: boolean,
-};
-
 export type Kind = "operation" | "feature" | "stream";
 
 export type MachineView = MachineView_Serialize | MachineView_Deserialize;
@@ -152,54 +180,6 @@ export type Missing_Serialize = {
 	reason: string | null,
 };
 
-export type Pane = Pane_Serialize | Pane_Deserialize;
-
-export type Pane_Deserialize = {
-	id?: number,
-	agent?: string | null,
-	status?: string | null,
-	program?: string | null,
-	title?: string | null,
-	path?: string | null,
-	parent?: number | null,
-	active?: boolean,
-	dialog?: boolean,
-	at_prompt?: boolean | null,
-};
-
-export type Pane_Serialize = {
-	id: number,
-	agent: string | null,
-	status: string | null,
-	program: string | null,
-	title: string | null,
-	path: string | null,
-	parent: number | null,
-	active: boolean,
-	dialog: boolean,
-	at_prompt: boolean | null,
-};
-
-export type Project = Project_Serialize | Project_Deserialize;
-
-export type Project_Deserialize = {
-	id?: number,
-	name?: string,
-	custom_name?: string | null,
-	path?: string | null,
-	group?: number | null,
-	workspaces?: Workspace_Deserialize[],
-};
-
-export type Project_Serialize = {
-	id: number,
-	name: string,
-	custom_name: string | null,
-	path: string | null,
-	group: number | null,
-	workspaces: Workspace_Serialize[],
-};
-
 export type RouteView = { kind: "bridge"; url: string };
 
 export type Run = Run_Serialize | Run_Deserialize;
@@ -216,18 +196,6 @@ export type Run_Serialize = {
 	style: Style_Serialize,
 };
 
-export type SessionChanged = SessionChanged_Serialize | SessionChanged_Deserialize;
-
-export type SessionChanged_Deserialize = {
-	machine: number,
-	session?: Snapshot_Deserialize | null,
-};
-
-export type SessionChanged_Serialize = {
-	machine: number,
-	session: Snapshot_Serialize | null,
-};
-
 export type Size = Size_Serialize | Size_Deserialize;
 
 export type Size_Deserialize = {
@@ -238,24 +206,6 @@ export type Size_Deserialize = {
 export type Size_Serialize = {
 	cols: number,
 	rows: number,
-};
-
-export type Snapshot = Snapshot_Serialize | Snapshot_Deserialize;
-
-export type Snapshot_Deserialize = {
-	boot?: string,
-	revision?: number,
-	version?: string,
-	groups?: Group_Deserialize[],
-	projects?: Project_Deserialize[],
-};
-
-export type Snapshot_Serialize = {
-	boot: string,
-	revision: number,
-	version: string,
-	groups: Group_Serialize[],
-	projects: Project_Serialize[],
 };
 
 export type Style = Style_Serialize | Style_Deserialize;
@@ -290,26 +240,6 @@ export type Style_Serialize = {
 	inverse: boolean,
 	invisible: boolean,
 	strikethrough: boolean,
-};
-
-export type Tab = Tab_Serialize | Tab_Deserialize;
-
-export type Tab_Deserialize = {
-	id?: number,
-	name?: string,
-	custom_name?: string | null,
-	status?: string | null,
-	active?: boolean,
-	panes?: Pane_Deserialize[],
-};
-
-export type Tab_Serialize = {
-	id: number,
-	name: string,
-	custom_name: string | null,
-	status: string | null,
-	active: boolean,
-	panes: Pane_Serialize[],
 };
 
 export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;
@@ -350,28 +280,6 @@ export type UnderlineKind = UnderlineKind_Serialize | UnderlineKind_Deserialize;
 export type UnderlineKind_Deserialize = "double" | "curly" | "dotted" | "dashed" | string;
 
 export type UnderlineKind_Serialize = "double" | "curly" | "dotted" | "dashed" | "other";
-
-export type Workspace = Workspace_Serialize | Workspace_Deserialize;
-
-export type Workspace_Deserialize = {
-	id?: number,
-	name?: string,
-	custom_name?: string | null,
-	path?: string | null,
-	branch?: string | null,
-	worktree?: boolean,
-	tabs?: Tab_Deserialize[],
-};
-
-export type Workspace_Serialize = {
-	id: number,
-	name: string,
-	custom_name: string | null,
-	path: string | null,
-	branch: string | null,
-	worktree: boolean,
-	tabs: Tab_Serialize[],
-};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

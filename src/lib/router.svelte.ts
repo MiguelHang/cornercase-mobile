@@ -1,9 +1,11 @@
-import type { AgentTab, Screen } from './connection'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
+import type { Screen } from './connection'
 
 export type Route =
   | { name: 'no-machines' }
   | { name: 'home' }
-  | { name: 'terminal'; machine: number; boot: string; tab: AgentTab }
+  | { name: 'agent'; pane: number }
+  | { name: 'terminal'; machine: number; row: AgentRow }
 
 export const routeFor = (screen: Screen): Route => (screen.machine === null ? { name: 'no-machines' } : { name: 'home' })
 
@@ -22,10 +24,11 @@ export class Router {
     this.#stack = [...this.#stack, route]
   }
 
-  replace(route: Route) {
-    if (this.#stack[0].name !== route.name) {
-      this.#stack = [route]
+  settle(route: Route) {
+    if (this.#stack[0].name === route.name) {
+      return
     }
+    this.#stack = [route]
   }
 
   back() {

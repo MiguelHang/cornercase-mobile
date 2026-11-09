@@ -1,11 +1,27 @@
 import { describe, expect, it } from 'vitest'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import * as connection from './connection'
 import { Router, routeFor } from './router.svelte'
 
 const HOME = { name: 'home' } as const
 const NO_MACHINES = { name: 'no-machines' } as const
-const TAB = { tab: 3, pane: 30, name: 'fix login', agent: 'claude', where: 'app · main' }
-const TERMINAL = { name: 'terminal', machine: 1, boot: 'b1', tab: TAB } as const
+const AGENT = { name: 'agent', pane: 7 } as const
+const ROW: AgentRow = {
+  boot: 'b1',
+  agent: 'claude',
+  title: null,
+  status: 'working',
+  since: null,
+  pane: 7,
+  tab: 3,
+  tab_name: 'fix login',
+  workspace: 2,
+  workspace_name: 'main',
+  workspace_count: 1,
+  project: 1,
+  project_name: 'app',
+}
+const TERMINAL = { name: 'terminal', machine: 1, row: ROW } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -26,44 +42,71 @@ describe('Router', () => {
     expect(router.current).toEqual(NO_MACHINES)
   })
 
-  it('replaces the base and drops what was above it', () => {
-    const router = new Router(NO_MACHINES)
-    router.go(NO_MACHINES)
-    router.replace(HOME)
-    expect(router.current).toEqual(HOME)
-    router.back()
-    expect(router.current).toEqual(HOME)
-  })
-
-  it('keeps the base when it is replaced by one of the same name', () => {
-    const base = { name: 'home' } as const
-    const router = new Router(base)
-    router.go(NO_MACHINES)
-    router.replace({ name: 'home' })
-    router.back()
-    expect(router.current).toBe(base)
-  })
-
-  it('keeps a terminal on top while the session changes under it', () => {
-    const router = new Router(HOME)
-    router.go(TERMINAL)
-    router.replace({ name: 'home' })
-    expect(router.current).toBe(TERMINAL)
-    router.back()
-    expect(router.current).toEqual(HOME)
-  })
-
-  it('drops a terminal once its machine is gone', () => {
-    const router = new Router(HOME)
-    router.go(TERMINAL)
-    router.replace(NO_MACHINES)
-    expect(router.current).toEqual(NO_MACHINES)
-  })
-
   it('stays on the only route when going back', () => {
     const router = new Router(HOME)
     router.back()
     expect(router.current).toEqual(HOME)
+  })
+
+  it('goes to an agent from home and back', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    expect(router.current).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+})
+
+describe('Router.settle', () => {
+  it('stays on an agent while the connection settles on home', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.settle(HOME)
+    expect(router.current).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('leaves only the empty screen once the machine is gone', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.settle(NO_MACHINES)
+    expect(router.current).toEqual(NO_MACHINES)
+    router.back()
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+
+  it('leaves only home once a machine is added', () => {
+    const router = new Router(NO_MACHINES)
+    router.settle(HOME)
+    expect(router.current).toEqual(HOME)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('stays on a terminal opened from an agent while the connection settles on home', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(TERMINAL)
+    router.settle(HOME)
+    expect(router.current).toBe(TERMINAL)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+  })
+
+  it('drops a terminal once its machine is gone', () => {
+    const router = new Router(HOME)
+    router.go(AGENT)
+    router.go(TERMINAL)
+    router.settle(NO_MACHINES)
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+
+  it('keeps the route it settles on when it is already there', () => {
+    const first = { name: 'home' } as const
+    const router = new Router(first)
+    router.settle({ name: 'home' })
+    expect(router.current).toBe(first)
   })
 })
 

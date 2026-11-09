@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { commands, events, type Size_Deserialize } from '../../lib/bindings'
-  import type { AgentTab } from '../../lib/connection'
+  import {
+    commands,
+    events,
+    type AgentRow_Serialize as AgentRow,
+    type Size_Deserialize,
+  } from '../../lib/bindings'
+  import { label, place } from '../../lib/board'
   import { Opening } from '../../lib/terminal/opening'
   import { Pane, shows } from '../../lib/terminal/pane.svelte'
   import TerminalView from '../../lib/terminal/Terminal.svelte'
@@ -9,15 +14,13 @@
 
   let {
     machine,
-    boot,
-    tab,
+    row,
     onback,
     onfailed,
     height = $bindable(0),
   }: {
     machine: number
-    boot: string
-    tab: AgentTab
+    row: AgentRow
     onback: () => void
     onfailed: (error: unknown) => void
     height?: number
@@ -29,12 +32,12 @@
 
   onMount(() => {
     const unlisten = events.terminalChanged.listen((event) => {
-      if (shows(event.payload, machine, tab.tab)) {
+      if (shows(event.payload, machine, row.tab)) {
         shown.apply(event.payload)
       }
     })
-    const open = (size: Size_Deserialize) => commands.terminalOpen(tab.tab, tab.pane, size)
-    const close = () => commands.terminalClose(tab.tab)
+    const open = (size: Size_Deserialize) => commands.terminalOpen(row.tab, row.pane, size)
+    const close = () => commands.terminalClose(row.tab)
     opening = new Opening(unlisten, { open, close, failed: onfailed })
     return () => {
       unlisten.then((stop) => stop()).catch(onfailed)
@@ -53,12 +56,12 @@
   <header class="bar" bind:clientHeight={height}>
     <button class="back" type="button" aria-label="Back" onclick={onback}><Icon name="chevron-left" /></button>
     <span class="lines">
-      <span class="line name">{tab.name}</span>
-      <span class="line where">{tab.agent} · {tab.where}</span>
+      <span class="line name">{label(row)}</span>
+      <span class="line where">{row.tab_name} · {place(row)}</span>
     </span>
   </header>
   <div class="view">
-    <TerminalView pane={shown.current} place={{ machine, boot, tab: tab.tab }} onfit={(size) => (wanted = size)} />
+    <TerminalView pane={shown.current} place={{ machine, boot: row.boot, tab: row.tab }} onfit={(size) => (wanted = size)} />
   </div>
   {#if shown.current.closed}
     <p class="closed" role="status">This tab was closed on the Mac</p>

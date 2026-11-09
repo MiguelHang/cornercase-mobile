@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use cornercase_core::cli::surface::{Colours, Size};
 use cornercase_core::machines::Machine;
@@ -11,6 +12,7 @@ use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
+use tokio::time;
 
 use super::*;
 use crate::secrets::{mock_store, on_mock};
@@ -22,6 +24,9 @@ use crate::test_util::{
 
 const RESTARTED: &str = "5152-1770000100";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
+const HEARD: &str = "2026-10-16T09:30:00.123Z";
+
+type Row = (Option<String>, Option<String>);
 
 fn by_call(fake: FakeTransport, argv: &'static [&'static str], answers: Vec<FakeTransport>) -> FakeTransport {
     let answers: Vec<Arc<FakeTransport>> = answers.into_iter().map(Arc::new).collect();
@@ -42,6 +47,42 @@ fn restarting() -> FakeTransport {
     by_call(by_call(fake, CONTRACT, contracts), STATUS, watches)
 }
 
+fn later(fake: FakeTransport, argv: &'static [&'static str], lines: &[String]) -> FakeTransport {
+    let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let late = Arc::new(FakeTransport::default().open(argv, &lines));
+    fake.script(argv, move |stdin, out| {
+        let late = Arc::clone(&late);
+        let argv = argv.iter().map(|&word| word.to_owned()).collect();
+        async move {
+            time::sleep(Duration::from_secs(5)).await;
+            late.run(argv, stdin, out).await
+        }
+    })
+}
+
+fn one_by_one(snapshots: &[String]) -> FakeTransport {
+    let mut watches: Vec<FakeTransport> =
+        snapshots.iter().map(|snapshot| FakeTransport::default().answer(STATUS, &[snapshot], &[], 0)).collect();
+    watches.push(FakeTransport::default().open(STATUS, &[]));
+    by_call(serving(&[]), STATUS, watches)
+}
+
+fn with_claude(revision: u64, status: &str) -> String {
+    let pane = json!({ "id": 4, "agent": "claude", "status": status });
+    let tab = json!({ "id": 3, "name": "claude", "panes": [pane] });
+    let workspace = json!({ "id": 2, "name": "default", "tabs": [tab] });
+    let project = json!({ "id": 1, "name": "shop", "workspaces": [workspace] });
+    json!({ "boot": BOOT, "revision": revision, "version": "first", "projects": [project] }).to_string()
+}
+
+fn status_event(to: &str) -> String {
+    json!({
+        "time": HEARD, "event": "status", "agent": "claude", "from": "working", "to": to,
+        "project": 1, "workspace": 2, "tab": 3, "pane": 4,
+    })
+    .to_string()
+}
+
 fn store_of(id: MachineId, fake: FakeTransport) -> (Store, impl Future<Output = ()> + Send + 'static) {
     let transport: Arc<dyn Transport> = Arc::new(fake);
     let machine = Machine { id, name: "studio".to_owned(), routes: vec![route()], last_route: None };
@@ -54,11 +95,11 @@ fn forwarding(id: MachineId, store: &Store, changes: Changes, machines: SharedMa
     recorder
 }
 
-fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {
+fn watching(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> (Store, Recorder) {
     let (store, driver) = store_of(id, fake);
     let recorder = forwarding(id, &store, store.changes(), machines);
     tokio::spawn(driver);
-    recorder
+    (store, recorder)
 }
 
 fn closed_terminal() -> Emitted {
@@ -82,8 +123,17 @@ fn closed_terminal_json() -> Value {
         "replaced": false, "rows": {}, "closed": true })
 }
 
-fn versions(recorder: &Recorder) -> Vec<(u64, Option<String>)> {
-    recorder.sessions().into_iter().map(|changed| (changed.machine, changed.session.map(|it| it.version))).collect()
+fn watched(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> Recorder {
+    watching(id, fake, machines).1
+}
+
+fn rows(recorder: &Recorder) -> Vec<Option<Vec<Row>>> {
+    let row = |row: AgentRow| (row.status, row.since);
+    recorder.agents().into_iter().map(|changed| changed.agents.map(|it| it.into_iter().map(row).collect())).collect()
+}
+
+fn claude(status: &str, since: Option<&str>) -> Vec<Row> {
+    vec![(Some(status.to_owned()), since.map(str::to_owned))]
 }
 
 mod the_forwarder {
@@ -102,38 +152,27 @@ mod the_forwarder {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn sends_only_the_connection_and_the_session() {
+    async fn sends_only_the_connection_and_the_agents() {
         let studio = Studio::new();
         let recorder = watched(studio.id, serving(&[snapshot(BOOT, 7, "first")]), studio.state.shared_machines());
         settle().await;
-        let session =
-            SessionChanged { machine: studio.id.0, session: serde_json::from_str(&snapshot(BOOT, 7, "first")).ok() };
-        assert!(recorder.all().contains(&Emitted::Session(session)), "{:?}", recorder.all());
         assert!(recorder.toasts().is_empty(), "{:?}", recorder.toasts());
-        assert_eq!(recorder.all().len(), recorder.connections().len() + recorder.sessions().len());
+        let agents = AgentsChanged { machine: studio.id.0, agents: Some(Vec::new()) };
+        assert_eq!(recorder.agents(), [agents]);
+        assert_eq!(recorder.all().len(), recorder.connections().len() + recorder.agents().len());
     }
 
     #[tokio::test(start_paused = true)]
-    async fn sends_one_session_for_a_burst_nobody_read_yet() {
+    async fn sends_the_agents_once_for_a_burst_nobody_read_yet() {
         let studio = Studio::new();
-        let burst = [snapshot(BOOT, 7, "first"), snapshot(BOOT, 8, "second"), snapshot(BOOT, 9, "third")];
+        let burst = [with_claude(7, "working"), with_claude(8, "waiting"), with_claude(9, "done")];
         let (store, driver) = store_of(studio.id, serving(&burst));
         let changes = store.changes();
         tokio::spawn(driver);
         settle().await;
         let recorder = forwarding(studio.id, &store, changes, studio.state.shared_machines());
         settle().await;
-        assert_eq!(versions(&recorder), [(studio.id.0, Some("third".to_owned()))]);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn sends_no_session_after_a_restart() {
-        let studio = Studio::new();
-        let recorder = watched(studio.id, restarting(), studio.state.shared_machines());
-        settle().await;
-        let seen = versions(&recorder);
-        assert_eq!(seen.first(), Some(&(studio.id.0, Some("first".to_owned()))), "{seen:?}");
-        assert_eq!(seen.last(), Some(&(studio.id.0, None)), "{seen:?}");
+        assert_eq!(rows(&recorder), [Some(claude("done", None))]);
     }
 
     #[tokio::test(start_paused = true)]
@@ -159,6 +198,82 @@ mod the_forwarder {
     }
 }
 
+mod the_agents {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_once_while_the_snapshots_keep_the_same_rows() {
+        let studio = Studio::new();
+        let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "working")]);
+        let (store, recorder) = watching(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(store.session().map(|session| session.revision), Some(8));
+        assert_eq!(rows(&recorder), [Some(claude("working", None))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_again_when_an_agent_changes_its_status() {
+        let studio = Studio::new();
+        let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "waiting")]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("working", None)), Some(claude("waiting", None))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_again_when_a_status_event_says_since_when() {
+        let studio = Studio::new();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[status_event("waiting")]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("waiting", None)), Some(claude("waiting", Some(HEARD)))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_not_sent_again_for_a_status_event_ahead_of_the_snapshot() {
+        let studio = Studio::new();
+        let events = [status_event("working"), status_event("waiting")];
+        let fake = later(serving(&[with_claude(7, "working")]), EVENTS, &events);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("working", None)), Some(claude("working", Some(HEARD)))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_again_without_their_times_once_some_events_were_dropped() {
+        let studio = Studio::new();
+        let dropped = json!({ "time": HEARD, "event": "dropped", "count": 3 }).to_string();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[status_event("waiting"), dropped]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder).last(), Some(&Some(claude("waiting", None))));
+    }
+
+    #[rstest]
+    #[case::opened(json!({ "time": HEARD, "event": "opened", "kind": "tab", "project": 1, "workspace": 2, "tab": 3 }))]
+    #[case::notice(json!({
+        "time": HEARD, "event": "notice", "token": "cc-ab12cd-3", "agent": "claude", "status": "waiting",
+        "place": "shop › default", "message": "claude needs you in shop › default", "panes": [4],
+        "project": 1, "workspace": 2,
+    }))]
+    #[tokio::test(start_paused = true)]
+    async fn are_not_sent_again_for_an_event_that_touches_no_row(#[case] event: Value) {
+        let studio = Studio::new();
+        let fake = later(serving(&[with_claude(7, "waiting")]), EVENTS, &[event.to_string()]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("waiting", None))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn are_sent_as_none_after_a_restart() {
+        let studio = Studio::new();
+        let recorder = watched(studio.id, restarting(), studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(Vec::new()), None]);
+    }
+}
+
 mod an_event {
     use super::*;
 
@@ -167,9 +282,9 @@ mod an_event {
         Emitted::Connection(changed(MachineId(7), ConnectionView::Connecting)),
         json!({ "machine": 7, "connection": { "state": "connecting" } })
     )]
-    #[case::session_changed_after_a_restart(
-        Emitted::Session(SessionChanged { machine: 7, session: None }),
-        json!({ "machine": 7, "session": null })
+    #[case::agents_changed_after_a_restart(
+        Emitted::Agents(AgentsChanged { machine: 7, agents: None }),
+        json!({ "machine": 7, "agents": null })
     )]
     #[case::terminal_changed(closed_terminal(), closed_terminal_json())]
     #[case::error_toast(
@@ -183,7 +298,7 @@ mod an_event {
     fn carries_its_fields(#[case] event: Emitted, #[case] expected: Value) {
         let json = match event {
             Emitted::Connection(changed) => serde_json::to_value(changed),
-            Emitted::Session(changed) => serde_json::to_value(changed),
+            Emitted::Agents(changed) => serde_json::to_value(changed),
             Emitted::Terminal(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
@@ -193,8 +308,8 @@ mod an_event {
     #[test]
     fn is_named_in_kebab_case() {
         assert_eq!(
-            [ConnectionChanged::NAME, SessionChanged::NAME, TerminalChanged::NAME, Toast::NAME],
-            ["connection-changed", "session-changed", "terminal-changed", "toast"]
+            [ConnectionChanged::NAME, AgentsChanged::NAME, TerminalChanged::NAME, Toast::NAME],
+            ["connection-changed", "agents-changed", "terminal-changed", "toast"]
         );
     }
 }
@@ -208,10 +323,10 @@ mod the_app {
         "connection-changed",
         json!({ "machine": 7, "connection": { "state": "connecting" } })
     )]
-    #[case::session_changed(
-        Emitted::Session(SessionChanged { machine: 7, session: None }),
-        "session-changed",
-        json!({ "machine": 7, "session": null })
+    #[case::agents_changed(
+        Emitted::Agents(AgentsChanged { machine: 7, agents: Some(Vec::new()) }),
+        "agents-changed",
+        json!({ "machine": 7, "agents": [] })
     )]
     #[case::terminal_changed(closed_terminal(), "terminal-changed", closed_terminal_json())]
     #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
@@ -220,5 +335,32 @@ mod the_app {
         let heard = heard(&ipc.app, name);
         ipc.app.handle().emit(event);
         assert_eq!(heard.try_recv(), Ok(expected));
+    }
+}
+
+mod a_change {
+    use cornercase_core::cli::events::Event;
+
+    use super::*;
+
+    fn event(what: What) -> Change {
+        Change::Event(Box::new(Event {
+            time: HEARD.to_owned(),
+            project: None,
+            workspace: None,
+            tab: None,
+            pane: Some(4),
+            what,
+        }))
+    }
+
+    #[rstest]
+    #[case::session(Change::Session, true)]
+    #[case::status(event(What::Status { agent: "claude".into(), from: None, to: Some("waiting".into()) }), true)]
+    #[case::dropped(event(What::Dropped { count: 3 }), true)]
+    #[case::exited(event(What::Exited { program: "sh".into() }), false)]
+    #[case::app(Change::App, false)]
+    fn touches_the_agents_only_when_a_row_may_change(#[case] change: Change, #[case] touches: bool) {
+        assert_eq!(touches_agents(&change), touches);
     }
 }

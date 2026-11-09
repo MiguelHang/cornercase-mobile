@@ -1,14 +1,20 @@
 <script lang="ts">
   import { isTauri } from '@tauri-apps/api/core'
   import { onMount } from 'svelte'
-  import { commands, events, type MachineView_Serialize } from './lib/bindings'
-  import { apply, connecting, firstToConnect, screen, type AgentTab, type Screen } from './lib/connection'
+  import {
+    commands,
+    events,
+    type AgentRow_Serialize as AgentRow,
+    type MachineView_Serialize,
+  } from './lib/bindings'
+  import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { oneAtATime } from './lib/join'
   import { Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
-  import Home from './routes/Home.svelte'
+  import Agent from './routes/agent/Agent.svelte'
+  import Board from './routes/board/Board.svelte'
   import NoMachines from './routes/NoMachines.svelte'
   import Terminal from './routes/terminal/Terminal.svelte'
 
@@ -23,17 +29,22 @@
   const toasts = new Toasts()
 
   const route = $derived(router.current)
-  const home = $derived(route.name === 'home')
+  const machine = $derived(route.name !== 'no-machines')
+  const opened = $derived(
+    route.name === 'agent' && current.agents !== null
+      ? current.agents.find((agent) => agent.pane === route.pane)
+      : null,
+  )
   const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
 
   const show = (next: Screen) => {
     current = next
-    router.replace(routeFor(next))
+    router.settle(routeFor(next))
   }
 
-  const opened = (tab: AgentTab) => {
-    if (current.machine !== null && current.session !== null) {
-      router.go({ name: 'terminal', machine: current.machine, boot: current.session.boot, tab })
+  const terminal = (row: AgentRow) => {
+    if (current.machine !== null) {
+      router.go({ name: 'terminal', machine: current.machine, row })
     }
   }
 
@@ -60,12 +71,12 @@
   }
 
   const load = async () => {
-    const [listed, state, session] = await Promise.all([
+    const [listed, state, agents] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
-      commands.session(),
+      commands.agents(),
     ])
-    show(screen(state, session))
+    show(screen(state, agents))
     const first = firstToConnect(remember(listed), state)
     if (first !== null) {
       await join(first)
@@ -78,7 +89,7 @@
     }
     const listening = [
       events.connectionChanged.listen((event) => show(apply(current, event.payload))),
-      events.sessionChanged.listen((event) => show(apply(current, event.payload))),
+      events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
     Promise.all(listening).then(load).catch(toasts.failed)
@@ -90,21 +101,31 @@
   {#if route.name === 'terminal'}
     <Terminal
       machine={route.machine}
-      boot={route.boot}
-      tab={route.tab}
+      row={route.row}
       onback={() => router.back()}
       onfailed={toasts.failed}
       bind:height={barHeight}
     />
-  {:else if home}
+  {:else if machine}
     <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} />
-    <Home screen={current} below={barHeight} onopen={opened} />
+    {#if route.name === 'agent'}
+      <Agent
+        row={opened}
+        connection={current.connection}
+        below={barHeight}
+        onback={() => router.back()}
+        onterminal={terminal}
+      />
+    {:else}
+      <Board
+        agents={current.agents}
+        connection={current.connection}
+        below={barHeight}
+        onopen={(pane) => router.go({ name: 'agent', pane })}
+      />
+    {/if}
   {:else}
     <NoMachines onadded={added} />
   {/if}
-  <ToastStack
-    items={toasts.items}
-    ondismiss={(id) => toasts.dismiss(id)}
-    below={route.name === 'no-machines' ? 0 : barHeight}
-  />
+  <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={machine ? barHeight : 0} />
 </main>

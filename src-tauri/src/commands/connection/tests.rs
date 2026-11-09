@@ -38,7 +38,7 @@ mod connecting {
             [changed(studio.id, ConnectionView::Connecting), changed(studio.id, connected())]
         );
         assert_eq!(current(&studio.state), ConnectionState { machine: Some(studio.id.0), connection: connected() });
-        assert_eq!(latest_session(&studio.state).map(|session| session.version), Some("first".to_owned()));
+        assert_eq!(latest_agents(&studio.state), Some(Vec::new()));
     }
 
     #[tokio::test(start_paused = true)]
@@ -125,10 +125,10 @@ mod without_a_machine {
     use super::*;
 
     #[test]
-    fn there_is_no_connection_nor_session() {
+    fn there_is_no_connection_nor_agents() {
         let studio = Studio::new();
         assert_eq!(current(&studio.state), ConnectionState::none());
-        assert_eq!(latest_session(&studio.state), None);
+        assert_eq!(latest_agents(&studio.state), None);
     }
 }
 
@@ -146,16 +146,17 @@ mod over_ipc {
     }
 
     #[test]
-    fn answers_there_is_no_connection_nor_session() {
+    fn answers_there_is_no_connection_nor_agents() {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
         let state = ipc.invoke("connection_state", json!({})).expect("a connection state");
         assert_eq!(state, json!({ "machine": null, "connection": { "state": "none" } }));
-        assert_eq!(ipc.invoke("session", json!({})), Ok(Value::Null));
+        assert!(ipc.invoke("session", json!({})).is_err());
+        assert_eq!(ipc.invoke("agents", json!({})), Ok(Value::Null));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn answers_the_active_connection_and_its_session() {
+    async fn answers_the_active_connection_and_its_agents() {
         let studio = Studio::new();
         let state = studio.reloaded();
         let (launcher, _) = launcher(serving(&first_snapshot()));
@@ -165,7 +166,6 @@ mod over_ipc {
         let state = ipc.invoke("connection_state", json!({})).expect("a connection state");
         assert_eq!(state["connection"]["state"], "connected");
         assert_eq!(state["machine"], studio.id.0);
-        let session = ipc.invoke("session", json!({})).expect("a session");
-        assert_eq!(session["version"], "first");
+        assert_eq!(ipc.invoke("agents", json!({})), Ok(json!([])));
     }
 }

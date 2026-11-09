@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 
 use super::{Change, Connection, Shared};
 use crate::cli::contract::boot::Boot;
-use crate::cli::events::Event;
+use crate::cli::events::{Event, What};
 use crate::cli::status::Snapshot;
 use crate::error::Error;
 use crate::machines::pick::Picked;
@@ -36,6 +36,7 @@ struct Opened<'a> {
 pub(super) async fn follow(shared: &Shared, picked: &Picked) -> Ended {
     let transport = picked.transport.as_ref();
     let route = picked.route.address();
+    shared.doubt();
     let streams = [
         pump(open(transport, EVENTS), going(|line| shared.event(line))).boxed(),
         pump(open(transport, STATUS), |line| shared.status(line, route)).boxed(),
@@ -99,7 +100,25 @@ fn ended(end: End) -> Error {
 impl Shared {
     fn event(&self, line: &str) {
         if let Some(event) = self.parsed::<Event>(line) {
+            self.heard(&event);
             self.publish(&Change::Event(Box::new(event)));
+        }
+    }
+
+    fn heard(&self, event: &Event) {
+        match (&event.what, event.pane) {
+            (What::Status { to, .. }, Some(pane)) => self.state().since.heard(pane, to.as_deref(), &event.time),
+            (What::Dropped { .. }, _) => {
+                self.state().since.doubt();
+            }
+            _ => {}
+        }
+    }
+
+    fn doubt(&self) {
+        let doubted = self.state().since.doubt();
+        if doubted {
+            self.publish(&Change::Session);
         }
     }
 
@@ -126,6 +145,7 @@ impl Shared {
         if state.session.as_ref().is_some_and(|last| snapshot.revision <= last.revision) {
             return Continue(());
         }
+        state.since.reconcile(&snapshot);
         state.session = Some(snapshot);
         drop(state);
         self.publish(&Change::Session);
