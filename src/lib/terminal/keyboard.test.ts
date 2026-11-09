@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { GAP, Keyboard, seen, type Screen, type Viewport } from './keyboard.svelte'
+import { describe, expect, it, vi } from 'vitest'
+import { GAP, Keyboard, seen, whileClosed, type Screen, type Viewport } from './keyboard.svelte'
 
 const FULL = 900
 
@@ -118,5 +118,16 @@ describe('seen', () => {
     ['closed while the visible height is short of the screen by the gap', FULL - GAP, false],
   ])('calls the keyboard %s', (_, height, open) => {
     expect(seen(screen(height)).open).toBe(open)
+  })
+})
+
+describe('whileClosed', () => {
+  it.each([
+    ['passes a value on while the keyboard is closed', false, [[7]]],
+    ['drops a value while the keyboard is open', true, []],
+  ])('%s', (_, open, calls) => {
+    const then = vi.fn()
+    whileClosed({ open }, then)(7)
+    expect(then.mock.calls).toEqual(calls)
   })
 })

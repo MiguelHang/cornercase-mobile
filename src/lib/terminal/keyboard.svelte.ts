@@ -1,3 +1,5 @@
+import { untrack } from 'svelte'
+
 export const GAP = 100
 
 type Listened = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>
@@ -54,3 +56,9 @@ export class Keyboard {
     }
   }
 }
+
+export const whileClosed =
+  <T>(keyboard: Pick<Keyboard, 'open'>, then: (value: T) => void) =>
+  (value: T) => {
+    if (!untrack(() => keyboard.open)) then(value)
+  }

@@ -20,6 +20,11 @@ describe('Typist', () => {
     expect(typist(true)).toMatch(/<textarea [^>]*disabled=""/)
   })
 
+  it('can be focused from a tap without scrolling the page', () => {
+    expect(typistSource).toContain('export const focus = () => textarea?.focus({ preventScroll: true })')
+    expect(typistSource).toContain('bind:this={textarea}')
+  })
+
   it('sends nothing on a closed tab', () => {
     expect(typistSource).toContain('if (!disabled && step.send.length > 0) send(step.send)')
   })

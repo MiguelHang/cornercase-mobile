@@ -6,10 +6,13 @@
 
 <script lang="ts">
   import type { Size_Deserialize } from '../bindings'
+  import type { InputEvent } from './keys'
   import type { PaneState } from './pane.svelte'
-  import { Pinch } from './pinch'
+  import { Pinch, type Point } from './pinch'
   import Row from './Row.svelte'
   import { paneColours, rgb } from './style'
+  import { Swipe, type Grid } from './swipe'
+  import { anchor, roomIn, slide } from './touch'
   import { BASE, clamp, fit, limits, LINE, type Place } from './zoom'
 
   const PROBE = 'M'.repeat(100)
@@ -19,7 +22,17 @@
     pane,
     place,
     onfit,
-  }: { pane: PaneState; place: Place; onfit: (size: Size_Deserialize) => void } = $props()
+    ontap,
+    onsend,
+    onscroll,
+  }: {
+    pane: PaneState
+    place: Place
+    onfit: (size: Size_Deserialize) => void
+    ontap: () => void
+    onsend: (events: InputEvent[]) => void
+    onscroll: (rowsUp: number) => void
+  } = $props()
 
   let width = $state(0)
   let height = $state(0)
@@ -27,6 +40,8 @@
   let start = BASE
   let byGesture = false
   const pinch = new Pinch()
+  const swipe = new Swipe()
+  let drawn: HTMLElement | undefined
 
   const cell = $derived(measured > 0 ? measured : BASE * ADVANCE)
   const cols = $derived(pane.size.cols)
@@ -72,24 +87,47 @@
       },
     })
 
+  const pointOf = (event: PointerEvent): Point => [event.clientX, event.clientY]
+
+  const gridIn = (box: HTMLElement): Grid => {
+    const { left, top } = (drawn ?? box).getBoundingClientRect()
+    const { modes, size: cells } = pane
+    return { modes, size: cells, cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room: roomIn(box) }
+  }
+
   const pressed = (event: PointerEvent) => {
-    if (pinch.press(event.pointerId, [event.clientX, event.clientY])) start = size
+    swipe.press(event.pointerId, pointOf(event))
+    if (pinch.press(event.pointerId, pointOf(event))) start = size
   }
 
-  const moved = (event: PointerEvent) => {
-    const scale = pinch.move(event.pointerId, [event.clientX, event.clientY])
+  const moved = (box: HTMLElement, event: PointerEvent) => {
+    const scale = pinch.move(event.pointerId, pointOf(event))
     if (scale !== null && !byGesture) zoom(scale)
+    const scroll = swipe.move(event.pointerId, pointOf(event), gridIn(box))
+    if (scroll !== null) slide(box, scroll, { send: onsend, scroll: onscroll })
   }
 
-  const lifted = (event: PointerEvent) => pinch.lift(event.pointerId)
+  const lifted = (event: PointerEvent) => {
+    pinch.lift(event.pointerId)
+    if (swipe.lift(event.pointerId)) ontap()
+  }
+
+  const cancelled = (event: PointerEvent) => {
+    pinch.lift(event.pointerId)
+    swipe.lift(event.pointerId)
+  }
 
   const pointers = (element: HTMLElement) =>
     listen(element, {
       pointerdown: (event) => event instanceof PointerEvent && pressed(event),
-      pointermove: (event) => event instanceof PointerEvent && moved(event),
+      pointermove: (event) => event instanceof PointerEvent && moved(element, event),
       pointerup: (event) => event instanceof PointerEvent && lifted(event),
-      pointercancel: (event) => event instanceof PointerEvent && lifted(event),
+      pointercancel: (event) => event instanceof PointerEvent && cancelled(event),
     })
+
+  const anchored = (box: HTMLElement) => {
+    if (height > 0) anchor(box)
+  }
 </script>
 
 <div
@@ -99,8 +137,10 @@
   bind:clientHeight={height}
   {@attach gestures}
   {@attach pointers}
+  {@attach anchored}
 >
   <div
+    bind:this={drawn}
     class="grid"
     style:font-size="{size}px"
     style:--cell="{cell / BASE}em"
@@ -132,7 +172,7 @@
     height: 100%;
     overflow: auto;
     overscroll-behavior: contain;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x;
   }
 
   .grid,

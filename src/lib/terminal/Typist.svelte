@@ -21,6 +21,10 @@
 
   const typing = $derived(new Typing(ctrl))
 
+  let textarea: HTMLTextAreaElement | undefined
+
+  export const focus = () => textarea?.focus({ preventScroll: true })
+
   const restore = (field: HTMLTextAreaElement) => {
     field.value = SENTINEL
     field.setSelectionRange(SENTINEL.length, SENTINEL.length)
@@ -34,6 +38,7 @@
 </script>
 
 <textarea
+  bind:this={textarea}
   class="typist"
   aria-label="Terminal input"
   rows="1"
