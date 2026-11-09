@@ -6,6 +6,8 @@ use serde_json::Value;
 use crate::error::Error;
 use crate::transport::json_error;
 
+pub mod boot;
+
 pub const CONTRACT: u32 = 1;
 
 const OLD_SERVER: &str = "has no `contract` command";
