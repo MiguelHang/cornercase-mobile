@@ -45,12 +45,6 @@ mod the_contract {
     use super::*;
 
     #[tokio::test(start_paused = true)]
-    async fn with_everything_keeps_connecting_without_retrying() {
-        let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, contract(REAL))], &Asked::default());
-        assert_eq!(settled(&store, driver).await, [Change::Connection(Connection::Connecting)]);
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn missing_something_stops_without_asking_for_anything_else() {
         let asked = Asked::default();
         let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, contract(&without_notices()))], &asked);

@@ -22,6 +22,7 @@ use crate::transport::Transport;
 
 mod backoff;
 mod connect;
+mod streams;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Connection {
@@ -194,7 +195,10 @@ where
         loop {
             self.shared.set_connection(Connection::Connecting);
             match self.connect().await {
-                Ok(_picked) => future::pending::<()>().await,
+                Ok(picked) => {
+                    let error = streams::follow(&self.shared, &picked).await;
+                    self.retry(error).await;
+                }
                 Err(Failure::Retry(error)) => self.retry(error).await,
                 Err(Failure::Stop(connection)) => self.stop(connection).await,
             }

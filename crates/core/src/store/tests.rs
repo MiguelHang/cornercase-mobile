@@ -13,6 +13,7 @@ use crate::transport::fake::FakeTransport;
 use crate::transport::{Exit, OutSink, Stdin};
 
 mod connect;
+mod streams;
 
 const CONTRACT: &[&str] = &["contract", "--json"];
 const LAN: &str = "studio.local";
