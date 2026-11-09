@@ -56,6 +56,18 @@ impl Route {
             Self::Bridge { url } => url.connection_url(),
         }
     }
+
+    pub(crate) fn token(&self) -> Option<&Token> {
+        match self {
+            Self::Bridge { url } => url.token.as_ref(),
+        }
+    }
+
+    pub(crate) fn set_token(&mut self, token: Option<Token>) {
+        match self {
+            Self::Bridge { url } => url.token = token,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,6 +186,10 @@ pub struct Token(String);
 impl Token {
     pub fn new(value: String) -> Self {
         Self(value)
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
