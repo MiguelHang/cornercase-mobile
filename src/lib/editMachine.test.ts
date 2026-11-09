@@ -157,6 +157,15 @@ describe('EditMachine adding a route', () => {
     expect(edit.adding).toBe(false)
   })
 
+  it('takes the machine code scanned again whole, for the core to add its addresses and update the token', async () => {
+    const code = 'ws://192.168.1.20:9000/?token=new&also=100.64.0.3&name=Studio'
+    const { edit, commands, onchanged } = editor()
+    edit.open()
+    await edit.fill(code)
+    expect([commands.machineRouteAdd.mock.calls, edit.urlError, edit.adding]).toEqual([[[3, code]], null, false])
+    expect(onchanged).toHaveBeenCalledOnce()
+  })
+
   it('refuses a URL without a token under the field, keeping the form open', async () => {
     const { edit, commands } = editor()
     edit.open()

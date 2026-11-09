@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { ErrorCode, SameWhy } from './bindings'
+import type { ErrorCode, MergeView, SameWhy } from './bindings'
 import * as form from './machineForm'
 
 const URL_TEXT = 'ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA'
+
+const CODE = 'ws://192.168.1.20:9000/?token=c3R1ZGlvLXNlY3JldA&also=100.101.102.103&also=fd7a:115c:a1e0::1'
+
+const named = (name: string) => `${CODE}&name=${name}`
 
 describe('checkUrl', () => {
   it.each<[string, string, string]>([
@@ -29,6 +33,10 @@ describe('checkUrl', () => {
     expect(form.checkUrl(raw)).toEqual({ ok: true, url: URL_TEXT })
   })
 
+  it('accepts a machine code with more addresses and the name of the Mac, trimmed', () => {
+    expect(form.checkUrl(` ${named('Studio')}\n`)).toEqual({ ok: true, url: named('Studio') })
+  })
+
   it('accepts the scheme in capitals', () => {
     expect(form.checkUrl('WS://studio.lan:9000/?token=abc').ok).toBe(true)
   })
@@ -49,6 +57,37 @@ describe('nameFor', () => {
   it('gives no name when neither the name nor the URL has one', () => {
     expect(form.nameFor('', 'studio.lan')).toBe('')
   })
+
+  it.each<[string, string, string]>([
+    ['plain', 'Studio', 'Studio'],
+    ['with spaces', 'Mac%20Studio', 'Mac Studio'],
+    ['with accents', 'Mac%20de%20Mar%C3%ADa', 'Mac de María'],
+    ['with an emoji', 'Studio%20%F0%9F%96%A5', 'Studio 🖥'],
+    ['with blanks around', '%20%20Studio%20', 'Studio'],
+  ])('takes the name of the code, %s, before the host', (_, name, shown) => {
+    expect(form.nameFor('', named(name))).toBe(shown)
+  })
+
+  it('keeps a typed name over the name of the code', () => {
+    expect(form.nameFor(' Desk ', named('Studio'))).toBe('Desk')
+  })
+
+  it('cuts a name of the code longer than the longest name, counting an emoji as one', () => {
+    expect(form.nameFor('', named('%F0%9F%96%A5'.repeat(70)))).toBe('🖥'.repeat(form.LONGEST_NAME))
+    expect(form.nameFor('', named(`${'x'.repeat(63)}%20y`))).toBe('x'.repeat(63))
+  })
+
+  it.each<[string, string]>([
+    ['empty', ''],
+    ['blank', '%20%20'],
+  ])('uses the host when the name of the code is %s', (_, name) => {
+    expect(form.nameFor('', named(name))).toBe('192.168.1.20')
+  })
+
+  it('uses the host when another machine has the name of the code, whatever the case', () => {
+    expect(form.nameFor('', named('Studio'), ['Desk', 'STUDIO'])).toBe('192.168.1.20')
+    expect(form.nameFor('', named('Studio'), ['Desk'])).toBe('Studio')
+  })
 })
 
 describe('placeholderName', () => {
@@ -59,6 +98,13 @@ describe('placeholderName', () => {
     ['a URL without its token', 'ws://studio.lan:9000/', 'Name'],
   ])('shows the host for %s', (_, url, shown) => {
     expect(form.placeholderName(url)).toBe(shown)
+  })
+
+  it('shows the name of the code, or the host when it is taken', () => {
+    expect([form.placeholderName(named('Studio')), form.placeholderName(named('Studio'), ['studio'])]).toEqual([
+      'Studio',
+      '192.168.1.20',
+    ])
   })
 })
 
@@ -109,10 +155,48 @@ describe('checkName', () => {
 
 describe('offerText', () => {
   it.each<[SameWhy, string, string]>([
-    ['address', 'Studio already has a route at this address.', 'Update the token of Studio'],
-    ['boot', 'This bridge is the one Studio answers from.', 'Add as a route of Studio'],
-    ['name', 'A machine is already called Studio.', 'Add as a route of Studio'],
+    ['address', 'Studio is already saved at this address.', 'Update the token of Studio'],
+    ['boot', 'This bridge is the one Studio answers from.', 'Add its addresses to Studio'],
+    ['name', 'A machine is already called Studio.', 'Add its addresses to Studio'],
   ])('explains a match by %s and names the choice it keeps', (why, reason, keep) => {
     expect(form.offerText({ saved: 'Studio', why })).toEqual({ reason, keep })
+  })
+})
+
+describe('mergedText', () => {
+  const merged = (added: number, token_updated: boolean, skipped = 0): MergeView => ({
+    added: Array.from({ length: added }, (_, at) => `ws://10.0.0.${at}:9000/`),
+    token_updated,
+    skipped: Array.from({ length: skipped }, (_, at) => `ws://10.0.1.${at}:9000/`),
+  })
+
+  it.each<[string, MergeView, string]>([
+    ['nothing changed', merged(0, false), 'MacBook already saved: nothing to add.'],
+    ['a route added and the token updated', merged(1, true), 'MacBook already saved: 1 route added, token updated.'],
+    ['two routes added', merged(2, false), 'MacBook already saved: 2 routes added.'],
+    ['only the token updated', merged(0, true), 'MacBook already saved: token updated.'],
+    [
+      'routes of another machine left alone',
+      merged(1, false, 2),
+      'MacBook already saved: 1 route added, 2 routes left to another machine.',
+    ],
+    ['only a route of another machine', merged(0, false, 1), 'MacBook already saved: 1 route left to another machine.'],
+  ])('tells %s', (_, view, text) => {
+    expect(form.mergedText('MacBook', view)).toBe(text)
+  })
+})
+
+describe('the texts of adding a machine', () => {
+  it('speak of the machine and its code, never of routes or URLs', () => {
+    const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.ALREADY_SAVED, form.UNCHECKED]
+    const offers = (['address', 'boot', 'name'] as const).map((why) => form.offerText({ saved: 'Studio', why }))
+    const all = [...texts, form.NEW_MACHINE, ...offers.flatMap(({ reason, keep }) => [reason, keep])]
+    expect(all.filter((text) => /route|url/i.test(text))).toEqual([])
+    expect([form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN]).toEqual([
+      'Paste the code the bridge prints',
+      'The code starts with ws://',
+      'This is not a machine code',
+      'The code has no token=: paste it whole',
+    ])
   })
 })

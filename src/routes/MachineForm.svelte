@@ -1,6 +1,6 @@
 <script lang="ts">
   import { AddMachine } from '../lib/addMachine.svelte'
-  import { commands } from '../lib/bindings'
+  import { commands, events } from '../lib/bindings'
   import { placeholderName } from '../lib/machineForm'
   import Button from '../lib/ui/Button.svelte'
   import Field from '../lib/ui/Field.svelte'
@@ -8,26 +8,37 @@
   import UrlField from '../lib/ui/UrlField.svelte'
 
   let {
+    taken = [],
     onadded,
     onrouted,
     oncancel,
-  }: { onadded: (machine: number) => void; onrouted: (machine: number) => void; oncancel: () => void } = $props()
+  }: {
+    taken?: readonly string[]
+    onadded: (machine: number) => void
+    onrouted: (machine: number) => void
+    oncancel: () => void
+  } = $props()
 
-  const form = new AddMachine(commands, (machine) => onadded(machine), (machine) => onrouted(machine))
+  const form = new AddMachine(
+    commands,
+    (machine) => onadded(machine),
+    (machine) => onrouted(machine),
+    (toast) => void events.toast.emit(toast),
+  )
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
-    void form.submit()
+    void form.submit(taken)
   }
 </script>
 
 <form class="form" onsubmit={submit}>
-  <UrlField bind:value={form.url} error={form.urlError} disabled={form.held} onscanned={(url) => void form.fill(url)} />
+  <UrlField bind:value={form.url} error={form.urlError} disabled={form.held} onscanned={(url) => void form.fill(url, taken)} />
   <Field
     label="Name"
     bind:value={form.name}
     error={form.nameError}
-    placeholder={placeholderName(form.url)}
+    placeholder={placeholderName(form.url, taken)}
     disabled={form.held}
   />
   {#if form.formError !== null}

@@ -54,7 +54,7 @@ describe('NoMachines', () => {
 
   it('shows no form yet', () => {
     expect(body).not.toContain('<form')
-    expect(body).not.toContain('Bridge URL')
+    expect(body).not.toContain('Machine code')
   })
 
   it('swaps the button for the form inside the card, under the emblem, and back on Cancel', () => {
@@ -73,20 +73,20 @@ describe('MachineForm', () => {
     expect(body).toMatch(/^<!--\[--><form class="form svelte-[\w-]+">/)
   })
 
-  it('asks for the bridge URL in a field that leaves it as pasted', () => {
+  it('asks for the machine code in a field that leaves it as pasted', () => {
     expect(body).toMatch(
-      /<label class="label svelte-[\w-]+" for="(\w+)-input">Bridge URL<\/label>(?:<!--[^>]*-->)* <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" value=""\/>/,
+      /<label class="label svelte-[\w-]+" for="(\w+)-input">Machine code<\/label>(?:<!--[^>]*-->)* <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url" value=""\/>/,
     )
   })
 
-  it('offers scanning the QR code above the URL field', () => {
+  it('offers scanning the QR code above the code field', () => {
     expect(body).toMatch(
       /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*<svg[^]*?<\/svg><!----> Scan QR code<!---->/,
     )
-    expect(body.indexOf('Scan QR code')).toBeLessThan(body.indexOf('Bridge URL'))
+    expect(body.indexOf('Scan QR code')).toBeLessThan(body.indexOf('Machine code'))
   })
 
-  it('asks for a name, with a placeholder until there is a URL', () => {
+  it('asks for a name, with a placeholder until there is a code', () => {
     expect(body).toMatch(
       /<label class="label svelte-[\w-]+" for="(\w+)-input">Name<\/label>(?:<!--[^>]*-->)* <input id="\1-input" class="input svelte-[\w-]+" type="text" autocomplete="off" placeholder="Name" value=""\/>/,
     )
@@ -103,19 +103,23 @@ describe('MachineForm', () => {
 
   const script = flat(formSource)
 
-  it('submits through AddMachine, with the commands and the handover', () => {
+  it('submits through AddMachine, with the commands, the handover and the toasts', () => {
     expect(script).toContain(
-      'const form = new AddMachine(commands, (machine) => onadded(machine), (machine) => onrouted(machine))',
+      'const form = new AddMachine( commands, (machine) => onadded(machine), (machine) => onrouted(machine), (toast) => void events.toast.emit(toast), )',
     )
-    expect(script).toContain('event.preventDefault() void form.submit()')
+    expect(script).toContain('event.preventDefault() void form.submit(taken)')
+  })
+
+  it('takes no names as taken unless told', () => {
+    expect(script).toContain('let { taken = [],')
   })
 
   it('holds still while adding: fields and Cancel off, the spinner and Adding… on Add', () => {
     expect(script).toContain(
-      '<UrlField bind:value={form.url} error={form.urlError} disabled={form.held} onscanned={(url) => void form.fill(url)} />',
+      '<UrlField bind:value={form.url} error={form.urlError} disabled={form.held} onscanned={(url) => void form.fill(url, taken)} />',
     )
     expect(script).toContain(
-      '<Field label="Name" bind:value={form.name} error={form.nameError} placeholder={placeholderName(form.url)} disabled={form.held} />',
+      '<Field label="Name" bind:value={form.name} error={form.nameError} placeholder={placeholderName(form.url, taken)} disabled={form.held} />',
     )
     expect(script).toContain('<Button tone="plain" resting={form.busy} onclick={oncancel}>Cancel</Button>')
     expect(script).toContain("<Button type=\"submit\" busy={form.busy}>{form.busy ? 'Adding…' : 'Add'}</Button>")
@@ -151,10 +155,10 @@ describe('the same machine offer', () => {
     const body = shown(offer('boot'))
     expect(body).toMatch(/<div class="offer svelte-[\w-]+" role="group" aria-label="Same machine">/)
     expect(body).toContain('This bridge is the one Studio answers from.')
-    expect(button(body, 'Add as a route of Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
+    expect(button(body, 'Add its addresses to Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
     expect(button(body, 'Add as a new machine')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
     expect(button(body, 'Back')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
-    expect(body.indexOf('Add as a route')).toBeLessThan(body.indexOf('Add as a new machine'))
+    expect(body.indexOf('Add its addresses')).toBeLessThan(body.indexOf('Add as a new machine'))
     expect(body).not.toContain('did not answer')
   })
 
@@ -164,7 +168,7 @@ describe('the same machine offer', () => {
 
   it('warns when the bridge could not be asked', () => {
     expect(shown(offer('name', false))).toMatch(
-      /<p class="note svelte-[\w-]+">The bridge did not answer at this URL, so it could not be asked which machine it is.<\/p>/,
+      /<p class="note svelte-[\w-]+">The bridge did not answer, so it could not be asked which machine it is.<\/p>/,
     )
   })
 
@@ -190,8 +194,10 @@ describe('scanning a QR code', () => {
         machineAdd: add,
         machineMatch: () => Promise.resolve({ status: 'ok', data: { found: { kind: 'none' }, checked: true } }),
         machineRouteAdd: () => Promise.resolve({ status: 'ok', data: null }),
+        machineMerge: () => Promise.resolve({ status: 'ok', data: { added: [], token_updated: false, skipped: [] } }),
       },
       onadded,
+      () => {},
       () => {},
     )
     const url = await camera('granted', qrCode).scan()
@@ -221,7 +227,7 @@ describe('scanning a QR code', () => {
 
   it('offers Open Settings when the camera is not allowed, with the field still there to paste', async () => {
     const body = await overlay(camera('denied', qrCode))
-    expect(body).toContain('Camera access is off. Turn it on in Settings, or paste the URL below.')
+    expect(body).toContain('Camera access is off. Turn it on in Settings, or paste the code below.')
     expect(button(body, 'Open Settings')?.slice(1)).toEqual([
       expect.stringMatching(/^button plain svelte-[\w-]+$/),
       'button',
@@ -231,7 +237,7 @@ describe('scanning a QR code', () => {
 
   it('says why the scan failed and leaves pasting to the field', async () => {
     const body = await overlay(camera('granted', () => Promise.reject(new Error('No camera available'))))
-    expect(body).toContain('Could not scan the code. Paste the URL below.')
+    expect(body).toContain('Could not scan the code. Paste the code below.')
     expect(body).toMatch(/<p class="detail svelte-[\w-]+">No camera available<\/p>/)
   })
 

@@ -1,8 +1,8 @@
-import type { CommandError, MatchView, commands } from './bindings'
-import { ALREADY_SAVED, checkName, checkUrl, fieldOf, nameFor, type Field, type Offer } from './machineForm'
+import type { CommandError, MatchView, Toast, commands } from './bindings'
+import { ALREADY_SAVED, checkName, checkUrl, fieldOf, mergedText, nameFor, type Field, type Offer } from './machineForm'
 import { messageOf } from './toasts'
 
-export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineRouteAdd'>
+export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineRouteAdd' | 'machineMerge'>
 
 export type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
@@ -34,23 +34,30 @@ export class AddMachine {
   #calls: MachineCalls
   #onadded: (machine: number) => void
   #onrouted: (machine: number) => void
+  #tell: (toast: Toast) => void
 
-  constructor(calls: MachineCalls, onadded: (machine: number) => void, onrouted: (machine: number) => void) {
+  constructor(
+    calls: MachineCalls,
+    onadded: (machine: number) => void,
+    onrouted: (machine: number) => void,
+    tell: (toast: Toast) => void,
+  ) {
     this.#calls = calls
     this.#onadded = onadded
     this.#onrouted = onrouted
+    this.#tell = tell
   }
 
   get held() {
     return this.busy || this.offer !== null
   }
 
-  async submit() {
+  async submit(taken: readonly string[] = []) {
     if (this.held) {
       return
     }
     const url = checkUrl(this.url)
-    const name = checkName(nameFor(this.name, this.url))
+    const name = checkName(nameFor(this.name, this.url, taken))
     this.urlError = url.ok ? null : url.error
     this.nameError = url.ok && !name.ok ? name.error : null
     this.formError = null
@@ -60,12 +67,12 @@ export class AddMachine {
     }
   }
 
-  async fill(url: string) {
+  async fill(url: string, taken: readonly string[] = []) {
     if (this.held) {
       return
     }
     this.url = url
-    await this.submit()
+    await this.submit(taken)
   }
 
   async addRoute() {
@@ -108,6 +115,10 @@ export class AddMachine {
       await this.#add(url, name)
       return
     }
+    if (found.kind === 'merge') {
+      await this.#merge(url, found.machine, found.name)
+      return
+    }
     this.busy = false
     if (found.kind === 'already_saved') {
       this.formError = ALREADY_SAVED
@@ -118,6 +129,13 @@ export class AddMachine {
 
   async #add(url: string, name: string) {
     this.#settle(await send(() => this.#calls.machineAdd(url, name)), (machine) => this.#onadded(machine))
+  }
+
+  async #merge(url: string, machine: number, saved: string) {
+    this.#settle(await send(() => this.#calls.machineMerge(machine, url)), (merged) => {
+      this.#tell({ level: 'info', message: mergedText(saved, merged) })
+      this.#onrouted(machine)
+    })
   }
 
   #settle<T>(outcome: Outcome<T>, done: (data: T) => void) {

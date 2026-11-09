@@ -110,16 +110,16 @@ describe('Machine', () => {
     )
   })
 
-  it('offers Add route, and opens its form with the scanner and the URL', () => {
+  it('offers Add route, and opens its form with the scanner and the code', () => {
     expect(screen()).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add route/)
-    expect(screen()).not.toContain('Bridge URL')
+    expect(screen()).not.toContain('Machine code')
     const machine = studio()
     const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
     edit.open()
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Add route<\/h2>/)
     expect(body).toContain('Scan QR code')
-    expect(body).toContain('Bridge URL')
+    expect(body).toContain('Machine code')
   })
 
   it('opens with Add route open when asked to scan again', () => {

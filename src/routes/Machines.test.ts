@@ -218,7 +218,9 @@ describe('Machines wiring', () => {
 
   it('swaps Add machine for the form, closing it once a machine is added', () => {
     expect(script).toContain('const added = (machine: number) => { adding = false onadded(machine) }')
-    expect(script).toContain('<MachineForm onadded={added} onrouted={routed} oncancel={() => (adding = false)} />')
+    expect(script).toContain(
+      '<MachineForm taken={machines.map((machine) => machine.name)} onadded={added} onrouted={routed} oncancel={() => (adding = false)} />',
+    )
     expect(script).toContain('<Button onclick={() => (adding = true)}>Add machine</Button>')
   })
 })

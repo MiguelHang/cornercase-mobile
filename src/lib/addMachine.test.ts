@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AddMachine, send, type MachineCalls } from './addMachine.svelte'
-import type { CommandError, MatchFound, SameWhy } from './bindings'
+import type { CommandError, MatchFound, MergeView, SameWhy } from './bindings'
 import { ALREADY_SAVED, EMPTY, NAME_TAKEN, NAME_TOO_LONG, NO_TOKEN } from './machineForm'
 
 const URL_TEXT = 'ws://studio.lan:9000/?token=abc'
+
+const CODE = 'ws://192.168.1.20:9000/?token=abc&also=100.101.102.103&name=Mac%20Studio'
+
+const MERGED: MergeView = { added: ['ws://100.101.102.103:9000/'], token_updated: true, skipped: [] }
 
 const ok = <T>(data: T) => Promise.resolve({ status: 'ok' as const, data })
 
@@ -25,16 +29,18 @@ const calls = (overrides: Partial<MachineCalls> = {}) => ({
   machineAdd: vi.fn(overrides.machineAdd ?? (() => added(1))),
   machineMatch: vi.fn(overrides.machineMatch ?? (() => matched({ kind: 'none' }))),
   machineRouteAdd: vi.fn(overrides.machineRouteAdd ?? (() => ok(null))),
+  machineMerge: vi.fn(overrides.machineMerge ?? (() => ok(MERGED))),
 })
 
 const form = (overrides: Partial<MachineCalls> = {}, url = URL_TEXT, name = '') => {
   const onadded = vi.fn()
   const onrouted = vi.fn()
+  const tell = vi.fn()
   const commands = calls(overrides)
-  const draft = new AddMachine(commands, onadded, onrouted)
+  const draft = new AddMachine(commands, onadded, onrouted, tell)
   draft.url = url
   draft.name = name
-  return { draft, onadded, onrouted, commands }
+  return { draft, onadded, onrouted, tell, commands }
 }
 
 const offered = async (why: SameWhy, name = '') => {
@@ -172,6 +178,69 @@ describe('AddMachine', () => {
   })
 })
 
+describe('AddMachine with a machine code', () => {
+  it('names the machine after the code and sends the code whole', async () => {
+    const { draft, commands } = form({}, CODE)
+    await draft.submit()
+    expect([commands.machineMatch.mock.calls, commands.machineAdd.mock.calls]).toEqual([
+      [[CODE, 'Mac Studio']],
+      [[CODE, 'Mac Studio']],
+    ])
+  })
+
+  it('names it after the host when another machine has the name of the code', async () => {
+    const { draft, commands } = form({}, CODE)
+    await draft.submit(['Desk', 'mac studio'])
+    expect(commands.machineAdd.mock.calls).toEqual([[CODE, '192.168.1.20']])
+  })
+
+  it('checks the names taken on a scan too', async () => {
+    const { draft, commands } = form({}, '')
+    await draft.fill(CODE, ['Mac Studio'])
+    expect(commands.machineMatch.mock.calls).toEqual([[CODE, '192.168.1.20']])
+  })
+})
+
+describe('AddMachine with a machine it can merge into', () => {
+  const merging = (overrides: Partial<MachineCalls> = {}) =>
+    form({ machineMatch: () => matched({ kind: 'merge', machine: 3, name: 'MacBook' }), ...overrides }, CODE)
+
+  it('merges the code into it, tells what changed and hands it over as routed', async () => {
+    const { draft, onadded, onrouted, tell, commands } = merging()
+    await draft.submit()
+    expect([commands.machineMerge.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, CODE]], []])
+    expect(tell.mock.calls).toEqual([[{ level: 'info', message: 'MacBook already saved: 1 route added, token updated.' }]])
+    expect([onrouted.mock.calls, onadded.mock.calls, draft.offer, draft.formError]).toEqual([[[3]], [], null, null])
+  })
+
+  it('tells that there was nothing to add', async () => {
+    const { draft, onrouted, tell } = merging({
+      machineMerge: () => ok({ added: [], token_updated: false, skipped: [] }),
+    })
+    await draft.submit()
+    expect(tell.mock.calls).toEqual([[{ level: 'info', message: 'MacBook already saved: nothing to add.' }]])
+    expect(onrouted.mock.calls).toEqual([[3]])
+  })
+
+  it('stays busy from checking until the machine is handed over', async () => {
+    const pending = gate()
+    const { draft, onrouted } = merging({ machineMerge: () => pending.promise.then(() => ok(MERGED)) })
+    const sent = draft.submit()
+    expect(draft.busy).toBe(true)
+    pending.open(3)
+    await sent
+    expect([onrouted.mock.calls, draft.busy]).toEqual([[[3]], true])
+  })
+
+  it('puts a failed merge under the form and tells nothing', async () => {
+    const failing = { code: 'secrets', message: 'the keychain is locked' } as const
+    const { draft, onrouted, tell } = merging({ machineMerge: () => refused(failing) })
+    await draft.submit()
+    expect([draft.formError, draft.busy, draft.offer]).toEqual([failing.message, false, null])
+    expect([onrouted, tell].map((mock) => mock.mock.calls.length)).toEqual([0, 0])
+  })
+})
+
 describe('AddMachine with a route already saved', () => {
   it('says so and adds nothing', async () => {
     const { draft, onadded, commands } = form({ machineMatch: () => matched({ kind: 'already_saved', machine: 3 }) })
@@ -202,6 +271,13 @@ describe('AddMachine offering the same machine', () => {
     await draft.addRoute()
     expect([commands.machineRouteAdd.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, URL_TEXT]], []])
     expect([onrouted.mock.calls, onadded.mock.calls]).toEqual([[[3]], []])
+  })
+
+  it('adds the whole code to that machine', async () => {
+    const { draft, commands } = form({ machineMatch: () => same('boot') }, CODE)
+    await draft.submit()
+    await draft.addRoute()
+    expect(commands.machineRouteAdd.mock.calls).toEqual([[3, CODE]])
   })
 
   it('adds a new machine instead under the name checked', async () => {
