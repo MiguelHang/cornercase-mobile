@@ -38,6 +38,24 @@ mod observe {
     }
 }
 
+mod current {
+    use super::*;
+
+    #[test]
+    fn is_none_before_any_boot_is_seen() {
+        assert_eq!(BootWatch::default().current(), None);
+    }
+
+    #[test]
+    fn is_the_last_boot_seen() {
+        let mut watch = BootWatch::default();
+        watch.observe(boot("28715-1"));
+        assert_eq!(watch.current(), Some(&boot("28715-1")));
+        watch.observe(boot("30102-2"));
+        assert_eq!(watch.current(), Some(&boot("30102-2")));
+    }
+}
+
 mod descriptor {
     use super::*;
 

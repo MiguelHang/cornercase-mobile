@@ -6,7 +6,7 @@ use rstest::rstest;
 
 use super::resume::{contracts, once};
 use super::retry::{answered, exit, held};
-use super::streams::{Lines, connected, connections, contract_of, fine, line, served, serving, snapshot};
+use super::streams::{BOOT, Lines, connected, connections, contract_of, fine, line, served, serving, snapshot};
 use super::*;
 use crate::cli::status::fixtures::{APP as APP_SNAPSHOT, WATCH};
 use crate::queue::Outcome;
@@ -165,6 +165,26 @@ mod a_restart {
         let disagree = Error::StaleBoot("the server's contract and its snapshots name different boots".to_owned());
         assert_eq!(waits, [(Duration::from_secs(1), disagree.clone()), (Duration::from_secs(2), disagree)]);
         assert_eq!((started.elapsed(), contracts(&asked)), (Duration::from_secs(1), 3));
+    }
+}
+
+mod the_boot {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn is_the_one_the_contract_names_once_connected() {
+        let (store, mut changes) = spawned(serving(fine()), &Asked::default());
+        until_connected(&mut changes).await;
+        assert_eq!(store.boot(), Some(BOOT.to_owned()));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_the_new_one_after_a_restart() {
+        let (store, mut changes) =
+            spawned(restarting(rebooting(serving(fine())), Some(restarted()), false), &Asked::default());
+        until_connected(&mut changes).await;
+        time::sleep(Duration::from_secs(60)).await;
+        assert_eq!(store.boot(), Some(RESTARTED.to_owned()));
     }
 }
 

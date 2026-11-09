@@ -200,6 +200,7 @@ mod the_handle {
         assert_eq!(store.connection(), Connection::Connecting);
         assert_eq!(store.session(), None);
         assert_eq!(store.app(), None);
+        assert_eq!(store.boot(), None);
         assert!(store.queue().is_none());
     }
 

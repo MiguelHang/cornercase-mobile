@@ -94,6 +94,10 @@ impl Store {
         self.shared.queue()
     }
 
+    pub fn boot(&self) -> Option<String> {
+        self.shared.state().boots.current().map(|boot| boot.0.clone())
+    }
+
     pub fn changes(&self) -> Changes {
         self.shared.subscribe()
     }
