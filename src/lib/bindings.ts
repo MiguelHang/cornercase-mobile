@@ -13,7 +13,7 @@ export const commands = {
 	session: () => __TAURI_INVOKE<Snapshot_Serialize | null>("session"),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	terminalOpen: (tab: number, pane: number | null, size: Size_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, size })),
-	terminalClose: () => __TAURI_INVOKE<void>("terminal_close"),
+	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 };
 
 /** Events */

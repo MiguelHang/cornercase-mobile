@@ -32,7 +32,7 @@ pub(crate) struct Active {
     store: Store,
     driver: JoinHandle<()>,
     forwarder: JoinHandle<()>,
-    terminal: Option<JoinHandle<()>>,
+    terminal: Option<(u64, JoinHandle<()>)>,
 }
 
 impl AppState {
@@ -105,13 +105,19 @@ impl Active {
         &self.store
     }
 
-    pub(crate) fn show(&mut self, terminal: JoinHandle<()>) {
-        self.hide();
-        self.terminal = Some(terminal);
+    pub(crate) fn show(&mut self, tab: u64, terminal: JoinHandle<()>) {
+        self.stop_terminal();
+        self.terminal = Some((tab, terminal));
     }
 
-    pub(crate) fn hide(&mut self) {
-        if let Some(terminal) = self.terminal.take() {
+    pub(crate) fn hide(&mut self, tab: u64) {
+        if self.terminal.as_ref().is_some_and(|(shown, _)| *shown == tab) {
+            self.stop_terminal();
+        }
+    }
+
+    fn stop_terminal(&mut self) {
+        if let Some((_, terminal)) = self.terminal.take() {
             terminal.abort();
         }
     }
@@ -121,7 +127,7 @@ impl Drop for Active {
     fn drop(&mut self) {
         self.driver.abort();
         self.forwarder.abort();
-        self.hide();
+        self.stop_terminal();
     }
 }
 

@@ -224,7 +224,7 @@ mod stopping {
     use super::*;
 
     fn closing(studio: &Studio) {
-        close(&studio.state);
+        close(&studio.state, TAB.tab);
     }
 
     fn connecting_again(studio: &Studio) {
@@ -247,6 +247,14 @@ mod stopping {
         settle().await;
         assert_eq!(opened.surfaces.running(), 0);
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn leaves_the_surface_of_another_tab_when_closing() {
+        let opened = Opened::with_tabs(&[3]).await;
+        close(&opened.studio.state, 4);
+        settle().await;
+        assert_eq!(opened.surfaces.running(), 1);
+    }
 }
 
 mod over_ipc {
@@ -263,7 +271,7 @@ mod over_ipc {
     #[test]
     fn closes_nothing_without_a_terminal() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        assert_eq!(ipc.invoke("terminal_close", json!({})), Ok(Value::Null));
+        assert_eq!(ipc.invoke("terminal_close", json!({ "tab": 3 })), Ok(Value::Null));
     }
 
     #[tokio::test(start_paused = true)]
@@ -277,7 +285,7 @@ mod over_ipc {
         settle().await;
         assert_eq!(surfaces.running(), 1);
         let ipc = Ipc::new(state);
-        assert_eq!(ipc.invoke("terminal_close", json!({})), Ok(Value::Null));
+        assert_eq!(ipc.invoke("terminal_close", json!({ "tab": 3 })), Ok(Value::Null));
         settle().await;
         assert_eq!(surfaces.running(), 0);
     }

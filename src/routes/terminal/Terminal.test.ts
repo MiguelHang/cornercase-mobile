@@ -35,7 +35,8 @@ describe('the terminal screen', () => {
   })
 
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
-    expect(source).toContain('new Opening(unlisten, { open, close: commands.terminalClose, failed: onfailed })')
+    expect(source).toContain('const close = () => commands.terminalClose(tab.tab)')
+    expect(source).toContain('new Opening(unlisten, { open, close, failed: onfailed })')
     expect(source).toContain('opening?.open(wanted)')
     expect(source).toContain('opening?.leave()')
   })

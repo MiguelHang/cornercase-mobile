@@ -34,8 +34,8 @@ pub(crate) fn terminal_open<R: Runtime>(
 #[tauri::command]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn terminal_close(state: State<'_, AppState>) {
-    close(&state);
+pub(crate) fn terminal_close(state: State<'_, AppState>, tab: u64) {
+    close(&state, tab);
 }
 
 pub(crate) fn open(
@@ -47,13 +47,13 @@ pub(crate) fn open(
     let mut active = state.active();
     let active = active.as_mut().ok_or_else(CommandError::not_connected)?;
     let shown = show(active.machine(), terminal, active.store().clone(), emit);
-    active.show(spawn(Box::pin(shown)));
+    active.show(terminal.tab, spawn(Box::pin(shown)));
     Ok(())
 }
 
-pub(crate) fn close(state: &AppState) {
+pub(crate) fn close(state: &AppState, tab: u64) {
     if let Some(active) = state.active().as_mut() {
-        active.hide();
+        active.hide(tab);
     }
 }
 

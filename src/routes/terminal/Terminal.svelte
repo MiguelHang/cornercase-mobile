@@ -34,7 +34,8 @@
       }
     })
     const open = (size: Size_Deserialize) => commands.terminalOpen(tab.tab, tab.pane, size)
-    opening = new Opening(unlisten, { open, close: commands.terminalClose, failed: onfailed })
+    const close = () => commands.terminalClose(tab.tab)
+    opening = new Opening(unlisten, { open, close, failed: onfailed })
     return () => {
       unlisten.then((stop) => stop()).catch(onfailed)
       opening?.leave()
