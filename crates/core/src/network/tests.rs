@@ -28,9 +28,12 @@ mod baseline {
     use super::*;
 
     #[tokio::test(start_paused = true)]
-    async fn decides_nothing_when_the_phone_starts_on_a_network() {
+    async fn settles_after_a_second_when_the_phone_starts_on_a_network() {
         let mut debounce = Debounce::default();
         debounce.observe(WIFI);
+        let started = Instant::now();
+        assert_eq!(debounce.decided().await, Decision::Baseline(WIFI));
+        assert_eq!(started.elapsed(), Duration::from_secs(1));
         assert_eq!(within(&mut debounce, Duration::from_secs(60)).await, None);
         assert!(!debounce.is_down());
     }

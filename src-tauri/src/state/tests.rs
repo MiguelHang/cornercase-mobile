@@ -7,6 +7,7 @@ use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
+use cornercase_core::network::Kind;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 
@@ -140,6 +141,27 @@ mod the_identity {
             state.identity().map(Identity::fingerprint),
             Err(CommandError::no_identity(&Error::Secrets("locked".to_owned())))
         );
+    }
+}
+
+mod the_network {
+    use super::*;
+
+    const WIFI: Network = Network { kind: Kind::Wifi, expensive: false };
+    const NONE: Network = Network { kind: Kind::None, expensive: false };
+
+    #[test]
+    fn is_unknown_until_the_first_one_is_applied() {
+        let state = AppState::load(NO_FOLDER, keychain());
+        assert_eq!(state.replace_network(WIFI), None);
+    }
+
+    #[test]
+    fn gives_back_the_one_it_replaces() {
+        let state = AppState::load(NO_FOLDER, keychain());
+        state.replace_network(NONE);
+        assert_eq!(state.replace_network(WIFI), Some(NONE));
+        assert_eq!(state.replace_network(WIFI), Some(WIFI));
     }
 }
 

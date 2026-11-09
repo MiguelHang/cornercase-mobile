@@ -29,6 +29,7 @@ impl Network {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Decision {
+    Baseline(Network),
     Offline,
     Changed(Network),
 }
@@ -80,7 +81,7 @@ impl Debounce {
         if network.is_down() {
             return Some(Decision::Offline);
         }
-        previous.map(|_| Decision::Changed(network))
+        Some(previous.map_or(Decision::Baseline(network), |_| Decision::Changed(network)))
     }
 }
 

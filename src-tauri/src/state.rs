@@ -7,6 +7,7 @@ use cornercase_core::identity::Identity;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::store::JsonFileStore;
+use cornercase_core::network::Network;
 use cornercase_core::secrets::Secrets;
 use cornercase_core::store::Store;
 use tauri::async_runtime::JoinHandle;
@@ -20,6 +21,7 @@ pub(crate) struct AppState {
     machines: SharedMachines,
     identity: Result<Identity, Error>,
     active: Mutex<Option<Active>>,
+    network: Mutex<Option<Network>>,
 }
 
 #[derive(Clone)]
@@ -40,7 +42,12 @@ impl AppState {
                 .map_err(|error| CommandError::machines_not_loaded(&error)),
             Err(reason) => Err(CommandError::no_data_dir(reason)),
         };
-        Self { machines: SharedMachines(Arc::new(Mutex::new(machines))), identity, active: Mutex::new(None) }
+        Self {
+            machines: SharedMachines(Arc::new(Mutex::new(machines))),
+            identity,
+            active: Mutex::new(None),
+            network: Mutex::new(None),
+        }
     }
 
     pub(crate) fn machines<T>(
@@ -60,6 +67,10 @@ impl AppState {
 
     pub(crate) fn active(&self) -> MutexGuard<'_, Option<Active>> {
         self.active.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub(crate) fn replace_network(&self, network: Network) -> Option<Network> {
+        self.network.lock().unwrap_or_else(PoisonError::into_inner).replace(network)
     }
 }
 
