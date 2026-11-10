@@ -2,6 +2,7 @@ import { createRawSnippet } from 'svelte'
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import Button from './Button.svelte'
+import CodeBox from './CodeBox.svelte'
 import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
@@ -10,6 +11,7 @@ import Labelled from './Labelled.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
 import buttonSource from './Button.svelte?raw'
+import codeBoxSource from './CodeBox.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
@@ -42,6 +44,27 @@ describe('Glass', () => {
   it('blurs what is behind it with and without the prefix', () => {
     expect(glassSource).toContain('-webkit-backdrop-filter: blur(24px);')
     expect(glassSource).toContain('\n    backdrop-filter: blur(24px);')
+  })
+})
+
+describe('CodeBox', () => {
+  it('draws its lines inside a box as wide as the longest of them, their numbers as wide as the longest', () => {
+    const body = render(CodeBox, { props: { digits: 3, children: html('<div>a line</div>') } }).body
+    expect(body).toMatch(
+      /<div class="box svelte-[\w-]+"><div class="lines svelte-[\w-]+" style="--digits: 3ch;"> ?<div>a line<\/div>/,
+    )
+  })
+
+  it.each([
+    'overflow-x: auto; overscroll-behavior-x: contain;',
+    '.lines { width: max-content; min-width: 100%; }',
+    ':global(.code-line) { --tint: transparent; display: flex; background: var(--tint);',
+    'font-family: var(--font-mono); font-size: 13px; line-height: 20px; white-space: pre; }',
+    ':global(.code-gutter) { position: sticky; left: 0;',
+    'background: linear-gradient(var(--tint), var(--tint)), var(--raised);',
+    ':global(.code-number) { box-sizing: content-box; width: var(--digits);',
+  ])('holds %s, the line rules global so that the lines of any screen take them', (text) => {
+    expect(flat(codeBoxSource)).toContain(text)
   })
 })
 

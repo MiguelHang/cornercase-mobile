@@ -2,6 +2,7 @@
   import type { Fold_Serialize as Fold } from '../../lib/bindings'
   import { CLOSED, goneMessage, type ChangesState } from '../../lib/changes.svelte'
   import { rows, shownPath } from '../../lib/diff'
+  import CodeBox from '../../lib/ui/CodeBox.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import DiffLine from './DiffLine.svelte'
@@ -54,13 +55,11 @@
   {:else if lines.length === 0}
     <p class="note">No lines changed</p>
   {:else}
-    <div class="diff">
-      <div class="lines">
-        {#each lines as row, at (at)}
-          <DiffLine {row} {digits} />
-        {/each}
-      </div>
-    </div>
+    <CodeBox {digits}>
+      {#each lines as row, at (at)}
+        <DiffLine {row} />
+      {/each}
+    </CodeBox>
   {/if}
 </section>
 
@@ -109,19 +108,6 @@
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .diff {
-    margin: 0 calc(-1 * var(--inset-wide));
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    border-block: 1px solid var(--border);
-    background: var(--raised);
-  }
-
-  .lines {
-    width: max-content;
-    min-width: 100%;
   }
 
   .note {

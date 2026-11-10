@@ -36,15 +36,13 @@ const bare = (html: string) => html.replace(/<!--[^]*?-->/g, '')
 
 const note = (body: string) => bare(body).match(/<p class="note svelte-[\w-]+">(.*?)<\/p>/)?.[1] ?? null
 
-const kinds = (body: string) => [...body.matchAll(/<div class="line (\w+) svelte-[\w-]+"/g)].map((m) => m[1])
+const kinds = (body: string) => [...body.matchAll(/<div class="code-line (\w+) svelte-[\w-]+"/g)].map((m) => m[1])
 
 const texts = (body: string) =>
-  [...bare(body).matchAll(/<span class="text svelte-[\w-]+">(.*?)<\/span><\/div>/g)].map((m) =>
-    m[1].replace(/<[^>]+>/g, ''),
-  )
+  [...bare(body).matchAll(/<span class="code-text">(.*?)<\/span><\/div>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''))
 
 const numbers = (body: string) =>
-  [...body.matchAll(/<span class="number svelte-[\w-]+">(\d*)<\/span><span class="number svelte-[\w-]+">(\d*)<\/span>/g)].map(
+  [...body.matchAll(/<span class="code-number">(\d*)<\/span><span class="code-number">(\d*)<\/span>/g)].map(
     (m) => [m[1], m[2]],
   )
 
@@ -140,13 +138,10 @@ describe('Diff', () => {
     expect(flat(diffSource)).toContain('<Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />')
   })
 
-  it('scrolls the whole diff sideways with unbroken lines and the numbers held at the left', () => {
-    const box = flat(diffSource)
-    expect(box).toContain('overflow-x: auto;')
-    expect(box).toContain('.lines { width: max-content; min-width: 100%; }')
-    const line = flat(lineSource)
-    expect(line).toContain('white-space: pre;')
-    expect(line).toContain('.gutter { position: sticky; left: 0;')
+  it('draws its lines in the code box, which scrolls them sideways with the numbers held at the left', () => {
+    expect(draw(stateWith(reading()))).toMatch(
+      /<div class="box svelte-[\w-]+"><div class="lines svelte-[\w-]+" style="--digits: 1ch;"><!--\[--><div class="code-line hunk /,
+    )
   })
 
   it('tints the lines and their changed characters with the theme', () => {
