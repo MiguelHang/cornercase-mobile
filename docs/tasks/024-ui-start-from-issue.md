@@ -1,6 +1,6 @@
 # 024 — Pantalla 4: arrancar desde una issue (`issue list/read`, `start --issue`)
 
-- Estado: en curso
+- Estado: hecha
 - Depende de: 023
 - Riesgo: bajo
 - Rama: `feat/024-start-from-issue` · PR: `feat: start an agent on an issue from the phone`
@@ -55,3 +55,6 @@ Tomadas el 2026-11-10 con los valores por defecto propuestos (`design/starting-w
 
 ## Verificación
 En el iPhone se arranca un agente en un worktree desde una issue de GitHub (criterio de éxito 4).
+Comprobado el 2026-11-10 en el simulador iPhone 17 contra el puente y cornercase 0.13.19: la lista con GitHub y
+Shortcut, el filtro por tracker, la búsqueda local, la issue en Markdown y un agente arrancado en el worktree de su
+rama, que aparece en el tablero (`design/starting-work.md` › Checked live).
