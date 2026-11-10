@@ -95,10 +95,6 @@ export class Router {
     this.#stack = [...this.#stack, route]
   }
 
-  replace(route: Route) {
-    this.#stack = [...this.#stack.slice(0, Math.max(1, this.#stack.length - 1)), route]
-  }
-
   settle(route: Route) {
     this.#stack = [this.#stack[0], route]
   }

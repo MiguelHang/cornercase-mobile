@@ -23,7 +23,7 @@
   <span class="title">{issue.title}</span>
   <span class="meta">
     <span class="by">{age === '' ? issue.author : `${issue.author} · ${age}`}</span>
-    {#each issue.labels as label (label)}
+    {#each issue.labels as label, at (at)}
       <span class="tag">{label}</span>
     {/each}
   </span>

@@ -349,26 +349,18 @@ describe('IssuesState reading again', () => {
     calls.issueList.mock.calls.length,
   ]
 
-  it('reads nothing more while it stays connected to the same server', async () => {
+  it('reads nothing more while it stays connected', async () => {
     const { state, calls } = await opened()
-    await state.see(true, 'boot-1')
-    await state.see(true, 'boot-1')
-    await state.see(true, null)
+    await state.see(true)
+    await state.see(true)
     expect(reads(calls)).toEqual([1, 2])
   })
 
   it('reads the trackers and the list again when the connection comes back', async () => {
     const { state, calls } = await opened()
-    await state.see(true, 'boot-1')
-    await state.see(false, 'boot-1')
-    await state.see(true, 'boot-1')
-    expect(reads(calls)).toEqual([2, 4])
-  })
-
-  it('reads them again when the server restarted', async () => {
-    const { state, calls } = await opened()
-    await state.see(true, 'boot-1')
-    await state.see(true, 'boot-2')
+    await state.see(true)
+    await state.see(false)
+    await state.see(true)
     expect(reads(calls)).toEqual([2, 4])
   })
 
@@ -377,8 +369,8 @@ describe('IssuesState reading again', () => {
     const calls = fakes()
     const { state } = await opened(calls)
     calls.issueList.mockImplementation(pending.call)
-    void state.see(true, 'boot-1')
-    void state.see(true, 'boot-2')
+    void state.see(false)
+    void state.see(true)
     await settled()
     expect([state.issues, state.loading]).toEqual([[ACME_41, ACME_38], true])
   })
@@ -390,6 +382,17 @@ describe('IssuesState reading again', () => {
     await state.refresh()
     expect(state.trackers.kind).toBe('ready')
     expect([state.issues, state.error]).toEqual([[ACME_41, ACME_38], 'offline'])
+  })
+
+  it('reads the trackers again on Try again after reading them again failed', async () => {
+    const calls = fakes()
+    const { state } = await opened(calls)
+    calls.issueSources.mockImplementation(() => refusal('offline'))
+    await state.refresh()
+    calls.issueSources.mockImplementation(() => answered(sources(tracker('github'), tracker('shortcut'))))
+    await state.retry()
+    expect(state.connected.map((known) => known.source)).toEqual(['github', 'shortcut'])
+    expect(state.error).toBeNull()
   })
 })
 
@@ -476,51 +479,19 @@ describe('IssueState stale answers', () => {
     const state = new IssueState(MACHINE, WANTED, calls)
     state.stop()
     await state.load()
-    await state.see(true, 'boot-1')
+    await state.see(true)
     expect(calls.issueRead).not.toHaveBeenCalled()
   })
 })
 
 describe('IssueState reading again', () => {
-  it.each<[string, [boolean, string | null][], number]>([
-    [
-      'the connection comes back',
-      [
-        [true, 'boot-1'],
-        [false, 'boot-1'],
-        [true, 'boot-1'],
-      ],
-      2,
-    ],
-    [
-      'the server restarted',
-      [
-        [true, 'boot-1'],
-        [true, 'boot-2'],
-      ],
-      2,
-    ],
-    [
-      'the boot is not known for a while',
-      [
-        [true, 'boot-1'],
-        [true, null],
-        [true, 'boot-1'],
-      ],
-      1,
-    ],
-    [
-      'nothing changed',
-      [
-        [true, 'boot-1'],
-        [true, 'boot-1'],
-      ],
-      1,
-    ],
+  it.each<[string, boolean[], number]>([
+    ['the connection comes back', [true, false, true], 2],
+    ['it stays connected', [true, true], 1],
   ])('reads as many times as it should when %s', async (_, seen, times) => {
     const { state, calls } = await shown()
-    for (const [connected, boot] of seen) {
-      await state.see(connected, boot)
+    for (const connected of seen) {
+      await state.see(connected)
     }
     expect(calls.issueRead).toHaveBeenCalledTimes(times)
   })
@@ -530,8 +501,8 @@ describe('IssueState reading again', () => {
     const calls = reader()
     const { state } = await shown(calls)
     calls.issueRead.mockImplementation(pending.call)
-    await state.see(true, 'boot-1')
-    void state.see(true, 'boot-2')
+    await state.see(false)
+    void state.see(true)
     expect(state.reading).toEqual({ kind: 'read', read: FIRST })
     pending.answer(0, SECOND)
     await settled()
@@ -542,8 +513,8 @@ describe('IssueState reading again', () => {
     const calls = reader()
     const { state } = await shown(calls)
     calls.issueRead.mockImplementation(() => refusal('offline'))
-    await state.see(true, 'boot-1')
-    await state.see(true, 'boot-2')
+    await state.see(false)
+    await state.see(true)
     expect(state.reading).toEqual({ kind: 'read', read: FIRST })
   })
 })

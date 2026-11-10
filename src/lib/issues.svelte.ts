@@ -36,15 +36,12 @@ const sameFilters = (one: Filters, other: Filters) =>
   one.closed === other.closed && one.mine === other.mine && one.source === other.source
 
 class Sight {
-  #boot: string | null = null
   #connected: boolean | null = null
 
-  changed(connected: boolean, boot: string | null) {
+  changed(connected: boolean) {
     const back = connected && this.#connected === false
-    const restarted = boot !== null && this.#boot !== null && boot !== this.#boot
     this.#connected = connected
-    this.#boot = boot ?? this.#boot
-    return back || restarted
+    return back
   }
 }
 
@@ -61,6 +58,7 @@ export class IssuesState {
   #left = false
   #sourcesAsked = 0
   #listsAsked = 0
+  #sourcesFailed = false
   #sight = new Sight()
 
   constructor(machine: number, project: number, calls: IssueCalls) {
@@ -118,6 +116,7 @@ export class IssuesState {
     if (asked !== this.#sourcesAsked || this.#left) {
       return
     }
+    this.#sourcesFailed = !reply.ok
     if (!reply.ok) {
       this.#unread(reply.error)
       return
@@ -128,7 +127,10 @@ export class IssuesState {
   }
 
   retry() {
-    return this.trackers.kind === 'ready' ? this.list() : this.load()
+    if (this.trackers.kind !== 'ready') {
+      return this.load()
+    }
+    return this.#sourcesFailed ? this.refresh() : this.list()
   }
 
   filter(change: Partial<Filters>) {
@@ -141,8 +143,8 @@ export class IssuesState {
     return this.list()
   }
 
-  async see(connected: boolean, boot: string | null) {
-    if (this.#sight.changed(connected, boot)) {
+  async see(connected: boolean) {
+    if (this.#sight.changed(connected)) {
       await this.refresh()
     }
   }
@@ -234,8 +236,8 @@ export class IssueState {
     return this.load()
   }
 
-  async see(connected: boolean, boot: string | null) {
-    if (this.#sight.changed(connected, boot)) {
+  async see(connected: boolean) {
+    if (this.#sight.changed(connected)) {
       await this.#read()
     }
   }

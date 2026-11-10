@@ -85,11 +85,10 @@ describe('Issue', () => {
     expect(all(drawn(reads({ body: ' \n' })), 'note')).toEqual(['No description'])
   })
 
-  it('starts on the project of the list with the issue and the prompt cornercase will use', () => {
+  it("starts on the project of the list with the issue under its row's tracker and key and the prompt cornercase will use", () => {
     expect(drawn(reads())).toMatch(/<button class="button primary svelte-[\w-]+"[^>]*>[^]*?Start[^]*?<\/button>/)
-    expect(flat(issueSource)).toContain(
-      'onstart({ project: issue.project, issue: read.issue, prompt: read.prompt })',
-    )
+    expect(flat(issueSource)).toContain('const chosen = { ...read.issue, source: issue.source, key: issue.key }')
+    expect(flat(issueSource)).toContain('onstart({ project: issue.project, issue: chosen, prompt: read.prompt })')
     expect(flat(issueSource)).toContain('<Button onclick={start}>Start</Button>')
   })
 })

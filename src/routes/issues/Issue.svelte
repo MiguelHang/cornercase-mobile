@@ -31,7 +31,8 @@
 
   const start = () => {
     if (read !== null) {
-      onstart({ project: issue.project, issue: read.issue, prompt: read.prompt })
+      const chosen = { ...read.issue, source: issue.source, key: issue.key }
+      onstart({ project: issue.project, issue: chosen, prompt: read.prompt })
     }
   }
 </script>
@@ -55,7 +56,7 @@
       <h2 class="name">{read.issue.title}</h2>
       {#if read.issue.labels.length > 0}
         <p class="line">
-          {#each read.issue.labels as tag (tag)}
+          {#each read.issue.labels as tag, at (at)}
             <span class="tag">{tag}</span>
           {/each}
         </p>

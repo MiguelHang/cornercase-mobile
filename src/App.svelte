@@ -188,7 +188,7 @@
   $effect(() => {
     const connected = current.connection.state === 'connected'
     const watched = [issues, issue]
-    untrack(() => watched.forEach((state) => void state?.see(connected, null)))
+    untrack(() => watched.forEach((state) => void state?.see(connected)))
   })
 
   const show = (next: Screen) => {

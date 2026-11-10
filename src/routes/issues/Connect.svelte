@@ -5,10 +5,21 @@
 
   let { sources, onretry }: { sources: SourceInfo[]; onretry: () => void } = $props()
 
-  const howTo = (source: SourceInfo) =>
+  const inRepository = (source: SourceInfo) =>
+    source.source === 'gitlab'
+      ? 'On the Mac, open a folder inside the git repository whose remote is on your GitLab server as the project.'
+      : 'On the Mac, open a folder inside the git repository as the project.'
+
+  const signIn = (source: SourceInfo) =>
     source.source === 'github'
       ? "On the Mac, sign in to gh in the project's folder."
       : "On the Mac, connect it in cornercase's Settings › Issues."
+
+  const howTo = (source: SourceInfo) => {
+    const repository = source.missing.includes('repository')
+    const settings = !repository || source.missing.some((what) => what !== 'repository')
+    return [...(repository ? [inRepository(source)] : []), ...(settings ? [signIn(source)] : [])]
+  }
 </script>
 
 <Glass>
@@ -27,7 +38,9 @@
             {#if source.reason !== null}
               <span class="why" class:failing={source.state === 'failing'}>{source.reason}</span>
             {/if}
-            <span class="how">{howTo(source)}</span>
+            {#each howTo(source) as how (how)}
+              <span class="how">{how}</span>
+            {/each}
           </li>
         {/each}
       </ul>

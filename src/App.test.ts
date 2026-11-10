@@ -216,9 +216,9 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => kept(issues)) $effect(() => kept(issue))')
   })
 
-  it('reads the issues again when the connection comes back, with no boot of its own', () => {
+  it('reads the issues again when the connection comes back', () => {
     expect(source).toContain(
-      "$effect(() => { const connected = current.connection.state === 'connected' const watched = [issues, issue] untrack(() => watched.forEach((state) => void state?.see(connected, null))) })",
+      "$effect(() => { const connected = current.connection.state === 'connected' const watched = [issues, issue] untrack(() => watched.forEach((state) => void state?.see(connected))) })",
     )
   })
 

@@ -182,40 +182,6 @@ describe('Router.below', () => {
   })
 })
 
-describe('Router.replace', () => {
-  it('puts the started agent in place of the start screen', () => {
-    const router = new Router(HOME)
-    router.go(START)
-    router.replace(STARTING)
-    expect(router.current).toEqual(STARTING)
-  })
-
-  it('goes back from the started agent to home, not to the start screen', () => {
-    const router = new Router(HOME)
-    router.go(START)
-    router.replace(STARTING)
-    router.back()
-    expect(router.current).toEqual(HOME)
-  })
-
-  it('keeps the base and goes on top of it when nothing is above it', () => {
-    const router = new Router(HOME)
-    router.replace(STARTING)
-    expect(router.current).toEqual(STARTING)
-    router.back()
-    expect(router.current).toEqual(HOME)
-  })
-
-  it('keeps the routes below the one it replaces', () => {
-    const router = new Router(HOME)
-    router.go(MACHINES)
-    router.go(START)
-    router.replace(STARTING)
-    router.back()
-    expect(router.current).toEqual(MACHINES)
-  })
-})
-
 describe('Router.setBase with an agent or its terminal open', () => {
   it('stays on an agent while the connection settles on home', () => {
     const router = new Router(HOME)
