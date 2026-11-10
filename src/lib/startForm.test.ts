@@ -14,6 +14,7 @@ import {
   BRANCH_EMPTY,
   CHOICES_UNANSWERED,
   PLACE_EMPTY,
+  PLACES_STALE,
   PROMPT_EMPTY,
   StartForm,
   WORKSPACE_EMPTY,
@@ -383,6 +384,24 @@ describe('StartForm when the connection comes back', () => {
     expect(form.place).toBe('workspace-22')
     await reconnect(form)
     expect(form.place).toBeNull()
+  })
+
+  it("stops offering an issue's places after a restart, and refuses to start it", async () => {
+    const answers = [ok(choices(SESSION)), ok(choices(SESSION, 'boot-2'))]
+    const where = { project: null, places: [NOTES, LOGIN] }
+    const { form, commands } = await fromIssue({ startProjects: () => answers.shift() ?? ok(choices(SESSION)) }, { ...FORGETFUL }, where)
+    await reconnect(form)
+    form.place = 'workspace-22'
+    await form.startIssue()
+    expect(form.placeChoices).toEqual({ kind: 'failed', reason: PLACES_STALE })
+    expect(commands.startIssue).not.toHaveBeenCalled()
+  })
+
+  it("keeps offering an issue's places when the connection comes back on the same boot", async () => {
+    const where = { project: null, places: [NOTES, LOGIN] }
+    const { form } = await fromIssue({}, { ...FORGETFUL }, where)
+    await reconnect(form)
+    expect(form.placeChoices).toEqual({ kind: 'ready', items: [NOTES, LOGIN] })
   })
 })
 

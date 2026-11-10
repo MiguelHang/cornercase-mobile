@@ -33,6 +33,7 @@ export const PROMPT_EMPTY = 'Write what the agent should do'
 export const AGENT_UNANSWERED =
   'cornercase did not answer, so the agent may have started: look at the board before trying again.'
 export const CHOICES_UNANSWERED = 'cornercase did not answer.'
+export const PLACES_STALE = 'cornercase restarted: go back to the issue to see where it can start.'
 
 const remembered: Memory = { agent: null, workspace: null }
 
@@ -105,6 +106,7 @@ export class StartForm {
   #onstarted: (started: Started, agent: string) => void
   #memory: Memory
   #boot: string | null = null
+  #placesStale = $state(false)
   #connected: boolean | null = null
   #projectsAsked = 0
   #agentsAsked = 0
@@ -124,6 +126,9 @@ export class StartForm {
   }
 
   get placeChoices(): Choices<PlaceInfo> {
+    if (this.#placesStale) {
+      return { kind: 'failed', reason: PLACES_STALE }
+    }
     return { kind: 'ready', items: this.issue?.places ?? [] }
   }
 
@@ -155,6 +160,7 @@ export class StartForm {
 
   forIssue(issue: StartingIssue) {
     this.issue = issue
+    this.#placesStale = false
     this.project = issue.project
     this.branch = issue.issue.branch
     const place = startedIn(issue)
@@ -224,6 +230,7 @@ export class StartForm {
   #forgetIds() {
     this.workspace = null
     this.place = null
+    this.#placesStale = this.issue !== null
   }
 
   async start() {
@@ -266,7 +273,7 @@ export class StartForm {
 
   async startIssue() {
     const issue = this.issue
-    if (this.sending || issue === null) {
+    if (this.sending || issue === null || this.#placesStale) {
       return
     }
     const chosen = this.chosenPlace
