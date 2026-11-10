@@ -2,6 +2,7 @@ import { createRawSnippet } from 'svelte'
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import Button from './Button.svelte'
+import CodeBox from './CodeBox.svelte'
 import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
@@ -9,13 +10,16 @@ import Icon from './Icon.svelte'
 import Labelled from './Labelled.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
+import ToolButton from './ToolButton.svelte'
 import buttonSource from './Button.svelte?raw'
+import codeBoxSource from './CodeBox.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import labelledSource from './Labelled.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
+import toolButtonSource from './ToolButton.svelte?raw'
 import baseSource from '../theme/base.css?raw'
 
 const html = (markup: string) => createRawSnippet(() => ({ render: () => markup }))
@@ -42,6 +46,27 @@ describe('Glass', () => {
   it('blurs what is behind it with and without the prefix', () => {
     expect(glassSource).toContain('-webkit-backdrop-filter: blur(24px);')
     expect(glassSource).toContain('\n    backdrop-filter: blur(24px);')
+  })
+})
+
+describe('CodeBox', () => {
+  it('draws its lines inside a box as wide as the longest of them, their numbers as wide as the longest', () => {
+    const body = render(CodeBox, { props: { digits: 3, children: html('<div>a line</div>') } }).body
+    expect(body).toMatch(
+      /<div class="box svelte-[\w-]+"><div class="lines svelte-[\w-]+" style="--digits: 3ch;"> ?<div>a line<\/div>/,
+    )
+  })
+
+  it.each([
+    'overflow-x: auto; overscroll-behavior-x: contain;',
+    '.lines { width: max-content; min-width: 100%; }',
+    ':global(.code-line) { --tint: transparent; display: flex; background: var(--tint);',
+    'font-family: var(--font-mono); font-size: 13px; line-height: 20px; white-space: pre; }',
+    ':global(.code-gutter) { position: sticky; left: 0;',
+    'background: linear-gradient(var(--tint), var(--tint)), var(--raised);',
+    ':global(.code-number) { box-sizing: content-box; width: var(--digits);',
+  ])('holds %s, the line rules global so that the lines of any screen take them', (text) => {
+    expect(flat(codeBoxSource)).toContain(text)
   })
 })
 
@@ -119,6 +144,27 @@ describe('Button', () => {
   it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
     expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
+  })
+})
+
+describe('ToolButton', () => {
+  const tool = (disabled?: boolean) =>
+    render(ToolButton, { props: { label: 'Whole file', icon: 'file-text', size: 22, disabled, onclick: () => {} } }).body
+
+  it('is an icon named for VoiceOver, at the size asked', () => {
+    expect(tool()).toMatch(/<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file">(?:<!--[^>]*-->| )*<svg [^>]*width="22"/)
+  })
+
+  it('takes no tap while disabled, faint', () => {
+    expect(tool(true)).toMatch(/<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file" disabled="">/)
+    expect(flat(toolButtonSource)).toContain('.tool:disabled { color: var(--faint); background: none; }')
+  })
+
+  it('is a target of 44 by 44 px in the accent, shaded while pressed', () => {
+    const source = flat(toolButtonSource)
+    expect(source).toContain('width: 44px; height: 44px; padding: 0; border: 0;')
+    expect(source).toContain('background: none; color: var(--accent); }')
+    expect(source).toContain('.tool:active { background: var(--hover); }')
   })
 })
 

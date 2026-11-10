@@ -2,6 +2,7 @@ pub mod agents;
 pub mod changes;
 pub mod contract;
 pub mod events;
+pub mod files;
 pub mod input;
 pub mod keys;
 pub mod last_message;

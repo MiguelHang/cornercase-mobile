@@ -2,9 +2,9 @@
   import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
   import { label, place, statusName } from '../../lib/board'
   import { compactHeader } from '../../lib/thread'
-  import Icon from '../../lib/ui/Icon.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
+  import ToolButton from '../../lib/ui/ToolButton.svelte'
 
   let {
     row,
@@ -14,6 +14,7 @@
     onback,
     onterminal,
     onchanges,
+    onfiles,
   }: {
     row: AgentRow
     backTo: string | null
@@ -22,6 +23,7 @@
     onback: () => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
+    onfiles: (workspace: number, title: string) => void
   } = $props()
 
   let scrolled = $state(0)
@@ -46,18 +48,9 @@
     </div>
   {/snippet}
   {#snippet right()}
-    <button class="tool" type="button" aria-label="Terminal" onclick={() => onterminal(row)} ontouchstart={() => {}}>
-      <Icon name="square-terminal" />
-    </button>
-    <button
-      class="tool"
-      type="button"
-      aria-label="Changes"
-      onclick={() => onchanges(row.workspace, row.workspace_name)}
-      ontouchstart={() => {}}
-    >
-      <Icon name="git-compare" />
-    </button>
+    <ToolButton label="Terminal" icon="square-terminal" onclick={() => onterminal(row)} />
+    <ToolButton label="Changes" icon="git-compare" onclick={() => onchanges(row.workspace, row.workspace_name)} />
+    <ToolButton label="Files" icon="folder" onclick={() => onfiles(row.workspace, row.workspace_name)} />
   {/snippet}
 </NavBar>
 <header class="head" bind:clientHeight={tall}>
@@ -69,24 +62,6 @@
 </header>
 
 <style>
-  .tool {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .tool:active {
-    background: var(--hover);
-  }
-
   .short {
     display: inline-flex;
     align-items: center;

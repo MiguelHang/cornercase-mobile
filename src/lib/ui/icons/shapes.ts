@@ -98,6 +98,44 @@ export const icons = {
     { kind: 'path', d: 'M11 13h4' },
     { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
   ],
+  folder: [
+    {
+      kind: 'path',
+      d: 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z',
+    },
+  ],
+  'folder-open': [
+    {
+      kind: 'path',
+      d: 'm6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2',
+    },
+  ],
+  file: [
+    {
+      kind: 'path',
+      d: 'M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z',
+    },
+    { kind: 'path', d: 'M14 2v5a1 1 0 0 0 1 1h5' },
+  ],
+  'file-text': [
+    {
+      kind: 'path',
+      d: 'M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z',
+    },
+    { kind: 'path', d: 'M14 2v5a1 1 0 0 0 1 1h5' },
+    { kind: 'path', d: 'M10 9H8' },
+    { kind: 'path', d: 'M16 13H8' },
+    { kind: 'path', d: 'M16 17H8' },
+  ],
+  search: [
+    { kind: 'path', d: 'm21 21-4.34-4.34' },
+    { kind: 'circle', cx: 11, cy: 11, r: 8 },
+  ],
+  image: [
+    { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
+    { kind: 'circle', cx: 9, cy: 9, r: 2 },
+    { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
+  ],
 } satisfies Record<string, Shape[]>
 
 export type IconName = keyof typeof icons

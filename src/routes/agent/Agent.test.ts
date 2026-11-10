@@ -1,48 +1,21 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
-import type { AttachImage } from '../../lib/attach.svelte'
 import { subagents } from '../../lib/board'
-import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
-import { fakeAsker, fakeClock, message, ok } from '../../lib/chatFakes'
+import type { Chat } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
+import { ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
 import chatHeaderSource from './ChatHeader.svelte?raw'
-import AgentLine from './AgentLine.svelte'
-import agentLineSource from './AgentLine.svelte?raw'
+import toolButtonSource from '../../lib/ui/ToolButton.svelte?raw'
 import Children from './Children.svelte'
 import childrenSource from './Children.svelte?raw'
 import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
-import Sent from './Sent.svelte'
-import sentSource from './Sent.svelte?raw'
 import subagentsSource from './Subagents.svelte?raw'
-import Thread from './Thread.svelte'
 import threadSource from './Thread.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
-
-const ROW: AgentRow = {
-  boot: 'b1',
-  agent: 'claude',
-  title: 'Fix the login flow',
-  status: 'waiting',
-  since: '2026-11-09T11:40:00.000Z',
-  parent: null,
-  depth: 0,
-  role: null,
-  rank_status: 'waiting',
-  pane: 12,
-  tab: 4,
-  tab_name: 'agent',
-  workspace: 9,
-  workspace_name: 'login',
-  workspace_count: 2,
-  project: 5,
-  project_name: 'web',
-}
-
-const unread: ReadLast = () => new Promise(() => {})
 
 const tool = (name: string, path: string) =>
   new RegExp(`<button class="tool svelte-[\\w-]+" type="button" aria-label="${name}">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!</svg>)[^])*?<path d="${path}"></path>`)
@@ -54,26 +27,7 @@ const TERMINAL = tool('Terminal', 'm7 11 2-2-2-2')
 
 const CHANGES = tool('Changes', 'M13 6h3a2 2 0 0 1 2 2v7')
 
-const unsent: SendText = () => new Promise(() => {})
-
-const unpressed: PressKey = () => new Promise(() => {})
-
-const unattached: AttachImage = () => new Promise(() => {})
-
-const unasked = fakeAsker().asker
-
-const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as const, data: null }) }
-
-const flat = (text: string) => text.replace(/\s+/g, ' ')
-
-const chatWith = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
-  if (row !== null) {
-    chat.see(1, [row])
-  }
-  chat.draft = draft
-  return chat
-}
+const FILES = tool('Files', 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z')
 
 const draw = (
   chat: Chat,
@@ -95,6 +49,7 @@ const draw = (
       onfailed: () => {},
       onterminal: () => {},
       onchanges: () => {},
+      onfiles: () => {},
     },
   }).body
 
@@ -217,12 +172,13 @@ const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
 const bar = (row: AgentRow) => draw(chatWith(row)).match(BAR)?.[1] ?? ''
 
 describe('Agent, its sticky header', () => {
-  it('keeps Back at the start of the bar and Terminal and Changes at its end, with the large header after it to scroll away', () => {
+  it('keeps Back at the start of the bar and Terminal, Changes and Files at its end, with the large header after it to scroll away', () => {
     const shown = bar(ROW)
     const end = shown.slice(shown.indexOf('<div class="end'))
     expect(shown.slice(0, shown.indexOf('<div class="center'))).toMatch(BACK)
     expect(end).toMatch(TERMINAL)
     expect(end).toMatch(CHANGES)
+    expect(end).toMatch(FILES)
     expect(shown).not.toContain('<h1')
   })
 
@@ -267,9 +223,9 @@ describe('Agent, its sticky header', () => {
 
   it('leaves the compact line the room its icon buttons of 44 by 44 px do not take, centred and cut at the end', () => {
     const source = flat(chatHeaderSource)
-    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(2)
-    expect(source).toContain('{#snippet right()} <button class="tool" type="button" aria-label="Terminal"')
-    expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
+    expect(source.match(/<ToolButton label="\w+" icon="[\w-]+" onclick=\{.*?\} \/>/g)).toHaveLength(3)
+    expect(source).toContain('{#snippet right()} <ToolButton label="Terminal"')
+    expect(flat(toolButtonSource)).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
     expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 0; overflow: hidden; vertical-align: middle;')
     expect(source).not.toContain('<Button')
   })
@@ -460,10 +416,10 @@ describe('Agent, without its row', () => {
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} /> {#key row.pane}')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} {onfiles} /> {#key row.pane}')
     const source = flat(chatHeaderSource)
-    expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
-    expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')
+    expect(source).toContain('label="Terminal" icon="square-terminal" onclick={() => onterminal(row)}')
+    expect(source).toContain('label="Changes" icon="git-compare" onclick={() => onchanges(row.workspace, row.workspace_name)}')
   })
 
   it("offers the changes of its agent's workspace, beside its terminal", () => {
@@ -472,9 +428,16 @@ describe('Agent, without its row', () => {
     expect(body.search(CHANGES)).toBeGreaterThan(body.search(TERMINAL))
   })
 
+  it("offers the files of its agent's workspace last, titled with the workspace's name", () => {
+    const body = draw(chatWith(ROW))
+    expect(body.search(FILES)).toBeGreaterThan(body.search(CHANGES))
+    expect(flat(chatHeaderSource)).toContain('label="Files" icon="folder" onclick={() => onfiles(row.workspace, row.workspace_name)}')
+  })
+
   it.each([
     ['terminal', TERMINAL],
     ['changes', CHANGES],
+    ['files', FILES],
   ])('offers no %s without its agent, nor once it is gone', (_, button) => {
     const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])
@@ -683,198 +646,6 @@ describe('Agent, its keys', () => {
   })
 })
 
-const CHIPS = [
-  { name: 'IMG_0042.jpg', size: '47 KiB' },
-  { name: 'pasted.png', size: '900 B' },
-]
-
-const outgoing = (state: Outgoing['state'], fields: Partial<Outgoing> = {}): Outgoing => ({
-  text: 'what is wrong here?',
-  chips: [],
-  state,
-  reason: state === 'failed' ? 'nothing was sent' : null,
-  answered: null,
-  ...fields,
-})
-
-const bubble = (shown: Outgoing | null, chat = chatWith({ ...ROW, status: 'done' })) => {
-  chat.outgoing = shown
-  return render(Sent, { props: { chat } }).body
-}
-
-const action = (body: string, name: string) =>
-  body.match(new RegExp(`<button class="([^"]*)" type="button"([^>]*)>((?:(?!</button>)[^])*)${name}(?:<!---->|\\s)*</button>`))
-
-describe('Sent', () => {
-  it('shows the text in a bubble while it is sending, named as your message, with no actions', () => {
-    const body = bubble(outgoing('sending'))
-    expect(body).toMatch(/<article class="sent svelte-[\w-]+" aria-label="Your message, sending">/)
-    expect(body).toMatch(/<p class="text svelte-[\w-]+">what is wrong here\?<\/p>/)
-    expect(body).toMatch(/<p class="state svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Sending…<\/p>/)
-    expect(body).not.toContain('Retry')
-    expect(body).not.toContain('Edit')
-    expect(body).not.toContain('<ul')
-  })
-
-  it('says it was sent with a check, and offers nothing', () => {
-    const body = bubble(outgoing('sent'))
-    expect(body).toContain('aria-label="Your message, sent"')
-    expect(body).toMatch(/<p class="state svelte-[\w-]+"><svg[^]*?<path d="M20 6 9 17l-5-5"><\/path>[^]*?<\/svg>(?:<!---->)?Sent<\/p>/)
-    expect(body).not.toContain('class="spinner')
-    expect(body).not.toContain('<button')
-  })
-
-  it('says why it was not sent and offers Retry and Edit, of 44 px, with their icons', () => {
-    const body = bubble(outgoing('failed', { reason: 'it may have been sent, but no answer came back' }))
-    expect(body).toContain('aria-label="Your message, not sent"')
-    expect(body).toMatch(
-      /<p class="state failed svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not sent: it may have been sent, but no answer came back<\/p>/,
-    )
-    expect(action(body, 'Retry')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
-    expect(action(body, 'Retry')?.[2]).toBe('')
-    expect(action(body, 'Retry')?.[3]).toContain('<path d="M3 3v5h5"></path>')
-    expect(action(body, 'Edit')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
-    expect(action(body, 'Edit')?.[3]).toContain('<path d="m15 5 4 4"></path>')
-    expect(body.indexOf('Not sent')).toBeLessThan(body.indexOf('Retry'))
-    expect(body.indexOf('Retry')).toBeLessThan(body.indexOf('Edit'))
-  })
-
-  it('rests Retry while it cannot go, and leaves Edit', () => {
-    const body = bubble(outgoing('failed'), chatWith(ROW))
-    expect(action(body, 'Retry')?.[1]).toMatch(/^button plain svelte-[\w-]+ resting$/)
-    expect(action(body, 'Retry')?.[2]).toBe(' disabled="" aria-disabled="true"')
-    expect(action(body, 'Edit')?.[2]).toBe('')
-  })
-
-  it('shows the names of the images that went with it, without their sizes', () => {
-    const body = bubble(outgoing('sent', { chips: CHIPS }))
-    const names = [...body.matchAll(/<li class="chip svelte-[\w-]+">([^<]*)<\/li>/g)].map((found) => found[1])
-    expect(names).toEqual(['IMG_0042.jpg', 'pasted.png'])
-    expect(body).not.toContain('KiB')
-    expect(body.indexOf('what is wrong here?')).toBeLessThan(body.indexOf('IMG_0042.jpg'))
-  })
-
-  it('shows only the chips when only an image went', () => {
-    const body = bubble(outgoing('sending', { text: '', chips: CHIPS.slice(0, 1) }))
-    expect(body).not.toContain('class="text')
-    expect(body).toMatch(/<div class="bubble svelte-[\w-]+">(?:<!--[^>]*-->|\s)*<ul class="chips svelte-[\w-]+">/)
-    expect(body).toContain('IMG_0042.jpg')
-  })
-
-  it('draws nothing while nothing was sent', () => {
-    expect(bubble(null)).not.toContain('<article')
-  })
-
-  it('retries and edits through the chat, keeping the text as it was written', () => {
-    expect(flat(sentSource)).toContain('resting={!chat.canRetry} onclick={() => void chat.retry()}>')
-    expect(flat(sentSource)).toContain('onclick={() => chat.edit()}>')
-    expect(flat(sentSource)).toContain('.text { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }')
-  })
-
-  it('sits on the right', () => {
-    expect(flat(sentSource)).toContain('align-items: flex-end;')
-    expect(flat(sentSource)).toContain('align-self: flex-end;')
-  })
-})
-
-const SINCE = Date.parse(ROW.since ?? '')
-
-const LATER = SINCE + 3 * 60_000
-
-const clockAt = (millis: number) => {
-  const { clock, tick } = fakeClock()
-  tick(millis)
-  return { clock, tick }
-}
-
-const lineChat = (status: string | null, since: string | null = ROW.since, clock: Clock = clockAt(LATER).clock) => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, clock, unasked)
-  chat.see(1, [{ ...ROW, status, since }])
-  return chat
-}
-
-const line = (chat: Chat, now = LATER) => render(AgentLine, { props: { chat, now } }).body
-
-const region = (body: string) => body.match(/<p class="said svelte-[\w-]+" aria-live="polite">([^]*?)<\/p>/)?.[1]
-
-const phrase = (text: string) => `<span class="phrase">${text}</span>`
-
-describe('AgentLine', () => {
-  it('says a working agent works, with its orbit and the time since it started outside the region', () => {
-    const body = line(lineChat('working'))
-    expect(body).toMatch(/<div class="line working svelte-[\w-]+">/)
-    expect(body).toContain('aria-label="Working"')
-    expect(body).toMatch(/<g class="orbit svelte-[\w-]+">/)
-    expect(region(body)).toContain(phrase('claude is working…'))
-    expect(region(body)).not.toContain('3 min')
-    expect(body).toMatch(/<\/p> (?:<!--[^>]*-->)*<span class="time svelte-[\w-]+">· 3 min<\/span>/)
-  })
-
-  it('says a shell agent waits for a background command, timed and orbiting too', () => {
-    const body = line(lineChat('shell'))
-    expect(body).toMatch(/<g class="orbit svelte-[\w-]+">/)
-    expect(region(body)).toContain(phrase('claude is waiting for a background command…'))
-    expect(body).toMatch(/<span class="time svelte-[\w-]+">· 3 min<\/span>/)
-  })
-
-  it('shows no time when the start is not known', () => {
-    const body = line(lineChat('working', null))
-    expect(region(body)).toContain(phrase('claude is working…'))
-    expect(body).not.toContain('class="time')
-  })
-
-  it('says a waiting agent waits for your answer, untimed', () => {
-    const body = line(lineChat('waiting'))
-    expect(body).toMatch(/<div class="line waiting svelte-[\w-]+">/)
-    expect(region(body)).toContain(phrase('claude is waiting for your answer'))
-    expect(body).not.toContain('class="time')
-  })
-
-  it('says a failed agent stopped, in the failure tone', () => {
-    const body = line(lineChat('failed'))
-    expect(body).toMatch(/<div class="line failed svelte-[\w-]+">/)
-    expect(body).toContain('aria-label="Failed"')
-    expect(region(body)).toContain(phrase('claude stopped with an error'))
-    expect(flat(agentLineSource)).toContain('.failed { color: var(--failed); }')
-  })
-
-  it('mutes a working agent with no news for two minutes, and keeps the minutes out of the region', () => {
-    const body = line(lineChat('working', ROW.since, clockAt(SINCE).clock), SINCE + 2 * 60_000)
-    expect(body).toMatch(/<div class="line muted svelte-[\w-]+">/)
-    expect(region(body)).toContain(phrase('claude is working… · no news'))
-    expect(region(body)).not.toContain('min')
-    expect(body).toMatch(/<span class="time svelte-[\w-]+">for 2 min · Ctrl-C interrupts<\/span>/)
-    expect(flat(agentLineSource)).toContain('.muted, .muted .time { color: var(--muted); }')
-  })
-
-  it('keeps working one moment before two minutes without news', () => {
-    expect(line(lineChat('working', ROW.since, clockAt(SINCE).clock), SINCE + 2 * 60_000 - 1)).toMatch(/<div class="line working svelte-[\w-]+">/)
-  })
-
-  it.each(['done', 'idle', 'pending', null])('draws nothing for a %o agent but keeps the region, hidden', (status) => {
-    const body = line(lineChat(status))
-    expect(body).toMatch(/<div class="line {2}svelte-[\w-]+ spoken">/)
-    expect(body).not.toContain('<svg')
-    expect(body).not.toContain('class="phrase"')
-    expect(region(body)).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
-  })
-
-  it('keeps the region while the agent is not seen yet', () => {
-    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
-    expect(region(line(chat))).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
-  })
-
-  it.each([
-    [outgoing('sending'), 'Sending'],
-    [outgoing('sent'), 'Sent'],
-    [outgoing('failed', { reason: 'the agent is gone' }), 'Not sent: the agent is gone'],
-  ])('says what happened to your message in the same region', (shown, news) => {
-    const chat = lineChat('working')
-    chat.outgoing = shown
-    expect(region(line(chat))).toContain(`<span class="spoken">${news}</span> <!--[0-->${phrase('claude is working…')}`)
-  })
-})
-
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
     expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <div class="composer">')
@@ -892,103 +663,5 @@ describe('Agent, its live line', () => {
     expect(flat(agentSource)).toContain(
       '$effect(() => { const told = chat const timer = setInterval(() => (now = told.now()), TICK_MS) return () => clearInterval(timer) })',
     )
-  })
-})
-
-const BEFORE = message('Shall I run the migration?')
-
-const threadChat = (shown: Chat['reading'], sent: Outgoing | null = outgoing('sent', { answered: BEFORE })) => {
-  const chat = lineChat('working')
-  chat.reading = shown
-  chat.outgoing = sent
-  return chat
-}
-
-const thread = (chat: Chat) => render(Thread, { props: { chat, now: LATER } }).body
-
-const at = (body: string, mark: string) => {
-  expect(body).toContain(mark)
-  return body.indexOf(mark)
-}
-
-const order = (body: string) => [
-  at(body, '<article class="message'),
-  at(body, '<article class="sent'),
-  at(body, '<p class="said'),
-]
-
-const count = (body: string, mark: string) => body.split(mark).length - 1
-
-describe('Thread', () => {
-  it('shows the message you answered, then your bubble, then the line, before the answer comes', () => {
-    const body = thread(threadChat({ kind: 'message', message: BEFORE }))
-    const [agent, you, line] = order(body)
-    expect(agent).toBeLessThan(you)
-    expect(you).toBeLessThan(line)
-    expect(body).toContain('Shall I run the migration?')
-  })
-
-  it.each([
-    ['its text', { ...BEFORE, text: 'Migrated.' }],
-    ['the time it was written', { ...BEFORE, written: '2026-11-09T11:43:00.000Z' }],
-  ])('shows your bubble, then the answer, then the line, once %s changes', (_, answer) => {
-    const body = thread(threadChat({ kind: 'message', message: answer }))
-    const [agent, you, line] = order(body)
-    expect(you).toBeLessThan(agent)
-    expect(agent).toBeLessThan(line)
-  })
-
-  it('keeps a single message of the agent and a single bubble', () => {
-    const body = thread(threadChat({ kind: 'message', message: message('Migrated.') }))
-    expect(count(body, '<article class="message')).toBe(1)
-    expect(count(body, '<article class="sent')).toBe(1)
-    expect(body).not.toContain('Shall I run the migration?')
-  })
-
-  it('shows only the message and the line while nothing was sent', () => {
-    const body = thread(threadChat({ kind: 'message', message: BEFORE }, null))
-    expect(body).not.toContain('<article class="sent')
-    expect(at(body, '<article class="message')).toBeLessThan(at(body, '<p class="said'))
-  })
-
-  it('keeps your bubble below the reading until a message comes', () => {
-    const body = thread(threadChat({ kind: 'loading' }))
-    expect(at(body, 'Reading its last message…')).toBeLessThan(at(body, '<article class="sent'))
-  })
-
-  it('marks a message whose turn is not over, faintly, after its text', () => {
-    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: false } }, null))
-    expect(body).toMatch(/<p class="going svelte-[\w-]+">More to come…<\/p>/)
-    expect(at(body, 'Shall I run the migration?')).toBeLessThan(at(body, 'More to come…'))
-    expect(flat(threadSource)).toContain('.written, .going { color: var(--faint); font-size: 13px; }')
-  })
-
-  it.each([true, null])('leaves the mark out when the turn is %o', (turnOver) => {
-    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: turnOver } }, null))
-    expect(body).not.toContain('More to come')
-  })
-
-  it('replaces a growing message in its place, without reading it again from the start', async () => {
-    const said = ['Reading thread.ts', 'Reading thread.ts and chat.svelte.ts']
-    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unattached, still, timers, unasked)
-    chat.see(1, [{ ...ROW, status: 'working' }])
-    await chat.refresh()
-    expect(thread(chat)).toContain('Reading thread.ts')
-    await chat.refresh()
-    const body = thread(chat)
-    expect(body).toContain('Reading thread.ts and chat.svelte.ts')
-    expect(body).not.toContain('Reading its last message…')
-    expect(threadSource).not.toContain('{#key')
-  })
-
-  it('goes down to the end after a reading only when the page was there before it', () => {
-    expect(flat(threadSource)).toContain(
-      '$effect.pre(() => { const was = read read = chat.reading.kind === \'message\' void chat.outgoing if (was && atEnd(window.scrollY, window.innerHeight, document.documentElement.scrollHeight)) { void tick().then(toEnd) } })',
-    )
-    expect(flat(threadSource)).toContain('const toEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight })')
-  })
-
-  it('stacks your bubble on the right of the column', () => {
-    expect(flat(threadSource)).toContain('.thread { display: flex; flex: 1; flex-direction: column;')
   })
 })

@@ -11,9 +11,8 @@ use tokio::sync::{Notify, mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio::time::{Instant, sleep, timeout_at};
 
-use cornercase_core::protocol::{BridgeMessage, USAGE_EXIT};
+use cornercase_core::protocol::{BridgeMessage, LINE_TOO_LONG, USAGE_EXIT};
 
-use super::TOO_LONG;
 use super::lines::{self, End};
 
 pub(super) const PATIENCE: Duration = Duration::from_secs(2);
@@ -78,7 +77,7 @@ fn read(child: &mut Child, readers: &Readers) -> Vec<JoinHandle<End>> {
 
 pub(super) fn last(status: io::Result<ExitStatus>, ends: &[End]) -> Vec<BridgeMessage> {
     if ends.contains(&End::TooLong) {
-        vec![BridgeMessage::Stderr(TOO_LONG.to_owned()), BridgeMessage::Exit(USAGE_EXIT)]
+        vec![BridgeMessage::Stderr(LINE_TOO_LONG.to_owned()), BridgeMessage::Exit(USAGE_EXIT)]
     } else {
         vec![BridgeMessage::Exit(exit_code(status))]
     }

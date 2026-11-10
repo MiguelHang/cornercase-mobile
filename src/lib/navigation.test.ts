@@ -44,6 +44,8 @@ describe('titleOf', () => {
     ['a terminal by its agent', { name: 'terminal', machine: 1, row: { ...ROW, title: null } }, 'claude'],
     ['the changes by their title', { name: 'changes', machine: 1, workspace: 2, title: 'main' }, 'main'],
     ['a diff by its file name', { name: 'change', machine: 1, workspace: 2, path: 'src/lib/app.rs' }, 'app.rs'],
+    ['the files by their title', { name: 'files', machine: 1, workspace: 2, title: 'main' }, 'main'],
+    ['a file by its name', { name: 'file', machine: 1, workspace: 2, path: 'src/lib/files.ts' }, 'files.ts'],
   ])('names %s', (_, route, title) => {
     expect(titleOf(route, LOOKUPS)).toBe(title)
   })

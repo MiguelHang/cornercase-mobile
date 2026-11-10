@@ -157,7 +157,7 @@ describe('App wiring', () => {
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} />",
     )
   })
 
@@ -225,7 +225,7 @@ describe('App wiring', () => {
       "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} {backTo} onback={goBack} /> {/if} {:else if route.name === 'start'}",
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} {backTo} onback={goBack} onfile={whole} /> {/if} {:else if route.name === 'files'}",
     )
   })
 
@@ -237,9 +237,9 @@ describe('App wiring', () => {
 
   it('goes back through one action that drops the open diff only when leaving it', () => {
     expect(source).toContain(
-      "const goBack = () => { if (router.current.name === 'change') { changes?.closeDiff() } router.back() }",
+      "const goBack = () => { const top = router.current.name if (top === 'change') { changes?.closeDiff() }",
     )
-    expect(source.match(/onback=\{goBack\}/g)).toHaveLength(7)
+    expect(source.match(/onback=\{goBack\}/g)).toHaveLength(9)
     expect(source).not.toContain('onback={() =>')
     expect(source).not.toContain('leaveDiff')
   })
@@ -252,6 +252,45 @@ describe('App wiring', () => {
     )
     expect(source).toContain(
       'const listening = events.changesChanged.listen((event) => state.see(event.payload)) listening.then(() => state.start()).catch(toasts.failed) return () => { state.stop() listening.then((unlisten) => unlisten()).catch(toasts.failed) }',
+    )
+  })
+
+  it("opens the files of an agent's workspace on top of it, on the active machine, and a file above them", () => {
+    expect(source).toContain(
+      "const browse = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'files', machine: current.machine, workspace, title }) } }",
+    )
+    expect(source).toContain(
+      "{:else if route.name === 'files'} {#if files !== null} <Files title={route.title} {files} {backTo} onback={goBack} onopen={read} /> {/if} {:else if route.name === 'file'} {#if files !== null} <File path={route.path} {files} {backTo} onback={goBack} /> {/if} {:else if route.name === 'start'}",
+    )
+  })
+
+  it('reads a file of the tree each time it opens it', () => {
+    expect(source).toContain(
+      "const read = (path: string) => { if (files !== null) { void files.open(path) router.go({ name: 'file', machine: files.machine, workspace: files.workspace, path }) } }",
+    )
+  })
+
+  it('drops the open file before going back from it, then lists the tree again', () => {
+    expect(source).toContain(
+      "if (top === 'file') { files?.closeFile() } router.back() if (top === 'file') { void files?.refresh() } }",
+    )
+    expect(source).not.toContain('leaveFile')
+  })
+
+  it('opens the whole file of a diff above it, on the same workspace, keeping the diff and its state under it', () => {
+    expect(source).toContain(
+      "const whole = (path: string) => { if (changes !== null) { router.go({ name: 'file', machine: changes.machine, workspace: changes.workspace, path }) } }",
+    )
+  })
+
+  it('keeps one state of the browsed workspace under its tree and its file, listing the tree or reading the file it opened on untracked, so its own writes do not stop it, and leaving it after', () => {
+    expect(source).toContain('const browsedMachine = $derived(browsed?.machine ?? null)')
+    expect(source).toContain('const browsedWorkspace = $derived(browsed?.workspace ?? null)')
+    expect(source).toContain(
+      '{ list: commands.filesList, read: commands.filesRead, search: commands.filesSearch, stopSearch: commands.filesSearchStop, }, (toast) => toasts.push(toast),',
+    )
+    expect(source).toContain(
+      "untrack(() => { const top = router.current void (top.name === 'file' ? state.open(top.path) : state.start()) }) return () => state.stop()",
     )
   })
 
@@ -274,7 +313,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

@@ -36,6 +36,10 @@ export const commands = {
 	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
 	changesFollow: (workspace: number, mode: Mode) => typedError<null, CommandError>(__TAURI_INVOKE("changes_follow", { workspace, mode })),
 	changesUnfollow: (workspace: number) => __TAURI_INVOKE<void>("changes_unfollow", { workspace }),
+	filesList: (workspace: number, paths: string[]) => typedError<Listing_Serialize, CommandError>(__TAURI_INVOKE("files_list", { workspace, paths })),
+	filesRead: (workspace: number, path: string) => typedError<FileShown_Serialize, CommandError>(__TAURI_INVOKE("files_read", { workspace, path })),
+	filesSearch: (workspace: number, query: string) => typedError<Searched_Serialize, CommandError>(__TAURI_INVOKE("files_search", { workspace, query })),
+	filesSearchStop: (workspace: number) => __TAURI_INVOKE<void>("files_search_stop", { workspace }),
 };
 
 /** Events */
@@ -266,13 +270,111 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
+export type Entry = Entry_Serialize | Entry_Deserialize;
+
+export type EntryKind = EntryKind_Serialize | EntryKind_Deserialize;
+
+export type EntryKind_Deserialize = "file" | "folder" | string;
+
+export type EntryKind_Serialize = "file" | "folder" | "other";
+
+export type Entry_Deserialize = {
+	name?: string,
+	kind?: EntryKind_Deserialize,
+	link?: boolean,
+	hidden?: boolean,
+	bytes?: number | null,
+	modified?: string | null,
+	status?: Status_Deserialize | null,
+};
+
+export type Entry_Serialize = {
+	name: string,
+	kind: EntryKind_Serialize,
+	link: boolean,
+	hidden: boolean,
+	bytes: number | null,
+	modified: string | null,
+	status: Status_Serialize | null,
+};
+
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here";
+
+export type FileShown = FileShown_Serialize | FileShown_Deserialize;
+
+export type FileShown_Deserialize = { shown: "read"; read: Read_Deserialize } | { shown: "too_large_here"; bytes: number; lines: number };
+
+export type FileShown_Serialize = { shown: "read"; read: Read_Serialize } | { shown: "too_large_here"; bytes: number; lines: number };
 
 export type Fold = Fold_Serialize | Fold_Deserialize;
 
 export type Fold_Deserialize = "open" | "lockfile" | "binary" | "large" | string;
 
 export type Fold_Serialize = "open" | "lockfile" | "binary" | "large" | "other";
+
+export type Folder = Folder_Serialize | Folder_Deserialize;
+
+export type Folder_Deserialize = {
+	path?: string,
+	dir?: string,
+	entries?: Entry_Deserialize[],
+	more?: boolean,
+	error?: string | null,
+};
+
+export type Folder_Serialize = {
+	path: string,
+	dir: string,
+	entries: Entry_Serialize[],
+	more: boolean,
+	error: string | null,
+};
+
+export type Found = Found_Serialize | Found_Deserialize;
+
+export type FoundFile = FoundFile_Serialize | FoundFile_Deserialize;
+
+export type FoundFile_Deserialize = {
+	path?: string,
+	lines?: FoundLine_Deserialize[],
+};
+
+export type FoundFile_Serialize = {
+	path: string,
+	lines: FoundLine_Serialize[],
+};
+
+export type FoundLine = FoundLine_Serialize | FoundLine_Deserialize;
+
+export type FoundLine_Deserialize = {
+	number?: number,
+	text?: string,
+	ranges?: ([number, number])[],
+};
+
+export type FoundLine_Serialize = {
+	number: number,
+	text: string,
+	ranges: ([number, number])[],
+};
+
+export type Found_Deserialize = {
+	query?: string,
+	mode?: SearchMode_Deserialize,
+	names?: Name_Deserialize[],
+	files?: FoundFile_Deserialize[],
+	matches?: number,
+	capped?: boolean,
+};
+
+export type Found_Serialize = {
+	query: string,
+	mode: SearchMode_Serialize,
+	names: Name_Serialize[],
+	files: FoundFile_Serialize[],
+	matches: number,
+	capped: boolean,
+};
 
 export type Hunk = Hunk_Serialize | Hunk_Deserialize;
 
@@ -288,6 +390,22 @@ export type Hunk_Serialize = {
 	new_start: number,
 	context: string,
 	lines: Line_Serialize[],
+};
+
+export type Image = Image_Serialize | Image_Deserialize;
+
+export type Image_Deserialize = {
+	format?: string,
+	width?: number | null,
+	height?: number | null,
+	data?: string,
+};
+
+export type Image_Serialize = {
+	format: string,
+	width: number | null,
+	height: number | null,
+	data: string,
 };
 
 export type InputEvent = InputEvent_Serialize | InputEvent_Deserialize;
@@ -356,6 +474,16 @@ export type Line_Serialize = {
 	text: string,
 	raw: string | null,
 	emphasis: ([number, number])[],
+};
+
+export type Listing = Listing_Serialize | Listing_Deserialize;
+
+export type Listing_Deserialize = {
+	folders?: Folder_Deserialize[],
+};
+
+export type Listing_Serialize = {
+	folders: Folder_Serialize[],
 };
 
 export type MachineList = MachineList_Serialize | MachineList_Deserialize;
@@ -473,6 +601,18 @@ export type Mouse_Serialize = {
 	mods?: Modifier[],
 };
 
+export type Name = Name_Serialize | Name_Deserialize;
+
+export type Name_Deserialize = {
+	path?: string,
+	indices?: number[],
+};
+
+export type Name_Serialize = {
+	path: string,
+	indices: number[],
+};
+
 export type NewWorkspace = {
 	project: number,
 	name: string,
@@ -548,6 +688,36 @@ export type QuestionChanged_Serialize = {
 	closed: boolean,
 };
 
+export type Read = Read_Serialize | Read_Deserialize;
+
+export type ReadKind = ReadKind_Serialize | ReadKind_Deserialize;
+
+export type ReadKind_Deserialize = "text" | "image" | "binary" | "too-large" | "folder" | "missing" | string;
+
+export type ReadKind_Serialize = "text" | "image" | "binary" | "too-large" | "folder" | "missing" | "other";
+
+export type Read_Deserialize = {
+	path?: string,
+	file?: string,
+	kind?: ReadKind_Deserialize,
+	bytes?: number | null,
+	modified?: string | null,
+	language?: string | null,
+	text?: string | null,
+	image?: Image_Deserialize | null,
+};
+
+export type Read_Serialize = {
+	path: string,
+	file: string,
+	kind: ReadKind_Serialize,
+	bytes: number | null,
+	modified: string | null,
+	language: string | null,
+	text: string | null,
+	image: Image_Serialize | null,
+};
+
 export type RouteFailure = {
 	route: string,
 	error: CommandError,
@@ -570,6 +740,18 @@ export type Run_Serialize = {
 };
 
 export type SameWhy = "address" | "boot" | "name";
+
+export type SearchMode = SearchMode_Serialize | SearchMode_Deserialize;
+
+export type SearchMode_Deserialize = "text" | "names" | string;
+
+export type SearchMode_Serialize = "text" | "names" | "other";
+
+export type Searched = Searched_Serialize | Searched_Deserialize;
+
+export type Searched_Deserialize = { searched: "found"; found: Found_Deserialize } | { searched: "cancelled" };
+
+export type Searched_Serialize = { searched: "found"; found: Found_Serialize } | { searched: "cancelled" };
 
 export type Shape = Shape_Serialize | Shape_Deserialize;
 
