@@ -1,13 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   CommandError,
   Entry_Serialize as Entry,
+  FileShown_Serialize as FileShown,
   Folder_Serialize as Folder,
+  Found_Serialize as Found,
   Listing_Serialize as Listing,
+  Read_Serialize as Read,
+  Searched_Serialize as Searched,
   Toast,
 } from './bindings'
 import { CLOSED } from './changes.svelte'
-import { childOf, FilesState, type Calls, type Row } from './files.svelte'
+import { childOf, FilesState, highlight, SEARCH_DELAY, type Calls, type Row } from './files.svelte'
 
 const MACHINE = 1
 const WORKSPACE = 3
@@ -45,7 +49,9 @@ type Listed = Awaited<ReturnType<Calls['list']>>
 
 const done = (data: Listing): Promise<Listed> => Promise.resolve({ status: 'ok', data })
 
-const refusal = (message: string, code: CommandError['code'] = 'failed'): Promise<Listed> =>
+type Refused = { status: 'error'; error: CommandError }
+
+const refusal = (message: string, code: CommandError['code'] = 'failed'): Promise<Refused> =>
   Promise.resolve({ status: 'error', error: { code, message } })
 
 const later = <T>() => {
@@ -57,8 +63,47 @@ const later = <T>() => {
 const fromTree = (tree: Record<string, Folder>) => (_: number, paths: string[]) =>
   done({ folders: paths.map((path) => tree[path] ?? folder(path, [], { error: 'no such folder' })) })
 
-const browsing = async (list: Calls['list'] = fromTree(TREE)) => {
-  const calls = { list: vi.fn<Calls['list']>(list) }
+const read = (path: string, more: Partial<Read> = {}): Read => ({
+  path,
+  file: `/work/shop/${path}`,
+  kind: 'text',
+  bytes: 12,
+  modified: null,
+  language: 'rust',
+  text: 'fn main() {}',
+  image: null,
+  ...more,
+})
+
+const found = (query: string, more: Partial<Found> = {}): Found => ({
+  query,
+  mode: 'names',
+  names: [{ path: 'src/main.rs', indices: [4, 5] }],
+  files: [],
+  matches: 1,
+  capped: false,
+  ...more,
+})
+
+type Shown = Awaited<ReturnType<Calls['read']>>
+type Search = Awaited<ReturnType<Calls['search']>>
+
+const searched = (data: Searched): Promise<Search> => Promise.resolve({ status: 'ok', data })
+
+const shownRead = (path: string): FileShown => ({ shown: 'read', read: read(path) })
+
+const readsAll: Calls['read'] = (_, path) => Promise.resolve({ status: 'ok', data: shownRead(path) })
+
+const findsAll: Calls['search'] = (_, query) => searched({ searched: 'found', found: found(query) })
+
+const fakes = (list: Calls['list'], others: Partial<Calls> = {}) => ({
+  list: vi.fn<Calls['list']>(list),
+  read: vi.fn<Calls['read']>(others.read ?? readsAll),
+  search: vi.fn<Calls['search']>(others.search ?? findsAll),
+})
+
+const browsing = async (list: Calls['list'] = fromTree(TREE), others: Partial<Calls> = {}) => {
+  const calls = fakes(list, others)
   const tell = vi.fn<(toast: Toast) => void>()
   const files = new FilesState(MACHINE, WORKSPACE, calls, tell)
   await files.start()
@@ -140,7 +185,10 @@ describe('FilesState, its tree', () => {
     const { files, tell } = await browsing(fromTree(broken))
     await files.toggle('src')
     await files.toggle('docs')
-    expect([tree(files), tell.mock.calls]).toEqual([['v src', '  ! permission denied', 'v docs', '  a.md', 'notes.txt'], []])
+    expect([tree(files), tell.mock.calls]).toEqual([
+      ['v src', '  ! permission denied', 'v docs', '  a.md', 'notes.txt'],
+      [],
+    ])
   })
 
   it('says when a folder holds more entries than it listed', async () => {
@@ -150,7 +198,11 @@ describe('FilesState, its tree', () => {
   })
 
   it('keeps the hidden, linked and other entries with what the server said of them', async () => {
-    const odd = [entry('.env', { hidden: true }), entry('link', { link: true, status: 'modified' }), entry('fifo', { kind: 'other' })]
+    const odd = [
+      entry('.env', { hidden: true }),
+      entry('link', { link: true, status: 'modified' }),
+      entry('fifo', { kind: 'other' }),
+    ]
     const { files } = await browsing(fromTree({ '': folder('', odd) }))
     expect(files.rows.map((row) => row.kind === 'entry' && row.entry)).toEqual(odd)
   })
@@ -179,7 +231,16 @@ describe('FilesState, coming back to it', () => {
     calls.list.mockImplementation(fromTree(fresh))
     await files.refresh()
     expect(calls.list.mock.calls.at(-1)).toEqual([WORKSPACE, ['', 'src', 'src/cli', 'docs']])
-    expect(tree(files)).toEqual(['v src', '  v cli', '    args.rs', '  main.rs', 'v docs', '  a.md', '  b.md', 'notes.txt'])
+    expect(tree(files)).toEqual([
+      'v src',
+      '  v cli',
+      '    args.rs',
+      '  main.rs',
+      'v docs',
+      '  a.md',
+      '  b.md',
+      'notes.txt',
+    ])
   })
 
   it('pairs each folder with the path asked, whatever path the server echoes', async () => {
@@ -238,7 +299,7 @@ describe('FilesState, failing', () => {
 
   it('drops what answers once left, telling nothing', async () => {
     const answer = later<Listed>()
-    const calls = { list: vi.fn<Calls['list']>(() => answer.promise) }
+    const calls = fakes(() => answer.promise)
     const tell = vi.fn<(toast: Toast) => void>()
     const files = new FilesState(MACHINE, WORKSPACE, calls, tell)
     const starting = files.start()
@@ -247,5 +308,255 @@ describe('FilesState, failing', () => {
     await starting
     await files.toggle('src')
     expect([files.folder('')?.listed, tell.mock.calls, calls.list.mock.calls.length]).toEqual([null, [], 1])
+  })
+})
+
+describe('FilesState, searching names', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const typed = async (files: FilesState, query: string) => {
+    files.find(query)
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY)
+  }
+
+  it('searches once typing stops for 200 ms, with the last query', async () => {
+    const { files, calls } = await browsing()
+    files.find('m')
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY - 1)
+    files.find('ma ')
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY - 1)
+    expect([calls.search.mock.calls, files.results, files.query]).toEqual([
+      [],
+      { found: null, loading: true, error: null },
+      'ma ',
+    ])
+    await vi.advanceTimersByTimeAsync(1)
+    expect([calls.search.mock.calls, files.results]).toEqual([
+      [[WORKSPACE, 'ma']],
+      { found: found('ma'), loading: false, error: null },
+    ])
+  })
+
+  it('keeps the results it found while the next query waits', async () => {
+    const { files } = await browsing()
+    await typed(files, 'ma')
+    files.find('main')
+    expect(files.results).toEqual({ found: found('ma'), loading: true, error: null })
+  })
+
+  it.each([
+    ['empty', ''],
+    ['blank', '   '],
+  ])('asks nothing for an %s query and goes back to the tree', async (_, blank) => {
+    const { files, calls } = await browsing()
+    await typed(files, 'ma')
+    files.find('main')
+    await typed(files, blank)
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY * 5)
+    expect([files.results, files.query, calls.search.mock.calls]).toEqual([null, blank, [[WORKSPACE, 'ma']]])
+  })
+
+  it('drops the answer of a query typed over, even when it comes last', async () => {
+    const old = later<Search>()
+    const search = vi.fn<Calls['search']>(findsAll)
+    const { files } = await browsing(fromTree(TREE), { search })
+    search.mockReturnValueOnce(old.promise)
+    await typed(files, 'ma')
+    await typed(files, 'main')
+    old.answer({ status: 'ok', data: { searched: 'found', found: found('ma') } })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(files.results).toEqual({ found: found('main'), loading: false, error: null })
+  })
+
+  it('keeps what it found when its search comes back cancelled', async () => {
+    const search = vi.fn<Calls['search']>(findsAll)
+    const { files, tell } = await browsing(fromTree(TREE), { search })
+    await typed(files, 'ma')
+    search.mockReturnValueOnce(searched({ searched: 'cancelled' }))
+    await typed(files, 'main')
+    expect([files.results, tell.mock.calls]).toEqual([{ found: found('ma'), loading: false, error: null }, []])
+  })
+
+  it.each<[string, Found]>([
+    ['capped', found('s', { names: [{ path: 'a.rs', indices: [] }], capped: true })],
+    ['empty', found('zzz', { names: [], matches: 0 })],
+  ])('keeps a %s answer as it came', async (_, answer) => {
+    const { files } = await browsing(fromTree(TREE), {
+      search: () => searched({ searched: 'found', found: answer }),
+    })
+    await typed(files, answer.query)
+    expect(files.results?.found).toEqual(answer)
+  })
+
+  it('shows why a search failed, and tells it', async () => {
+    const { files, tell } = await browsing(fromTree(TREE), {
+      search: () => Promise.reject(new Error('IPC is gone')),
+    })
+    await typed(files, 'ma')
+    expect([files.results, tell.mock.calls]).toEqual([
+      { found: null, loading: false, error: 'IPC is gone' },
+      [[{ level: 'error', message: 'IPC is gone' }]],
+    ])
+  })
+
+  it('says the workspace was closed on the Mac when a search finds it gone', async () => {
+    const { files, tell } = await browsing(fromTree(TREE), {
+      search: () => refusal(`workspace ${WORKSPACE} is closing`),
+    })
+    await typed(files, 'ma')
+    expect([files.gone, files.results?.error, tell.mock.calls]).toEqual([
+      true,
+      CLOSED,
+      [[{ level: 'info', message: CLOSED }]],
+    ])
+  })
+
+  it('searches nothing once left', async () => {
+    const { files, calls } = await browsing()
+    files.find('ma')
+    files.stop()
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY)
+    files.find('main')
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY)
+    expect([calls.search.mock.calls, files.results]).toEqual([[], null])
+  })
+})
+
+describe('highlight', () => {
+  it.each<[string, string, number[], [string, boolean][]]>([
+    ['nothing', 'src/main.rs', [], [['src/main.rs', false]]],
+    [
+      'runs of letters',
+      'src/main.rs',
+      [4, 5, 6, 9],
+      [
+        ['src/', false],
+        ['mai', true],
+        ['n.', false],
+        ['r', true],
+        ['s', false],
+      ],
+    ],
+    ['every letter', 'ab', [0, 1], [['ab', true]]],
+    [
+      'emoji as one letter',
+      '🦀/main.rs',
+      [0, 2],
+      [
+        ['🦀', true],
+        ['/', false],
+        ['m', true],
+        ['ain.rs', false],
+      ],
+    ],
+    [
+      'accents as one letter',
+      'café/ñu.md',
+      [3, 5, 6],
+      [
+        ['caf', false],
+        ['é', true],
+        ['/', false],
+        ['ñu', true],
+        ['.md', false],
+      ],
+    ],
+  ])('marks %s', (_, path, indices, pieces) => {
+    expect(highlight(path, indices)).toEqual(pieces.map(([text, hit]) => ({ text, hit })))
+  })
+})
+
+describe('FilesState, reading a file', () => {
+  it('reads a file with a spinner meanwhile', async () => {
+    const answer = later<Shown>()
+    const { files, calls } = await browsing(fromTree(TREE), {
+      read: () => answer.promise,
+    })
+    const opening = files.open('src/main.rs')
+    expect(files.file).toEqual({ path: 'src/main.rs', reading: { kind: 'loading' } })
+    answer.answer({ status: 'ok', data: shownRead('src/main.rs') })
+    await opening
+    expect([files.file, calls.read.mock.calls]).toEqual([
+      {
+        path: 'src/main.rs',
+        reading: { kind: 'shown', shown: shownRead('src/main.rs') },
+      },
+      [[WORKSPACE, 'src/main.rs']],
+    ])
+  })
+
+  it('reads a file again each time it opens', async () => {
+    const { files, calls } = await browsing()
+    await files.open('src/main.rs')
+    files.closeFile()
+    await files.open('src/main.rs')
+    await files.open('src/main.rs')
+    expect(calls.read.mock.calls).toEqual([1, 2, 3].map(() => [WORKSPACE, 'src/main.rs']))
+  })
+
+  it('takes only the newest read', async () => {
+    const old = later<Shown>()
+    const read = vi.fn<Calls['read']>(readsAll)
+    const { files } = await browsing(fromTree(TREE), { read })
+    read.mockReturnValueOnce(old.promise)
+    const first = files.open('a.md')
+    await files.open('b.md')
+    old.answer({ status: 'ok', data: shownRead('a.md') })
+    await first
+    expect(files.file).toEqual({ path: 'b.md', reading: { kind: 'shown', shown: shownRead('b.md') } })
+  })
+
+  it('keeps a text too large for the phone as the bridge said it', async () => {
+    const shown: FileShown = { shown: 'too_large_here', bytes: 3_000_000, lines: 40_000 }
+    const { files } = await browsing(fromTree(TREE), {
+      read: () => Promise.resolve({ status: 'ok', data: shown }),
+    })
+    await files.open('dump.sql')
+    expect(files.file?.reading).toEqual({ kind: 'shown', shown })
+  })
+
+  it('drops a read that answers once the file is closed', async () => {
+    const answer = later<Shown>()
+    const { files } = await browsing(fromTree(TREE), {
+      read: () => answer.promise,
+    })
+    const opening = files.open('a.md')
+    files.closeFile()
+    answer.answer({ status: 'ok', data: shownRead('a.md') })
+    await opening
+    expect(files.file).toBeNull()
+  })
+
+  it.each<[string, Calls['read'], string, Toast]>([
+    [
+      'refused',
+      () => refusal('no machine is connected'),
+      'no machine is connected',
+      { level: 'error', message: 'no machine is connected' },
+    ],
+    [
+      'rejected',
+      () => Promise.reject(new Error('IPC is gone')),
+      'IPC is gone',
+      { level: 'error', message: 'IPC is gone' },
+    ],
+    [
+      'on a closed workspace',
+      () => refusal(`workspace ${WORKSPACE} is being removed`),
+      CLOSED,
+      { level: 'info', message: CLOSED },
+    ],
+  ])('shows why a read was %s, and tells it', async (_, readFile, reason, toast) => {
+    const { files, tell } = await browsing(fromTree(TREE), {
+      read: readFile,
+    })
+    await files.open('a.md')
+    expect([files.file, tell.mock.calls]).toEqual([{ path: 'a.md', reading: { kind: 'failed', reason } }, [[toast]]])
   })
 })

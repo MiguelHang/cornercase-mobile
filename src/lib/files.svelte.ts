@@ -2,7 +2,9 @@ import type {
   CommandError,
   commands,
   Entry_Serialize as Entry,
+  FileShown_Serialize as FileShown,
   Folder_Serialize as Folder,
+  Found_Serialize as Found,
   Listing_Serialize as Listing,
   Toast,
 } from './bindings'
@@ -11,6 +13,8 @@ import { messageOf } from './toasts'
 
 export type Calls = {
   list: typeof commands.filesList
+  read: typeof commands.filesRead
+  search: typeof commands.filesSearch
 }
 
 export type Listed = { entries: Entry[]; more: boolean; error: string | null }
@@ -22,9 +26,28 @@ export type Row =
   | { kind: 'more'; folder: string; depth: number }
   | { kind: 'error'; folder: string; depth: number; error: string }
 
-type Answer = { status: 'ok'; data: Listing } | { status: 'error'; error: CommandError }
+export type Results = { found: Found | null; loading: boolean; error: string | null }
+
+export type Reading = { kind: 'loading' } | { kind: 'shown'; shown: FileShown } | { kind: 'failed'; reason: string }
+
+export type OpenFile = { path: string; reading: Reading }
+
+export type Piece = { text: string; hit: boolean }
+
+type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
 export const ROOT = ''
+
+export const SEARCH_DELAY = 200
+
+export const highlight = (path: string, indices: readonly number[]): Piece[] =>
+  Array.from(path).reduce<Piece[]>((pieces, char, index) => {
+    const hit = indices.includes(index)
+    const last = pieces.at(-1)
+    return last?.hit === hit
+      ? [...pieces.slice(0, -1), { text: last.text + char, hit }]
+      : [...pieces, { text: char, hit }]
+  }, [])
 
 export const childOf = (folder: string, name: string) => (folder === ROOT ? name : `${folder}/${name}`)
 
@@ -41,6 +64,9 @@ export class FilesState {
   readonly machine: number
   readonly workspace: number
   gone = $state(false)
+  query = $state('')
+  results = $state.raw<Results | null>(null)
+  file = $state.raw<OpenFile | null>(null)
   #folders = $state.raw<Record<string, Shown>>({})
   #open = $state.raw<readonly string[]>([])
   #calls: Calls
@@ -48,6 +74,9 @@ export class FilesState {
   #left = false
   #generation = 0
   #asked: Record<string, number> = {}
+  #searches = 0
+  #timer: ReturnType<typeof setTimeout> | undefined
+  #reads = 0
 
   constructor(machine: number, workspace: number, calls: Calls, tell: (toast: Toast) => void) {
     this.machine = machine
@@ -88,8 +117,38 @@ export class FilesState {
     return this.#list([path])
   }
 
+  find(query: string) {
+    this.query = query
+    this.#searches += 1
+    clearTimeout(this.#timer)
+    const asked = query.trim()
+    if (asked === '' || !this.#usable()) {
+      this.results = null
+      return
+    }
+    this.results = { found: this.results?.found ?? null, loading: true, error: null }
+    const number = this.#searches
+    this.#timer = setTimeout(() => void this.#search(asked, number), SEARCH_DELAY)
+  }
+
+  open(path: string) {
+    if (!this.#usable()) {
+      return Promise.resolve()
+    }
+    this.file = { path, reading: { kind: 'loading' } }
+    return this.#read(path)
+  }
+
+  closeFile() {
+    this.file = null
+    this.#reads += 1
+  }
+
   stop() {
     this.#left = true
+    clearTimeout(this.#timer)
+    this.#searches += 1
+    this.#reads += 1
   }
 
   #usable() {
@@ -123,7 +182,7 @@ export class FilesState {
     const number = ++this.#generation
     paths.forEach((path) => (this.#asked[path] = number))
     this.#update(paths, (shown) => ({ listed: shown?.listed ?? null, loading: true }))
-    const answer = await this.#call(paths)
+    const answer = await this.#ask(() => this.#calls.list(this.workspace, paths))
     if (!this.#usable()) {
       return
     }
@@ -135,9 +194,36 @@ export class FilesState {
     }
   }
 
-  async #call(paths: string[]): Promise<Answer> {
+  async #search(query: string, number: number) {
+    const answer = await this.#ask(() => this.#calls.search(this.workspace, query))
+    if (number !== this.#searches || !this.#usable()) {
+      return
+    }
+    const found = this.results?.found ?? null
+    if (answer.status === 'error') {
+      this.results = { found, loading: false, error: this.#shownError(answer.error.message) }
+      return
+    }
+    const searched = answer.data
+    this.results = { found: searched.searched === 'found' ? searched.found : found, loading: false, error: null }
+  }
+
+  async #read(path: string) {
+    const number = ++this.#reads
+    const answer = await this.#ask(() => this.#calls.read(this.workspace, path))
+    if (number !== this.#reads || !this.#usable()) {
+      return
+    }
+    if (answer.status === 'ok') {
+      this.file = { path, reading: { kind: 'shown', shown: answer.data } }
+    } else {
+      this.file = { path, reading: { kind: 'failed', reason: this.#shownError(answer.error.message) } }
+    }
+  }
+
+  async #ask<T>(call: () => Promise<Answer<T>>): Promise<Answer<T>> {
     try {
-      return await this.#calls.list(this.workspace, paths)
+      return await call()
     } catch (error) {
       return { status: 'error', error: { code: 'failed', message: messageOf(error) } }
     }
@@ -151,14 +237,25 @@ export class FilesState {
   }
 
   #failed(mine: string[], message: string) {
-    if (closedBy(this.workspace, message)) {
-      this.gone = true
-      this.#tell({ level: 'info', message: CLOSED })
+    if (this.#refused(message)) {
       return
     }
     const failed: Listed = { entries: [], more: false, error: message }
     this.#update(mine, (shown) => ({ listed: shown?.listed ?? failed, loading: false }))
+  }
+
+  #shownError(message: string) {
+    return this.#refused(message) ? CLOSED : message
+  }
+
+  #refused(message: string) {
+    if (closedBy(this.workspace, message)) {
+      this.gone = true
+      this.#tell({ level: 'info', message: CLOSED })
+      return true
+    }
     this.#tell({ level: 'error', message })
+    return false
   }
 
   #update(paths: string[], next: (shown: Shown | undefined, path: string) => Shown) {
