@@ -529,6 +529,7 @@ dependencies = [
  "tauri-plugin-haptics",
  "tauri-plugin-network",
  "tauri-plugin-photos",
+ "tauri-plugin-secrets",
  "tauri-specta",
  "tokio",
 ]
@@ -3643,6 +3644,16 @@ name = "tauri-plugin-photos"
 version = "0.1.0"
 dependencies = [
  "cornercase-core",
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-secrets"
+version = "0.1.0"
+dependencies = [
+ "cornercase-core",
+ "rstest",
  "tauri",
  "tauri-plugin",
 ]
