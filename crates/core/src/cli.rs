@@ -4,6 +4,7 @@ pub mod contract;
 pub mod events;
 pub mod files;
 pub mod input;
+pub mod issues;
 pub mod keys;
 pub mod last_message;
 pub mod paste_file;
