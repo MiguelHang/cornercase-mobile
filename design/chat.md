@@ -122,6 +122,10 @@ The agent's screen a row of the board opens (`src/routes/agent/Agent.svelte`, Bo
 - **Before the first list** (`null` without having seen the row: connecting, a new `Store`) the screen does not know yet and shows the board's mark (Board › A row).
 - **An agent the app just started** has no row yet: `Chat.see` takes `starting` from its route, and until the row comes a list without the pane does not count it as gone, while the screen says `Starting <agent>…` (Starting work › After it starts). Once the row was seen, or on another machine, the rules above hold.
 
+## Kept on the phone
+
+- **Forgotten with its machine**: removing a machine (`machine_remove`) deletes its whole history folder (`release` in `src-tauri/src/commands/machines.rs`), once the machine is gone from the list; a removal that fails to save the list keeps both. Merging a code into a machine (`machine_merge`) only adds routes and tokens to it and removes no machine, so it deletes nothing; two entries for one Mac become one when the user removes the duplicate, which forgets that one's history. Switching the active machine deletes nothing. A failed delete goes to the log as `cornercase-mobile: the history was not removed: <code>`, without a toast, and leaves the folder behind.
+
 ## Seen from the phone
 
 - **Opening a `done` agent reviews it**: while the agent's screen or its terminal (passive or fitted) is on top and the page shows, a row in `done` sends `mark --pane P --reviewed` through the ordered queue (`mark_reviewed` in `src-tauri/src/commands/chat.rs`, `crates/core/src/cli/mark.rs`), once per arrival at `done`: on opening, on coming back to the foreground, and when the row turns `done` in sight. Upstream clears the `✓` without a view and without touching sizes, so the board drops its `✓` (out of Done by sections, its status in the tree) by the `status` event the `Store` already follows, with no state of its own (Board › Sections). Asked for in 029: opening is reviewing, with no button; whoever wants a reminder has `pending`.

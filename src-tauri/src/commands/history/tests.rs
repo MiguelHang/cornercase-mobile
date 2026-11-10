@@ -124,3 +124,32 @@ mod saving {
         assert_eq!(line, "cornercase-mobile: the history was not saved: no folder");
     }
 }
+
+mod forgetting {
+    use super::*;
+
+    #[test]
+    fn removes_only_that_machine() {
+        let dir = TempDir::new();
+        let state = kept_in(&dir);
+        save(&state, STUDIO, BOOT, 7, &said("fix the login")).expect("the history is saved");
+        save(&state, MachineId(4), BOOT, 7, &said("fix the login")).expect("the history is saved");
+        forget(&state, STUDIO).expect("the history is removed");
+        assert_eq!(load(&state, STUDIO, BOOT, 7), Ok(vec![]));
+        assert_eq!(load(&state, MachineId(4), BOOT, 7), Ok(said("fix the login")));
+    }
+
+    #[test]
+    fn says_only_what_failed() {
+        let (_dir, state) = unwritable();
+        assert_eq!(forget(&state, STUDIO), Err("cornercase-mobile: the history was not removed: Store".to_owned()));
+    }
+
+    #[test]
+    fn says_so_without_a_folder() {
+        assert_eq!(
+            forget(&state(), STUDIO),
+            Err("cornercase-mobile: the history was not removed: no folder".to_owned())
+        );
+    }
+}

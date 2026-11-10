@@ -46,6 +46,10 @@ pub(crate) fn save(
     held(state, "saved", |store| store.save(machine, boot, pane, entries))
 }
 
+pub(crate) fn forget(state: &AppState, machine: MachineId) -> Result<(), String> {
+    held(state, "removed", |store| store.forget(machine))
+}
+
 fn held<T>(state: &AppState, what: &str, work: impl FnOnce(&JsonFolderStore) -> Result<T, Error>) -> Result<T, String> {
     let store = state.history();
     let store = store.as_ref().ok_or_else(|| format!("cornercase-mobile: the history was not {what}: no folder"))?;
