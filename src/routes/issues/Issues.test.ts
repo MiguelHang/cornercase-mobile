@@ -1,0 +1,250 @@
+import { render } from 'svelte/server'
+import { describe, expect, it } from 'vitest'
+import type {
+  IssueInfo_Serialize as IssueInfo,
+  ListedInfo_Serialize as ListedInfo,
+  SourceInfo_Serialize as SourceInfo,
+} from '../../lib/bindings'
+import { CAP, IssuesState, type Trackers } from '../../lib/issues.svelte'
+import Connect from './Connect.svelte'
+import connectSource from './Connect.svelte?raw'
+import IssueRow from './IssueRow.svelte'
+import rowSource from './IssueRow.svelte?raw'
+import Issues from './Issues.svelte'
+import issuesSource from './Issues.svelte?raw'
+
+const NOW = Date.parse('2026-11-10T09:20:24Z')
+
+const pending = () => new Promise<never>(() => {})
+
+const GITHUB: SourceInfo = {
+  source: 'github',
+  name: 'GitHub',
+  repository: true,
+  state: 'connected',
+  missing: [],
+  reason: null,
+}
+
+const SHORTCUT: SourceInfo = { ...GITHUB, source: 'shortcut', name: 'Shortcut', repository: false }
+
+const LINEAR: SourceInfo = {
+  ...SHORTCUT,
+  source: 'linear',
+  name: 'Linear',
+  state: 'failing',
+  reason: 'Linear rejected the token: it may have expired',
+}
+
+const JIRA: SourceInfo = { ...SHORTCUT, source: 'jira', name: 'Jira', state: 'missing', missing: ['site', 'token'] }
+
+const COUPON: IssueInfo = {
+  source: 'github',
+  key: '#41',
+  title: 'Checkout forgets the coupon after a refresh',
+  state: 'open',
+  closed: false,
+  labels: ['bug', 'checkout'],
+  author: 'grace',
+  updated_at: '2026-11-07T09:20:24Z',
+  branch: 'issue-41-checkout-forgets-the-coupon',
+}
+
+const THEME: IssueInfo = {
+  ...COUPON,
+  key: '#38',
+  title: 'Add a dark theme',
+  state: 'closed',
+  closed: true,
+  labels: [],
+  author: 'linus',
+  updated_at: '2026-11-10T07:05:00Z',
+}
+
+const REFUNDS: IssueInfo = {
+  ...COUPON,
+  source: 'shortcut',
+  key: 'sc-7',
+  title: 'Refunds by bank transfer',
+  labels: ['payments'],
+}
+
+const counted = (source: string, count: number, error: string | null = null): ListedInfo => ({
+  source,
+  count,
+  cached: false,
+  error,
+})
+
+type Seen = {
+  trackers?: Trackers
+  issues?: IssueInfo[] | null
+  listed?: ListedInfo[]
+  more?: Partial<Pick<IssuesState, 'query' | 'filters' | 'loading' | 'error'>>
+}
+
+const stateOf = ({ trackers = { kind: 'ready', sources: [GITHUB] }, issues = [], listed, more = {} }: Seen) => {
+  const state = new IssuesState(3, 7, { issueSources: pending, issueList: pending })
+  state.trackers = trackers
+  state.lists = issues === null ? null : { project: 7, issues, sources: listed ?? [counted('github', issues.length)] }
+  Object.assign(state, more)
+  return state
+}
+
+const screenOf = (seen: Seen) =>
+  render(Issues, {
+    props: { issues: stateOf(seen), backTo: 'shop', onback: () => {}, onopen: () => {}, now: NOW },
+  }).body
+
+const textsOf = (body: string, kind: string) =>
+  [...body.matchAll(new RegExp(`<(?:p|span) class="${kind}[^"]*">([^<]*)<`, 'g'))].map((found) => found[1])
+
+const pressedIn = (body: string, label: string) => {
+  const group = body.match(new RegExp(`aria-label="${label}">([^]*?)</div>`))?.[1] ?? ''
+  return [...group.matchAll(/aria-pressed="(true|false)"[^>]*>\s*([^<]*?)\s*</g)].map(
+    (found) => `${found[2]} ${found[1]}`,
+  )
+}
+
+const one = (source: string) => source.replace(/\s+/g, ' ')
+
+describe('Issues', () => {
+  it('heads the screen with Issues in the shared bar, going back to the project', () => {
+    const body = screenOf({})
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to shop"/)
+    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Issues<\/h1>/)
+  })
+
+  it('spins while it reads which trackers the project has', () => {
+    const body = screenOf({ trackers: { kind: 'loading' }, issues: null })
+    expect(body).toMatch(/<p class="note svelte-[\w-]+"><span class="spinner[^]*?Reading the trackers…<\/p>/)
+    expect(body).not.toContain('type="search"')
+  })
+
+  it('says why the trackers could not be read and offers to try again', () => {
+    const body = screenOf({ trackers: { kind: 'failed', reason: 'cornercase did not answer.' }, issues: null })
+    expect(textsOf(body, 'note reason svelte-')).toEqual(['cornercase did not answer.'])
+    expect(body).toContain('Try again')
+    expect(body).not.toContain('type="search"')
+  })
+
+  it('lists each issue with its state, key, title, author, age and labels', () => {
+    const body = screenOf({ issues: [COUPON, THEME] })
+    expect(textsOf(body, 'key svelte-')).toEqual(['#41', '#38'])
+    expect(textsOf(body, 'title svelte-')).toEqual([COUPON.title, 'Add a dark theme'])
+    expect(textsOf(body, 'by svelte-')).toEqual(['grace · 3 d', 'linus · 2 h'])
+    expect(textsOf(body, 'tag svelte-')).toEqual(['bug', 'checkout'])
+    expect(body).toMatch(/<span class="state svelte-[\w-]+">open<\/span>/)
+    expect(body).toMatch(/<span class="state svelte-[\w-]+ closed">closed<\/span>/)
+  })
+
+  it('keeps only the issues whose key, title or labels hold every word typed, without asking again', () => {
+    const body = screenOf({ issues: [COUPON, THEME, REFUNDS], more: { query: 'PAY transfer' } })
+    expect(textsOf(body, 'key svelte-')).toEqual(['sc-7'])
+    expect(body).toMatch(/<input class="query svelte-[\w-]+" type="search" aria-label="Search issues"/)
+    expect(one(issuesSource)).toContain('bind:value={issues.query}')
+  })
+
+  it.each<[string, Seen, string]>([
+    ['nothing is open', {}, 'No open issues'],
+    ['closed ones are asked for too', { more: { filters: { closed: true, mine: false, source: null } } }, 'No issues'],
+    ['the search matches nothing', { issues: [COUPON], more: { query: 'payments' } }, 'No issue matches the search'],
+  ])('says so when %s', (_, seen, text) => {
+    expect(textsOf(screenOf(seen), 'note svelte-')).toEqual([text])
+  })
+
+  it('spins until the first list arrives, then only in the bar while it asks again', () => {
+    const first = screenOf({ issues: null, more: { loading: true } })
+    expect(first).toMatch(/<span class="spinner[^]*?Reading the issues…/)
+    const again = screenOf({ issues: [COUPON], more: { loading: true } })
+    expect(again).not.toContain('Reading the issues…')
+    expect(again).toMatch(/<span class="busy svelte-[\w-]+"><span class="spinner/)
+  })
+
+  it('presses the filters it lists with and offers a tracker only when more than one is connected', () => {
+    const mine = { closed: true, mine: true, source: 'shortcut' }
+    const body = screenOf({ trackers: { kind: 'ready', sources: [GITHUB, SHORTCUT, LINEAR] }, more: { filters: mine } })
+    expect(pressedIn(body, 'State')).toEqual(['Open false', 'Closed too true'])
+    expect(pressedIn(body, 'People')).toEqual(['All false', 'Mine true'])
+    expect(pressedIn(body, 'Tracker')).toEqual(['All trackers false', 'GitHub false', 'Shortcut true'])
+    expect(screenOf({})).not.toContain('aria-label="Tracker"')
+    expect(one(issuesSource)).toContain('onclick={() => void issues.filter(segment.change)}')
+  })
+
+  it('keeps what was listed and adds a line for each tracker that failed, once', () => {
+    const body = screenOf({
+      trackers: { kind: 'ready', sources: [GITHUB, SHORTCUT, LINEAR] },
+      issues: [COUPON],
+      listed: [
+        counted('github', 1),
+        counted('shortcut', 0, 'Shortcut rejected the token'),
+        counted('linear', 0, 'gone'),
+      ],
+    })
+    expect(textsOf(body, 'note failing svelte-')).toEqual(['Shortcut: Shortcut rejected the token', 'Linear: gone'])
+    expect(textsOf(body, 'key svelte-')).toEqual(['#41'])
+  })
+
+  it('shows why a tracker that is not listed is failing', () => {
+    const body = screenOf({ trackers: { kind: 'ready', sources: [GITHUB, LINEAR] } })
+    expect(textsOf(body, 'note failing svelte-')).toEqual([`Linear: ${LINEAR.reason}`])
+  })
+
+  it('asks to narrow the filters when a tracker gave as many issues as it can, without a number', () => {
+    const body = screenOf({ issues: [COUPON], listed: [counted('github', CAP)] })
+    expect(textsOf(body, 'note svelte-')).toEqual([
+      'A tracker has more issues than these. Narrow the filters to see the rest.',
+    ])
+    expect(screenOf({ issues: [COUPON] })).not.toContain('Narrow the filters')
+  })
+
+  it('keeps the rows under a failed refresh and offers to try again', () => {
+    const body = screenOf({ issues: [COUPON], more: { error: 'cornercase did not answer.' } })
+    expect(textsOf(body, 'note reason svelte-')).toEqual(['cornercase did not answer.'])
+    expect(textsOf(body, 'key svelte-')).toEqual(['#41'])
+    expect(one(issuesSource)).toContain('const retry = () => void issues.retry()')
+  })
+
+  it('tells how to connect a tracker instead of the list when none is connected', () => {
+    const body = screenOf({ trackers: { kind: 'ready', sources: [{ ...GITHUB, state: 'missing' }, JIRA] } })
+    expect(body).toContain('No issue tracker is connected')
+    expect(body).not.toContain('type="search"')
+    expect(one(issuesSource)).toContain('<Connect sources={trackers.sources} onretry={() => void issues.load()} />')
+  })
+})
+
+describe('Connect', () => {
+  const connect = (sources: SourceInfo[]) => render(Connect, { props: { sources, onretry: () => {} } }).body
+
+  it("says what each tracker misses, why it fails and where on the Mac it is connected, with no token field", () => {
+    const body = connect([{ ...GITHUB, state: 'missing', missing: ['repository'] }, LINEAR, JIRA])
+    expect(textsOf(body, 'name svelte-')).toEqual(['GitHub', 'Linear', 'Jira'])
+    expect(textsOf(body, 'why svelte-')).toEqual(['Missing: repository', LINEAR.reason, 'Missing: site, token'])
+    expect(textsOf(body, 'why svelte-[\\w-]+ failing')).toEqual([LINEAR.reason])
+    expect(textsOf(body, 'how svelte-')).toEqual([
+      "On the Mac, sign in to gh in the project's folder.",
+      "On the Mac, connect it in cornercase's Settings › Issues.",
+      "On the Mac, connect it in cornercase's Settings › Issues.",
+    ])
+    expect(body).not.toContain('<input')
+    expect(body).toContain('Check again')
+  })
+
+  it('points at the Mac when the project has no tracker at all', () => {
+    const how = textsOf(connect([]), 'how svelte-')
+    expect(how).toEqual(["Connect one on the Mac, in cornercase's Settings › Issues."])
+    expect(one(connectSource)).toContain('<Button tone="plain" onclick={onretry}>Check again</Button>')
+  })
+})
+
+describe('IssueRow', () => {
+  it('leaves the age out when the tracker gave no date it can read, and opens the issue on a tap', () => {
+    const body = render(IssueRow, {
+      props: { issue: { ...COUPON, updated_at: '' }, now: NOW, onopen: () => {} },
+    }).body
+    expect(textsOf(body, 'by svelte-')).toEqual(['grace'])
+    expect(one(rowSource)).toContain(
+      '<button class="issue" type="button" onclick={() => onopen(issue)} ontouchstart={() => {}}>',
+    )
+  })
+})
