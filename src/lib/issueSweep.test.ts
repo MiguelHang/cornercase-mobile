@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type {
   IssueInfo_Serialize as IssueInfo,
   ListedInfo_Serialize as ListedInfo,
+  PlaceInfo_Serialize as PlaceInfo,
   SourceInfo_Serialize as SourceInfo,
   Sources_Serialize as Sources,
 } from './bindings'
-import { CAP, LIMIT, capped, connect, failed, gathered, limited, toList, tracked, type Swept, type Wanted } from './issueSweep'
+import { CAP, LIMIT, capped, failed, gathered, limited, placesIn, standing, toList, type Swept, type Wanted } from './issueSweep'
 
 const SHOP = 4
 const NOTES = 8
@@ -24,6 +25,13 @@ const tracker = (source: string, more: Partial<SourceInfo> = {}): SourceInfo => 
 const unrepo = tracker('github', { state: 'missing', missing: ['repository'] })
 
 const answer = (project: number, ...trackers: SourceInfo[]): Sources => ({ project, sources: trackers, places: [] })
+
+const place = (project: number, workspace: number | null, label: string): PlaceInfo => ({
+  project,
+  workspace,
+  label,
+  worktree: workspace === null,
+})
 
 const issue = (source: string, key: string, updated: string, url = `https://example.com/${source}/${key}`): IssueInfo => ({
   source,
@@ -90,43 +98,54 @@ describe('what to list', () => {
   })
 })
 
-describe('the connected trackers', () => {
-  it('are each tracker connected in some project, once, in the order they first come', () => {
-    const answers = [
-      answer(SHOP, unrepo, tracker('shortcut')),
-      answer(NOTES, tracker('github'), tracker('shortcut')),
-      answer(BLOG, tracker('github')),
-    ]
-    expect(tracked(answers).map(({ source }) => source)).toEqual(['shortcut', 'github'])
-  })
-})
-
-describe('connecting', () => {
-  it('is not needed once a tracker is connected in some project', () => {
-    expect(connect([answer(SHOP, unrepo), answer(NOTES, tracker('github'))])).toBeNull()
+describe('each tracker', () => {
+  it('is shown once, in the order they first come, connected if it is in some project', () => {
+    const github = tracker('github')
+    const shortcut = tracker('shortcut')
+    const answers = [answer(SHOP, unrepo, shortcut), answer(NOTES, github, shortcut), answer(BLOG, github)]
+    expect(standing(answers)).toEqual([github, shortcut])
   })
 
-  it('shows each tracker once, as it is in a repository if some project is one', () => {
+  it('is shown as it is in a repository when no project has it connected', () => {
     const signedOut = tracker('github', { state: 'missing', missing: ['gh'] })
     const token = tracker('shortcut', { state: 'missing', missing: ['token'] })
-    expect(connect([answer(SHOP, unrepo, token), answer(NOTES, signedOut, token)])).toEqual([signedOut, token])
+    expect(standing([answer(SHOP, unrepo, token), answer(NOTES, signedOut, token)])).toEqual([signedOut, token])
   })
 
-  it('shows a tracker where it misses least', () => {
+  it('is shown where it misses least', () => {
     const both = tracker('gitlab', { state: 'missing', missing: ['host', 'token'] })
     const token = tracker('gitlab', { state: 'missing', missing: ['token'] })
     const nowhere = tracker('gitlab', { state: 'missing', missing: ['repository'] })
-    expect(connect([answer(SHOP, both), answer(NOTES, token), answer(BLOG, nowhere)])).toEqual([token])
+    expect(standing([answer(SHOP, both), answer(NOTES, token), answer(BLOG, nowhere)])).toEqual([token])
   })
 
-  it('keeps the first project when two miss as much', () => {
+  it('is shown as in the first project when two miss as much', () => {
     const first = tracker('jira', { state: 'failing', reason: '401' })
     const second = tracker('jira', { state: 'failing', reason: '500' })
-    expect(connect([answer(SHOP, first), answer(NOTES, second)])).toEqual([first])
+    expect(standing([answer(SHOP, first), answer(NOTES, second)])).toEqual([first])
   })
 
-  it('shows no tracker without projects', () => {
-    expect(connect([])).toEqual([])
+  it('keeps a tracker failing everywhere next to a connected one', () => {
+    const failing = tracker('github', { state: 'failing', reason: 'gh is signed out' })
+    const shortcut = tracker('shortcut')
+    expect(standing([answer(SHOP, failing, shortcut), answer(NOTES, failing)])).toEqual([failing, shortcut])
+  })
+
+  it('is none without projects', () => {
+    expect(standing([])).toEqual([])
+  })
+})
+
+describe('the places', () => {
+  it('are each place once, in the order they first come', () => {
+    const worktree = place(SHOP, null, 'shop · new worktree')
+    const main = place(NOTES, 3, 'notes › main')
+    const answers = [
+      { ...answer(SHOP), places: [worktree, main] },
+      { ...answer(NOTES), places: [worktree, main, { ...main, label: 'shown again' }] },
+      { ...answer(BLOG), places: [place(NOTES, 5, 'notes › draft')] },
+    ]
+    expect(placesIn(answers)).toEqual([worktree, main, place(NOTES, 5, 'notes › draft')])
   })
 })
 

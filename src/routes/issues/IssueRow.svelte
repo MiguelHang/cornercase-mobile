@@ -1,15 +1,15 @@
 <script lang="ts">
-  import type { IssueInfo_Serialize as IssueInfo } from '../../lib/bindings'
   import { elapsed } from '../../lib/board'
+  import type { Found } from '../../lib/issueSweep'
 
   let {
     issue,
     now,
     onopen,
   }: {
-    issue: IssueInfo
+    issue: Found
     now: number
-    onopen: (issue: IssueInfo) => void
+    onopen: (issue: Found) => void
   } = $props()
 
   const age = $derived(elapsed(issue.updated_at, now))

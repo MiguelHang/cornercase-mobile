@@ -6,7 +6,6 @@
     commands,
     events,
     type AgentRow_Serialize as AgentRow,
-    type IssueInfo_Serialize as IssueInfo,
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
@@ -17,6 +16,7 @@
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
   import { IssuesState, IssueState } from './lib/issues.svelte'
+  import type { Found } from './lib/issueSweep'
   import { latestWins } from './lib/join'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
@@ -134,7 +134,7 @@
   )
 
   const listing = $derived(router.latest('issues'))
-  const issues = $derived(listing === null ? null : new IssuesState(listing.machine, listing.project, commands))
+  const issues = $derived(listing === null ? null : new IssuesState(listing.machine, commands))
   const shown = $derived(router.latest('issue'))
   const issue = $derived(shown === null ? null : new IssueState(shown.machine, shown, commands))
 
@@ -306,9 +306,9 @@
     }
   }
 
-  const openIssue = (row: IssueInfo) => {
+  const openIssue = (row: Found) => {
     if (issues !== null) {
-      router.go({ name: 'issue', machine: issues.machine, project: issues.project, key: row.key, source: row.source })
+      router.go({ name: 'issue', machine: issues.machine, project: row.project, key: row.key, source: row.source })
     }
   }
 

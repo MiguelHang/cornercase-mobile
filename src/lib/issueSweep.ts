@@ -1,6 +1,7 @@
 import type {
   IssueInfo_Serialize as IssueInfo,
   Lists_Serialize as Lists,
+  PlaceInfo_Serialize as PlaceInfo,
   SourceInfo_Serialize as SourceInfo,
   Sources_Serialize as Sources,
 } from './bindings'
@@ -44,26 +45,26 @@ const oneKey = (wanted: Wanted) =>
 export const toList = (answers: Sources[], source: string | null): Wanted[] =>
   firstBy(everyWanted(answers), oneKey).filter((wanted) => source === null || wanted.source === source)
 
-export const tracked = (answers: Sources[]): SourceInfo[] =>
-  firstBy(answers.flatMap(connectedIn), (tracker) => tracker.source)
-
 const inRepository = (tracker: SourceInfo) => !tracker.missing.includes('repository')
 
 const closer = (one: SourceInfo, other: SourceInfo) =>
   inRepository(one) === inRepository(other) ? one.missing.length < other.missing.length : inRepository(one)
 
-const nearest = (trackers: SourceInfo[], source: string) =>
-  trackers
-    .filter((tracker) => tracker.source === source)
-    .reduce((best, tracker) => (closer(tracker, best) ? tracker : best))
-
-export const connect = (answers: Sources[]): SourceInfo[] | null => {
-  const every = answers.flatMap((answer) => answer.sources)
-  if (every.some((tracker) => tracker.state === 'connected')) {
-    return null
-  }
-  return firstBy(every, (tracker) => tracker.source).map((tracker) => nearest(every, tracker.source))
+const best = (trackers: SourceInfo[], source: string) => {
+  const same = trackers.filter((tracker) => tracker.source === source)
+  const nearest = same.reduce((at, tracker) => (closer(tracker, at) ? tracker : at))
+  return same.find((tracker) => tracker.state === 'connected') ?? nearest
 }
+
+export const standing = (answers: Sources[]): SourceInfo[] => {
+  const every = answers.flatMap((answer) => answer.sources)
+  return firstBy(every, (tracker) => tracker.source).map((tracker) => best(every, tracker.source))
+}
+
+const samePlace = (place: PlaceInfo) => `${place.project}\n${place.workspace}`
+
+export const placesIn = (answers: Sources[]): PlaceInfo[] =>
+  firstBy(answers.flatMap((answer) => answer.places), samePlace)
 
 const sameIssue = (found: Found) =>
   found.url !== '' ? found.url : `${found.source}\n${found.key}\n${found.project}`

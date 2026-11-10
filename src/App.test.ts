@@ -192,12 +192,12 @@ describe('App wiring', () => {
     )
   })
 
-  it('lists the issues of the project Start chose on the machine of Start, opens a tapped one and starts on it', () => {
+  it('lists the issues on the machine of Start, opens a tapped one with its project and starts on it', () => {
     expect(source).toContain(
       "const listIssues = (project: number) => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine, project }) } }",
     )
     expect(source).toContain(
-      "const openIssue = (row: IssueInfo) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: issues.project, key: row.key, source: row.source }) } }",
+      "const openIssue = (row: Found) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: row.project, key: row.key, source: row.source }) } }",
     )
     expect(source).toContain(
       "const startOn = (starting: StartingIssue) => { if (issue !== null) { router.go({ name: 'start', machine: issue.machine, issue: starting }) } }",
@@ -210,7 +210,7 @@ describe('App wiring', () => {
   it('keeps one state of the listed project and one of the read issue while they are in the stack, reading them on untracked and leaving them after', () => {
     expect(source).toContain("const listing = $derived(router.latest('issues'))")
     expect(source).toContain(
-      'const issues = $derived(listing === null ? null : new IssuesState(listing.machine, listing.project, commands))',
+      'const issues = $derived(listing === null ? null : new IssuesState(listing.machine, commands))',
     )
     expect(source).toContain("const shown = $derived(router.latest('issue'))")
     expect(source).toContain(

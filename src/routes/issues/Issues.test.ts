@@ -87,9 +87,10 @@ type Seen = {
 }
 
 const stateOf = ({ trackers = { kind: 'ready', sources: [GITHUB] }, issues = [], listed, more = {} }: Seen) => {
-  const state = new IssuesState(3, 7, { issueSources: pending, issueList: pending })
+  const state = new IssuesState(3, { startProjects: pending, issueSources: pending, issueList: pending })
   state.trackers = trackers
-  state.lists = issues === null ? null : { project: 7, issues, sources: listed ?? [counted('github', issues.length)] }
+  const lists = { project: 7, issues: issues ?? [], sources: listed ?? [counted('github', issues?.length ?? 0)] }
+  state.swept = issues === null ? null : [{ wanted: { project: 7, source: 'github', repository: true }, lists }]
   Object.assign(state, more)
   return state
 }
@@ -131,11 +132,11 @@ describe('Issues', () => {
     expect(body).not.toContain('type="search"')
   })
 
-  it('lists each issue with its state, key, title, author, age and labels', () => {
+  it('lists each issue, the newest first, with its state, key, title, author, age and labels', () => {
     const body = screenOf({ issues: [COUPON, THEME] })
-    expect(textsOf(body, 'key svelte-')).toEqual(['#41', '#38'])
-    expect(textsOf(body, 'title svelte-')).toEqual([COUPON.title, 'Add a dark theme'])
-    expect(textsOf(body, 'by svelte-')).toEqual(['grace · 3 d', 'linus · 2 h'])
+    expect(textsOf(body, 'key svelte-')).toEqual(['#38', '#41'])
+    expect(textsOf(body, 'title svelte-')).toEqual(['Add a dark theme', COUPON.title])
+    expect(textsOf(body, 'by svelte-')).toEqual(['linus · 2 h', 'grace · 3 d'])
     expect(textsOf(body, 'tag svelte-')).toEqual(['bug', 'checkout'])
     expect(body).toMatch(/<span class="state svelte-[\w-]+">open<\/span>/)
     expect(body).toMatch(/<span class="state svelte-[\w-]+ closed">closed<\/span>/)
@@ -266,7 +267,7 @@ describe('Connect', () => {
 describe('IssueRow', () => {
   it('leaves the age out when the tracker gave no date it can read, and opens the issue on a tap', () => {
     const body = render(IssueRow, {
-      props: { issue: { ...COUPON, updated_at: '' }, now: NOW, onopen: () => {} },
+      props: { issue: { ...COUPON, updated_at: '', project: 7, repository: true }, now: NOW, onopen: () => {} },
     }).body
     expect(textsOf(body, 'by svelte-')).toEqual(['grace'])
     expect(one(rowSource)).toContain(

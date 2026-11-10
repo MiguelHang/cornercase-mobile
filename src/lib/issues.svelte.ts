@@ -1,14 +1,28 @@
 import type {
-  IssueInfo_Serialize as IssueInfo,
   Lists_Serialize as Lists,
+  PlaceInfo_Serialize as PlaceInfo,
+  ProjectChoice,
   ReadIssue_Serialize as ReadIssue,
   SourceInfo_Serialize as SourceInfo,
+  Sources_Serialize as Sources,
   commands,
 } from './bindings'
-import { CAP } from './issueSweep'
+import {
+  CAP,
+  capped as reachedCap,
+  failed,
+  gathered,
+  limited,
+  placesIn,
+  standing,
+  toList,
+  type Found,
+  type Swept,
+  type Wanted,
+} from './issueSweep'
 import { CHOICES_UNANSWERED, ask, type Reply } from './startForm.svelte'
 
-export type IssueCalls = Pick<typeof commands, 'issueSources' | 'issueList'>
+export type IssueCalls = Pick<typeof commands, 'startProjects' | 'issueSources' | 'issueList'>
 
 export type ReadCalls = Pick<typeof commands, 'issueRead'>
 
@@ -22,19 +36,35 @@ export type WantedIssue = { project: number; source: string; key: string }
 
 export type IssueReading = { kind: 'reading' } | { kind: 'read'; read: ReadIssue } | { kind: 'failed'; reason: string }
 
+type Read = { projects: ProjectChoice[]; answers: Sources[] }
+
+type Round = { asked: number; wanted: Wanted[]; filters: Filters; slots: (Lists | null)[] }
+
+type Refused = { ok: false; error: string }
+
 export { CAP }
 
 export const ANY_FILTERS: Filters = { closed: false, mine: false, source: null }
 
 const termsOf = (query: string) => query.toLowerCase().split(/\s+/).filter((term) => term !== '')
 
-const matches = (issue: IssueInfo, terms: string[]) => {
+const matches = (issue: Found, terms: string[]) => {
   const words = [issue.key, issue.title, ...issue.labels].map((word) => word.toLowerCase())
   return terms.every((term) => words.some((word) => word.includes(term)))
 }
 
 const sameFilters = (one: Filters, other: Filters) =>
   one.closed === other.closed && one.mine === other.mine && one.source === other.source
+
+const sameWanted = (one: Wanted, other: Wanted) => one.project === other.project && one.source === other.source
+
+const refusedIn = <T>(replies: Reply<T>[]) => replies.find((reply): reply is Refused => !reply.ok)
+
+const filled = (round: Round): Swept[] =>
+  round.wanted.flatMap((wanted, at) => {
+    const lists = round.slots[at]
+    return lists === null ? [] : [{ wanted, lists }]
+  })
 
 class Sight {
   #connected: boolean | null = null
@@ -48,13 +78,15 @@ class Sight {
 
 export class IssuesState {
   readonly machine: number
-  readonly project: number
   trackers = $state.raw<Trackers>({ kind: 'loading' })
   filters = $state.raw<Filters>(ANY_FILTERS)
   query = $state('')
-  lists = $state.raw<Lists | null>(null)
+  swept = $state.raw<Swept[] | null>(null)
+  places = $state.raw<PlaceInfo[]>([])
   loading = $state(false)
   error = $state<string | null>(null)
+  #projects = $state.raw<ProjectChoice[]>([])
+  #answers: Sources[] = []
   #calls: IssueCalls
   #left = false
   #sourcesAsked = 0
@@ -62,9 +94,8 @@ export class IssuesState {
   #sourcesFailed = false
   #sight = new Sight()
 
-  constructor(machine: number, project: number, calls: IssueCalls) {
+  constructor(machine: number, calls: IssueCalls) {
     this.machine = machine
-    this.project = project
     this.#calls = calls
   }
 
@@ -80,24 +111,30 @@ export class IssuesState {
     return this.connected.length > 1
   }
 
-  get issues(): IssueInfo[] {
+  get issues(): Found[] {
     const terms = termsOf(this.query)
-    return (this.lists?.issues ?? []).filter((issue) => matches(issue, terms))
+    return gathered(this.swept ?? []).filter((issue) => matches(issue, terms))
   }
 
   get failures(): Failure[] {
-    return (this.lists?.sources ?? []).flatMap(({ source, error }) =>
-      error === null ? [] : [{ source, name: this.nameOf(source), error }],
-    )
+    return failed(this.swept ?? []).map(({ source, error }) => ({ source, name: this.nameOf(source), error }))
   }
 
   get capped() {
-    return (this.lists?.sources ?? []).some((listed) => listed.error === null && listed.count >= CAP)
+    return reachedCap(this.swept ?? [])
   }
 
   nameOf(source: string) {
     const known = this.trackers.kind === 'ready' ? this.trackers.sources : []
     return known.find((tracker) => tracker.source === source)?.name ?? source
+  }
+
+  projectName(project: number) {
+    return this.#projects.find((known) => known.id === project)?.name ?? `${project}`
+  }
+
+  placesOf(project: number | null) {
+    return project === null ? this.places : this.places.filter((place) => place.project === project)
   }
 
   load() {
@@ -113,7 +150,7 @@ export class IssuesState {
       return
     }
     const asked = ++this.#sourcesAsked
-    const reply = await ask(() => this.#calls.issueSources(this.project), CHOICES_UNANSWERED)
+    const reply = await this.#readSources()
     if (asked !== this.#sourcesAsked || this.#left) {
       return
     }
@@ -122,7 +159,10 @@ export class IssuesState {
       this.#unread(reply.error)
       return
     }
-    this.trackers = { kind: 'ready', sources: reply.data.sources }
+    this.#projects = reply.data.projects
+    this.#answers = reply.data.answers
+    this.places = placesIn(reply.data.answers)
+    this.trackers = { kind: 'ready', sources: standing(reply.data.answers) }
     this.#keepSource()
     await this.list()
   }
@@ -140,7 +180,7 @@ export class IssuesState {
       return Promise.resolve()
     }
     this.filters = next
-    this.lists = null
+    this.swept = null
     return this.list()
   }
 
@@ -160,33 +200,59 @@ export class IssuesState {
     if (this.#left || this.connect) {
       return
     }
-    const asked = ++this.#listsAsked
+    const wanted = toList(this.#answers, this.filters.source)
+    const shown = this.swept ?? []
+    const slots = wanted.map((one) => shown.find((swept) => sameWanted(swept.wanted, one))?.lists ?? null)
+    const round = { asked: ++this.#listsAsked, wanted, filters: this.filters, slots }
     this.loading = true
     this.error = null
-    await this.#read(asked, true)
-    await this.#read(asked, false)
-  }
-
-  async #read(asked: number, cached: boolean) {
-    if (asked !== this.#listsAsked) {
-      return
-    }
-    const filter = { ...this.filters, cached }
-    const reply = await ask(() => this.#calls.issueList(this.project, filter), CHOICES_UNANSWERED)
-    if (asked === this.#listsAsked && !this.#left) {
-      this.#adopt(reply, cached)
+    await this.#sweep(round, true)
+    await this.#sweep(round, false)
+    if (round.asked === this.#listsAsked) {
+      this.loading = false
     }
   }
 
-  #adopt(reply: Reply<Lists>, cached: boolean) {
-    const lists = reply.ok && reply.data.project === this.project ? reply.data : null
-    if (cached) {
-      this.lists = lists !== null && lists.issues.length > 0 ? lists : this.lists
+  async #readSources(): Promise<Reply<Read>> {
+    const chosen = await ask(() => this.#calls.startProjects(), CHOICES_UNANSWERED)
+    if (!chosen.ok) {
+      return chosen
+    }
+    const { projects } = chosen.data
+    const replies = await limited(
+      projects.map(({ id }) => () => ask(() => this.#calls.issueSources(id), CHOICES_UNANSWERED)),
+    )
+    const answers = replies.flatMap((reply) => (reply.ok ? [reply.data] : []))
+    return refusedIn(replies) ?? { ok: true, data: { projects, answers } }
+  }
+
+  #sweep(round: Round, cached: boolean) {
+    return limited(round.wanted.map((_, at) => () => this.#read(round, at, cached)))
+  }
+
+  async #read(round: Round, at: number, cached: boolean) {
+    if (round.asked !== this.#listsAsked) {
       return
     }
-    this.loading = false
-    this.lists = lists ?? this.lists
-    this.error = reply.ok ? null : reply.error
+    const { project, source } = round.wanted[at]
+    const filter = { ...round.filters, source, cached }
+    const reply = await ask(() => this.#calls.issueList(project, filter), CHOICES_UNANSWERED)
+    if (round.asked === this.#listsAsked && !this.#left) {
+      this.#adopt(round, at, reply, cached)
+    }
+  }
+
+  #adopt(round: Round, at: number, reply: Reply<Lists>, cached: boolean) {
+    if (!reply.ok) {
+      this.error = cached || this.error !== null ? this.error : reply.error
+      return
+    }
+    const lists = reply.data
+    if (lists.project !== round.wanted[at].project || (cached && lists.issues.length === 0)) {
+      return
+    }
+    round.slots[at] = lists
+    this.swept = filled(round)
   }
 
   #unread(reason: string) {
@@ -201,7 +267,7 @@ export class IssuesState {
     const source = this.filters.source
     if (source !== null && !this.connected.some((tracker) => tracker.source === source)) {
       this.filters = { ...this.filters, source: null }
-      this.lists = null
+      this.swept = null
     }
   }
 }
