@@ -1,6 +1,6 @@
 # 035 — Una máquina, un código: el puente da todas sus rutas y la app elige
 
-- Estado: pendiente
+- Estado: hecha (escanear el QR con la cámara y quitar la wifi en el iPhone queda para el usuario)
 - Depende de: 027, 028
 - Riesgo: medio — cambia lo que imprime el puente y lo que acepta la app; hay máquinas ya guardadas con una sola ruta.
 - Rama: `feat/035-one-code-per-machine` · PR: `feat: add a machine with one code that carries every route of its bridge`
@@ -15,29 +15,29 @@ hay que añadir a mano la segunda ruta (Machines › Edit › Add route). El usu
 "para el usuario añadir una máquina tiene que darle igual, es una máquina, y usar la red más rápida es cosa nuestra".
 
 ## Criterios de aceptación
-- [ ] CA1 — El puente imprime **un solo código de máquina** (QR y su texto para pegar) con todas las direcciones en las
+- [x] CA1 — El puente imprime **un solo código de máquina** (QR y su texto para pegar) con todas las direcciones en las
   que escucha y el token, y el nombre del Mac como sugerencia de nombre. El formato (p. ej. un enlace con varias
   direcciones) se decide en el análisis y se documenta en `design/bridge.md`; las URLs por dirección pueden seguir
   saliendo como texto para depurar, pero el QR que se enseña es uno.
-- [ ] CA2 — La app acepta ese código al añadir una máquina (escáner y pegar): guarda la máquina con **todas** sus rutas
+- [x] CA2 — La app acepta ese código al añadir una máquina (escáner y pegar): guarda la máquina con **todas** sus rutas
   de una vez, en el orden que convenga, sin preguntar por ninguna.
-- [ ] CA3 — Si el código es de un Mac ya guardado (mismo token o mismas direcciones), la app no crea otra máquina:
+- [x] CA3 — Si el código es de un Mac ya guardado (mismo token o mismas direcciones), la app no crea otra máquina:
   le añade las rutas que falten y actualiza el token si cambió, y lo dice en una línea.
-- [ ] CA4 — Compatibilidad: las URLs de una sola ruta que ya imprime el puente (y las máquinas ya guardadas) siguen
+- [x] CA4 — Compatibilidad: las URLs de una sola ruta que ya imprime el puente (y las máquinas ya guardadas) siguen
   funcionando.
-- [ ] CA5 — Rutas al día sin volver a escanear: estando conectada, la app conoce las direcciones actuales del puente
+- [x] CA5 — Rutas al día sin volver a escanear: estando conectada, la app conoce las direcciones actuales del puente
   (p. ej. el puente las anuncia o responde a una petición propia del puente, no un comando de cornercase) y añade a la
   máquina las que falten (p. ej. Tailscale encendido después). Las que ya no existan no se borran solas; como mucho
   se marcan. Si esto se complica, queda como plan B (abajo) y se documenta.
-- [ ] CA6 — Elegir la ruta es de la app: con varias rutas que contestan se usa la más rápida (hoy la carrera de
+- [x] CA6 — Elegir la ruta es de la app: con varias rutas que contestan se usa la más rápida (hoy la carrera de
   `pick_route`, con la ganadora anterior primero); al cambiar de red (028) se vuelve a elegir sola. Anotar en
   `design/connection.md` qué pasa cuando LAN y Tailscale contestan a la vez y por qué gana la que gana.
-- [ ] CA7 — La UI habla de máquinas: añadir no menciona rutas; en la pantalla de una máquina las rutas se ven como
+- [x] CA7 — La UI habla de máquinas: añadir no menciona rutas; en la pantalla de una máquina las rutas se ven como
   información (por dónde se llega ahora) y las acciones de rutas a mano quedan como opción avanzada, no como paso
   necesario.
-- [ ] CA8 — Comprobado en el simulador (pegar el código; el escáner no tiene cámara) y, pendiente para el usuario en
+- [x] CA8 — Comprobado en el simulador (pegar el código; el escáner no tiene cámara) y, pendiente para el usuario en
   su iPhone: escanear el QR único, quitar la wifi y ver que sigue por Tailscale sin tocar nada.
-- [ ] CA9 — `hx check full` y mutation en verde; tests del formato (puente y app) con casos de una, dos y ninguna
+- [x] CA9 — `hx check full` y mutation en verde; tests del formato (puente y app) con casos de una, dos y ninguna
   dirección, IPv6 y token con caracteres raros.
 
 ## Plan B

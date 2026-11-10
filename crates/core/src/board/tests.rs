@@ -1,8 +1,8 @@
 use rstest::rstest;
 
-use super::fixtures::{agent, pane, project, session, snapshot, tab, workspace};
+use super::fixtures::{agent, child, member, pane, project, session, snapshot, tab, workspace};
 use super::*;
-use crate::cli::status::fixtures::{STATUS, WATCH};
+use crate::cli::status::fixtures::{STATUS, STATUS_TREE, WATCH};
 
 const EARLIER: &str = "2026-11-09T12:00:00.000Z";
 const LATER: &str = "2026-11-09T12:05:00.000Z";
@@ -347,13 +347,18 @@ mod the_agents {
             title: title.map(str::to_owned),
             status: Some("working".to_owned()),
             since: None,
+            parent: None,
+            depth: 0,
+            role: None,
+            rank_status: Some("working".to_owned()),
         }
     }
 
     #[test]
     fn of_a_watched_session_are_a_row_per_agent() {
         let rows = agents(&parsed(WATCH), &Since::default());
-        assert_eq!(rows, vec![watched(4, Some("Claude Code")), watched(5, None)]);
+        let coder = AgentRow { parent: Some(4), depth: 1, role: Some("coder".to_owned()), ..watched(5, None) };
+        assert_eq!(rows, vec![watched(4, Some("Claude Code")), coder]);
     }
 
     #[test]
@@ -441,5 +446,82 @@ mod the_order {
         let other = project(7, vec![workspace(8, vec![tab(9, vec![agent(16, "idle")])])]);
         let snapshot = session(vec![project(1, vec![first, second]), other]);
         assert_eq!(order(&snapshot, &Since::default()), vec![20, 19, 18, 17, 16]);
+    }
+}
+
+mod the_tree {
+    use super::*;
+
+    fn shape(snapshot: &Snapshot) -> Vec<(u64, u32, Option<u64>)> {
+        agents(snapshot, &Since::default()).iter().map(|row| (row.pane, row.depth, row.parent)).collect()
+    }
+
+    fn row_of(snapshot: &Snapshot, pane: u64) -> AgentRow {
+        let rows = agents(snapshot, &Since::default());
+        rows.into_iter().find(|row| row.pane == pane).expect("a row for the pane")
+    }
+
+    #[test]
+    fn of_a_real_server_puts_each_agent_under_the_one_that_started_it() {
+        let expected = vec![
+            (5, 0, None),
+            (7, 1, Some(5)),
+            (9, 2, Some(7)),
+            (12, 1, Some(5)),
+            (16, 0, None),
+            (17, 1, Some(16)),
+            (18, 1, Some(16)),
+        ];
+        assert_eq!(shape(&parsed(STATUS_TREE)), expected);
+    }
+
+    #[test]
+    fn hangs_a_child_in_another_workspace_from_its_parent_in_its_own_place() {
+        let child = row_of(&parsed(STATUS_TREE), 12);
+        assert_eq!((child.parent, child.depth), (Some(5), 1));
+        assert_eq!((child.workspace, child.tab), (11, 13));
+    }
+
+    #[test]
+    fn of_a_real_server_carries_each_role() {
+        let snapshot = parsed(STATUS_TREE);
+        let roles: Vec<Option<String>> = [16, 17, 18, 5].map(|pane| row_of(&snapshot, pane).role).into();
+        let expected =
+            [Some("orchestrator"), Some("coder"), Some("reviewer"), None].map(|role| role.map(str::to_owned));
+        assert_eq!(roles, expected);
+    }
+
+    #[test]
+    fn ranks_a_branch_by_the_child_that_needs_attention() {
+        let row = row_of(&parsed(STATUS_TREE), 5);
+        assert_eq!((row.status.as_deref(), row.rank_status.as_deref()), (Some("working"), Some("waiting")));
+    }
+
+    #[test]
+    fn ranks_a_branch_nobody_raises_by_its_own_status() {
+        let row = row_of(&snapshot(vec![agent(4, "working"), child(5, 4, "done")]), 4);
+        assert_eq!(row.rank_status.as_deref(), Some("working"));
+    }
+
+    #[test]
+    fn leaves_a_child_of_a_pane_without_an_agent_a_root() {
+        let snapshot = snapshot(vec![pane(4, None, Some("working")), child(5, 4, "idle")]);
+        assert_eq!(shape(&snapshot), vec![(5, 0, None)]);
+    }
+
+    #[test]
+    fn leaves_a_child_whose_parent_is_gone_a_root_with_its_role() {
+        let row = only_row(&snapshot(vec![member(5, 4, "coder")]));
+        assert_eq!((row.parent, row.depth, row.role.as_deref()), (None, 0, Some("coder")));
+    }
+
+    #[test]
+    fn keeps_the_time_of_each_row_its_own() {
+        let snapshot = snapshot(vec![agent(4, "idle"), child(5, 4, "waiting")]);
+        let mut since = seen(vec![agent(4, "idle"), child(5, 4, "waiting")]);
+        since.heard(5, Some("waiting"), EARLIER);
+        let rows = agents(&snapshot, &since);
+        let times: Vec<Option<&str>> = rows.iter().map(|row| row.since.as_deref()).collect();
+        assert_eq!(times, vec![None, Some(EARLIER)]);
     }
 }

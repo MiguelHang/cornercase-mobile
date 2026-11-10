@@ -14,6 +14,10 @@ const withBar = Object.entries(screens)
   .filter(([, text]) => text.includes('<NavBar'))
   .map(([path]) => path)
 
+const FIXED_SCREEN = '/src/routes/terminal/Terminal.svelte'
+
+const SAFE_TOP = /(?:padding|margin)(?:-top)?:[^;]*safe-area-inset-top/
+
 describe('the screens of src/routes', () => {
   it('reads every screen', () => {
     expect(Object.keys(screens)).toContain('/src/routes/terminal/Terminal.svelte')
@@ -24,8 +28,25 @@ describe('the screens of src/routes', () => {
     expect(leftovers(text)).toEqual([])
   })
 
-  it.each(withBar)('%s leaves the safe area on top to the body, which pads it already', (path) => {
-    expect(screens[path]).not.toMatch(/padding(-top)?: calc\(env\(safe-area-inset-top\)/)
+  it.each(withBar.filter((path) => path !== FIXED_SCREEN))(
+    '%s leaves the safe area on top to the body, which pads it already',
+    (path) => {
+      expect(screens[path]).not.toMatch(SAFE_TOP)
+    },
+  )
+
+  it('pads the safe area only on the fixed screen of the terminal, which the body does not reach', () => {
+    expect(screens[FIXED_SCREEN]).toMatch(SAFE_TOP)
+  })
+
+  it('reach over the safe area only on the screens without the connection bar above', () => {
+    expect(withBar.filter((path) => /<NavBar [^>]*\btopmost\b/.test(screens[path])).sort()).toEqual([
+      '/src/routes/Machine.svelte',
+      '/src/routes/Machines.svelte',
+      '/src/routes/changes/Changes.svelte',
+      '/src/routes/changes/Diff.svelte',
+      '/src/routes/start/Start.svelte',
+    ])
   })
 
   it('go back through the NavBar on every screen with a way back', () => {
@@ -39,6 +60,21 @@ describe('the screens of src/routes', () => {
       '/src/routes/start/Start.svelte',
       '/src/routes/terminal/Terminal.svelte',
     ])
+  })
+})
+
+describe('the guard of the safe area', () => {
+  it.each([
+    ['a padding over it', 'padding-top: calc(env(safe-area-inset-top) + var(--gap));'],
+    ['a padding of it alone', 'padding-top: env(safe-area-inset-top);'],
+    ['a padding shorthand', 'padding: env(safe-area-inset-top) 0 0;'],
+    ['a margin', 'margin-top: env(safe-area-inset-top);'],
+  ])('finds %s', (_, text) => {
+    expect(text).toMatch(SAFE_TOP)
+  })
+
+  it('leaves a height that takes it out', () => {
+    expect('min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));').not.toMatch(SAFE_TOP)
   })
 })
 

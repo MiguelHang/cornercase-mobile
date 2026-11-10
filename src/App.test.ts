@@ -22,7 +22,7 @@ describe('App', () => {
 
   it('says what a machine is and what it needs', () => {
     expect(body).toContain('A machine is a computer running cornercase whose agents you follow from here.')
-    expect(body).toContain('It needs the cornercase bridge running on your Mac, and the URL it prints.')
+    expect(body).toContain('It needs the cornercase bridge running on your Mac, and the code it prints.')
   })
 
   it('offers adding a machine, ready to be pressed', () => {
@@ -136,7 +136,10 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board agents={current.agents} connection={current.connection} below={barHeight} onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })} onstart={start} />",
+      "<Board machine={current.machine} agents={current.agents} connection={current.connection} below={barHeight} onopen={open} onstart={start} />",
+    )
+    expect(source).toContain(
+      "const open = (pane: number) => router.go({ name: 'agent', machine: current.machine, pane })",
     )
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
@@ -151,7 +154,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
     )
   })
 
@@ -163,9 +166,9 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
   })
 
-  it('names the route below for the back button, from the saved machines and the open chat', () => {
+  it("names the route below for the back button, from the saved machines and the active machine's rows", () => {
     expect(source).toContain(
-      'const lookups: Lookups = { machineName: (id) => machines.find((machine) => machine.id === id)?.name, agentRow: (opened) => (chat?.machine === opened.machine && chat.pane === opened.pane ? chat.row : undefined), }',
+      'const lookups: Lookups = { machineName: (id) => machines.find((machine) => machine.id === id)?.name, agentRow: (opened) => opened.machine === current.machine ? current.agents?.find((row) => row.pane === opened.pane) : undefined, listed: () => current.agents ?? [], }',
     )
     expect(source).toContain('const backTo = $derived(titleOf(router.below, lookups))')
   })
@@ -268,7 +271,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

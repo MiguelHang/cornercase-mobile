@@ -49,7 +49,7 @@
 </script>
 
 <section class="screen">
-  <NavBar {backTo} title="Start" {onback} />
+  <NavBar {backTo} title="Start" {onback} topmost />
   <div class="actions" role="group" aria-label="What to start">
     {#each ACTIONS as [name, words] (name)}
       <button

@@ -10,27 +10,32 @@
   import TextArea from '../../lib/ui/TextArea.svelte'
   import ChatHeader from './ChatHeader.svelte'
   import KeyRow from './KeyRow.svelte'
+  import Subagents from './Subagents.svelte'
   import Thread from './Thread.svelte'
 
   const TICK_MS = 15_000
 
   let {
     chat,
+    agents,
     connection,
     backTo,
     below = 0,
     starting = null,
     onback,
+    onopen,
     onfailed,
     onterminal,
     onchanges,
   }: {
     chat: Chat
+    agents: AgentRow[] | null
     connection: ConnectionView_Serialize
     backTo: string | null
     below?: number
     starting?: string | null
     onback: () => void
+    onopen: (pane: number) => void
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
@@ -73,7 +78,10 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} {backTo} {below} {onback} {onterminal} {onchanges} />
+    <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} />
+    {#key row.pane}
+      <Subagents {row} agents={agents ?? []} {onopen} />
+    {/key}
     <Thread {chat} {now} />
     <div class="composer">
       {#if chat.asking}

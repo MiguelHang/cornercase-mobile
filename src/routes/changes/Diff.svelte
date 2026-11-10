@@ -34,7 +34,7 @@
 </script>
 
 <section class="screen">
-  <NavBar {backTo} {onback}>
+  <NavBar {backTo} {onback} topmost>
     {#snippet center()}
       <h1 class="path"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
     {/snippet}

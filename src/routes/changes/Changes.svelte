@@ -43,7 +43,7 @@
 </script>
 
 <section class="screen">
-  <NavBar {backTo} {title} {onback}>
+  <NavBar {backTo} {title} {onback} topmost>
     {#snippet right()}
       {#if listed !== null}
         <p class="totals"><span class="plus">+{listed.added}</span> <span class="minus">−{listed.removed}</span></p>

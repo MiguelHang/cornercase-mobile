@@ -12,6 +12,7 @@ type Props = {
   right?: string
   below?: number
   fixed?: boolean
+  topmost?: boolean
   edge?: boolean
   variant?: Platform
 }
@@ -57,7 +58,7 @@ describe('NavBar', () => {
 
   it('shows the arrow without the title below on Android', () => {
     const body = bar({ backTo: 'Agents', variant: 'android' })
-    expect(body).toMatch(/<div class="bar android svelte-[\w-]+ fixed topmost"/)
+    expect(body).toMatch(/<div class="bar android svelte-[\w-]+ fixed"/)
     expect(body).toContain('aria-label="Back to Agents"')
     expect(body).not.toContain('<path d="m15 18-6-6 6-6">')
     expect(body).not.toContain('class="label')
@@ -86,9 +87,11 @@ describe('NavBar', () => {
   })
 
   it.each<[string, Props, RegExp]>([
-    ['sticks to the top by default', {}, /<div class="bar ios svelte-[\w-]+ fixed topmost" style="--below: 0px;">/],
+    ['sticks by default, under whatever is above it', {}, /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 0px;">/],
+    ['reaches over the safe area when topmost', { topmost: true }, /<div class="bar ios svelte-[\w-]+ fixed topmost" style="--below: 0px;">/],
     ['stays in place when not fixed', { fixed: false }, /<div class="bar ios svelte-[\w-]+" style="--below: 0px;">/],
-    ['draws its edge', { edge: true }, /<div class="bar ios svelte-[\w-]+ fixed topmost edge" style="--below: 0px;">/],
+    ['stays in place when not fixed, even topmost', { fixed: false, topmost: true }, /<div class="bar ios svelte-[\w-]+" style="--below: 0px;">/],
+    ['draws its edge', { edge: true, topmost: true }, /<div class="bar ios svelte-[\w-]+ fixed topmost edge" style="--below: 0px;">/],
     ['sits below a bar', { below: 32 }, /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 32px;">/],
   ])('%s', (_, props, root) => {
     expect(bar({ ...props, variant: 'ios' })).toMatch(root)

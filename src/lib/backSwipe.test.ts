@@ -72,8 +72,12 @@ describe('BackSwipe', () => {
       expect(moved(CLAIM)).toEqual({ state: 'claimed', shift: CLAIM })
     })
 
-    it('claims a finger that moved more right than down', () => {
-      expect(moved(CLAIM, CLAIM - 1)).toEqual({ state: 'claimed', shift: CLAIM })
+    it('claims a finger that moved more than twice as far right as down', () => {
+      expect(moved(CLAIM, CLAIM / 2 - 1)).toEqual({ state: 'claimed', shift: CLAIM })
+    })
+
+    it('waits while the finger has not moved at all', () => {
+      expect(moved(0)).toEqual({ state: 'pending', shift: 0 })
     })
 
     it.each([
@@ -82,8 +86,16 @@ describe('BackSwipe', () => {
       ['left', -CLAIM, 0],
       ['as much down as right', CLAIM, CLAIM],
       ['more up than right', CLAIM - 1, -CLAIM],
+      ['more right than down, but not twice as far', CLAIM, CLAIM - 1],
+      ['a little, more right than down but not twice as far', 3, 2],
     ])('cancels a finger that moved %s', (_, dx, dy) => {
       expect(moved(dx, dy)).toEqual(STILL)
+    })
+
+    it('stays cancelled once a first move it did not hold goes on to the right', () => {
+      const swipe = pressed()
+      swipe.move(1, [X + 3, Y + 2], 10)
+      expect(swipe.move(1, [X + 30, Y + 20], 20)).toEqual(STILL)
     })
 
     it('stays cancelled when the finger turns right', () => {

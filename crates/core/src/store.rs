@@ -128,6 +128,10 @@ impl Store {
     pub fn online(&self) {
         let _ = self.resumes.send(Resume::Online);
     }
+
+    pub fn learn(&self, routes: &[Route]) {
+        self.shared.state().learned.extend_from_slice(routes);
+    }
 }
 
 pub struct Changes {
@@ -199,6 +203,7 @@ struct State {
     followed: bool,
     subscribers: Vec<Subscriber>,
     boots: BootWatch,
+    learned: Vec<Route>,
 }
 
 impl Shared {
@@ -219,6 +224,10 @@ impl Shared {
 
     fn queue(&self) -> Option<Queue> {
         self.state().queue.clone()
+    }
+
+    fn learned(&self) -> Vec<Route> {
+        mem::take(&mut self.state().learned)
     }
 
     fn connected(&self) -> bool {

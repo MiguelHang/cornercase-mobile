@@ -14,6 +14,7 @@
     onback,
     below = 0,
     fixed = true,
+    topmost = false,
     edge = false,
     variant = platform,
   }: {
@@ -24,6 +25,7 @@
     onback: () => void
     below?: number
     fixed?: boolean
+    topmost?: boolean
     edge?: boolean
     variant?: Platform
   } = $props()
@@ -35,7 +37,7 @@
   const fits = $derived(fitsLabel(labelWidth, room - TAP))
 </script>
 
-<div class="bar {variant}" class:fixed class:topmost={fixed && below === 0} class:edge style:--below="{below}px">
+<div class="bar {variant}" class:fixed class:topmost={fixed && topmost} class:edge style:--below="{below}px">
   <div class="start" bind:clientWidth={room}>
     <button class="back" type="button" aria-label={backLabel(backTo)} onclick={onback} ontouchstart={() => {}}>
       <Icon name={ios ? 'chevron-left' : 'arrow-left'} />

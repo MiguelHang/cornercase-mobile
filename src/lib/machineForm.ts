@@ -1,4 +1,4 @@
-import type { CommandError, SameWhy } from './bindings'
+import type { CommandError, MergeView, SameWhy } from './bindings'
 
 export type Checked = { ok: true; url: string } | { ok: false; error: string }
 
@@ -8,25 +8,23 @@ export type Field = 'url' | 'name' | 'form'
 
 export type Offer = { url: string; name: string; machine: number; saved: string; why: SameWhy; checked: boolean }
 
-export const EMPTY = 'Paste the URL the bridge prints'
-export const NO_SCHEME = 'The URL starts with ws://'
-export const NOT_A_URL = 'This is not a URL'
-export const NO_TOKEN = 'The URL has no token=: paste it whole'
+export const EMPTY = 'Paste the code the bridge prints'
+export const NO_SCHEME = 'The code starts with ws://'
+export const NOT_A_URL = 'This is not a machine code'
+export const NO_TOKEN = 'The code has no token=: paste it whole'
 
 export const LONGEST_NAME = 64
 export const NAME_EMPTY = 'the name is empty'
 export const NAME_TOO_LONG = `the name is longer than ${LONGEST_NAME} characters`
 export const NAME_TAKEN = 'another machine already has that name'
 
-export const ALREADY_SAVED = 'This URL is already saved: there is nothing to add.'
-export const UNCHECKED = 'The bridge did not answer at this URL, so it could not be asked which machine it is.'
+export const UNCHECKED = 'The bridge did not answer, so it could not be asked which machine it is.'
 export const NEW_MACHINE = 'Add as a new machine'
 
 const NAME = 'Name'
 
 const REASONS: Record<SameWhy, (saved: string) => string> = {
-  address: (saved) => `${saved} already has a route at this address.`,
-  token: (saved) => `${saved} uses the same bridge token.`,
+  address: (saved) => `${saved} is already saved at this address.`,
   boot: (saved) => `This bridge is the one ${saved} answers from.`,
   name: (saved) => `A machine is already called ${saved}.`,
 }
@@ -56,16 +54,26 @@ export const checkUrl = (raw: string): Checked => {
   return found.searchParams.get('token') ? { ok: true, url } : refused(NO_TOKEN)
 }
 
-const hostOf = (raw: string) => {
+const folded = (name: string) => name.trim().toLowerCase()
+
+const isTaken = (name: string, taken: readonly string[]) => taken.some((other) => folded(other) === folded(name))
+
+const cut = (name: string) => [...name.trim()].slice(0, LONGEST_NAME).join('').trim()
+
+const suggested = (raw: string, taken: readonly string[]) => {
   const checked = checkUrl(raw)
-  return checked.ok ? new URL(checked.url).hostname : ''
+  if (!checked.ok) {
+    return ''
+  }
+  const url = new URL(checked.url)
+  const named = cut(url.searchParams.get('name') ?? '')
+  return named !== '' && !isTaken(named, taken) ? named : url.hostname
 }
 
-export const nameFor = (name: string, url: string) => name.trim() || hostOf(url)
+export const nameFor = (name: string, url: string, taken: readonly string[] = []) =>
+  name.trim() || suggested(url, taken)
 
-export const placeholderName = (url: string) => hostOf(url) || NAME
-
-const folded = (name: string) => name.trim().toLowerCase()
+export const placeholderName = (url: string, taken: readonly string[] = []) => suggested(url, taken) || NAME
 
 export const checkName = (raw: string, taken: readonly string[] = []): NameChecked => {
   const name = raw.trim()
@@ -75,7 +83,7 @@ export const checkName = (raw: string, taken: readonly string[] = []): NameCheck
   if ([...name].length > LONGEST_NAME) {
     return { ok: false, error: NAME_TOO_LONG }
   }
-  if (taken.some((other) => folded(other) === folded(name))) {
+  if (isTaken(name, taken)) {
     return { ok: false, error: NAME_TAKEN }
   }
   return { ok: true, name }
@@ -83,8 +91,23 @@ export const checkName = (raw: string, taken: readonly string[] = []): NameCheck
 
 export const offerText = (offer: Pick<Offer, 'saved' | 'why'>) => ({
   reason: REASONS[offer.why](offer.saved),
-  keep: offer.why === 'address' ? `Update the token of ${offer.saved}` : `Add as a route of ${offer.saved}`,
+  keep: offer.why === 'address' ? `Update the token of ${offer.saved}` : `Add its addresses to ${offer.saved}`,
 })
+
+const counted = (count: number, what: string) => `${count} ${what}${count === 1 ? '' : 's'}`
+
+const mergeSummary = (merged: MergeView) => {
+  const told = [
+    merged.added.length > 0 ? `${counted(merged.added.length, 'route')} added` : '',
+    merged.token_updated ? 'token updated' : '',
+    merged.skipped.length > 0 ? `${counted(merged.skipped.length, 'route')} left to another machine` : '',
+  ].filter((part) => part !== '')
+  return told.length > 0 ? told.join(', ') : 'nothing to add'
+}
+
+export const mergedText = (saved: string, merged: MergeView) => `${saved} already saved: ${mergeSummary(merged)}.`
+
+export const routesText = (machine: string, merged: MergeView) => `${machine}: ${mergeSummary(merged)}.`
 
 export const fieldOf = (error: CommandError): Field => {
   if (error.code.startsWith('route_')) {

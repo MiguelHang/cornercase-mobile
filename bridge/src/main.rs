@@ -1,7 +1,7 @@
 use std::env;
 use std::fmt;
 use std::io::{self, Write};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -12,7 +12,7 @@ use tokio::signal::unix::{SignalKind, signal};
 use cornercase_bridge::network::{self, Target};
 use cornercase_bridge::qr::{self, Place};
 use cornercase_bridge::server::{Config, Server};
-use cornercase_bridge::{binary, token};
+use cornercase_bridge::{binary, name, token};
 
 const SETUP: u8 = 2;
 const FAILED: u8 = 1;
@@ -62,8 +62,11 @@ async fn run(args: Args) -> Result<(), Failure> {
     let listeners = network::listen(&ips, args.port).await.map_err(failing(FAILED))?;
     let count = listeners.len();
     eprintln!("cornercase-bridge: listening on {count} address{}", if count == 1 { "" } else { "es" });
-    print(&places, &listeners, &token).map_err(failing(FAILED))?;
-    Server::from_listeners(listeners, Config::new(token, binary)).run(shutdown).await;
+    let addresses = addresses(&listeners)?;
+    let port = addresses.first().map_or(args.port, SocketAddr::port);
+    print(name::read().as_deref(), &places, port, &token)?;
+    let config = Config::new(token, binary).with_addresses(addresses);
+    Server::from_listeners(listeners, config).run(shutdown).await;
     Ok(())
 }
 
@@ -96,13 +99,13 @@ fn places(targets: Option<&[Target]>) -> Vec<(Place<'_>, IpAddr)> {
     }
 }
 
-fn print(places: &[(Place<'_>, IpAddr)], listeners: &[TcpListener], token: &str) -> io::Result<()> {
-    let mut blocks = Vec::with_capacity(places.len());
-    for (&(place, _), listener) in places.iter().zip(listeners) {
-        let address = listener.local_addr()?;
-        blocks.push(qr::block(place, &qr::url(address.ip(), address.port(), token)).join("\n"));
-    }
-    writeln!(io::stdout().lock(), "{}", blocks.join("\n\n"))
+fn addresses(listeners: &[TcpListener]) -> Result<Vec<SocketAddr>, Failure> {
+    listeners.iter().map(|listener| listener.local_addr().map_err(failing(FAILED))).collect()
+}
+
+fn print(name: Option<&str>, places: &[(Place<'_>, IpAddr)], port: u16, token: &str) -> Result<(), Failure> {
+    let block = qr::block(name, places, port, token).map_err(failing(FAILED))?;
+    writeln!(io::stdout().lock(), "{}", block.join("\n")).map_err(failing(FAILED))
 }
 
 fn shutdown() -> io::Result<impl Future<Output = ()>> {

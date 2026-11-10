@@ -21,6 +21,10 @@ const agentIn = (status: string | null, since: string | null = null): AgentRow =
   title: 'Fix the chat',
   status,
   since,
+  parent: null,
+  depth: 0,
+  role: null,
+  rank_status: status,
 })
 
 const ago = (millis: number) => new Date(NOW - millis).toISOString()

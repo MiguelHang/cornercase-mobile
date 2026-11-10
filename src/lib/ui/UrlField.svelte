@@ -36,7 +36,7 @@
     Scan QR code
   </Button>
   <ScanOverlay {scanner} />
-  <Field label="Bridge URL" url bind:value {error} {disabled} />
+  <Field label="Machine code" url bind:value {error} {disabled} />
 </div>
 
 <style>

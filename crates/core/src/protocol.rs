@@ -1,4 +1,5 @@
 use std::fmt;
+use std::net::SocketAddr;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -8,6 +9,7 @@ use serde_json::error::Category;
 pub const USAGE_EXIT: i32 = 2;
 pub const LONGEST_LINE: usize = 16 << 20;
 pub const LARGEST_MESSAGE: usize = 1 << 20;
+pub const BRIDGE_ROUTES: &str = "--bridge-routes";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
@@ -27,6 +29,29 @@ impl fmt::Display for Refusal {
 }
 
 impl std::error::Error for Refusal {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BridgeRoutes {
+    pub routes: Vec<BridgeRoute>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BridgeRoute {
+    pub host: String,
+    pub port: u16,
+}
+
+impl BridgeRoutes {
+    pub fn new(addresses: &[SocketAddr]) -> Self {
+        let routes =
+            addresses.iter().map(|address| BridgeRoute { host: address.ip().to_string(), port: address.port() });
+        Self { routes: routes.collect() }
+    }
+
+    pub fn asked(argv: &[String]) -> bool {
+        matches!(argv, [only] if only == BRIDGE_ROUTES)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -65,7 +65,9 @@
   const reviewedWorkspace = $derived(reviewed?.workspace ?? null)
   const lookups: Lookups = {
     machineName: (id) => machines.find((machine) => machine.id === id)?.name,
-    agentRow: (opened) => (chat?.machine === opened.machine && chat.pane === opened.pane ? chat.row : undefined),
+    agentRow: (opened) =>
+      opened.machine === current.machine ? current.agents?.find((row) => row.pane === opened.pane) : undefined,
+    listed: () => current.agents ?? [],
   }
   const backTo = $derived(titleOf(router.below, lookups))
   const swipeable = $derived(backSwipes(platform, router.below))
@@ -116,6 +118,8 @@
     current = next
     router.setBase(routeFor(next, machines.length))
   }
+
+  const open = (pane: number) => router.go({ name: 'agent', machine: current.machine, pane })
 
   const terminal = (row: AgentRow) => {
     if (current.machine !== null) {
@@ -268,21 +272,24 @@
     <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>
       {#if route.name === 'home'}
         <Board
+          machine={current.machine}
           agents={current.agents}
           connection={current.connection}
           below={barHeight}
-          onopen={(pane) => router.go({ name: 'agent', machine: current.machine, pane })}
+          onopen={open}
           onstart={start}
         />
       {:else if barred}
         {#if chat !== null}
           <Agent
             {chat}
+            agents={current.agents}
             connection={current.connection}
             {backTo}
             below={barHeight}
             {starting}
             onback={goBack}
+            onopen={open}
             onfailed={(message) => toasts.push({ level: 'error', message })}
             onterminal={terminal}
             onchanges={review}

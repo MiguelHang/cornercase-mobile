@@ -10,7 +10,7 @@ async fn reached(store: &Store, asked: &Asked) -> String {
     asked.all().pop().expect("the command was asked")
 }
 
-async fn until_connected_on(changes: &mut Changes, host: &str) {
+pub(super) async fn until_connected_on(changes: &mut Changes, host: &str) {
     let expected = Connection::Connected { route: route(host).address().clone() };
     bounded(async { while next_connection(changes).await != expected {} }).await;
 }

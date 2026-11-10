@@ -17,6 +17,10 @@ const ROW: AgentRow = {
   workspace_count: 1,
   project: 1,
   project_name: 'app',
+  parent: null,
+  depth: 0,
+  role: null,
+  rank_status: null,
 }
 
 const asked: ChatOf[] = []
@@ -27,6 +31,7 @@ const LOOKUPS: Lookups = {
     asked.push(chat)
     return chat.pane === 7 ? ROW : undefined
   },
+  listed: () => [],
 }
 
 describe('titleOf', () => {
@@ -56,6 +61,12 @@ describe('titleOf', () => {
     ['no route', null],
   ])('is unknown for %s', (_, route) => {
     expect(titleOf(route, LOOKUPS)).toBeNull()
+  })
+
+  it("names a flow's member by its role, as its chat does", () => {
+    const lead = { ...ROW, pane: 6, role: 'orchestrator' }
+    const coder = { ...ROW, parent: 6, depth: 1, role: 'coder' }
+    expect(titleOf({ name: 'agent', machine: 1, pane: 7 }, { ...LOOKUPS, agentRow: () => coder, listed: () => [lead, coder] })).toBe('coder')
   })
 
   it('is unknown for an agent whose lookup finds no row at all', () => {

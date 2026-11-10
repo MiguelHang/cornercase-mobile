@@ -20,7 +20,7 @@ const done = () => Promise.resolve({ status: 'ok' as const, data: null })
 
 const CALLS = {
   machineRename: done,
-  machineRouteAdd: done,
+  machineMerge: () => Promise.resolve({ status: 'ok' as const, data: { added: [], token_updated: false, skipped: [] } }),
   machineRouteRemove: done,
   machineRouteMove: done,
   machineRemove: done,
@@ -28,16 +28,28 @@ const CALLS = {
 
 const nothing = () => Promise.resolve()
 
+const quiet = () => {}
+
 const screen = (
   machine = studio(),
   connection: ConnectionView_Serialize | null = CONNECTED,
-  edit = new EditMachine(CALLS, () => machine, nothing, nothing),
+  edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet),
 ) =>
   render(Machine, {
     props: { machine, taken: ['Desk'], connection, backTo: 'Machines', onback: () => {}, onchanged: nothing, onremoved: nothing, edit },
   }).body
 
-const routes = (body: string) => body.split(/(?=<li class="route )/).slice(1)
+const rows = (body: string, kind: string) => body.split(new RegExp(`(?=<li class="${kind} )`)).slice(1)
+
+const routes = (body: string) => rows(body, 'route')
+
+const changes = (body: string) => rows(body, 'change')
+
+const EDIT = /<details class="edit"><summary class="summary svelte-[\w-]+">Edit routes<\/summary>([^]*?)<\/details>/
+
+const editing = (body: string) => body.match(EDIT)?.[1] ?? ''
+
+const address = (row: string) => row.match(/<span class="address svelte-[\w-]+">([^<]*)<\/span>/)?.[1]
 
 const tools = (row: string) =>
   [...row.matchAll(/<button class="tool svelte-[\w-]+" type="button" aria-label="([^"]+)"( disabled="")?/g)].map(
@@ -62,14 +74,14 @@ describe('Machine', () => {
 
   it('tells a refused name under the field', async () => {
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.name = 'desk'
     await edit.rename(['Desk'])
     expect(screen(machine, CONNECTED, edit)).toMatch(/<p class="error svelte-[\w-]+" id="[^"]+">another machine already has that name<\/p>/)
   })
 
   it('lists the routes in their order by address', () => {
-    const addresses = routes(screen()).map((row) => row.match(/<span class="address svelte-[\w-]+">([^<]*)<\/span>/)?.[1])
+    const addresses = routes(screen()).map(address)
     expect(addresses).toEqual(['studio.lan:9000', '192.168.1.20:9000', '100.64.0.3:9000'])
   })
 
@@ -86,8 +98,22 @@ describe('Machine', () => {
     expect(screen(studio(), { state: 'connecting' })).not.toContain('Connected')
   })
 
+  it('shows the routes as information, with no button to change them', () => {
+    const shown = screen().split('<details')[0]
+    expect(routes(shown).map(tools)).toEqual([[], [], []])
+    expect(shown).not.toContain('Add route')
+  })
+
+  it('keeps moving, removing and adding routes in Edit routes, closed until opened', () => {
+    const body = screen()
+    expect(body).not.toMatch(/<details[^>]* open/)
+    expect(changes(editing(body)).map(address)).toEqual(['studio.lan:9000', '192.168.1.20:9000', '100.64.0.3:9000'])
+    expect(changes(editing(body)).some((row) => row.includes('class="mark'))).toBe(false)
+    expect(editing(body)).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add route/)
+  })
+
   it('moves each route up or down but not past the ends, and removes any', () => {
-    expect(routes(screen()).map(tools)).toEqual([
+    expect(changes(editing(screen())).map(tools)).toEqual([
       ['Move up (off)', 'Move down', 'Remove route'],
       ['Move up', 'Move down', 'Remove route'],
       ['Move up', 'Move down (off)', 'Remove route'],
@@ -95,7 +121,7 @@ describe('Machine', () => {
   })
 
   it('never removes the last route', () => {
-    expect(routes(screen(studio([ROUTES[0]]))).map(tools)).toEqual([
+    expect(changes(editing(screen(studio([ROUTES[0]])))).map(tools)).toEqual([
       ['Move up (off)', 'Move down (off)', 'Remove route (off)'],
     ])
   })
@@ -104,23 +130,24 @@ describe('Machine', () => {
     const machine = studio()
     const refused = () =>
       Promise.resolve({ status: 'error' as const, error: { code: 'store' as const, message: 'the disk is full' } })
-    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, nothing, nothing)
+    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, nothing, nothing, quiet)
     await edit.move(ROUTES[0], 'down')
     expect(screen(machine, CONNECTED, edit)).toMatch(
-      /<\/ul>(?:<[^p][^>]*>|<!--[^>]*-->| )*<p class="problem svelte-[\w-]+" role="alert">the disk is full<\/p>/,
+      /<\/details>(?:<[^p][^>]*>|<!--[^>]*-->| )*<p class="problem svelte-[\w-]+" role="alert">the disk is full<\/p>/,
     )
   })
 
-  it('offers Add route, and opens its form with the scanner and the URL', () => {
-    expect(screen()).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add route/)
-    expect(screen()).not.toContain('Bridge URL')
+  it('opens the form for the code with Add route, outside Edit routes, which then offers it no more', () => {
+    expect(screen()).not.toContain('Machine code')
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.open()
     const body = screen(machine, CONNECTED, edit)
-    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Add route<\/h2>/)
-    expect(body).toContain('Scan QR code')
-    expect(body).toContain('Bridge URL')
+    const after = body.slice(body.indexOf('</details>'))
+    expect(after).toMatch(/<h2 class="heading svelte-[\w-]+">Scan or paste its code<\/h2>/)
+    expect(after).toContain('Scan QR code')
+    expect(after).toContain('Machine code')
+    expect(body).not.toContain('Add route')
   })
 
   it('opens with Add route open when asked to scan again', () => {
@@ -136,8 +163,10 @@ describe('Machine', () => {
         adding: true,
       },
     }).body
-    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Add route<\/h2>/)
-    expect(body).toContain('Scan QR code')
+    const after = body.slice(body.indexOf('</details>'))
+    expect(after).toMatch(/<h2 class="heading svelte-[\w-]+">Scan or paste its code<\/h2>/)
+    expect(after).toContain('Scan QR code')
+    expect(body).not.toMatch(/<details[^>]* open/)
   })
 
   it('offers deleting the machine in the tone of danger', () => {
@@ -145,9 +174,9 @@ describe('Machine', () => {
     expect(screen()).not.toContain('Delete Studio?')
   })
 
-  it('asks before deleting, with the name and what goes, instead of Add route', () => {
+  it('asks before deleting, with the name and what goes, instead of Add route and Delete machine', () => {
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.askToDelete()
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)
@@ -188,12 +217,16 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
   })
 
+  it('reloads the machines on opening, since the bridge may have told new routes', () => {
+    expect(script).toContain('onMount(() => { void onchanged() })')
+  })
+
   it('opens Add route once, on arriving to scan again', () => {
     expect(script).toContain('untrack(() => { if (adding) { edit.open() } })')
   })
 
   it('reloads the machines after each change, leaves once deleted and goes back on Back', () => {
     expect(script).toContain('() => machine, () => onchanged(), () => onremoved(),')
-    expect(script).toContain('<NavBar {backTo} title={machine.name} {onback} />')
+    expect(script).toContain('<NavBar {backTo} title={machine.name} {onback} topmost />')
   })
 })

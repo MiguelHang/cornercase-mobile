@@ -6,6 +6,7 @@ import type { ChatOf, Route } from './router.svelte'
 export type Lookups = {
   machineName: (id: number) => string | undefined
   agentRow: (chat: ChatOf) => AgentRow | null | undefined
+  listed: () => AgentRow[]
 }
 
 type Title<R extends Route> = (route: R, lookups: Lookups) => string | null
@@ -14,7 +15,7 @@ type Titles = { [N in Route['name']]?: Title<Extract<Route, { name: N }>> }
 
 const agentTitle: Title<Extract<Route, { name: 'agent' }>> = (route, lookups) => {
   const row = lookups.agentRow({ machine: route.machine, pane: route.pane })
-  return row == null ? null : label(row)
+  return row == null ? null : label(row, lookups.listed())
 }
 
 const TITLES: Titles = {

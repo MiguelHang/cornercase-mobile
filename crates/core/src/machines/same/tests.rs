@@ -9,6 +9,7 @@ const LAN: &str = "192.168.1.20";
 const TAILNET: &str = "fd7a:115c:a1e0::1";
 const GONE: &str = "10.0.0.9";
 const BOOT: &str = "2026-11-09T08:00:00Z";
+const NEW_TAILNET: &str = "100.101.102.103";
 
 fn route(host: &str, token: &str) -> Route {
     bridge(host, 8765, Some(token))
@@ -27,7 +28,12 @@ fn seen(boots: &[(u64, &str)]) -> HashMap<MachineId, String> {
 }
 
 fn same(machines: &[Machine], route: &Route, name: &str, probed: Option<&str>, boots: &[(u64, &str)]) -> Option<Same> {
-    same_machine(machines, route, name, probed, &seen(boots))
+    same_machine(machines, std::slice::from_ref(route), name, probed, &seen(boots))
+}
+
+fn same_code(machines: &[Machine], hosts: &[&str], token: &str) -> Option<Same> {
+    let routes: Vec<Route> = hosts.iter().map(|host| route(host, token)).collect();
+    same_machine(machines, &routes, "new", None, &seen(&[]))
 }
 
 fn found(id: u64, why: Why) -> Same {
@@ -39,8 +45,8 @@ mod by_address {
 
     #[test]
     fn offers_to_update_the_token_of_the_route_at_the_same_address() {
-        let same = same(&studio_and_laptop(), &route(TAILNET, OTHER_TOKEN), "new", None, &[]);
-        assert_eq!(same, Some(found(1, Why::Address)));
+        let same = same(&studio_and_laptop(), &route(LAN, OTHER_TOKEN), "new", None, &[]);
+        assert_eq!(same, Some(found(0, Why::Address)));
     }
 
     #[test]
@@ -75,6 +81,87 @@ mod by_token {
     fn skips_saved_routes_without_a_token() {
         let machines = vec![machine(0, "Studio", vec![bridge(LAN, 8765, None)])];
         assert_eq!(same(&machines, &route(GONE, TOKEN), "new", None, &[]), None);
+    }
+}
+
+mod by_tailscale {
+    use super::*;
+
+    #[rstest]
+    #[case::v6(TAILNET, 1)]
+    #[case::v4(NEW_TAILNET, 2)]
+    fn merges_by_a_tailnet_address_saved_with_another_token(#[case] host: &str, #[case] id: u64) {
+        let mut machines = studio_and_laptop();
+        machines.push(machine(2, "mini", vec![route(NEW_TAILNET, NEW_TOKEN)]));
+        assert_eq!(same_code(&machines, &[GONE, host], OTHER_TOKEN), Some(found(id, Why::Tailscale)));
+    }
+
+    #[test]
+    fn comes_before_a_lan_address_of_another_machine() {
+        let same = same_code(&studio_and_laptop(), &[LAN, TAILNET], OTHER_TOKEN);
+        assert_eq!(same, Some(found(1, Why::Tailscale)));
+    }
+}
+
+mod by_all_addresses {
+    use super::*;
+
+    fn studio() -> Vec<Machine> {
+        vec![machine(0, "Studio", vec![route(LAN, TOKEN), route(GONE, TOKEN)])]
+    }
+
+    #[test]
+    fn merges_when_every_address_of_the_code_is_saved_with_another_token() {
+        assert_eq!(same_code(&studio(), &[GONE, LAN], OTHER_TOKEN), Some(found(0, Why::AllAddresses)));
+    }
+
+    #[test]
+    fn offers_when_one_address_of_the_code_is_new() {
+        assert_eq!(same_code(&studio(), &[GONE, LAN, "10.0.0.10"], OTHER_TOKEN), Some(found(0, Why::Address)));
+    }
+
+    #[test]
+    fn offers_when_the_code_has_a_single_lan_address() {
+        assert_eq!(same_code(&studio(), &[LAN], OTHER_TOKEN), Some(found(0, Why::Address)));
+    }
+}
+
+mod codes {
+    use super::*;
+
+    #[test]
+    fn are_already_saved_when_the_machine_has_every_route_with_its_token() {
+        let machines = vec![machine(0, "Studio", vec![route(LAN, TOKEN), route(GONE, TOKEN)])];
+        assert_eq!(same_code(&machines, &[GONE, LAN], TOKEN), Some(found(0, Why::AlreadySaved)));
+    }
+
+    #[test]
+    fn merge_by_the_token_when_the_machine_misses_a_route() {
+        assert_eq!(same_code(&studio_and_laptop(), &[LAN, NEW_TAILNET], TOKEN), Some(found(0, Why::Token)));
+    }
+
+    #[test]
+    fn whose_routes_are_saved_as_two_machines_go_to_the_first_with_the_token() {
+        let machines =
+            vec![machine(0, "Studio", vec![route(LAN, TOKEN)]), machine(1, "Tailnet", vec![route(TAILNET, TOKEN)])];
+        assert_eq!(same_code(&machines, &[TAILNET, LAN], TOKEN), Some(found(0, Why::Token)));
+    }
+
+    #[test]
+    fn without_routes_match_no_saved_route() {
+        assert_eq!(same_code(&studio_and_laptop(), &[], TOKEN), None);
+    }
+
+    #[rstest]
+    #[case::already_saved(Why::AlreadySaved, true)]
+    #[case::token(Why::Token, true)]
+    #[case::tailscale(Why::Tailscale, true)]
+    #[case::all_addresses(Why::AllAddresses, true)]
+    #[case::address(Why::Address, false)]
+    #[case::boot(Why::Boot, false)]
+    #[case::name(Why::Name, false)]
+    fn merge_without_asking_only_when_the_match_is_sure(#[case] why: Why, #[case] merges: bool) {
+        assert_eq!(why.merges(), merges);
     }
 }
 
@@ -123,7 +210,7 @@ mod priority {
     use super::*;
 
     #[rstest]
-    #[case::the_address_before_the_token(route(TAILNET, TOKEN), "new", None, Some(found(1, Why::Address)))]
+    #[case::the_token_before_the_address(route(LAN, NEW_TOKEN), "new", None, Some(found(1, Why::Token)))]
     #[case::the_token_before_the_boot(route(GONE, NEW_TOKEN), "new", Some(BOOT), Some(found(1, Why::Token)))]
     #[case::the_token_before_the_name(route(GONE, NEW_TOKEN), "Studio", None, Some(found(1, Why::Token)))]
     #[case::the_boot_before_the_name(

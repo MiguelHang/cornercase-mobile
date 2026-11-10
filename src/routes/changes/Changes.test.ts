@@ -142,7 +142,7 @@ describe('Changes', () => {
 
   it('keeps the totals on one line and goes back through the bar', () => {
     const source = flat(changesSource)
-    expect(source).toContain('<NavBar {backTo} {title} {onback}> {#snippet right()}')
+    expect(source).toContain('<NavBar {backTo} {title} {onback} topmost> {#snippet right()}')
     expect(source).toContain('.totals { margin: 0; padding-right: var(--inset); font-variant-numeric: tabular-nums; white-space: nowrap; }')
   })
 })

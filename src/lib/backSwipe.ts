@@ -24,9 +24,15 @@ export type Ending = 'back' | 'settle' | 'tap' | 'none'
 
 type Sample = { x: number; at: number }
 
-const claimed = ([dx, dy]: Point): EdgeState => (dx > Math.abs(dy) ? 'claimed' : 'cancelled')
-
 const leans = ([dx, dy]: Point) => dx > LEAN * Math.abs(dy)
+
+const still = ([dx, dy]: Point) => dx === 0 && dy === 0
+
+const decided = (moved: Point): EdgeState => {
+  if (still(moved)) return 'pending'
+  if (!leans(moved)) return 'cancelled'
+  return Math.hypot(...moved) >= CLAIM ? 'claimed' : 'pending'
+}
 
 export class BackSwipe {
   #fingers = new Set<number>()
@@ -54,7 +60,7 @@ export class BackSwipe {
     this.#expire(at)
     const moved: Point = [x - this.#from[0], y - this.#from[1]]
     this.#moved = moved
-    if (this.#state === 'pending' && Math.hypot(...moved) >= CLAIM) this.#state = claimed(moved)
+    if (this.#state === 'pending') this.#state = decided(moved)
     this.#before = this.#last
     this.#last = { x, at }
     this.#shift = this.#state === 'claimed' ? Math.max(0, moved[0]) : 0

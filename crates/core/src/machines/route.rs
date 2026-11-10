@@ -17,26 +17,34 @@ pub enum Route {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum RouteError {
-    #[error("the text is not a URL")]
+    #[error("the text is not a machine code")]
     NotAUrl,
-    #[error("only ws:// routes work")]
+    #[error("the code does not start with ws://")]
     Scheme,
-    #[error("the URL has a user name or a password")]
+    #[error("the code has a user name or a password")]
     UserInfo,
-    #[error("the URL has no host")]
+    #[error("the code has no host")]
     NoHost,
-    #[error("the URL's port is not a number from 1 to 65535")]
+    #[error("the code's port is not a number from 1 to 65535")]
     Port,
-    #[error("the URL's path is not /")]
+    #[error("the code's path is not /")]
     Path,
-    #[error("the URL has no token")]
+    #[error("the code has no token")]
     NoToken,
-    #[error("the URL's token is empty")]
+    #[error("the code's token is empty")]
     EmptyToken,
-    #[error("the URL has more than one token")]
+    #[error("the code has more than one token")]
     TokenTwice,
-    #[error("the URL's token has characters other than letters, digits, - and _")]
+    #[error("the code's token has characters other than letters, digits, - and _")]
     TokenCharacters,
+    #[error("the code has an empty also= address")]
+    AlsoEmpty,
+    #[error("an also= address of the code is not a host name or an IP address without brackets")]
+    AlsoInvalid,
+    #[error("the code's name is not percent-encoded UTF-8")]
+    NameEncoding,
+    #[error("the code has more than one name")]
+    NameTwice,
 }
 
 impl Route {
@@ -130,12 +138,12 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-fn saved_address(text: &str) -> Option<Address> {
+pub(super) fn saved_address(text: &str) -> Option<Address> {
     let uri: Uri = text.parse().ok()?;
     address(&uri).ok().filter(|address| address.to_string() == text)
 }
 
-fn address(uri: &Uri) -> Result<Address, RouteError> {
+pub(super) fn address(uri: &Uri) -> Result<Address, RouteError> {
     if !uri.scheme_str().is_some_and(|scheme| scheme.eq_ignore_ascii_case("ws")) {
         return Err(RouteError::Scheme);
     }
@@ -169,19 +177,34 @@ fn path(uri: &Uri) -> Result<(), RouteError> {
     if path == "/" { Ok(()) } else { Err(RouteError::Path) }
 }
 
-fn token(query: Option<&str>) -> Result<Token, RouteError> {
-    let values: Vec<&str> = query.unwrap_or_default().split('&').filter_map(token_value).collect();
-    match values.as_slice() {
+pub(super) fn token(query: Option<&str>) -> Result<Token, RouteError> {
+    match values(query, "token").as_slice() {
         [] => Err(RouteError::NoToken),
-        [""] => Err(RouteError::EmptyToken),
-        [value] if base64url(value) => Ok(Token((*value).to_owned())),
-        [_] => Err(RouteError::TokenCharacters),
+        [value] => checked_token(value),
         _ => Err(RouteError::TokenTwice),
     }
 }
 
-fn token_value(pair: &str) -> Option<&str> {
-    pair.strip_prefix("token=").or_else(|| (pair == "token").then_some(""))
+pub(super) fn checked_token(value: &str) -> Result<Token, RouteError> {
+    if value.is_empty() {
+        Err(RouteError::EmptyToken)
+    } else if base64url(value) {
+        Ok(Token(value.to_owned()))
+    } else {
+        Err(RouteError::TokenCharacters)
+    }
+}
+
+pub(super) fn values<'a>(query: Option<&'a str>, key: &str) -> Vec<&'a str> {
+    let pairs = query.unwrap_or_default().split('&');
+    pairs.filter_map(|pair| value(pair, key)).collect()
+}
+
+fn value<'a>(pair: &'a str, key: &str) -> Option<&'a str> {
+    match pair.split_once('=') {
+        Some((name, value)) => (name == key).then_some(value),
+        None => (pair == key).then_some(""),
+    }
 }
 
 fn base64url(text: &str) -> bool {

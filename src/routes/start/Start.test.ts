@@ -215,7 +215,7 @@ describe('Start wiring', () => {
     const script = flat(startSource)
     expect(script).toContain('(started, agent) => onstarted(started, agent),')
     expect(script).toContain('(name) => oncreated(name),')
-    expect(script).toContain('<NavBar {backTo} title="Start" {onback} />')
+    expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
     expect(script).toContain('onclick={() => (action = name)}')
     expect(script).toContain("{#if action === 'agent'} <AgentForm {form} {sendable} /> {:else}")
     expect(script).toContain('{:else} <WorkspaceForm {form} {sendable} />')

@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Bytes, Error, Message, Utf8Bytes};
 
-use cornercase_core::protocol::{BridgeMessage, Refusal, USAGE_EXIT, first_message};
+use cornercase_core::protocol::{BridgeMessage, BridgeRoutes, Refusal, USAGE_EXIT, first_message};
 
 use super::{Config, Stop, log, stopped};
 use crate::allowlist;
@@ -25,6 +25,11 @@ const CLOSING: Duration = Duration::from_secs(2);
 
 type Socket = WebSocketStream<TcpStream>;
 
+enum Opened {
+    Running(Running),
+    Routes,
+}
+
 pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config, mut stop: Stop) {
     let opened = tokio::select! {
         opened = open(&mut socket, peer, config) => opened,
@@ -34,22 +39,27 @@ pub(super) async fn serve(mut socket: Socket, peer: SocketAddr, config: &Config,
         }
     };
     match opened {
-        Ok(running) => run(socket, running, peer, config, stop).await,
+        Ok(Opened::Running(running)) => return run(socket, running, peer, config, stop).await,
+        Ok(Opened::Routes) => tell_routes(&mut socket, &config.addresses).await,
         Err(refusal) => {
             log(format_args!("refused {peer}'s command: {refusal}"));
             refuse(&mut socket, refusal).await;
-            close(&mut socket, CloseCode::Normal).await;
         }
     }
+    close(&mut socket, CloseCode::Normal).await;
 }
 
-async fn open(socket: &mut Socket, peer: SocketAddr, config: &Config) -> Result<Running, Refusal> {
+async fn open(socket: &mut Socket, peer: SocketAddr, config: &Config) -> Result<Opened, Refusal> {
     let argv = first_message(&hello(socket, config.hello).await?)?;
+    if BridgeRoutes::asked(&argv) {
+        log(format_args!("{peer} asks for its routes"));
+        return Ok(Opened::Routes);
+    }
     allowlist::allowed(&argv)?;
     let running = process::spawn(&config.binary, &argv)
         .map_err(|error| Refusal::new(&format!("could not run cornercase: {error}")))?;
     log(format_args!("{peer} runs {}", command(&argv)));
-    Ok(running)
+    Ok(Opened::Running(running))
 }
 
 async fn hello(socket: &mut Socket, within: Duration) -> Result<Utf8Bytes, Refusal> {
@@ -139,7 +149,17 @@ trait Outgoing: Sink<Message, Error = Error> + Unpin {}
 impl<S: Sink<Message, Error = Error> + Unpin> Outgoing for S {}
 
 async fn refuse(sink: &mut impl Outgoing, refusal: Refusal) {
-    for message in [BridgeMessage::Stderr(refusal.message), BridgeMessage::Exit(USAGE_EXIT)] {
+    answer(sink, [BridgeMessage::Stderr(refusal.message), BridgeMessage::Exit(USAGE_EXIT)]).await;
+}
+
+async fn tell_routes(sink: &mut impl Outgoing, addresses: &[SocketAddr]) {
+    if let Ok(routes) = serde_json::to_string(&BridgeRoutes::new(addresses)) {
+        answer(sink, [BridgeMessage::Stdout(routes), BridgeMessage::Exit(0)]).await;
+    }
+}
+
+async fn answer(sink: &mut impl Outgoing, messages: [BridgeMessage; 2]) {
+    for message in messages {
         if send(sink, &message).await.is_err() {
             return;
         }

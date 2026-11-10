@@ -9,6 +9,7 @@
   let {
     row,
     backTo,
+    agents,
     below = 0,
     onback,
     onterminal,
@@ -16,6 +17,7 @@
   }: {
     row: AgentRow
     backTo: string | null
+    agents: AgentRow[]
     below?: number
     onback: () => void
     onterminal: (row: AgentRow) => void
@@ -39,7 +41,7 @@
   {#snippet center()}
     <div class="short" class:compact aria-hidden="true">
       <StatusDot status={row.status} />
-      <span class="called">{label(row)}</span>
+      <span class="called">{label(row, agents)}</span>
       <span class="state">{statusName(row.status)}</span>
     </div>
   {/snippet}
@@ -61,7 +63,7 @@
 <header class="head" bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
   <div class="lines">
-    <h1 class="title">{label(row)}</h1>
+    <h1 class="title">{label(row, agents)}</h1>
     <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
   </div>
 </header>

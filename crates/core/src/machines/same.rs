@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::hash::BuildHasher;
 
 use super::name::folded;
-use super::route::Route;
-use super::{Machine, MachineId};
+use super::route::{Address, Route};
+use super::{Machine, MachineId, tailscale};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Same {
@@ -13,38 +13,61 @@ pub struct Same {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Why {
-    Address,
+    AlreadySaved,
     Token,
+    Tailscale,
+    AllAddresses,
+    Address,
     Boot,
     Name,
-    AlreadySaved,
+}
+
+impl Why {
+    pub fn merges(self) -> bool {
+        matches!(self, Self::AlreadySaved | Self::Token | Self::Tailscale | Self::AllAddresses)
+    }
 }
 
 pub fn same_machine<S: BuildHasher>(
     machines: &[Machine],
-    route: &Route,
+    routes: &[Route],
     name: &str,
     probed_boot: Option<&str>,
     seen_boots: &HashMap<MachineId, String, S>,
 ) -> Option<Same> {
-    by_address(machines, route)
-        .or_else(|| by_token(machines, route))
+    already_saved(machines, routes)
+        .or_else(|| by_token(machines, routes))
+        .or_else(|| by_address(machines, routes, Why::Tailscale, tailscale))
+        .or_else(|| by_all_addresses(machines, routes))
+        .or_else(|| by_address(machines, routes, Why::Address, |_| true))
         .or_else(|| by_boot(machines, probed_boot?, seen_boots))
         .or_else(|| by_name(machines, name))
 }
 
-fn by_address(machines: &[Machine], route: &Route) -> Option<Same> {
-    machines.iter().find_map(|machine| {
-        let saved = machine.routes.iter().find(|saved| saved.address() == route.address())?;
-        let token = saved.token();
-        let why = if token.is_some() && token == route.token() { Why::AlreadySaved } else { Why::Address };
-        Some(Same { machine: machine.id, why })
+fn already_saved(machines: &[Machine], routes: &[Route]) -> Option<Same> {
+    first(machines, Why::AlreadySaved, |machine| {
+        !routes.is_empty() && routes.iter().all(|route| route.has_token() && machine.routes.contains(route))
     })
 }
 
-fn by_token(machines: &[Machine], route: &Route) -> Option<Same> {
-    let token = route.token()?;
-    first(machines, Why::Token, |machine| machine.routes.iter().any(|saved| saved.token() == Some(token)))
+fn by_token(machines: &[Machine], routes: &[Route]) -> Option<Same> {
+    let tokens: Vec<_> = routes.iter().filter_map(Route::token).collect();
+    first(machines, Why::Token, |machine| {
+        machine.routes.iter().filter_map(Route::token).any(|token| tokens.contains(&token))
+    })
+}
+
+fn by_address(machines: &[Machine], routes: &[Route], why: Why, counts: impl Fn(&Address) -> bool) -> Option<Same> {
+    first(machines, why, |machine| {
+        routes.iter().map(Route::address).any(|address| counts(address) && has(machine, address))
+    })
+}
+
+fn by_all_addresses(machines: &[Machine], routes: &[Route]) -> Option<Same> {
+    if routes.len() < 2 {
+        return None;
+    }
+    first(machines, Why::AllAddresses, |machine| routes.iter().all(|route| has(machine, route.address())))
 }
 
 fn by_boot<S: BuildHasher>(
@@ -58,6 +81,10 @@ fn by_boot<S: BuildHasher>(
 fn by_name(machines: &[Machine], name: &str) -> Option<Same> {
     let wanted = folded(name);
     first(machines, Why::Name, |machine| folded(&machine.name) == wanted)
+}
+
+fn has(machine: &Machine, address: &Address) -> bool {
+    machine.routes.iter().any(|saved| saved.address() == address)
 }
 
 fn first(machines: &[Machine], why: Why, matches: impl Fn(&Machine) -> bool) -> Option<Same> {

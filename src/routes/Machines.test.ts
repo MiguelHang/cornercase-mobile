@@ -180,12 +180,16 @@ describe('Machines wiring', () => {
 
   it('probes the others on opening, and the one that stops being active, without tracking the probes', () => {
     expect(script).toContain('void probes.open( machines.map(({ id }) => id), active, ) void device.load()')
+  })
+
+  it('reloads the machines on opening, since the bridge may have told new routes', () => {
+    expect(script).toContain('onMount(() => { onrouted() void probes.open(')
     expect(script).toContain('$effect(() => { const now = active untrack(() => void probes.follow(now)) })')
   })
 
   it('connects to the one picked, probes one again on Check again, and goes back on Back', () => {
     expect(script).toContain('onpick={() => onpick(machine.id)} oncheck={() => void probes.check([machine.id])}')
-    expect(script).toContain('<NavBar {backTo} title="Machines" {onback} />')
+    expect(script).toContain('<NavBar {backTo} title="Machines" {onback} topmost />')
     expect(flat(rowSource)).toContain(
       '{:else if !active} <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button> {/if}',
     )
@@ -220,7 +224,9 @@ describe('Machines wiring', () => {
 
   it('swaps Add machine for the form, closing it once a machine is added', () => {
     expect(script).toContain('const added = (machine: number) => { adding = false onadded(machine) }')
-    expect(script).toContain('<MachineForm onadded={added} onrouted={routed} oncancel={() => (adding = false)} />')
+    expect(script).toContain(
+      '<MachineForm taken={machines.map((machine) => machine.name)} onadded={added} onrouted={routed} oncancel={() => (adding = false)} />',
+    )
     expect(script).toContain('<Button onclick={() => (adding = true)}>Add machine</Button>')
   })
 })
