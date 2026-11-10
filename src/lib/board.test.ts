@@ -279,6 +279,11 @@ describe('items while searching', () => {
     ])
   })
 
+  it('stops climbing when two agents name each other as parent', () => {
+    const loop = [agent(1, 'working', { parent: 2 }), agent(2, 'working', { parent: 1 })]
+    expect(board.items(loop, undefined, 'agent')).toEqual([])
+  })
+
   it('lists nothing when nothing matches', () => {
     expect(board.items(TEAM, new Set([5]), 'billing')).toEqual([])
   })

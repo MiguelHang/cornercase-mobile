@@ -189,7 +189,7 @@ describe('Board', () => {
     const body = draw(BRANCH)
     expect(titles(body)).toEqual(['Lead'])
     expect(body).toMatch(/<span class="hidden svelte-[\w-]+">\+2<\/span>/)
-    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true">/)
+    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true" style="gap: 4px;">/)
     expect(body).toMatch(/aria-label="Waiting" width="10" height="10"/)
     expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', undefined, '180', CHEVRON_RIGHT]])
   })
@@ -275,7 +275,8 @@ describe('Board', () => {
     expect(body.indexOf('<span class="folded', count)).toBeGreaterThan(count)
     expect(count).toBeLessThan(body.indexOf('<button class="row'))
     expect(flat(rowSource)).toContain('.count { position: absolute; left: 24px; pointer-events: none; }')
-    expect(flat(rowSource)).toContain('.count :global(.marks) { gap: 4px; }')
+    expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} gap="4px" />')
+    expect(flat(rowSource)).not.toContain(':global(.marks)')
   })
 
   it('leaves only the time on the right edge, and lets it shrink when the row runs out of room', () => {

@@ -119,9 +119,16 @@ const sectionItems = (made: Tree, section: Section, walk: Walk): Item[] => {
 }
 
 const pruned = (rows: AgentRow[], wanted: string[]) => {
-  const made = tree(rows, NO_PANES)
-  const hit = (agent: AgentRow) => [agent, ...descendants(made, agent)].some((one) => matches(one, wanted))
-  return rows.filter(hit)
+  const panes = new Map(rows.map((agent) => [agent.pane, agent]))
+  const kept = new Set<number>()
+  const keep = (agent: AgentRow | undefined) => {
+    if (agent !== undefined && !kept.has(agent.pane)) {
+      kept.add(agent.pane)
+      keep(agent.parent === null ? undefined : panes.get(agent.parent))
+    }
+  }
+  rows.filter((agent) => matches(agent, wanted)).forEach(keep)
+  return rows.filter((agent) => kept.has(agent.pane))
 }
 
 const closed = (made: Tree, agent: AgentRow) => {

@@ -42,7 +42,7 @@
         </span>
       </button>
       <span class="count">
-        <Hidden hidden={item.hidden} attention={item.attention} />
+        <Hidden hidden={item.hidden} attention={item.attention} gap="4px" />
       </span>
     {/if}
   </div>
@@ -111,10 +111,6 @@
     position: absolute;
     left: 24px;
     pointer-events: none;
-  }
-
-  .count :global(.marks) {
-    gap: 4px;
   }
 
   .chevron {

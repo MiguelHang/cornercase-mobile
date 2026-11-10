@@ -25,6 +25,13 @@ describe('BoardSearch', () => {
     expect([made.query(1), made.query(2)]).toEqual(['', 'shop'])
   })
 
+  it('shows a machine its query again when it comes back before another writes', () => {
+    const made = new BoardSearch()
+    made.write(1, 'login')
+    const away = made.query(2)
+    expect([away, made.query(1)]).toEqual(['', 'login'])
+  })
+
   it('leaves the query empty once cleared', () => {
     const made = new BoardSearch()
     made.write(1, 'login')
