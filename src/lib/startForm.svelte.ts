@@ -7,9 +7,13 @@ import type {
   Started_Serialize as Started,
   commands,
 } from './bindings'
+import type { StartingIssue } from './router.svelte'
 import { messageOf } from './toasts'
 
-export type StartCalls = Pick<typeof commands, 'startProjects' | 'installedAgents' | 'startAgent' | 'newWorkspace'>
+export type StartCalls = Pick<
+  typeof commands,
+  'startProjects' | 'installedAgents' | 'startAgent' | 'startIssue' | 'newWorkspace'
+>
 
 export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; items: T[] }
 
@@ -62,6 +66,8 @@ export class StartForm {
   worktree = $state('')
   name = $state('')
   ownWorktree = $state(false)
+  issue = $state.raw<StartingIssue | null>(null)
+  branch = $state('')
   projectError = $state<string | null>(null)
   agentError = $state<string | null>(null)
   promptError = $state<string | null>(null)
@@ -89,8 +95,18 @@ export class StartForm {
     this.#memory = memory
   }
 
+  get issueBranch() {
+    return this.issue?.issue.branch ?? ''
+  }
+
   get noAgents() {
     return this.agents.kind === 'ready' && this.agents.items.length === 0
+  }
+
+  forIssue(issue: StartingIssue) {
+    this.issue = issue
+    this.project = issue.project
+    this.branch = issue.issue.branch
   }
 
   async load() {
@@ -157,7 +173,27 @@ export class StartForm {
       return
     }
     const form = { project, agent, model, prompt, worktree }
-    const reply = await this.#send(() => this.#calls.startAgent(form), AGENT_UNANSWERED)
+    await this.#launch(() => this.#calls.startAgent(form), agent)
+  }
+
+  async startIssue() {
+    const issue = this.issue
+    if (this.sending || issue === null) {
+      return
+    }
+    this.agentError = errorIf(this.agent === '', AGENT_EMPTY)
+    this.formError = null
+    const { agent, model, branch, issueBranch } = this
+    if (this.agentError !== null) {
+      return
+    }
+    const { key, source } = issue.issue
+    const form = { project: issue.project, agent, model, key, source, branch, issue_branch: issueBranch }
+    await this.#launch(() => this.#calls.startIssue(form), agent)
+  }
+
+  async #launch(call: () => Promise<Answer<Started>>, agent: string) {
+    const reply = await this.#send(call, AGENT_UNANSWERED)
     if (reply.ok) {
       this.#memory.agent = agent
       this.#onstarted(reply.data, agent)
@@ -195,7 +231,7 @@ export class StartForm {
   }
 
   #pickProject() {
-    if (this.projects.kind !== 'ready') {
+    if (this.projects.kind !== 'ready' || this.issue !== null) {
       return
     }
     const items = this.projects.items

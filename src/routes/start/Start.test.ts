@@ -23,6 +23,7 @@ const CALLS: StartCalls = {
   startProjects: () => answer({ boot: 'boot-1', projects: [{ id: 1, name: 'web' }, { id: 2, name: 'api' }] }),
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
+  startIssue: never,
   newWorkspace: never,
 }
 

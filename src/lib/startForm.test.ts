@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
   CommandError,
+  IssueInfo_Serialize as IssueInfo,
   ProjectChoice,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
@@ -45,6 +46,7 @@ const calls = (overrides: Partial<StartCalls> = {}) => ({
   startProjects: vi.fn(overrides.startProjects ?? (() => ok(choices([project(1), project(2)])))),
   installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
+  startIssue: vi.fn(overrides.startIssue ?? (() => ok(STARTED))),
   newWorkspace: vi.fn(overrides.newWorkspace ?? (() => ok(STARTED))),
 })
 
@@ -71,6 +73,27 @@ const filled = async (overrides: Partial<StartCalls> = {}) => {
   built.form.name = 'login'
   return built
 }
+
+const TICKET: IssueInfo = {
+  source: 'shortcut',
+  key: 'sc-7',
+  title: 'Refunds round the wrong way',
+  state: 'In Progress',
+  closed: false,
+  labels: [],
+  author: 'ada',
+  updated_at: '2026-11-08T17:02:11Z',
+  branch: 'ada/sc-7/refunds',
+}
+
+const fromIssue = async (overrides: Partial<StartCalls> = {}, memory: Memory = { agent: null }) => {
+  const built = made(overrides, memory)
+  built.form.forIssue({ project: 9, issue: TICKET, prompt: 'Work on sc-7: Refunds round the wrong way' })
+  await built.form.load()
+  return built
+}
+
+const issueFields = (form: StartForm) => [form.project, form.agent, form.model, form.branch]
 
 const typed = (form: StartForm) => ({
   project: form.project,
@@ -347,5 +370,90 @@ describe('StartForm create', () => {
     await form.create()
     expect(form.formError).toBe(WORKSPACE_UNANSWERED)
     expect(commands.newWorkspace).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('StartForm from an issue', () => {
+  const sent = (branch: string, agent = 'claude', model = '') => ({
+    project: 9,
+    agent,
+    model,
+    key: 'sc-7',
+    source: 'shortcut',
+    branch,
+    issue_branch: 'ada/sc-7/refunds',
+  })
+
+  it("keeps the issue's project and fills the branch with the issue's, leaving the model empty", async () => {
+    const { form } = await fromIssue({ startProjects: () => ok(choices([project(5)])) }, { agent: 'codex' })
+    expect(issueFields(form)).toEqual([9, 'codex', '', 'ada/sc-7/refunds'])
+    expect(form.issueBranch).toBe('ada/sc-7/refunds')
+    expect(form.issue?.prompt).toBe('Work on sc-7: Refunds round the wrong way')
+  })
+
+  it.each<[string, string, string]>([
+    ["the issue's branch", 'ada/sc-7/refunds', 'ada/sc-7/refunds'],
+    ['a branch typed over it', 'refunds-fix', 'refunds-fix'],
+  ])('sends the issue from its tracker with %s, remembering the agent', async (_, branch, expected) => {
+    const { form, commands, onstarted, memory } = await fromIssue()
+    form.agent = 'codex'
+    form.model = 'gpt-5'
+    form.branch = branch
+    await form.startIssue()
+    expect(commands.startIssue.mock.calls).toEqual([[sent(expected, 'codex', 'gpt-5')]])
+    expect(commands.startAgent).not.toHaveBeenCalled()
+    expect(onstarted.mock.calls).toEqual([[STARTED, 'codex']])
+    expect(memory.agent).toBe('codex')
+  })
+
+  it('needs no prompt but refuses no agent under its field without sending', async () => {
+    const { form, commands } = await fromIssue()
+    form.agent = ''
+    await form.startIssue()
+    expect([form.agentError, form.promptError]).toEqual([AGENT_EMPTY, null])
+    expect(commands.startIssue).not.toHaveBeenCalled()
+  })
+
+  it('keeps every field and shows what the server says', async () => {
+    const { form, onstarted, memory } = await fromIssue({ startIssue: () => failed('no issue sc-7 in Shortcut') })
+    form.branch = 'refunds-fix'
+    await form.startIssue()
+    expect(issueFields(form)).toEqual([9, 'claude', '', 'refunds-fix'])
+    expect([form.formError, form.sending, memory.agent]).toEqual(['no issue sc-7 in Shortcut', false, null])
+    expect(onstarted).not.toHaveBeenCalled()
+  })
+
+  it('clears what the server said once the agent is right', async () => {
+    const answers = [failed('refused'), ok(STARTED)]
+    const { form } = await fromIssue({ startIssue: () => answers.shift() ?? ok(STARTED) })
+    await form.startIssue()
+    await form.startIssue()
+    expect([form.agentError, form.formError]).toEqual([null, null])
+  })
+
+  it('says the agent may have started when the request is left unanswered, and does not try again', async () => {
+    const { form, commands } = await fromIssue({ startIssue: () => refused(UNANSWERED) })
+    await form.startIssue()
+    expect([form.formError, form.sending]).toEqual([AGENT_UNANSWERED, false])
+    expect(commands.startIssue).toHaveBeenCalledTimes(1)
+  })
+
+  it('cannot be sent again while it waits', async () => {
+    const answer = gate<{ status: 'ok'; data: Started }>()
+    const { form, commands } = await fromIssue({ startIssue: () => answer.promise })
+    const first = form.startIssue()
+    expect(form.sending).toBe(true)
+    await form.startIssue()
+    await form.start()
+    answer.open({ status: 'ok', data: STARTED })
+    await first
+    expect([commands.startIssue.mock.calls.length, commands.startAgent.mock.calls.length]).toEqual([1, 0])
+  })
+
+  it('sends nothing without an issue', async () => {
+    const { form, commands } = await filled()
+    await form.startIssue()
+    expect([form.agentError, form.formError, form.sending]).toEqual([null, null, false])
+    expect(commands.startIssue).not.toHaveBeenCalled()
   })
 })
