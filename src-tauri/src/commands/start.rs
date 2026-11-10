@@ -53,7 +53,10 @@ pub(crate) async fn run(state: &AppState, argv: Vec<String>) -> Result<Started, 
     answered(queue.ask(argv, None).await, start::started)
 }
 
-fn answered<T>(outcome: Result<Outcome, Error>, read: fn(&str) -> Result<T, Error>) -> Result<T, CommandError> {
+pub(crate) fn answered<T>(
+    outcome: Result<Outcome, Error>,
+    read: fn(&str) -> Result<T, Error>,
+) -> Result<T, CommandError> {
     match outcome {
         Ok(Outcome::Done(text)) => Ok(read(&text)?),
         Ok(Outcome::Skipped) => Err(CommandError::not_sent()),
