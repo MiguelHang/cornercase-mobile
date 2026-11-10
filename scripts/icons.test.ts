@@ -46,7 +46,7 @@ function png(path: string): Png {
   const height = data.readUInt32BE(20)
   const colorType = data[25]
   const channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[colorType]
-  if (channels === undefined || data[24] !== 8) throw new Error(`unsupported png ${path}`)
+  if (channels === undefined || data[24] !== 8 || data[28] !== 0) throw new Error(`unsupported png ${path}`)
   const stride = width * channels
   const pixels = unfilter(inflateSync(idatOf(data)), stride, height, channels)
   const rgba = (x: number, y: number) => {
@@ -57,6 +57,10 @@ function png(path: string): Png {
     return [pixels[at], pixels[at], pixels[at], 255]
   }
   return { width, height, colorType, rgba }
+}
+
+function near(rgba: number[], rgb: number[]) {
+  rgba.slice(0, 3).forEach((channel, i) => expect(Math.abs(channel - rgb[i])).toBeLessThanOrEqual(4))
 }
 
 function pixelsOf(image: Png) {
@@ -132,8 +136,11 @@ describe('android icon', () => {
 
   it('leaves no template drawable behind', () => {
     const drawables = readdirSync(res).filter((name) => name.startsWith('drawable'))
-    for (const dir of drawables) expect(readdirSync(join(res, dir))).not.toContain('ic_launcher_background.xml')
-    expect(readdirSync(res)).not.toContain('drawable-v24')
+    for (const dir of drawables) {
+      const names = readdirSync(join(res, dir))
+      expect(names).not.toContain('ic_launcher_background.xml')
+      expect(names).not.toContain('ic_launcher_foreground.xml')
+    }
   })
 
   it('keeps the foreground inside the safe zone: 132 px of 432 from the centre', () => {
@@ -148,9 +155,8 @@ describe('android icon', () => {
     for (const name of ['ic_launcher.png', 'ic_launcher_round.png']) {
       const image = png(join(res, `mipmap-${density}`, name))
       const middle = Math.floor(image.width / 2)
-      expect(image.rgba(middle, Math.floor(image.height * 0.3)).slice(0, 3)).not.toEqual([0x0c, 0x0e, 0x11])
-      const cursor = image.rgba(Math.floor(image.width * 0.54), Math.floor(image.height * 0.62)).slice(0, 3)
-      cursor.forEach((channel, i) => expect(Math.abs(channel - [0xec, 0xee, 0xf1][i])).toBeLessThanOrEqual(4))
+      near(image.rgba(middle, Math.floor(image.height * 0.3)), [0x00, 0x5f, 0xff])
+      near(image.rgba(Math.floor(image.width * 0.54), Math.floor(image.height * 0.62)), [0xec, 0xee, 0xf1])
     }
   })
 })
