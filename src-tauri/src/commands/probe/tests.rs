@@ -11,7 +11,7 @@ use super::*;
 use crate::commands::connection::start;
 use crate::commands::error::ErrorCode;
 use crate::commands::machines::list;
-use crate::commands::routes::add_route;
+use crate::commands::routes::merge;
 use crate::test_util::{
     ADDRESS, BOOT, BRIDGE, CONTRACT, Ipc, Recorder, Studio, contracted, launcher, route, serving, settle, snapshot,
 };
@@ -42,7 +42,7 @@ fn asleep() -> Error {
 
 fn with_the_laptop() -> Studio {
     let studio = Studio::new();
-    add_route(&studio.state, Recorder::default(), &answering(contracted(BOOT), Err(asleep())), studio.id, LAPTOP)
+    merge(&studio.state, Recorder::default(), &answering(contracted(BOOT), Err(asleep())), studio.id, LAPTOP)
         .expect("the laptop route is added");
     studio
 }
@@ -217,7 +217,7 @@ mod matching_a_url {
     async fn merges_into_the_machine_it_surely_is_without_asking_the_url(#[case] code: &str) {
         let studio = with_the_laptop();
         let launcher = answering(contracted(BOOT), Err(asleep()));
-        add_route(&studio.state, Recorder::default(), &launcher, studio.id, TAILSCALE)
+        merge(&studio.state, Recorder::default(), &launcher, studio.id, TAILSCALE)
             .expect("the tailscale route is added");
         let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), code, "desk").await;
         let found = MatchFound::Merge { machine: studio.id.0, name: "studio".to_owned() };

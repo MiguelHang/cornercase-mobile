@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { CommandError, MachineView_Serialize } from './bindings'
+import type { CommandError, MachineView_Serialize, MergeView } from './bindings'
 import { EditMachine, type EditCalls } from './editMachine.svelte'
 import { NAME_EMPTY, NAME_TAKEN, NO_TOKEN } from './machineForm'
 
@@ -14,19 +14,23 @@ const studio = (routes = ROUTES): MachineView_Serialize => ({
   last_route: null,
 })
 
-const done = () => Promise.resolve({ status: 'ok' as const, data: null })
+const MERGED: MergeView = { added: ['ws://100.64.0.3:9000/'], token_updated: false, skipped: [] }
+
+const ok = <T>(data: T) => Promise.resolve({ status: 'ok' as const, data })
+
+const done = () => ok(null)
 
 const refused = (error: CommandError) => Promise.resolve({ status: 'error' as const, error })
 
-const gate = () => {
+const gate = <T>(data: T) => {
   let open: () => void = () => {}
   const promise = new Promise<void>((resolve) => (open = resolve))
-  return { promise: promise.then(() => ({ status: 'ok' as const, data: null })), open }
+  return { promise: promise.then(() => ({ status: 'ok' as const, data })), open }
 }
 
 const calls = (overrides: Partial<EditCalls> = {}) => ({
   machineRename: vi.fn(overrides.machineRename ?? done),
-  machineRouteAdd: vi.fn(overrides.machineRouteAdd ?? done),
+  machineMerge: vi.fn(overrides.machineMerge ?? (() => ok(MERGED))),
   machineRouteRemove: vi.fn(overrides.machineRouteRemove ?? done),
   machineRouteMove: vi.fn(overrides.machineRouteMove ?? done),
   machineRemove: vi.fn(overrides.machineRemove ?? done),
@@ -36,8 +40,9 @@ const editor = (overrides: Partial<EditCalls> = {}, machine = studio()) => {
   const commands = calls(overrides)
   const onchanged = vi.fn(() => Promise.resolve())
   const onremoved = vi.fn(() => Promise.resolve())
-  const edit = new EditMachine(commands, () => machine, onchanged, onremoved)
-  return { edit, commands, onchanged, onremoved }
+  const tell = vi.fn()
+  const edit = new EditMachine(commands, () => machine, onchanged, onremoved, tell)
+  return { edit, commands, onchanged, onremoved, tell }
 }
 
 describe('EditMachine renaming', () => {
@@ -120,7 +125,7 @@ describe('EditMachine routes', () => {
   })
 
   it('holds every change while one runs, until the machines are reloaded', async () => {
-    const pending = gate()
+    const pending = gate(null)
     const { edit, commands } = editor({ machineRouteMove: () => pending.promise })
     const moving = edit.move(ROUTES[0], 'down')
     expect(edit.busy).toBe(true)
@@ -131,7 +136,7 @@ describe('EditMachine routes', () => {
     edit.url = URL_TEXT
     await edit.addRoute()
     expect(commands.machineRouteMove).toHaveBeenCalledOnce()
-    expect([commands.machineRename, commands.machineRouteRemove, commands.machineRouteAdd].map((call) => call.mock.calls.length)).toEqual([0, 0, 0])
+    expect([commands.machineRename, commands.machineRouteRemove, commands.machineMerge].map((call) => call.mock.calls.length)).toEqual([0, 0, 0])
     pending.open()
     await moving
     expect(edit.busy).toBe(false)
@@ -139,21 +144,32 @@ describe('EditMachine routes', () => {
 })
 
 describe('EditMachine adding a route', () => {
-  it('adds the URL pasted, then closes the form and reloads the machines', async () => {
-    const { edit, commands, onchanged } = editor()
+  it('adds the URL pasted, says what changed, then closes the form and reloads the machines', async () => {
+    const { edit, commands, onchanged, tell } = editor()
     edit.open()
     edit.url = ` ${URL_TEXT}\n`
     await edit.addRoute()
-    expect(commands.machineRouteAdd.mock.calls).toEqual([[3, URL_TEXT]])
+    expect(commands.machineMerge.mock.calls).toEqual([[3, URL_TEXT]])
+    expect(tell.mock.calls).toEqual([[{ level: 'info', message: 'Studio: 1 route added.' }]])
     expect(onchanged).toHaveBeenCalledOnce()
     expect([edit.adding, edit.url]).toEqual([false, ''])
+  })
+
+  it.each<[string, MergeView, string]>([
+    ['left to the machine that has it', { added: [], token_updated: false, skipped: [URL_TEXT] }, 'Studio: 1 route left to another machine.'],
+    ['already there', { added: [], token_updated: false, skipped: [] }, 'Studio: nothing to add.'],
+  ])('says so when the address is %s, instead of closing the form in silence', async (_, merged, message) => {
+    const { edit, tell } = editor({ machineMerge: () => ok(merged) })
+    edit.open()
+    await edit.fill(URL_TEXT)
+    expect([tell.mock.calls, edit.adding]).toEqual([[[{ level: 'info', message }]], false])
   })
 
   it('adds the URL scanned', async () => {
     const { edit, commands } = editor()
     edit.open()
     await edit.fill(URL_TEXT)
-    expect(commands.machineRouteAdd.mock.calls).toEqual([[3, URL_TEXT]])
+    expect(commands.machineMerge.mock.calls).toEqual([[3, URL_TEXT]])
     expect(edit.adding).toBe(false)
   })
 
@@ -162,7 +178,7 @@ describe('EditMachine adding a route', () => {
     const { edit, commands, onchanged } = editor()
     edit.open()
     await edit.fill(code)
-    expect([commands.machineRouteAdd.mock.calls, edit.urlError, edit.adding]).toEqual([[[3, code]], null, false])
+    expect([commands.machineMerge.mock.calls, edit.urlError, edit.adding]).toEqual([[[3, code]], null, false])
     expect(onchanged).toHaveBeenCalledOnce()
   })
 
@@ -172,14 +188,14 @@ describe('EditMachine adding a route', () => {
     edit.url = 'ws://100.64.0.3:9000/'
     await edit.addRoute()
     expect([edit.urlError, edit.adding]).toEqual([NO_TOKEN, true])
-    expect(commands.machineRouteAdd).not.toHaveBeenCalled()
+    expect(commands.machineMerge).not.toHaveBeenCalled()
   })
 
   it.each<[string, CommandError, 'urlError' | 'formError']>([
     ['a route error under the field', { code: 'route_empty_token', message: 'the token is empty' }, 'urlError'],
     ['any other under the page', { code: 'secrets', message: 'the keychain is locked' }, 'formError'],
   ])('puts %s, keeping the form open', async (_, error, field) => {
-    const { edit, onchanged } = editor({ machineRouteAdd: () => refused(error) })
+    const { edit, onchanged } = editor({ machineMerge: () => refused(error) })
     edit.open()
     await edit.fill(URL_TEXT)
     expect(edit[field]).toBe(error.message)
@@ -187,8 +203,8 @@ describe('EditMachine adding a route', () => {
   })
 
   it('closes the form clearing what was typed, but not while adding', async () => {
-    const pending = gate()
-    const { edit } = editor({ machineRouteAdd: () => pending.promise })
+    const pending = gate(MERGED)
+    const { edit } = editor({ machineMerge: () => pending.promise })
     edit.open()
     const adding = edit.fill(URL_TEXT)
     edit.close()
@@ -241,7 +257,7 @@ describe('EditMachine deleting', () => {
   })
 
   it('neither asks nor cancels while a change runs', async () => {
-    const pending = gate()
+    const pending = gate(null)
     const { edit } = editor({ machineRemove: () => pending.promise })
     edit.askToDelete()
     const deleting = edit.deleteMachine()
@@ -249,7 +265,7 @@ describe('EditMachine deleting', () => {
     expect(edit.deleting).toBe(true)
     pending.open()
     await deleting
-    const moved = gate()
+    const moved = gate(null)
     const other = editor({ machineRouteMove: () => moved.promise })
     const moving = other.edit.move(ROUTES[0], 'down')
     other.edit.askToDelete()

@@ -193,7 +193,6 @@ describe('scanning a QR code', () => {
       {
         machineAdd: add,
         machineMatch: () => Promise.resolve({ status: 'ok', data: { found: { kind: 'none' }, checked: true } }),
-        machineRouteAdd: () => Promise.resolve({ status: 'ok', data: null }),
         machineMerge: () => Promise.resolve({ status: 'ok', data: { added: [], token_updated: false, skipped: [] } }),
       },
       onadded,

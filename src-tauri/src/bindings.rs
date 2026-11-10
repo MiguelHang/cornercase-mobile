@@ -10,7 +10,6 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
         machines::machine_add,
         machines::machine_remove::<Wry>,
         machines::machine_rename,
-        routes::machine_route_add::<Wry>,
         routes::machine_merge::<Wry>,
         routes::machine_route_remove::<Wry>,
         routes::machine_route_move,

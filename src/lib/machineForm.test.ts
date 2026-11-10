@@ -184,6 +184,10 @@ describe('mergedText', () => {
   ])('tells %s', (_, view, text) => {
     expect(form.mergedText('MacBook', view)).toBe(text)
   })
+
+  it("tells the same of a route added from the machine's own screen, naming it alone", () => {
+    expect(form.routesText('Studio', merged(0, false, 1))).toBe('Studio: 1 route left to another machine.')
+  })
 })
 
 describe('the texts of adding a machine', () => {

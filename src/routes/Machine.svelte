@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import { commands, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
+  import { commands, events, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
   import { routeAddress } from '../lib/connection'
   import { EditMachine } from '../lib/editMachine.svelte'
   import Button from '../lib/ui/Button.svelte'
@@ -22,6 +22,7 @@
       () => machine,
       () => onchanged(),
       () => onremoved(),
+      (toast) => void events.toast.emit(toast),
     ),
   }: {
     machine: MachineView_Serialize

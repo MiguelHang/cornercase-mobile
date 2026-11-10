@@ -15,18 +15,6 @@ use crate::view::MergeView;
 #[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machine_route_add<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, AppState>,
-    id: u64,
-    code: String,
-) -> Result<(), CommandError> {
-    add_route(&state, app, &Launcher::bridge(), MachineId(id), &code)
-}
-
-#[tauri::command(async)]
-#[specta::specta]
-#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn machine_merge<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
@@ -58,16 +46,6 @@ pub(crate) fn machine_route_move(
     direction: Direction,
 ) -> Result<(), CommandError> {
     move_route(&state, MachineId(id), &url, direction)
-}
-
-pub(crate) fn add_route(
-    state: &AppState,
-    emit: impl Emit,
-    launcher: &Launcher,
-    id: MachineId,
-    code: &str,
-) -> Result<(), CommandError> {
-    merge(state, emit, launcher, id, code).map(drop)
 }
 
 pub(crate) fn merge(

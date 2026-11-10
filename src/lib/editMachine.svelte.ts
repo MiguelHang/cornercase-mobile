@@ -1,10 +1,10 @@
 import { ERRORS, send, type Answer } from './addMachine.svelte'
-import type { Direction, MachineView_Serialize, commands } from './bindings'
-import { checkName, checkUrl, type Field } from './machineForm'
+import type { Direction, MachineView_Serialize, MergeView, Toast, commands } from './bindings'
+import { checkName, checkUrl, routesText, type Field } from './machineForm'
 
 export type EditCalls = Pick<
   typeof commands,
-  'machineRename' | 'machineRouteAdd' | 'machineRouteRemove' | 'machineRouteMove' | 'machineRemove'
+  'machineRename' | 'machineMerge' | 'machineRouteRemove' | 'machineRouteMove' | 'machineRemove'
 >
 
 export class EditMachine {
@@ -20,17 +20,20 @@ export class EditMachine {
   #machine: () => MachineView_Serialize
   #onchanged: () => Promise<unknown>
   #onremoved: () => Promise<unknown>
+  #tell: (toast: Toast) => void
 
   constructor(
     calls: EditCalls,
     machine: () => MachineView_Serialize,
     onchanged: () => Promise<unknown>,
     onremoved: () => Promise<unknown>,
+    tell: (toast: Toast) => void,
   ) {
     this.#calls = calls
     this.#machine = machine
     this.#onchanged = onchanged
     this.#onremoved = onremoved
+    this.#tell = tell
     this.name = machine().name
   }
 
@@ -83,7 +86,11 @@ export class EditMachine {
       this.urlError = url.error
       return
     }
-    if (await this.#run(() => this.#calls.machineRouteAdd(this.#machine().id, url.url), 'url')) {
+    const machine = this.#machine()
+    const added = await this.#run(() => this.#calls.machineMerge(machine.id, url.url), 'url', (merged) =>
+      this.#merged(machine.name, merged),
+    )
+    if (added) {
       this.close()
     }
   }
@@ -114,7 +121,12 @@ export class EditMachine {
     }
   }
 
-  async #run(call: () => Promise<Answer<null>>, own: Field, after = this.#onchanged) {
+  #merged(name: string, merged: MergeView) {
+    this.#tell({ level: 'info', message: routesText(name, merged) })
+    return this.#onchanged()
+  }
+
+  async #run<T>(call: () => Promise<Answer<T>>, own: Field, after: (data: T) => Promise<unknown> = this.#onchanged) {
     this.busy = true
     this.nameError = null
     this.urlError = null
@@ -122,7 +134,7 @@ export class EditMachine {
     const outcome = await send(call)
     if (outcome.kind === 'done') {
       try {
-        await after()
+        await after(outcome.data)
       } finally {
         this.busy = false
       }

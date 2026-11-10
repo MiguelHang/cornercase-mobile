@@ -20,7 +20,7 @@ const done = () => Promise.resolve({ status: 'ok' as const, data: null })
 
 const CALLS = {
   machineRename: done,
-  machineRouteAdd: done,
+  machineMerge: () => Promise.resolve({ status: 'ok' as const, data: { added: [], token_updated: false, skipped: [] } }),
   machineRouteRemove: done,
   machineRouteMove: done,
   machineRemove: done,
@@ -28,10 +28,12 @@ const CALLS = {
 
 const nothing = () => Promise.resolve()
 
+const quiet = () => {}
+
 const screen = (
   machine = studio(),
   connection: ConnectionView_Serialize | null = CONNECTED,
-  edit = new EditMachine(CALLS, () => machine, nothing, nothing),
+  edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet),
 ) =>
   render(Machine, {
     props: { machine, taken: ['Desk'], connection, onback: () => {}, onchanged: nothing, onremoved: nothing, edit },
@@ -71,7 +73,7 @@ describe('Machine', () => {
 
   it('tells a refused name under the field', async () => {
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.name = 'desk'
     await edit.rename(['Desk'])
     expect(screen(machine, CONNECTED, edit)).toMatch(/<p class="error svelte-[\w-]+" id="[^"]+">another machine already has that name<\/p>/)
@@ -127,7 +129,7 @@ describe('Machine', () => {
     const machine = studio()
     const refused = () =>
       Promise.resolve({ status: 'error' as const, error: { code: 'store' as const, message: 'the disk is full' } })
-    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, nothing, nothing)
+    const edit = new EditMachine({ ...CALLS, machineRouteMove: refused }, () => machine, nothing, nothing, quiet)
     await edit.move(ROUTES[0], 'down')
     expect(screen(machine, CONNECTED, edit)).toMatch(
       /<\/details>(?:<[^p][^>]*>|<!--[^>]*-->| )*<p class="problem svelte-[\w-]+" role="alert">the disk is full<\/p>/,
@@ -137,7 +139,7 @@ describe('Machine', () => {
   it('opens the form for the code with Add route, outside Edit routes, which then offers it no more', () => {
     expect(screen()).not.toContain('Machine code')
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.open()
     const body = screen(machine, CONNECTED, edit)
     const after = body.slice(body.indexOf('</details>'))
@@ -172,7 +174,7 @@ describe('Machine', () => {
 
   it('asks before deleting, with the name and what goes, instead of Add route and Delete machine', () => {
     const machine = studio()
-    const edit = new EditMachine(CALLS, () => machine, nothing, nothing)
+    const edit = new EditMachine(CALLS, () => machine, nothing, nothing, quiet)
     edit.askToDelete()
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)

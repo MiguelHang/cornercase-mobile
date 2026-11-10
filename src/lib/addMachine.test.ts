@@ -28,7 +28,6 @@ const gate = () => {
 const calls = (overrides: Partial<MachineCalls> = {}) => ({
   machineAdd: vi.fn(overrides.machineAdd ?? (() => added(1))),
   machineMatch: vi.fn(overrides.machineMatch ?? (() => matched({ kind: 'none' }))),
-  machineRouteAdd: vi.fn(overrides.machineRouteAdd ?? (() => ok(null))),
   machineMerge: vi.fn(overrides.machineMerge ?? (() => ok(MERGED))),
 })
 
@@ -274,23 +273,33 @@ describe('AddMachine offering the same machine', () => {
   })
 
   it('adds the URL as a route of that machine and says so, without calling it added', async () => {
-    const { draft, onadded, onrouted, commands } = await offered('boot')
+    const { draft, onadded, onrouted, tell, commands } = await offered('boot')
     await draft.addRoute()
-    expect([commands.machineRouteAdd.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, URL_TEXT]], []])
+    expect([commands.machineMerge.mock.calls, commands.machineAdd.mock.calls]).toEqual([[[3, URL_TEXT]], []])
     expect([onrouted.mock.calls, onadded.mock.calls]).toEqual([[[3]], []])
+    expect(tell.mock.calls).toEqual([[{ level: 'info', message: 'Studio already saved: 1 route added, token updated.' }]])
+  })
+
+  it("says so when the address it offered is another machine's", async () => {
+    const elsewhere = { added: [], token_updated: false, skipped: ['ws://studio.lan:9000/'] }
+    const { draft, tell } = form({ machineMatch: () => same('boot'), machineMerge: () => ok(elsewhere) })
+    await draft.submit()
+    await draft.addRoute()
+    const message = 'Studio already saved: 1 route left to another machine.'
+    expect(tell.mock.calls).toEqual([[{ level: 'info', message }]])
   })
 
   it('adds the whole code to that machine', async () => {
     const { draft, commands } = form({ machineMatch: () => same('boot') }, CODE)
     await draft.submit()
     await draft.addRoute()
-    expect(commands.machineRouteAdd.mock.calls).toEqual([[3, CODE]])
+    expect(commands.machineMerge.mock.calls).toEqual([[3, CODE]])
   })
 
   it('adds a new machine instead under the name checked', async () => {
     const { draft, onadded, onrouted, commands } = await offered('boot', ' Desk ')
     await draft.addNew()
-    expect([commands.machineAdd.mock.calls, commands.machineRouteAdd.mock.calls]).toEqual([[[URL_TEXT, 'Desk']], []])
+    expect([commands.machineAdd.mock.calls, commands.machineMerge.mock.calls]).toEqual([[[URL_TEXT, 'Desk']], []])
     expect([onadded.mock.calls, onrouted.mock.calls]).toEqual([[[1]], []])
   })
 
@@ -303,7 +312,7 @@ describe('AddMachine offering the same machine', () => {
 
   it('drops the offer and puts the error in its place when adding the route fails', async () => {
     const failing = { code: 'secrets', message: 'the keychain is locked' } as const
-    const { draft, onrouted } = form({ machineMatch: () => same('address'), machineRouteAdd: () => refused(failing) })
+    const { draft, onrouted } = form({ machineMatch: () => same('address'), machineMerge: () => refused(failing) })
     await draft.submit()
     await draft.addRoute()
     expect([draft.formError, draft.offer, draft.busy]).toEqual([failing.message, null, false])
@@ -316,7 +325,7 @@ describe('AddMachine offering the same machine', () => {
     await draft.addRoute()
     await draft.addNew()
     expect([draft.offer, draft.held]).toEqual([null, false])
-    expect([commands.machineRouteAdd, commands.machineAdd].map((mock) => mock.mock.calls.length)).toEqual([0, 0])
+    expect([commands.machineMerge, commands.machineAdd].map((mock) => mock.mock.calls.length)).toEqual([0, 0])
   })
 
   it('takes one choice at a time and holds Back while it runs', async () => {
@@ -330,7 +339,7 @@ describe('AddMachine offering the same machine', () => {
     expect(draft.offer).not.toBeNull()
     pending.open(6)
     await chosen
-    expect([commands.machineAdd.mock.calls.length, commands.machineRouteAdd.mock.calls.length]).toEqual([1, 0])
+    expect([commands.machineAdd.mock.calls.length, commands.machineMerge.mock.calls.length]).toEqual([1, 0])
   })
 
   it('ignores a submit or a scan while the offer is up', async () => {

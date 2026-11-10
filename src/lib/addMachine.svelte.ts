@@ -2,7 +2,7 @@ import type { CommandError, MatchView, Toast, commands } from './bindings'
 import { checkName, checkUrl, fieldOf, mergedText, nameFor, type Field, type Offer } from './machineForm'
 import { messageOf } from './toasts'
 
-export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineRouteAdd' | 'machineMerge'>
+export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineMerge'>
 
 export type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
@@ -82,8 +82,7 @@ export class AddMachine {
       return
     }
     this.busy = true
-    const outcome = await send(() => this.#calls.machineRouteAdd(offer.machine, offer.url))
-    this.#settle(outcome, () => this.#onrouted(offer.machine))
+    await this.#merge(offer.url, offer.machine, offer.saved)
   }
 
   async addNew() {

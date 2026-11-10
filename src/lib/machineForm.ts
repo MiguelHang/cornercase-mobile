@@ -96,14 +96,18 @@ export const offerText = (offer: Pick<Offer, 'saved' | 'why'>) => ({
 
 const counted = (count: number, what: string) => `${count} ${what}${count === 1 ? '' : 's'}`
 
-export const mergedText = (saved: string, merged: MergeView) => {
+const mergeSummary = (merged: MergeView) => {
   const told = [
     merged.added.length > 0 ? `${counted(merged.added.length, 'route')} added` : '',
     merged.token_updated ? 'token updated' : '',
     merged.skipped.length > 0 ? `${counted(merged.skipped.length, 'route')} left to another machine` : '',
   ].filter((part) => part !== '')
-  return `${saved} already saved: ${told.length > 0 ? told.join(', ') : 'nothing to add'}.`
+  return told.length > 0 ? told.join(', ') : 'nothing to add'
 }
+
+export const mergedText = (saved: string, merged: MergeView) => `${saved} already saved: ${mergeSummary(merged)}.`
+
+export const routesText = (machine: string, merged: MergeView) => `${machine}: ${mergeSummary(merged)}.`
 
 export const fieldOf = (error: CommandError): Field => {
   if (error.code.startsWith('route_')) {
