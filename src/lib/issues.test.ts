@@ -36,6 +36,7 @@ const issue = (key: string, title: string, labels: string[] = []): IssueInfo => 
   source: 'github',
   key,
   title,
+  url: `https://github.com/acme/shop/issues/${key.slice(1)}`,
   state: 'open',
   closed: false,
   labels,
@@ -61,7 +62,7 @@ const lists = (issues: IssueInfo[], sources: ListedInfo[] = [listed('github', is
   sources,
 })
 
-const sources = (...trackers: SourceInfo[]): Sources => ({ project: PROJECT, sources: trackers })
+const sources = (...trackers: SourceInfo[]): Sources => ({ project: PROJECT, sources: trackers, places: [] })
 
 type Lister = (project: number, filter: ListFilter) => Promise<Answer<Lists>>
 

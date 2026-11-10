@@ -42,6 +42,7 @@ const COUPON: IssueInfo = {
   source: 'github',
   key: '#41',
   title: 'Checkout forgets the coupon after a refresh',
+  url: 'https://github.com/acme/shop/issues/41',
   state: 'open',
   closed: false,
   labels: ['bug', 'checkout'],
@@ -54,6 +55,7 @@ const THEME: IssueInfo = {
   ...COUPON,
   key: '#38',
   title: 'Add a dark theme',
+  url: 'https://github.com/acme/shop/issues/38',
   state: 'closed',
   closed: true,
   labels: [],
@@ -66,6 +68,7 @@ const REFUNDS: IssueInfo = {
   source: 'shortcut',
   key: 'sc-7',
   title: 'Refunds by bank transfer',
+  url: 'https://app.shortcut.com/acme/story/7',
   labels: ['payments'],
 }
 

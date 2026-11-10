@@ -437,6 +437,7 @@ export type IssueInfo_Deserialize = {
 	source?: string,
 	key?: string,
 	title?: string,
+	url?: string,
 	state?: string,
 	closed?: boolean,
 	labels?: string[],
@@ -449,6 +450,7 @@ export type IssueInfo_Serialize = {
 	source: string,
 	key: string,
 	title: string,
+	url: string,
 	state: string,
 	closed: boolean,
 	labels: string[],
@@ -744,6 +746,22 @@ export type Patch_Serialize = {
 
 export type Place = { kind: "workspace"; workspace: number } | { kind: "worktree"; project: number; branch: string };
 
+export type PlaceInfo = PlaceInfo_Serialize | PlaceInfo_Deserialize;
+
+export type PlaceInfo_Deserialize = {
+	project?: number,
+	workspace?: number | null,
+	label?: string,
+	worktree?: boolean,
+};
+
+export type PlaceInfo_Serialize = {
+	project: number,
+	workspace: number | null,
+	label: string,
+	worktree: boolean,
+};
+
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
@@ -910,11 +928,13 @@ export type Sources = Sources_Serialize | Sources_Deserialize;
 export type Sources_Deserialize = {
 	project?: number,
 	sources?: SourceInfo_Deserialize[],
+	places?: PlaceInfo_Deserialize[],
 };
 
 export type Sources_Serialize = {
 	project: number,
 	sources: SourceInfo_Serialize[],
+	places: PlaceInfo_Serialize[],
 };
 
 export type Staged = Staged_Serialize | Staged_Deserialize;

@@ -87,6 +87,7 @@ const TICKET: IssueInfo = {
   source: 'shortcut',
   key: 'sc-7',
   title: 'Refunds round the wrong way',
+  url: 'https://app.shortcut.com/acme/story/7',
   state: 'In Progress',
   closed: false,
   labels: [],

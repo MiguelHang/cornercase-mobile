@@ -47,6 +47,7 @@ const ON_ISSUE: Route = {
       source: 'github',
       key: '#41',
       title: 'Checkout forgets the coupon',
+      url: 'https://github.com/acme/shop/issues/41',
       state: 'open',
       closed: false,
       labels: [],
