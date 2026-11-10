@@ -27,6 +27,7 @@
 pnpm install                                      # frontend packages and the Tauri CLI (pnpm from packageManager)
 pnpm build                                        # dist/: release builds need it; CI runs it before cargo
 pnpm tauri ios dev "<iPhone>"                     # the app in the iOS simulator; names from `xcrun simctl list devices`
+pnpm tauri android dev [<AVD or device>]          # the app on Android; names from `emulator -list-avds`, `adb devices`
 cargo run -p cornercase-bridge                    # the development bridge, on the Mac's LAN and Tailscale addresses
 cargo run -p cornercase-bridge -- --loopback --port 0   # the same, only on 127.0.0.1, to try it on the Mac
 cargo fmt --check
@@ -38,8 +39,8 @@ npx -y jscpd@4.3.0                                # copy-paste detector, reads .
 pnpm test                                         # vitest
 ```
 
-- **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets; rustup installs it on the first
-  cargo command. Node 22.
+- **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets and `aarch64-linux-android`; rustup
+  installs it on the first cargo command. Node 22.
 - **CI runs `pnpm install --frozen-lockfile`, `pnpm build` and the checks from `cargo fmt --check` down, in that
   order** (`design/code-layout.md`). Before calling a task done, run them and fix what fails.
 - **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
@@ -48,7 +49,29 @@ pnpm test                                         # vitest
   libimobiledevice on `ios init`, ios-deploy on `ios dev`); CocoaPods is `brew install cocoapods`.
 - **`src-tauri/gen/apple` is in git** (`design/architecture.md`): change the Xcode project in its `project.yml`,
   which the Tauri CLI turns into the `.xcodeproj`, and commit both; `.gitignore` leaves out what the builds write.
-- Android has no project yet (task 030).
+- **Android needs JDK 17, the SDK and NDK 29.0.14206865**, without Android Studio and without sudo
+  (`design/architecture/android.md`):
+  - `brew install openjdk@17`, `brew install --cask android-commandlinetools`, then in the shell's profile
+    `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`,
+    `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools`, `NDK_HOME=$ANDROID_HOME/ndk/29.0.14206865`, and
+    `$JAVA_HOME/bin`, `$ANDROID_HOME/platform-tools` and `$ANDROID_HOME/emulator` on the `PATH`.
+  - `yes | sdkmanager --licenses`, then `sdkmanager platform-tools "platforms;android-37.0" "build-tools;37.0.0"
+    "ndk;29.0.14206865" emulator "system-images;android-37.0;google_apis;arm64-v8a"`. Gradle downloads the rest
+    (platform 36) on the first build, which takes a few minutes.
+  - An emulator: `avdmanager create avd -n cornercase_api37 -d pixel_8 -k
+    "system-images;android-37.0;google_apis;arm64-v8a"`, started with `emulator -avd cornercase_api37`. A phone needs
+    USB debugging on.
+  - rustup brings `aarch64-linux-android` with the toolchain; a release for every ABI also needs
+    `rustup target add armv7-linux-androideabi i686-linux-android x86_64-linux-android`.
+  - Clippy for the phone, `cargo clippy -p cornercase-mobile --target aarch64-linux-android --all-targets --locked --
+    -D warnings`, needs the NDK's compiler: with `T=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin`, set
+    `CC_aarch64_linux_android=$T/aarch64-linux-android24-clang`, `AR_aarch64_linux_android=$T/llvm-ar` and
+    `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$T/aarch64-linux-android24-clang`.
+  - **The emulator reaches the bridge** at the Mac's LAN or Tailscale address the bridge prints, not at `10.0.2.2`
+    (`--loopback` prints `127.0.0.1`, which is the emulator itself). Paste the code into the form, or type it with
+    `adb shell "input text '<piece>'"`, 16 characters at a time: longer text gets cut.
+- **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest and the two files of
+  `res/xml/` are changed by hand. `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
 
 ## Structure
 - `crates/core/`: pure, testable logic: transport trait, bridge protocol, CLI types over `--json`,
