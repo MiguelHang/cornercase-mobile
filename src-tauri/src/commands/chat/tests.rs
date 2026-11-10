@@ -2,7 +2,7 @@ use cornercase_core::error::Error;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::{mark_reviewed, press_key, send_message};
+use super::{mark_pane_reviewed, press_key, send_message};
 use crate::commands::error::CommandError;
 use crate::test_util::{Ipc, Studio, connected_with, queueing, written};
 
@@ -65,7 +65,7 @@ async fn pressing(answer: Option<Value>, key: &str) -> (Result<(), Value>, Vec<V
 
 async fn reviewing(answer: Option<Value>) -> (Result<(), Value>, Vec<Value>) {
     let (ipc, lines) = queueing(answer).await;
-    let marked = mark_reviewed(&ipc.state(), 543).await.map_err(|error| json_of(&error));
+    let marked = mark_pane_reviewed(&ipc.state(), 543).await.map_err(|error| json_of(&error));
     (marked, written(&lines))
 }
 
@@ -209,7 +209,7 @@ mod without_a_connection {
     #[case::sending("send", json!({ "pane": 543, "text": "hello", "force": false }))]
     #[case::attaching("attach", json!({ "pane": 543 }))]
     #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
-    #[case::reviewing("reviewed", json!({ "pane": 543 }))]
+    #[case::reviewing("mark_reviewed", json!({ "pane": 543 }))]
     fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
         let refused = ipc.invoke(command, args).expect_err("nowhere to queue");

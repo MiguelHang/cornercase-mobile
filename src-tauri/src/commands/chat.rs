@@ -32,8 +32,12 @@ pub(crate) async fn keys(state: State<'_, AppState>, pane: u64, key: String) -> 
 
 #[tauri::command(async)]
 #[specta::specta]
-pub(crate) async fn reviewed(state: State<'_, AppState>, pane: u64) -> Result<(), CommandError> {
-    mark_reviewed(&state, pane).await
+pub(crate) async fn mark_reviewed(state: State<'_, AppState>, pane: u64) -> Result<(), CommandError> {
+    let marked = mark_pane_reviewed(&state, pane).await;
+    if let Err(error) = &marked {
+        eprintln!("cornercase-mobile: mark --pane {pane} --reviewed failed: {}", error.message);
+    }
+    marked
 }
 
 pub(crate) async fn read_last_message(state: &AppState, pane: u64) -> Result<LastMessage, CommandError> {
@@ -54,7 +58,7 @@ pub(crate) async fn press_key(state: &AppState, pane: u64, key: &str) -> Result<
     ask(state, args, None).await
 }
 
-pub(crate) async fn mark_reviewed(state: &AppState, pane: u64) -> Result<(), CommandError> {
+pub(crate) async fn mark_pane_reviewed(state: &AppState, pane: u64) -> Result<(), CommandError> {
     ask(state, mark::reviewed_args(pane), None).await
 }
 

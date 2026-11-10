@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { whileShown, type MarkReviewed } from './chat.svelte'
 import { FakePage, MACHINE, PANE, fakeMarker, fresh, refused, row, settle } from './chatFakes'
 
@@ -23,9 +23,9 @@ const turned = (chat: ReturnType<typeof fresh>, ...statuses: string[]) => {
   statuses.forEach((status) => chat.see(MACHINE, [row(PANE, status)]))
 }
 
-const quiet = () => vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-afterEach(() => vi.restoreAllMocks())
+const arrived = (chat: ReturnType<typeof fresh>, since: string) => {
+  chat.see(MACHINE, [{ ...row(PANE, 'done'), since }])
+}
 
 describe('Chat, marking a done agent reviewed while it is in view', () => {
   it('marks the pane once when its screen opens on a done row', () => {
@@ -161,19 +161,16 @@ describe('Chat, a mark that fails', () => {
   it.each<[string, () => ReturnType<MarkReviewed>]>([
     ['refused', () => Promise.resolve(refused(NO_AGENT))],
     ['thrown', () => Promise.reject(new Error(NO_AGENT))],
-  ])('is %s into the log without touching the chat', async (_, answer) => {
-    const warned = quiet()
+  ])('is %s without touching the chat', async (_, answer) => {
     const { chat } = watched('done', answer)
     const before = { reading: chat.reading, outgoing: chat.outgoing, row: chat.row }
     await settle()
 
-    expect(warned).toHaveBeenCalledWith(`mark --pane ${PANE} --reviewed failed: ${NO_AGENT}`)
     expect({ reading: chat.reading, outgoing: chat.outgoing, row: chat.row }).toEqual(before)
     expect(chat.gone).toBe(false)
   })
 
   it('is not tried again until the next arrival at done or the next watch', async () => {
-    quiet()
     const { chat, stop, marked } = watched('done', () => Promise.resolve(refused(NO_AGENT)))
     await settle()
     turned(chat, 'done')
@@ -187,11 +184,12 @@ describe('Chat, a mark that fails', () => {
     expect(marked).toEqual([PANE, PANE, PANE])
   })
 
-  it('logs nothing when the mark goes through', async () => {
-    const warned = quiet()
-    watched('done')
+  it('is tried again on a new arrival at done the phone saw no other status between', async () => {
+    const { chat, marked } = watched('done', () => Promise.resolve(refused(NO_AGENT)))
     await settle()
+    arrived(chat, '2026-11-10T10:00:00Z')
+    arrived(chat, '2026-11-10T10:00:00Z')
 
-    expect(warned).not.toHaveBeenCalled()
+    expect(marked).toEqual([PANE, PANE])
   })
 })

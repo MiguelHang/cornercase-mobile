@@ -16,7 +16,7 @@ export type SendText = typeof commands.send
 
 export type PressKey = typeof commands.keys
 
-export type MarkReviewed = typeof commands.reviewed
+export type MarkReviewed = typeof commands.markReviewed
 
 export type Clock = { after: (ms: number, then: () => void) => () => void; now: () => number }
 
@@ -119,7 +119,7 @@ export class Chat {
   #following = false
   #questioning = false
   #watchingDone = false
-  #marked = false
+  #marked: string | null | undefined = undefined
   #asked = 0
   #busy = false
   #again = false
@@ -279,18 +279,12 @@ export class Chat {
   }
 
   #review() {
-    if (!this.#watchingDone || this.row?.status !== 'done') {
-      this.#marked = false
-    } else if (!this.#marked) {
-      this.#marked = true
-      void this.#mark()
-    }
-  }
-
-  async #mark() {
-    const failed = await deliver(() => this.#markReviewed(this.pane))
-    if (failed !== null) {
-      console.warn(`mark --pane ${this.pane} --reviewed failed: ${failed}`)
+    const row = this.row
+    if (!this.#watchingDone || row?.status !== 'done') {
+      this.#marked = undefined
+    } else if (this.#marked !== row.since) {
+      this.#marked = row.since
+      void deliver(() => this.#markReviewed(this.pane))
     }
   }
 

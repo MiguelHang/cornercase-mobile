@@ -72,7 +72,7 @@
           commands.lastMessage,
           commands.send,
           commands.keys,
-          commands.reviewed,
+          commands.markReviewed,
           commands.attach,
           haptics,
           timers,
