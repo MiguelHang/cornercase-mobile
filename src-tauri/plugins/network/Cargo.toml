@@ -14,7 +14,7 @@ tauri-plugin = { version = "2.7", features = ["build"] }
 cornercase-core = { path = "../../../crates/core" }
 tauri = "2.12"
 
-[target.'cfg(target_os = "ios")'.dependencies]
+[target.'cfg(any(target_os = "ios", target_os = "android"))'.dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 
 [lints]
