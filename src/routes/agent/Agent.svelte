@@ -25,6 +25,7 @@
     onfailed,
     onterminal,
     onchanges,
+    onfiles,
   }: {
     chat: Chat
     agents: AgentRow[] | null
@@ -36,6 +37,7 @@
     onfailed: (reason: string) => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
+    onfiles: (workspace: number, title: string) => void
   } = $props()
 
   let now = $state(untrack(() => chat.now()))
@@ -79,7 +81,7 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} />
+    <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} {onfiles} />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}

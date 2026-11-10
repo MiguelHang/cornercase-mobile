@@ -17,10 +17,12 @@
     path,
     changes,
     onback,
+    onfile,
   }: {
     path: string
     changes: ChangesState
     onback: () => void
+    onfile: (path: string) => void
   } = $props()
 
   const reading = $derived(changes.diff?.path === path ? changes.diff.reading : null)
@@ -30,6 +32,7 @@
   const notice = $derived(patch === null ? undefined : NOTICES[patch.fold])
   const viewed = $derived(changes.viewed(path))
   const open = $derived(!changes.gone && reading?.kind !== 'gone')
+  const whole = $derived(open && patch !== null && patch.status !== 'deleted' ? patch.path : null)
 </script>
 
 <section class="screen">
@@ -38,6 +41,11 @@
       <Icon name="chevron-left" size={24} />
     </button>
     <h1 class="title"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
+    {#if whole !== null}
+      <button class="tool" type="button" aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>
+        <Icon name="file-text" size={22} />
+      </button>
+    {/if}
     {#if open}
       <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
     {/if}
@@ -79,7 +87,8 @@
     margin: 0 calc(-1 * var(--inset));
   }
 
-  .back {
+  .back,
+  .tool {
     display: flex;
     flex: none;
     align-items: center;
@@ -93,7 +102,8 @@
     color: var(--accent);
   }
 
-  .back:active {
+  .back:active,
+  .tool:active {
     background: var(--hover);
   }
 

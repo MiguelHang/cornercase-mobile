@@ -151,7 +151,7 @@ describe('App wiring', () => {
       'const chat = $derived( pane === null ? null : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers), )',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} />",
     )
   })
 
@@ -212,7 +212,7 @@ describe('App wiring', () => {
       "const review = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'changes', machine: current.machine, workspace, title }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} onback={leaveDiff} /> {/if} {:else if route.name === 'start'}",
+      "{:else if route.name === 'changes'} {#if changes !== null} <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} /> {/if} {:else if route.name === 'change'} {#if changes !== null} <Diff path={route.path} {changes} onback={leaveDiff} onfile={whole} /> {/if} {:else if route.name === 'files'}",
     )
   })
 
@@ -237,9 +237,45 @@ describe('App wiring', () => {
     )
   })
 
+  it("opens the files of an agent's workspace on top of it, on the active machine, and a file above them", () => {
+    expect(source).toContain(
+      "const browse = (workspace: number, title: string) => { if (current.machine !== null) { router.go({ name: 'files', machine: current.machine, workspace, title }) } }",
+    )
+    expect(source).toContain(
+      "{:else if route.name === 'files'} {#if files !== null} <Files title={route.title} {files} onback={() => router.back()} onopen={read} /> {/if} {:else if route.name === 'file'} {#if files !== null} <File path={route.path} {files} onback={leaveFile} /> {/if} {:else if route.name === 'start'}",
+    )
+  })
+
+  it('reads a file of the tree each time it opens it', () => {
+    expect(source).toContain(
+      "const read = (path: string) => { if (files !== null) { void files.open(path) router.go({ name: 'file', machine: files.machine, workspace: files.workspace, path }) } }",
+    )
+  })
+
+  it('drops the open file before going back from it, then lists the tree again', () => {
+    expect(source).toContain('const leaveFile = () => { files?.closeFile() router.back() void files?.refresh() }')
+  })
+
+  it('opens the whole file of a diff above it, on the same workspace, keeping the diff and its state under it', () => {
+    expect(source).toContain(
+      "const whole = (path: string) => { if (changes !== null) { router.go({ name: 'file', machine: changes.machine, workspace: changes.workspace, path }) } }",
+    )
+  })
+
+  it('keeps one state of the browsed workspace under its tree and its file, listing the tree or reading the file it opened on and leaving it after', () => {
+    expect(source).toContain('const browsedMachine = $derived(browsed?.machine ?? null)')
+    expect(source).toContain('const browsedWorkspace = $derived(browsed?.workspace ?? null)')
+    expect(source).toContain(
+      '{ list: commands.filesList, read: commands.filesRead, search: commands.filesSearch }, (toast) => toasts.push(toast),',
+    )
+    expect(source).toContain(
+      "const top = untrack(() => router.current) void (top.name === 'file' ? state.open(top.path) : state.start()) return () => state.stop()",
+    )
+  })
+
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} /> {/if}",
+      "{:else if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} below={barHeight} {starting} onback={() => router.back()} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if}",
     )
   })
 })

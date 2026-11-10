@@ -28,7 +28,8 @@ const stateWith = (shown: Reading | null, path = PATH) => {
   return state
 }
 
-const draw = (changes: ChangesState) => render(Diff, { props: { path: PATH, changes, onback: () => {} } }).body
+const draw = (changes: ChangesState) =>
+  render(Diff, { props: { path: PATH, changes, onback: () => {}, onfile: () => {} } }).body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -45,6 +46,8 @@ const numbers = (body: string) =>
   [...body.matchAll(/<span class="code-number">(\d*)<\/span><span class="code-number">(\d*)<\/span>/g)].map(
     (m) => [m[1], m[2]],
   )
+
+const WHOLE = /<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!<\/svg>)[^])*?<path d="M6 22a2 2 0 0 1-2-2V4/
 
 const viewedButton = (body: string) => body.match(/aria-label="Viewed" aria-pressed="(\w+)"/)?.[1] ?? null
 
@@ -127,6 +130,31 @@ describe('Diff', () => {
     expect(note(body)).toBe(`${CLOSED}.`)
     expect(viewedButton(body)).toBeNull()
     expect(body).toContain('aria-label="Back"')
+  })
+
+  it.each(['modified', 'added', 'renamed', 'untracked', 'other'] as const)(
+    'offers the whole file of a %s change before the viewed button',
+    (status) => {
+      const body = draw(stateWith(reading({ status })))
+      expect(body).toMatch(WHOLE)
+      expect(body.search(WHOLE)).toBeLessThan(body.indexOf('aria-label="Viewed"'))
+    },
+  )
+
+  it('offers no whole file for a deleted change, nor before the patch, once the change is gone or the workspace closed', () => {
+    const closed = stateWith(reading())
+    closed.gone = true
+    expect(draw(stateWith(reading({ status: 'deleted' })))).not.toMatch(WHOLE)
+    expect(draw(stateWith({ kind: 'loading' }))).not.toMatch(WHOLE)
+    expect(draw(stateWith({ kind: 'gone' }))).not.toMatch(WHOLE)
+    expect(draw(closed)).not.toMatch(WHOLE)
+  })
+
+  it("opens the patch's own path, the new one of a rename", () => {
+    expect(flat(diffSource)).toContain(
+      "const whole = $derived(open && patch !== null && patch.status !== 'deleted' ? patch.path : null)",
+    )
+    expect(flat(diffSource)).toContain('aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>')
   })
 
   it("presses the viewed button by the state's mark of the file", () => {

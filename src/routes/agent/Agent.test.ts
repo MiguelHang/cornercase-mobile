@@ -53,6 +53,8 @@ const TERMINAL = tool('Terminal', 'm7 11 2-2-2-2')
 
 const CHANGES = tool('Changes', 'M13 6h3a2 2 0 0 1 2 2v7')
 
+const FILES = tool('Files', 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z')
+
 const BACK_WORD = /<button class="button plain svelte-[\w-]+" type="button"[^>]*>(?:<!--[^>]*-->| )*Back<!---->/
 
 const unsent: SendText = () => new Promise(() => {})
@@ -93,6 +95,7 @@ const draw = (
       onfailed: () => {},
       onterminal: () => {},
       onchanges: () => {},
+      onfiles: () => {},
     },
   }).body
 
@@ -215,11 +218,12 @@ const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
 const bar = (row: AgentRow) => draw(chatWith(row)).match(BAR)?.[1] ?? ''
 
 describe('Agent, its sticky header', () => {
-  it('keeps Back, Terminal and Changes in a bar of their own, with the large header after it to scroll away', () => {
+  it('keeps Back, Terminal, Changes and Files in a bar of their own, with the large header after it to scroll away', () => {
     const shown = bar(ROW)
     expect(shown.search(BACK)).toBe(0)
     expect(shown).toMatch(TERMINAL)
     expect(shown).toMatch(CHANGES)
+    expect(shown).toMatch(FILES)
     expect(shown).not.toContain('<h1')
   })
 
@@ -262,7 +266,7 @@ describe('Agent, its sticky header', () => {
 
   it('leaves the compact line the room its icon buttons of 44 by 44 px do not take', () => {
     const source = flat(chatHeaderSource)
-    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(3)
+    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(4)
     expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
     expect(source).toContain('padding: var(--gap) calc(var(--inset-wide) - var(--inset));')
     expect(source).not.toContain('<Button')
@@ -421,7 +425,7 @@ describe('Agent, without its row', () => {
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} /> {#key row.pane}')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} {onfiles} /> {#key row.pane}')
     const source = flat(chatHeaderSource)
     expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
     expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')
@@ -433,9 +437,16 @@ describe('Agent, without its row', () => {
     expect(body.search(CHANGES)).toBeGreaterThan(body.search(TERMINAL))
   })
 
+  it("offers the files of its agent's workspace last, titled with the workspace's name", () => {
+    const body = draw(chatWith(ROW))
+    expect(body.search(FILES)).toBeGreaterThan(body.search(CHANGES))
+    expect(flat(chatHeaderSource)).toContain('aria-label="Files" onclick={() => onfiles(row.workspace, row.workspace_name)}')
+  })
+
   it.each([
     ['terminal', TERMINAL],
     ['changes', CHANGES],
+    ['files', FILES],
   ])('offers no %s without its agent, nor once it is gone', (_, button) => {
     const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])

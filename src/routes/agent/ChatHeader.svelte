@@ -12,6 +12,7 @@
     onback,
     onterminal,
     onchanges,
+    onfiles,
   }: {
     row: AgentRow
     agents: AgentRow[]
@@ -19,6 +20,7 @@
     onback: () => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
+    onfiles: (workspace: number, title: string) => void
   } = $props()
 
   let scrolled = $state(0)
@@ -54,6 +56,15 @@
     ontouchstart={() => {}}
   >
     <Icon name="git-compare" />
+  </button>
+  <button
+    class="tool"
+    type="button"
+    aria-label="Files"
+    onclick={() => onfiles(row.workspace, row.workspace_name)}
+    ontouchstart={() => {}}
+  >
+    <Icon name="folder" />
   </button>
 </div>
 <header class="head" bind:clientHeight={tall}>
