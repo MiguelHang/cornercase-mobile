@@ -2,6 +2,7 @@ import type { Answer } from './addMachine.svelte'
 import type {
   AgentChoice_Serialize as AgentChoice,
   CommandError,
+  FlowStarted_Serialize as FlowStarted,
   Place,
   PlaceInfo_Serialize as PlaceInfo,
   ProjectChoice,
@@ -14,7 +15,7 @@ import { messageOf } from './toasts'
 
 export type StartCalls = Pick<
   typeof commands,
-  'startProjects' | 'installedAgents' | 'startAgent' | 'startIssue'
+  'startProjects' | 'installedAgents' | 'startAgent' | 'startIssue' | 'issueFlows' | 'startFlow'
 >
 
 export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; items: T[] }
@@ -24,6 +25,8 @@ export type Memory = { agent: string | null; workspace: { boot: string; id: numb
 export type WorkspaceOption = { id: number; project: number; label: string }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
+
+export type Keep = (place: PlaceInfo) => boolean
 
 export const WORKSPACE_EMPTY = 'Choose a workspace'
 export const PLACE_EMPTY = 'Choose where to start'
@@ -59,6 +62,11 @@ const projectsOf = (reply: Reply<StartChoices>): Reply<ProjectChoice[]> =>
   reply.ok ? { ok: true, data: reply.data.projects } : reply
 
 const errorIf = (empty: boolean, error: string) => (empty ? error : null)
+
+const everywhere: Keep = () => true
+
+const naming = (answer: Answer<Started>, agent: string): Answer<FlowStarted> =>
+  answer.status === 'ok' ? { status: 'ok', data: { started: answer.data, agent } } : answer
 
 const worktreeOf = (project: number, branch: string): Place => ({ kind: 'worktree', project, branch })
 
@@ -121,15 +129,40 @@ export class StartForm {
     this.#memory = memory
   }
 
+  get boot() {
+    return this.#boot
+  }
+
   get issueBranch() {
     return this.issue?.issue.branch ?? ''
   }
 
   get placeChoices(): Choices<PlaceInfo> {
+    return this.placesWhere(everywhere)
+  }
+
+  placesWhere(keep: Keep): Choices<PlaceInfo> {
     if (this.#placesStale) {
       return { kind: 'failed', reason: PLACES_STALE }
     }
-    return { kind: 'ready', items: this.issue?.places ?? [] }
+    return { kind: 'ready', items: (this.issue?.places ?? []).filter(keep) }
+  }
+
+  defaultPlace(keep: Keep = everywhere) {
+    const issue = this.issue
+    const place = issue === null ? undefined : startedIn({ ...issue, places: issue.places.filter(keep) })
+    return place === undefined ? null : placeKey(place)
+  }
+
+  get canStartIssue() {
+    return !this.sending && this.issue !== null && !this.#placesStale
+  }
+
+  checkPlace() {
+    const chosen = this.chosenPlace
+    this.placeError = errorIf(chosen === undefined, PLACE_EMPTY)
+    this.formError = null
+    return chosen
   }
 
   get chosenPlace() {
@@ -163,8 +196,7 @@ export class StartForm {
     this.#placesStale = false
     this.project = issue.project
     this.branch = issue.issue.branch
-    const place = startedIn(issue)
-    this.place = place === undefined ? null : placeKey(place)
+    this.place = this.defaultPlace()
   }
 
   prefer(workspace: number) {
@@ -273,13 +305,11 @@ export class StartForm {
 
   async startIssue() {
     const issue = this.issue
-    if (this.sending || issue === null || this.#placesStale) {
+    if (issue === null || !this.canStartIssue) {
       return
     }
-    const chosen = this.chosenPlace
-    this.placeError = errorIf(chosen === undefined, PLACE_EMPTY)
+    const chosen = this.checkPlace()
     this.agentError = errorIf(this.agent === '', AGENT_EMPTY)
-    this.formError = null
     const { agent, model, branch, issueBranch } = this
     if (chosen === undefined || this.agentError !== null) {
       return
@@ -290,10 +320,17 @@ export class StartForm {
   }
 
   async #launch(call: () => Promise<Answer<Started>>, agent: string) {
-    const reply = await this.#send(call, AGENT_UNANSWERED)
-    if (reply.ok) {
+    const launched = await this.launch(async () => naming(await call(), agent), AGENT_UNANSWERED)
+    if (launched) {
       this.#memory.agent = agent
-      this.#onstarted(reply.data, agent)
+    }
+    return launched
+  }
+
+  async launch(call: () => Promise<Answer<FlowStarted>>, unanswered: string) {
+    const reply = await this.#send(call, unanswered)
+    if (reply.ok) {
+      this.#onstarted(reply.data.started, reply.data.agent)
     }
     return reply.ok
   }

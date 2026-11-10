@@ -7,6 +7,7 @@
   import NavBar from '../../lib/ui/NavBar.svelte'
   import AgentForm from './AgentForm.svelte'
   import IssueForm from './IssueForm.svelte'
+  import Segmented from './Segmented.svelte'
   import ShowIssues from './ShowIssues.svelte'
 
   type Action = 'agent' | 'issue'
@@ -62,20 +63,7 @@
 <section class="screen">
   <NavBar {backTo} title="Start" {onback} topmost />
   {#if form.issue === null}
-    <div class="actions" role="group" aria-label="What to start">
-      {#each ACTIONS as [name, words] (name)}
-        <button
-          class="action"
-          type="button"
-          aria-pressed={action === name}
-          disabled={form.sending}
-          onclick={() => (action = name)}
-          ontouchstart={() => {}}
-        >
-          {words}
-        </button>
-      {/each}
-    </div>
+    <Segmented label="What to start" options={ACTIONS} bind:value={action} disabled={form.sending} />
   {/if}
   {#if !sendable}
     <p class="offline">Not connected to the Mac. What you type stays here until it connects.</p>
@@ -99,36 +87,6 @@
     max-width: 520px;
     margin: 0 auto;
     padding: var(--gap) var(--inset-wide) 40px;
-  }
-
-  .actions {
-    display: flex;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-control);
-    background: var(--field);
-  }
-
-  .action {
-    flex: 1;
-    min-height: 40px;
-    border: 0;
-    border-radius: calc(var(--radius-control) - 2px);
-    background: none;
-    color: var(--soft);
-    font: inherit;
-    font-size: 15px;
-  }
-
-  .action[aria-pressed='true'] {
-    background: var(--selected);
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  .action:disabled {
-    opacity: 0.6;
   }
 
   .offline {
