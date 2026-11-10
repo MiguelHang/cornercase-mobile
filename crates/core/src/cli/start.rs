@@ -19,6 +19,19 @@ pub struct StartAgent {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct StartIssue {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub project: u64,
+    pub agent: String,
+    pub model: String,
+    pub key: String,
+    pub source: String,
+    pub branch: String,
+    pub issue_branch: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct NewWorkspace {
     #[cfg_attr(feature = "specta", specta(type = u32))]
     pub project: u64,
@@ -49,6 +62,23 @@ impl StartAgent {
         argv.push(format!("--prompt={}", self.prompt.trim()));
         argv.extend(words(&["--placed", "--json"]));
         argv
+    }
+}
+
+impl StartIssue {
+    pub fn argv(&self) -> Vec<String> {
+        let mut argv = words(&["start", self.agent.trim(), "--project", &self.project.to_string()]);
+        argv.push(format!("--issue={}", self.key.trim()));
+        argv.extend(optional("--source", &self.source));
+        argv.extend(optional("--worktree", self.other_branch()));
+        argv.extend(optional("--model", &self.model));
+        argv.extend(words(&["--placed", "--json"]));
+        argv
+    }
+
+    fn other_branch(&self) -> &str {
+        let branch = self.branch.trim();
+        if branch == self.issue_branch.trim() { "" } else { branch }
     }
 }
 
