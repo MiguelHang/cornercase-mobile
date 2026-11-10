@@ -8,7 +8,7 @@ export type Route =
   | { name: 'terminal'; machine: number; row: AgentRow }
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
-  | { name: 'start'; machine: number; issue?: StartingIssue }
+  | { name: 'start'; machine: number; issue?: StartingIssue; workspace?: number }
   | { name: 'changes'; machine: number; workspace: number; title: string }
   | { name: 'change'; machine: number; workspace: number; path: string }
   | { name: 'files'; machine: number; workspace: number; title: string }

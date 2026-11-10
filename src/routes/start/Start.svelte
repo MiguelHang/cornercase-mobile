@@ -14,6 +14,7 @@
   let {
     connection,
     issue,
+    workspace,
     backTo,
     onback,
     onstarted,
@@ -22,6 +23,7 @@
   }: {
     connection: ConnectionView_Serialize
     issue?: StartingIssue
+    workspace?: number
     backTo: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
@@ -39,6 +41,9 @@
   untrack(() => {
     if (issue !== undefined) {
       form.forIssue(issue)
+    }
+    if (workspace !== undefined) {
+      form.prefer(workspace)
     }
   })
 

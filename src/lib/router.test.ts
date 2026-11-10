@@ -485,6 +485,29 @@ describe('Router, the issues of a project', () => {
   })
 })
 
+describe('Router, starting from an agent', () => {
+  const IN_WORKSPACE: Route = { name: 'start', machine: 1, workspace: 2 }
+
+  it("stacks Start with the agent's workspace on its chat and goes back to the chat", () => {
+    const router = routed(AGENT, IN_WORKSPACE)
+    expect(router.current).toEqual({ name: 'start', machine: 1, workspace: 2 })
+    expect(router.latest('start')).toBe(router.current)
+    expect(router.below).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+    expect(router.opened).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it('leaves only the agent it started on the base, so going back reaches the board', () => {
+    const router = routed(AGENT, IN_WORKSPACE)
+    const started = { name: 'agent', machine: 1, pane: 9, starting: true } as const
+    router.settle(started)
+    expect(router.below).toEqual(HOME)
+    expect(router.opened).toEqual({ machine: 1, pane: 9 })
+    expect(router.latest('start')).toBeNull()
+  })
+})
+
 describe('Router.settle', () => {
   it('leaves only the started agent on the base, so going back reaches the board', () => {
     const router = routed(START, ISSUES, ISSUE, ON_ISSUE)

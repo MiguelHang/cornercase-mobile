@@ -422,6 +422,7 @@ describe('Icon', () => {
     ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
     ['image-plus', 'M16 5h6', '<circle cx="9" cy="9" r="2"></circle>'],
     ['check', 'M20 6 9 17l-5-5', ''],
+    ['plus', 'M5 12h14', '<path d="M12 5v14"></path>'],
     ['pencil', 'm15 5 4 4', ''],
     ['rotate-ccw', 'M3 3v5h5', ''],
     ['smartphone', 'M12 18h.01', '<rect x="5" y="2" width="14" height="20" rx="2"></rect>'],

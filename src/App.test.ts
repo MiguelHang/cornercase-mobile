@@ -157,7 +157,7 @@ describe('App wiring', () => {
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
     )
   })
 
@@ -182,7 +182,13 @@ describe('App wiring', () => {
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} {backTo} onback={goBack} onstarted={started} onissues={listIssues} /> {:else if route.name === 'issues'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} workspace={route.workspace} {backTo} onback={goBack} onstarted={started} onissues={listIssues} /> {:else if route.name === 'issues'}",
+    )
+  })
+
+  it("opens Start from an agent on the active machine, with the agent's workspace chosen", () => {
+    expect(source).toContain(
+      "const startIn = (workspace: number) => { if (current.machine !== null) { router.go({ name: 'start', machine: current.machine, workspace }) } }",
     )
   })
 
@@ -352,7 +358,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

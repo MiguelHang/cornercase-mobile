@@ -280,6 +280,12 @@
     }
   }
 
+  const startIn = (workspace: number) => {
+    if (current.machine !== null) {
+      router.go({ name: 'start', machine: current.machine, workspace })
+    }
+  }
+
   const started = (placed: Started, agent: string) => {
     const at = router.current
     if (at.name === 'start') {
@@ -420,6 +426,7 @@
             onterminal={terminal}
             onchanges={review}
             onfiles={browse}
+            onstart={startIn}
           />
         {/if}
       {:else if route.name === 'changes'}
@@ -442,6 +449,7 @@
         <Start
           connection={current.connection}
           issue={route.issue}
+          workspace={route.workspace}
           {backTo}
           onback={goBack}
           onstarted={started}

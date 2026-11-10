@@ -43,6 +43,7 @@ const screen = (chat: Chat) =>
       onchanges: () => {},
       onfiles: () => {},
       onterminal: () => {},
+      onstart: () => {},
     },
   }).body
 

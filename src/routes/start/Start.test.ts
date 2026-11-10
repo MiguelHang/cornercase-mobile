@@ -56,11 +56,17 @@ const READ = comments as ReadIssue
 
 const COUPON: StartingIssue = { project: 2, issue: READ.issue, prompt: READ.prompt }
 
-const screen = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED, issue?: StartingIssue) =>
+const screen = (
+  form: StartForm,
+  connection: ConnectionView_Serialize = CONNECTED,
+  issue?: StartingIssue,
+  workspace?: number,
+) =>
   render(Start, {
     props: {
       connection,
       issue,
+      workspace,
       backTo: 'Agents',
       onback: () => {},
       onstarted: () => {},
@@ -136,6 +142,13 @@ describe('Start, its agent form', () => {
       /<option disabled="" selected="">Choose…<\/option>[^]*?<option value="12">web › main<\/option><option value="9">api › Login</,
     )
     expect(body).toMatch(/<option value="claude" selected="">claude<\/option><option value="codex">codex<\/option>/)
+  })
+
+  it('chooses the workspace of the agent it was opened from', async () => {
+    const form = await formOf()
+    const body = screen(form, CONNECTED, undefined, 9)
+    expect(form.workspace).toBe(9)
+    expect(body).toMatch(/<option value="12">web › main<\/option><option value="9" selected="">api › Login</)
   })
 
   it('chooses the only workspace', async () => {
@@ -359,7 +372,9 @@ describe('Start wiring', () => {
 
   it('turns into the issue form when it opens on an issue', () => {
     const script = flat(startSource)
-    expect(script).toContain('untrack(() => { if (issue !== undefined) { form.forIssue(issue) } })')
+    expect(script).toContain(
+      'untrack(() => { if (issue !== undefined) { form.forIssue(issue) } if (workspace !== undefined) { form.prefer(workspace) } })',
+    )
     expect(script).toContain('{#if form.issue === null} <div class="actions"')
     expect(script).toContain('{#if form.issue !== null} <IssueForm {form} {sendable} />')
   })
