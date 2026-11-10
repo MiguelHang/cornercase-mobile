@@ -303,10 +303,10 @@ describe('App wiring', () => {
   })
 
   it("takes android's back button only while it goes back or cancels the scanner, deciding when pressed", () => {
-    expect(source).toContain('const pressed = () => backPressed(platform, router.below, shown.scanning)')
+    expect(source).toContain('const pressed = () => backPressed(platform, router.below, openScanner.scanning)')
     expect(source).toContain('const backHandled = $derived(handled(pressed()))')
     expect(source).toContain(
-      '$effect(() => { if (!backHandled) { return } return watchBackButton({ pressed, onback: goBack, onscan: () => void shown.stop(), failed: toasts.failed }) })',
+      '$effect(() => { if (!backHandled) { return } return watchBackButton({ pressed, onback: goBack, onscan: () => void openScanner.stop(), failed: toasts.failed }) })',
     )
     expect(source.match(/watchBackButton\(/g)).toHaveLength(1)
   })

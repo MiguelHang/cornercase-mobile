@@ -109,7 +109,7 @@ const replayed = (fired: Fired[]) => {
 describe('Typist with an Android keyboard: GBoard on the emulator, a composition and a processed Enter', () => {
   const steps = replayed(BOARD)
 
-  it('sends each character, delete, composition and Enter once, in order', () => {
+  it('sends each character, the delete, the composition and each of its two Enters once, in order', () => {
     expect(steps.flatMap(({ step }) => step?.send ?? [])).toEqual([
       { text: 'l' },
       { text: 's' },

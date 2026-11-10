@@ -13,7 +13,7 @@ Que la terminal y el chat funcionen con los teclados de Android y que el cambio 
   Con solo el viewport la WebView no encogía (edge-to-edge con `targetSdk` 37): `MainActivity.kt` aplica los insets
   del IME (`design/architecture/android.md`). `keyboard.svelte.ts` mide el teclado contra la mayor altura vista al
   mismo ancho, porque en Android encogen la página y el visual viewport a la vez (`design/terminal.md` › Typing).
-- [x] CA2 — GBoard y SwiftKey: escribir, borrar (los IME de Android mandan `beforeinput`/composición en vez de
+- [x] CA2 — GBoard (SwiftKey y las composiciones, en la lista del dispositivo): escribir, borrar (los IME de Android mandan `beforeinput`/composición en vez de
   `keydown`: se traducen bien a `input`), predicción desactivada en la terminal. GBoard comprobado en el emulador:
   letra a letra, sin componer; un `keydown` 229 pasa sin contar como tecla. La barra de sugerencias sale aunque la
   WebView pide `NO_SUGGESTIONS`, pero GBoard no autocorrige. SwiftKey y las composiciones (deslizar, voz, acentos),

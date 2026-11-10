@@ -22,7 +22,7 @@ type Permission = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
 const granted = (state: Permission) => state === 'granted'
 
-export class Shown {
+export class OpenScanner {
   scanner = $state<Scanner | null>(null)
 
   get scanning() {
@@ -34,19 +34,19 @@ export class Shown {
   }
 }
 
-export const shown = new Shown()
+export const openScanner = new OpenScanner()
 
 export class Scanner {
   state = $state<ScanState>('idle')
   error = $state<string | null>(null)
   #api: ScannerApi
   #root: Classes
-  #shown: Shown
+  #open: OpenScanner
 
-  constructor(api: ScannerApi, root: Classes, on: Shown = shown) {
+  constructor(api: ScannerApi, root: Classes, on: OpenScanner = openScanner) {
     this.#api = api
     this.#root = root
-    this.#shown = on
+    this.#open = on
   }
 
   async scan(): Promise<string | null> {
@@ -55,7 +55,7 @@ export class Scanner {
     }
     this.state = 'scanning'
     this.error = null
-    this.#shown.scanner = this
+    this.#open.scanner = this
     try {
       return await this.#read()
     } catch (error) {
@@ -63,6 +63,7 @@ export class Scanner {
       return null
     } finally {
       this.#root.remove(SCANNING)
+      this.#close()
       await this.#api.cancel().catch(() => undefined)
     }
   }
@@ -98,6 +99,12 @@ export class Scanner {
 
   async #allowed() {
     return granted(await this.#api.checkPermissions()) || granted(await this.#api.requestPermissions())
+  }
+
+  #close() {
+    if (this.#open.scanner === this) {
+      this.#open.scanner = null
+    }
   }
 
   #fail(error: unknown) {

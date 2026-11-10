@@ -44,9 +44,10 @@ class FakeScreen extends Target implements Screen {
 }
 
 const watched = (screen = new FakeScreen()) => {
-  const keyboard = new Keyboard(screen)
+  const field = { focused: true }
+  const keyboard = new Keyboard(screen, () => field.focused)
   const stop = keyboard.watch()
-  return { screen, viewport: screen.visualViewport ?? new FakeViewport(), keyboard, stop }
+  return { screen, viewport: screen.visualViewport ?? new FakeViewport(), keyboard, stop, field }
 }
 
 const shown = ({ height, offset, covered, open }: Keyboard) => ({ height, offset, covered, open })
@@ -143,6 +144,21 @@ describe('Keyboard where the page shrinks with it, as on Android', () => {
     shrunk(watching, 400, FULL)
     shrunk(watching, 400 - KEYBOARD / 2, FULL)
     expect(watching.keyboard.open).toBe(true)
+  })
+
+  it('reads a page that shrinks with no field focused as a smaller screen, as a split screen does', () => {
+    const watching = watched()
+    watching.field.focused = false
+    shrunk(watching, FULL - KEYBOARD)
+    expect(shown(watching.keyboard)).toEqual({ height: FULL - KEYBOARD, offset: 0, covered: false, open: false })
+  })
+
+  it('calls the keyboard closed once the field loses the focus, though the page stays short', () => {
+    const watching = watched()
+    shrunk(watching, FULL - KEYBOARD)
+    watching.field.focused = false
+    shrunk(watching, FULL - KEYBOARD)
+    expect(watching.keyboard.open).toBe(false)
   })
 
   it('drops the size asked for while the keyboard is open', () => {

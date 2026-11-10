@@ -50,12 +50,19 @@ private object Watcher : ConnectivityManager.NetworkCallback() {
     @Synchronized
     fun watch(connectivity: ConnectivityManager, next: Channel) {
         channel = next
-        if (last == null) {
-            val network = connectivity.activeNetwork
-            last = seenOf(network, network?.let(connectivity::getNetworkCapabilities))
+        send((last ?: registered(connectivity)).path)
+    }
+
+    private fun registered(connectivity: ConnectivityManager): Seen {
+        val network = connectivity.activeNetwork
+        val seen = seenOf(network, network?.let(connectivity::getNetworkCapabilities))
+        try {
             connectivity.registerDefaultNetworkCallback(this)
+            last = seen
+        } catch (failed: RuntimeException) {
+            Logger.error("cornercase-mobile: network not watched", failed)
         }
-        send((last ?: GONE).path)
+        return seen
     }
 
     override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {

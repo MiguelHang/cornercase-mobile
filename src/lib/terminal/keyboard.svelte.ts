@@ -24,6 +24,8 @@ export const seen = (screen: Screen, before?: Tallest): Seen => {
   return { height, offset: offsetTop, covered: hidden > 0, open: hidden > GAP, tallest }
 }
 
+const editingNow = () => globalThis.document?.activeElement?.matches('textarea, input, [contenteditable]') ?? false
+
 const listened = (target: Listened, names: string[], listener: () => void) => {
   for (const name of names) target.addEventListener(name, listener)
   return () => {
@@ -33,10 +35,12 @@ const listened = (target: Listened, names: string[], listener: () => void) => {
 
 export class Keyboard {
   readonly #screen: Screen
+  readonly #editing: () => boolean
   #seen: Seen = $state.raw({ height: 0, offset: 0, covered: false, open: false, tallest: { width: 0, height: 0 } })
 
-  constructor(screen: Screen) {
+  constructor(screen: Screen, editing: () => boolean = editingNow) {
     this.#screen = screen
+    this.#editing = editing
   }
 
   get height() {
@@ -57,7 +61,7 @@ export class Keyboard {
 
   watch() {
     const read = () => {
-      this.#seen = seen(this.#screen, this.#seen.tallest)
+      this.#seen = seen(this.#screen, this.#editing() ? this.#seen.tallest : undefined)
     }
     read()
     const viewport = this.#screen.visualViewport

@@ -20,7 +20,7 @@
   import { platform } from './lib/platform'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
   import type { Asker } from './lib/question.svelte'
-  import { shown } from './lib/scanner.svelte'
+  import { openScanner } from './lib/scanner.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import { prefersReducedMotion } from './lib/ui/motion'
@@ -92,7 +92,7 @@
   }
   const backTo = $derived(titleOf(router.below, lookups))
   const swipeable = $derived(backSwipes(platform, router.below))
-  const pressed = () => backPressed(platform, router.below, shown.scanning)
+  const pressed = () => backPressed(platform, router.below, openScanner.scanning)
   const backHandled = $derived(handled(pressed()))
   const changes = $derived(
     reviewedMachine === null || reviewedWorkspace === null
@@ -244,7 +244,7 @@
     if (!backHandled) {
       return
     }
-    return watchBackButton({ pressed, onback: goBack, onscan: () => void shown.stop(), failed: toasts.failed })
+    return watchBackButton({ pressed, onback: goBack, onscan: () => void openScanner.stop(), failed: toasts.failed })
   })
 
   const start = () => {
