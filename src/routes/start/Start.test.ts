@@ -13,7 +13,6 @@ import AgentForm from './AgentForm.svelte'
 import agentSource from './AgentForm.svelte?raw'
 import pickerSource from './AgentPicker.svelte?raw'
 import issueSource from './IssueForm.svelte?raw'
-import projectSource from './ProjectPicker.svelte?raw'
 import ShowIssues from './ShowIssues.svelte'
 import showSource from './ShowIssues.svelte?raw'
 import Start from './Start.svelte'
@@ -78,8 +77,7 @@ const screen = (
 const onIssue = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED) =>
   screen(form, connection, COUPON)
 
-const showIssues = (form: StartForm, sendable = true) =>
-  render(ShowIssues, { props: { form, sendable, onshow: () => {} } }).body
+const showIssues = (sendable = true) => render(ShowIssues, { props: { sendable, onshow: () => {} } }).body
 
 const agentForm = (form: StartForm, sendable = true) => render(AgentForm, { props: { form, sendable } }).body
 
@@ -98,7 +96,6 @@ const label = (button: RegExpMatchArray | null) => button?.[2].replace(/<[^>]*>|
 
 const filled = async (calls: Partial<StartCalls> = {}) => {
   const form = await formOf(calls)
-  form.project = 2
   form.workspace = 9
   form.prompt = 'fix the login'
   return form
@@ -259,25 +256,18 @@ describe('Start, where its agent works', () => {
 })
 
 describe('Start, its way to the issues', () => {
-  it('chooses the project and offers Show issues', async () => {
-    const body = showIssues(await formOf())
-    expect(labels(body)).toEqual(['Project'])
-    expect(body).toContain("Pick one of the project's issues to start an agent on it.")
+  it('asks for no project and offers Show issues, for the issues of every project', () => {
+    const body = showIssues()
+    expect(labels(body)).toEqual([])
+    expect(body).not.toContain('<select')
+    expect(body).toContain('See the issues of every project and pick one to start an agent on it.')
     expect(label(submit(body))).toBe('Showissues')
     expect(submit(body)?.[1]).not.toContain('disabled')
+    expect(flat(showSource)).toContain('<FormFrame problem={null} onsubmit={onshow}>')
   })
 
-  it('says to choose a project instead of showing the issues of none', async () => {
-    const form = await formOf()
-    form.chooseProject()
-    expect(errorOf(showIssues(form), 'Project')).toBe('Choose a project')
-    expect(flat(showSource)).toContain(
-      'const show = () => { const project = form.chooseProject() if (project !== null) { onshow(project) } }',
-    )
-  })
-
-  it('holds Show issues while not connected', async () => {
-    expect(submit(showIssues(await formOf(), false))?.[1]).toContain('disabled=""')
+  it('holds Show issues while not connected', () => {
+    expect(submit(showIssues(false))?.[1]).toContain('disabled=""')
   })
 })
 
@@ -367,7 +357,7 @@ describe('Start wiring', () => {
     expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
     expect(script).toContain('onclick={() => (action = name)}')
     expect(script).toContain("{:else if action === 'agent'} <AgentForm {form} {sendable} />")
-    expect(script).toContain('{:else} <ShowIssues {form} {sendable} onshow={onissues} />')
+    expect(script).toContain('{:else} <ShowIssues {sendable} onshow={onissues} />')
   })
 
   it('turns into the issue form when it opens on an issue', () => {
@@ -386,7 +376,6 @@ describe('Start wiring', () => {
 
   it('reads again what failed on Try again', () => {
     expect(flat(pickerSource)).toContain('onretry={() => void form.loadAgents()}')
-    expect(flat(projectSource)).toContain('onretry={() => void form.loadProjects()}')
     expect(flat(workspacePickerSource)).toContain('onretry={() => void form.loadProjects()}')
   })
 })

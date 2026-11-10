@@ -299,10 +299,10 @@
     }
   }
 
-  const listIssues = (project: number) => {
+  const listIssues = () => {
     const at = router.current
     if (at.name === 'start') {
-      router.go({ name: 'issues', machine: at.machine, project })
+      router.go({ name: 'issues', machine: at.machine })
     }
   }
 

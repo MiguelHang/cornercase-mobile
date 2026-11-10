@@ -66,6 +66,11 @@
     return filters.closed ? 'No issues' : 'No open issues'
   })
 
+  const whereOf = (issue: Found) => {
+    const tracker = issues.nameOf(issue.source)
+    return issue.repository ? `${tracker} · ${issues.projectName(issue.project)}` : tracker
+  }
+
   const retry = () => void issues.retry()
 </script>
 
@@ -124,7 +129,7 @@
     {#if shown.length > 0}
       <ul class="issues">
         {#each shown as issue (`${issue.project}:${issue.source}:${issue.key}`)}
-          <li><IssueRow {issue} {now} {onopen} /></li>
+          <li><IssueRow {issue} where={whereOf(issue)} {now} {onopen} /></li>
         {/each}
       </ul>
     {:else if issues.swept === null}

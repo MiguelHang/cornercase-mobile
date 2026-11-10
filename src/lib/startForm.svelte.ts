@@ -24,7 +24,6 @@ export type WorkspaceOption = { id: number; project: number; label: string }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
 
-export const PROJECT_EMPTY = 'Choose a project'
 export const WORKSPACE_EMPTY = 'Choose a workspace'
 export const BRANCH_EMPTY = 'Name the branch'
 export const AGENT_EMPTY = 'Choose an agent'
@@ -80,7 +79,6 @@ export class StartForm {
   ownWorktree = $state(false)
   issue = $state.raw<StartingIssue | null>(null)
   branch = $state('')
-  projectError = $state<string | null>(null)
   workspaceError = $state<string | null>(null)
   branchError = $state<string | null>(null)
   agentError = $state<string | null>(null)
@@ -134,11 +132,6 @@ export class StartForm {
     this.#pickWorkspace()
   }
 
-  chooseProject() {
-    this.projectError = errorIf(this.project === null, PROJECT_EMPTY)
-    return this.project
-  }
-
   async load() {
     await Promise.all([this.loadProjects(), this.loadAgents()])
   }
@@ -180,7 +173,6 @@ export class StartForm {
       return false
     }
     this.projects = choicesOf(projectsOf(reply))
-    this.#pickProject()
     this.#pickWorkspace()
     return reply.ok && this.#restarted(reply.data.boot)
   }
@@ -262,19 +254,6 @@ export class StartForm {
       this.formError = reply.error
     }
     return reply
-  }
-
-  #pickProject() {
-    if (this.projects.kind !== 'ready' || this.issue !== null) {
-      return
-    }
-    const items = this.projects.items
-    if (!items.some((choice) => choice.id === this.project)) {
-      this.project = null
-    }
-    if (this.project === null && items.length === 1) {
-      this.project = items[0].id
-    }
   }
 
   #pickWorkspace() {

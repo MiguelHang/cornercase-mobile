@@ -194,7 +194,7 @@ describe('App wiring', () => {
 
   it('lists the issues on the machine of Start, opens a tapped one with its project and starts on it', () => {
     expect(source).toContain(
-      "const listIssues = (project: number) => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine, project }) } }",
+      "const listIssues = () => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine }) } }",
     )
     expect(source).toContain(
       "const openIssue = (row: Found) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: row.project, key: row.key, source: row.source }) } }",

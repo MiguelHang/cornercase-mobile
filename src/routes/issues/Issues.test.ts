@@ -17,6 +17,8 @@ const NOW = Date.parse('2026-11-10T09:20:24Z')
 
 const pending = () => new Promise<never>(() => {})
 
+const ok = <T>(data: T) => Promise.resolve({ status: 'ok' as const, data })
+
 const GITHUB: SourceInfo = {
   source: 'github',
   name: 'GitHub',
@@ -95,10 +97,44 @@ const stateOf = ({ trackers = { kind: 'ready', sources: [GITHUB] }, issues = [],
   return state
 }
 
-const screenOf = (seen: Seen) =>
-  render(Issues, {
-    props: { issues: stateOf(seen), backTo: 'shop', onback: () => {}, onopen: () => {}, now: NOW },
-  }).body
+const drawn = (issues: IssuesState) =>
+  render(Issues, { props: { issues, backTo: 'Start', onback: () => {}, onopen: () => {}, now: NOW } }).body
+
+const screenOf = (seen: Seen) => drawn(stateOf(seen))
+
+const SHOP = 7
+const NOTES = 8
+
+const NOTED: IssueInfo = {
+  ...COUPON,
+  key: '#12',
+  title: 'Notes lose their order',
+  url: 'https://github.com/acme/notes/issues/12',
+  updated_at: '2026-11-09T09:20:24Z',
+}
+
+const LISTED: Record<string, IssueInfo[]> = {
+  [`github ${SHOP}`]: [COUPON],
+  [`github ${NOTES}`]: [NOTED],
+  [`shortcut ${SHOP}`]: [{ ...REFUNDS, updated_at: '2026-11-08T09:20:24Z' }],
+}
+
+const everyProject = async () => {
+  const projects = [
+    { id: SHOP, name: 'shop', workspaces: [] },
+    { id: NOTES, name: 'notes', workspaces: [] },
+  ]
+  const state = new IssuesState(3, {
+    startProjects: () => ok({ boot: null, projects }),
+    issueSources: (project) => ok({ project, sources: [GITHUB, SHORTCUT], places: [] }),
+    issueList: (project, { source }) => {
+      const issues = LISTED[`${source} ${project}`] ?? []
+      return ok({ project, issues, sources: [counted(source ?? '', issues.length)] })
+    },
+  })
+  await state.refresh()
+  return drawn(state)
+}
 
 const textsOf = (body: string, kind: string) =>
   [...body.matchAll(new RegExp(`<(?:p|span) class="${kind}[^"]*">([^<]*)<`, 'g'))].map((found) => found[1])
@@ -113,13 +149,13 @@ const pressedIn = (body: string, label: string) => {
 const one = (source: string) => source.replace(/\s+/g, ' ')
 
 describe('Issues', () => {
-  it('heads the screen with Issues in the shared bar, going back to the project', () => {
+  it('heads the screen with Issues in the shared bar, going back to Start', () => {
     const body = screenOf({})
-    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to shop"/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Start"/)
     expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Issues<\/h1>/)
   })
 
-  it('spins while it reads which trackers the project has', () => {
+  it('spins while it reads which trackers the projects have', () => {
     const body = screenOf({ trackers: { kind: 'loading' }, issues: null })
     expect(body).toMatch(/<p class="note svelte-[\w-]+"><span class="spinner[^]*?Reading the trackers…<\/p>/)
     expect(body).not.toContain('type="search"')
@@ -140,6 +176,13 @@ describe('Issues', () => {
     expect(textsOf(body, 'tag svelte-')).toEqual(['bug', 'checkout'])
     expect(body).toMatch(/<span class="state svelte-[\w-]+">open<\/span>/)
     expect(body).toMatch(/<span class="state svelte-[\w-]+ closed">closed<\/span>/)
+  })
+
+  it("lists every project's issues, each row with its tracker and, for a repository's, its project", async () => {
+    const body = await everyProject()
+    expect(textsOf(body, 'key svelte-')).toEqual(['#12', 'sc-7', '#41'])
+    expect(textsOf(body, 'where svelte-')).toEqual(['GitHub · notes', 'Shortcut', 'GitHub · shop'])
+    expect(body).not.toContain('<select')
   })
 
   it('keeps only the issues whose key, title or labels hold every word typed, without asking again', () => {
@@ -257,7 +300,7 @@ describe('Connect', () => {
     expect(textsOf(connect([{ ...GITHUB, ...change }]), 'how svelte-')).toEqual(how)
   })
 
-  it('points at the Mac when the project has no tracker at all', () => {
+  it('points at the Mac when no project has a tracker at all', () => {
     const how = textsOf(connect([]), 'how svelte-')
     expect(how).toEqual(["Connect one on the Mac, in cornercase's Settings › Issues."])
     expect(one(connectSource)).toContain('<Button tone="plain" onclick={onretry}>Check again</Button>')
@@ -266,10 +309,10 @@ describe('Connect', () => {
 
 describe('IssueRow', () => {
   it('leaves the age out when the tracker gave no date it can read, and opens the issue on a tap', () => {
-    const body = render(IssueRow, {
-      props: { issue: { ...COUPON, updated_at: '', project: 7, repository: true }, now: NOW, onopen: () => {} },
-    }).body
+    const issue = { ...COUPON, updated_at: '', project: SHOP, repository: true }
+    const body = render(IssueRow, { props: { issue, where: 'GitHub · shop', now: NOW, onopen: () => {} } }).body
     expect(textsOf(body, 'by svelte-')).toEqual(['grace'])
+    expect(textsOf(body, 'where svelte-')).toEqual(['GitHub · shop'])
     expect(one(rowSource)).toContain(
       '<button class="issue" type="button" onclick={() => onopen(issue)} ontouchstart={() => {}}>',
     )

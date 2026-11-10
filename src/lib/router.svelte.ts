@@ -13,7 +13,7 @@ export type Route =
   | { name: 'change'; machine: number; workspace: number; path: string }
   | { name: 'files'; machine: number; workspace: number; title: string }
   | { name: 'file'; machine: number; workspace: number; path: string }
-  | { name: 'issues'; machine: number; project: number }
+  | { name: 'issues'; machine: number }
   | { name: 'issue'; machine: number; project: number; key: string; source: string }
 
 export type StartingIssue = { project: number; issue: IssueInfo; prompt: string }

@@ -4,10 +4,12 @@
 
   let {
     issue,
+    where,
     now,
     onopen,
   }: {
     issue: Found
+    where: string
     now: number
     onopen: (issue: Found) => void
   } = $props()
@@ -19,6 +21,7 @@
   <span class="head">
     <span class="state" class:closed={issue.closed}>{issue.state}</span>
     <span class="key">{issue.key}</span>
+    <span class="where">{where}</span>
   </span>
   <span class="title">{issue.title}</span>
   <span class="meta">
@@ -72,6 +75,10 @@
   .key {
     color: var(--muted);
     font-family: var(--font-mono);
+  }
+
+  .where {
+    color: var(--soft);
   }
 
   .title {

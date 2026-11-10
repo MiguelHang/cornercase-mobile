@@ -27,7 +27,7 @@
     backTo: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
-    onissues: (project: number) => void
+    onissues: () => void
     form?: StartForm
   } = $props()
 
@@ -86,7 +86,7 @@
     {:else if action === 'agent'}
       <AgentForm {form} {sendable} />
     {:else}
-      <ShowIssues {form} {sendable} onshow={onissues} />
+      <ShowIssues {sendable} onshow={onissues} />
     {/if}
   </Glass>
 </section>

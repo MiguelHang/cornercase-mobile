@@ -12,7 +12,6 @@ import {
   AGENT_UNANSWERED,
   BRANCH_EMPTY,
   CHOICES_UNANSWERED,
-  PROJECT_EMPTY,
   PROMPT_EMPTY,
   StartForm,
   WORKSPACE_EMPTY,
@@ -75,7 +74,6 @@ const loaded = async (overrides: Partial<StartCalls> = {}, memory: Memory = { ..
 
 const filled = async (overrides: Partial<StartCalls> = {}) => {
   const built = await loaded(overrides)
-  built.form.project = 2
   built.form.workspace = 22
   built.form.model = ' opus '
   built.form.prompt = 'fix the login\nand its tests'
@@ -106,7 +104,6 @@ const fromIssue = async (overrides: Partial<StartCalls> = {}, memory: Memory = {
 const issueFields = (form: StartForm) => [form.project, form.agent, form.model, form.branch]
 
 const typed = (form: StartForm) => ({
-  project: form.project,
   workspace: form.workspace,
   agent: form.agent,
   model: form.model,
@@ -135,11 +132,6 @@ describe('StartForm choices', () => {
     expect(form.projects).toEqual({ kind: 'ready', items: SESSION })
     expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude'), agent('codex')] })
     expect([form.project, form.agent]).toEqual([null, 'claude'])
-  })
-
-  it('picks the only project', async () => {
-    const { form } = await loaded({ startProjects: () => ok(choices([project(5)])) })
-    expect(form.project).toBe(5)
   })
 
   it('picks the agent last started in the app while it is still installed', async () => {
@@ -193,7 +185,6 @@ describe('StartForm choices', () => {
 
   it('knows when no agent is installed and refuses to start', async () => {
     const { form, commands } = await loaded({ installedAgents: () => ok([]) })
-    form.project = 1
     form.prompt = 'fix it'
     await form.start()
     expect([form.noAgents, form.agent, form.agentError]).toEqual([true, '', AGENT_EMPTY])
@@ -330,19 +321,19 @@ describe('StartForm when the connection comes back', () => {
     expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude')] })
   })
 
-  it('empties only a project that is gone', async () => {
-    const answers = [ok(choices([project(1), project(2)])), ok(choices([project(1), project(3)], 'boot-2'))]
+  it('empties only a workspace that is gone', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices([project(1), project(3)], 'boot-2'))]
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     const before = typed(form)
     await reconnect(form)
-    expect(typed(form)).toEqual({ ...before, project: null, workspace: null })
+    expect(typed(form)).toEqual({ ...before, workspace: null })
   })
 
-  it('keeps a project that is still there', async () => {
-    const answers = [ok(choices([project(1), project(2)])), ok(choices([project(2)], 'boot-2'))]
+  it('keeps a workspace that is still there', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices([SESSION[1]], 'boot-2'))]
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     await reconnect(form)
-    expect(form.project).toBe(2)
+    expect(form.workspace).toBe(22)
   })
 })
 
@@ -442,23 +433,6 @@ describe('StartForm start', () => {
     await form.start()
     expect([form.formError, form.sending]).toEqual([AGENT_UNANSWERED, false])
     expect(commands.startAgent).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('StartForm choosing a project for its issues', () => {
-  it('says to choose a project when none is chosen', async () => {
-    const { form, commands } = await loaded()
-    expect(form.chooseProject()).toBeNull()
-    expect(form.projectError).toBe(PROJECT_EMPTY)
-    expect(commands.startIssue).not.toHaveBeenCalled()
-  })
-
-  it('gives the chosen project and clears what it said before', async () => {
-    const { form } = await loaded()
-    form.chooseProject()
-    form.project = 2
-    expect(form.chooseProject()).toBe(2)
-    expect(form.projectError).toBeNull()
   })
 })
 

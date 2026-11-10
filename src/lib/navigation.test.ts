@@ -46,7 +46,7 @@ describe('titleOf', () => {
     ['a diff by its file name', { name: 'change', machine: 1, workspace: 2, path: 'src/lib/app.rs' }, 'app.rs'],
     ['the files by their title', { name: 'files', machine: 1, workspace: 2, title: 'main' }, 'main'],
     ['a file by its name', { name: 'file', machine: 1, workspace: 2, path: 'src/lib/files.ts' }, 'files.ts'],
-    ["a project's issues", { name: 'issues', machine: 1, project: 4 }, 'Issues'],
+    ['the issues', { name: 'issues', machine: 1 }, 'Issues'],
     ['an issue by its key', { name: 'issue', machine: 1, project: 4, key: 'ENG-42', source: 'linear' }, 'ENG-42'],
   ])('names %s', (_, route, title) => {
     expect(titleOf(route, LOOKUPS)).toBe(title)

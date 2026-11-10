@@ -36,7 +36,7 @@ const FILES = { name: 'files', machine: 1, workspace: 3, title: 'feature' } as c
 const FILE = { name: 'file', machine: 1, workspace: 3, path: 'src/main.rs' } as const
 const WHOLE = { name: 'file', machine: 1, workspace: 2, path: 'src/app.rs' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
-const ISSUES = { name: 'issues', machine: 1, project: 4 } as const
+const ISSUES = { name: 'issues', machine: 1 } as const
 const ISSUE = { name: 'issue', machine: 1, project: 4, key: '#41', source: 'github' } as const
 const ON_ISSUE: Route = {
   name: 'start',
