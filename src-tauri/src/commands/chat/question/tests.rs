@@ -1,7 +1,7 @@
 use cornercase_core::cli::surface::Style;
 use cornercase_core::error::Error;
 use cornercase_core::terminal::grid::Run;
-use cornercase_core::terminal::question::Choice;
+use cornercase_core::terminal::question::{Card, CardOption, Choice};
 use serde_json::{Value, json};
 
 use super::*;
@@ -19,7 +19,12 @@ const ASKING: Asking = Asking { tab: 942, pane: 941, size: SIZE };
 fn question(label: &str) -> Asked {
     let rows = vec![vec![Run { text: label.to_owned(), width: 3, style: Style::default(), link: None }]];
     let options = vec![Choice { number: 1, label: label.to_owned() }, Choice { number: 2, label: "No".to_owned() }];
-    Asked::Question(Question { pane: 941, colours: Colours::default(), rows, options })
+    Asked::Question(Question { pane: 941, colours: Colours::default(), rows, options, card: Some(card(label)) })
+}
+
+fn card(label: &str) -> Card {
+    let options = vec![CardOption { number: 1, label: label.to_owned(), detail: None, selected: true }];
+    Card { tabs: Vec::new(), open: None, blocks: Vec::new(), options, help: Vec::new() }
 }
 
 fn batched(said: Vec<Asked>) -> Vec<Emitted> {
@@ -70,19 +75,21 @@ mod asks {
         let changed = told(vec![question("Red"), question("Green")]);
         assert_eq!((changed.machine, changed.tab, changed.pane, changed.closed), (7, 942, 941, false));
         assert_eq!(labels(&changed), ["Green", "No"]);
+        assert_eq!(changed.card, Some(card("Green")));
     }
 
     #[test]
     fn clear_the_question_without_a_toast_when_the_surface_fails() {
         let failed = Error::Failed { code: 1, stderr: "no tab 942".to_owned() };
         let changed = told(vec![question("Red"), Asked::Failed(failed)]);
-        assert_eq!((changed.rows.len(), changed.options.len(), changed.closed), (0, 0, false));
+        assert_eq!((changed.rows.len(), changed.options.len(), changed.card, changed.closed), (0, 0, None, false));
     }
 
     #[test]
     fn say_the_tab_closed_without_a_question() {
         let changed = told(vec![question("Red"), Asked::Closed]);
-        assert_eq!((changed.pane, changed.rows.len(), changed.options.len(), changed.closed), (941, 0, 0, true));
+        let cleared = (changed.pane, changed.rows.len(), changed.options.len(), changed.card, changed.closed);
+        assert_eq!(cleared, (941, 0, 0, None, true));
     }
 
     #[test]
@@ -111,6 +118,9 @@ mod opening {
         let [changed] = &told[..] else { panic!("one question: {told:?}") };
         assert_eq!((changed.machine, changed.pane, changed.closed), (asked.studio.id.0, 941, false));
         assert_eq!(labels(changed), ["Red", "Green", "Blue", "Type something.", "Chat about this"]);
+        let card = changed.card.as_ref().expect("the card of the question");
+        let chosen: Vec<_> = card.options.iter().map(|option| (option.label.as_str(), option.selected)).collect();
+        assert_eq!(chosen[..2], [("Red", true), ("Green", false)]);
         assert_eq!(asked.surfaces.running(), 1);
         assert_eq!(asked.recorder.toasts(), []);
     }

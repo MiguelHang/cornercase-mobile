@@ -15,7 +15,7 @@ use cornercase_core::machines::route::{Address, Route};
 use cornercase_core::protocol::{BRIDGE_ROUTES, BridgeRoutes};
 use cornercase_core::store::{Change, Changes, Connection, Store};
 use cornercase_core::terminal::grid::Line;
-use cornercase_core::terminal::question::Choice;
+use cornercase_core::terminal::question::{Card, Choice};
 use cornercase_core::transport::{self, Transport};
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
@@ -76,6 +76,7 @@ pub(crate) struct QuestionChanged {
     pub(crate) colours: Colours,
     pub(crate) rows: Vec<Line>,
     pub(crate) options: Vec<Choice>,
+    pub(crate) card: Option<Card>,
     pub(crate) closed: bool,
 }
 

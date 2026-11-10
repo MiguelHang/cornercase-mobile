@@ -144,7 +144,43 @@ export type AttachedImage_Serialize = {
 	thumbnail: string | null,
 };
 
+export type Block = { kind: "text"; text: string } | { kind: "code"; text: string };
+
 export type Button = "left" | "middle" | "right";
+
+export type Card = Card_Serialize | Card_Deserialize;
+
+export type CardOption = CardOption_Serialize | CardOption_Deserialize;
+
+export type CardOption_Deserialize = {
+	number: number,
+	label: string,
+	detail?: string | null,
+	selected: boolean,
+};
+
+export type CardOption_Serialize = {
+	number: number,
+	label: string,
+	detail: string | null,
+	selected: boolean,
+};
+
+export type Card_Deserialize = {
+	tabs: Tab[],
+	open?: number | null,
+	blocks: Block[],
+	options: CardOption_Deserialize[],
+	help: string[],
+};
+
+export type Card_Serialize = {
+	tabs: Tab[],
+	open: number | null,
+	blocks: Block[],
+	options: CardOption_Serialize[],
+	help: string[],
+};
 
 export type ChangedFile = ChangedFile_Serialize | ChangedFile_Deserialize;
 
@@ -798,6 +834,7 @@ export type QuestionChanged_Deserialize = {
 	colours: Colours_Deserialize,
 	rows: Run_Deserialize[][],
 	options: Choice[],
+	card?: Card_Deserialize | null,
 	closed: boolean,
 };
 
@@ -808,6 +845,7 @@ export type QuestionChanged_Serialize = {
 	colours: Colours_Serialize,
 	rows: Run_Serialize[][],
 	options: Choice[],
+	card: Card_Serialize | null,
 	closed: boolean,
 };
 
@@ -1076,6 +1114,11 @@ export type Summary_Serialize = {
 	state: State_Serialize,
 	error: string | null,
 	workspaces: ChangedWorkspace_Serialize[],
+};
+
+export type Tab = {
+	label: string,
+	answered: boolean,
 };
 
 export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;

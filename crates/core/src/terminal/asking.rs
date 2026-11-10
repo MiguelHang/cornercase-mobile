@@ -1,6 +1,6 @@
 use super::grid::{Grid, Line};
 use super::live::{Live, Source, holds};
-use super::question::{Choice, cropped, options};
+use super::question::{Card, Choice, card, cropped, options};
 use crate::cli::surface::{Colours, Size};
 use crate::error::Error;
 use crate::follow::{self, Notice, Opened, Reached, Step};
@@ -12,15 +12,23 @@ pub struct Question {
     pub colours: Colours,
     pub rows: Vec<Line>,
     pub options: Vec<Choice>,
+    pub card: Option<Card>,
 }
 
 impl Question {
     fn of(asked: u64, grid: &Grid) -> Self {
         let Some(pane) = grid.panes.iter().find(|pane| pane.pane == asked) else {
-            return Self { pane: asked, colours: Colours::default(), rows: Vec::new(), options: Vec::new() };
+            return Self {
+                pane: asked,
+                colours: Colours::default(),
+                rows: Vec::new(),
+                options: Vec::new(),
+                card: None,
+            };
         };
         let rows = cropped(pane);
-        Self { pane: pane.pane, colours: pane.colours.clone(), rows: rows.to_vec(), options: options(rows) }
+        let card = card(rows, pane.size.cols);
+        Self { pane: pane.pane, colours: pane.colours.clone(), rows: rows.to_vec(), options: options(rows), card }
     }
 }
 
