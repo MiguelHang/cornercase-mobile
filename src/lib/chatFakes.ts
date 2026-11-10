@@ -176,6 +176,7 @@ export type Calls = {
   haptics?: HapticsApi
   clock?: Clock
   asker?: Asker
+  history?: History
 }
 
 const imagesOf = ({ attachImage = attachedOk, pasteAttached = pastedOk, discard = discardedOk }: Calls): Images => ({
@@ -193,8 +194,10 @@ export const fresh = (calls: Calls = {}) => {
     haptics = still(),
     clock = fakeClock().clock,
     asker = fakeAsker().asker,
+    history = fakeHistory().history,
   } = calls
-  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, imagesOf(calls), haptics, clock, asker)
+  const images = imagesOf(calls)
+  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, images, haptics, clock, asker, history)
 }
 
 export const seen = (calls: Calls = {}, status: string | null = 'done') => {

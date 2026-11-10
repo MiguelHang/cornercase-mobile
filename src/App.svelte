@@ -16,6 +16,7 @@
   import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
+  import { LocalHistory } from './lib/history'
   import { IssuesState, IssueState } from './lib/issues.svelte'
   import type { Found } from './lib/issueSweep'
   import { latestWins } from './lib/join'
@@ -79,6 +80,7 @@
           haptics,
           timers,
           asker,
+          new LocalHistory(commands),
         ),
   )
   const seen = $derived(chat?.row != null)

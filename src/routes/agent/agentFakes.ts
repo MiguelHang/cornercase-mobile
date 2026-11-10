@@ -10,6 +10,7 @@ import {
   type SendText,
 } from '../../lib/chat.svelte'
 import { fakeAsker, fakeClock } from '../../lib/chatFakes'
+import type { History } from '../../lib/history'
 
 export const ROW: AgentRow = {
   boot: 'b1',
@@ -47,6 +48,8 @@ export const unattached: Images = {
 
 export const unasked = fakeAsker().asker
 
+export const unkept: History = { open: () => Promise.resolve([]), keep: () => {} }
+
 export const CHIPS: Chip[] = [
   { id: 1, name: 'IMG_0042.jpg', size: '47 KiB', thumbnail: null, pasted: false },
   { id: 2, name: 'pasted.png', size: '900 B', thumbnail: null, pasted: false },
@@ -57,7 +60,7 @@ export const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as c
 export const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 export const chatWith = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, timers, unasked)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, timers, unasked, unkept)
   if (row !== null) {
     chat.see(1, [row])
   }
@@ -76,7 +79,7 @@ export const clockAt = (millis: number) => {
 }
 
 export const lineChat = (status: string | null, since: string | null = ROW.since, clock: Clock = clockAt(LATER).clock) => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, clock, unasked)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, clock, unasked, unkept)
   chat.see(1, [{ ...ROW, status, since }])
   return chat
 }
