@@ -3,6 +3,7 @@ import type { Modes_Serialize } from '../bindings'
 import { empty } from './pane.svelte'
 import type { Point } from './pinch'
 import { STEPS, Swipe, TAP, wheel, type Grid } from './swipe'
+import { roomAt } from './touch'
 
 const LINE = 20
 
@@ -148,6 +149,11 @@ describe('Swipe', () => {
 
     it('does not move towards an edge it has no room before', () => {
       expect(slid(3 * LINE, { room: { up: 0, down: 5 * LINE } })).toEqual({ pan: 0, send: [], rowsUp: 3 })
+    })
+
+    it('scrolls the history without moving back first once fitted at the base', () => {
+      const held = roomAt({ scrollTop: 400, scrollHeight: 1000, clientHeight: 600 }, true)
+      expect(slid(3 * LINE, { room: held })).toEqual({ pan: 0, send: [], rowsUp: 3 })
     })
   })
 
