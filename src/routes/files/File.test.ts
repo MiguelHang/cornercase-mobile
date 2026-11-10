@@ -24,7 +24,7 @@ const shown = (shown: FileShown): Reading => ({ kind: 'shown', shown })
 
 const reads = (read: Partial<Read>, base = TEXT) => shown({ shown: 'read', read: { ...base, ...read } })
 
-const draw = (files: FilesState, path = TEXT.path) => render(File, { props: { path, files, onback: () => {} } }).body
+const draw = (files: FilesState, path = TEXT.path) => render(File, { props: { path, files, backTo: 'login', onback: () => {} } }).body
 
 const noted = (body: string) =>
   body.replace(/<!--[^]*?-->/g, '').match(/<p class="note svelte-[\w-]+">(.*?)<\/p>/s)?.[1].trim() ?? null
@@ -35,11 +35,12 @@ const texts = (body: string) =>
   [...body.matchAll(/<span class="code-text text svelte-[\w-]+">([^<]*)<\/span>/g)].map((m) => m[1])
 
 describe('File', () => {
-  it('heads the screen with the path cut at its start and a Back button', () => {
+  it('heads the screen with the path cut at its start in the shared bar, going back to the files', () => {
     const body = draw(showing(reads({})))
-    expect(body).toMatch(/<h1 class="title svelte-[\w-]+"><span dir="ltr">src\/main\.rs<\/span><\/h1>/)
-    expect(body).toContain('aria-label="Back"')
-    expect(fileSource).toMatch(/\.title \{[^}]*direction: rtl;[^}]*text-overflow: ellipsis;/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to login"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->| )*<h1 class="path svelte-[\w-]+"><span dir="ltr">src\/main\.rs<\/span><\/h1>/)
+    expect(body.match(/<h1/g)).toHaveLength(1)
+    expect(fileSource).toMatch(/\.path \{[^}]*direction: rtl;[^}]*text-overflow: ellipsis;/)
   })
 
   it('spins while the file is read', () => {
@@ -125,6 +126,6 @@ describe('File', () => {
     const body = draw(files)
     expect(noted(body)).toBe(`${CLOSED}.`)
     expect(body).not.toContain('class="box')
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toContain('aria-label="Back to login"')
   })
 })

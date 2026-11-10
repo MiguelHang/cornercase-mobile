@@ -1,3 +1,4 @@
+import type { Edge } from '../edge.svelte'
 import type { InputEvent } from './keys'
 import type { Room, Scroll } from './swipe'
 
@@ -36,4 +37,11 @@ export class Tap {
     this.#marked = false
     return tapped
   }
+}
+
+export const followed = (edge: Edge) => edge === 'idle'
+
+export const ended = (tap: Tap, edge: Edge, still: boolean) => {
+  if (edge === 'claimed') tap.cancelled()
+  else tap.lifted(still)
 }

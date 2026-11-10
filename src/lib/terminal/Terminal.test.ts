@@ -21,7 +21,7 @@ describe('the terminal view', () => {
   })
 
   it('takes a tap on the click that follows it, so the focus outlives the tap and the keyboard opens', () => {
-    expect(source).toContain('pinch.lift(event.pointerId) tap.lifted(swipe.lift(event.pointerId))')
+    expect(source).toContain('pinch.lift(event.pointerId) ended(tap, edge.state, swipe.lift(event.pointerId))')
     expect(source).toContain('const clicked = () => { if (tap.clicked()) ontap() }')
     expect(source).toContain('click: clicked,')
   })
@@ -31,6 +31,13 @@ describe('the terminal view', () => {
       'const cancelled = (event: PointerEvent) => { pinch.lift(event.pointerId) swipe.lift(event.pointerId) tap.cancelled() }',
     )
     expect(source).toContain('pointercancel: (event) => event instanceof PointerEvent && cancelled(event),')
+  })
+
+  it('leaves a finger at the edge of the screen to the swipe back, before the pinch and the swipe see it', () => {
+    expect(source).toContain(
+      'const moved = (box: HTMLElement, event: PointerEvent) => { if (!followed(edge.state)) return const scale = pinch.move(',
+    )
+    expect(source).toContain("import { edge } from '../edge.svelte'")
   })
 
   it('points the wheel at the cell under the finger at the zoom it shows', () => {

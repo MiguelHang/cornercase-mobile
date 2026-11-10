@@ -4,7 +4,7 @@
   import { CLOSED } from '../../lib/changes.svelte'
   import type { FilesState } from '../../lib/files.svelte'
   import CodeBox from '../../lib/ui/CodeBox.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
 
   const NOTICES: Partial<Record<ReadKind, (read: Read) => string>> = {
@@ -18,10 +18,12 @@
   let {
     path,
     files,
+    backTo,
     onback,
   }: {
     path: string
     files: FilesState
+    backTo: string | null
     onback: () => void
   } = $props()
 
@@ -44,12 +46,11 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title"><span dir="ltr">{path}</span></h1>
-  </header>
+  <NavBar {backTo} {onback} topmost>
+    {#snippet center()}
+      <h1 class="path"><span dir="ltr">{path}</span></h1>
+    {/snippet}
+  </NavBar>
   {#if files.gone}
     <p class="note">{CLOSED}.</p>
   {:else if reading?.kind === 'failed'}
@@ -89,44 +90,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--inset-wide);
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    min-width: 0;
-    margin: 0 calc(-1 * var(--inset));
-  }
-
-  .back {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .back:active {
-    background: var(--hover);
-  }
-
-  .title {
-    flex: 1;
-    min-width: 0;
+  .path {
     margin: 0;
     overflow: hidden;
     direction: rtl;
+    color: var(--text);
     font-size: 17px;
     font-weight: 600;
-    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

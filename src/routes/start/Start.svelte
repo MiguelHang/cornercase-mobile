@@ -3,7 +3,7 @@
   import { commands, type ConnectionView_Serialize, type Started_Serialize as Started } from '../../lib/bindings'
   import { StartForm } from '../../lib/startForm.svelte'
   import Glass from '../../lib/ui/Glass.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import AgentForm from './AgentForm.svelte'
   import WorkspaceForm from './WorkspaceForm.svelte'
 
@@ -11,6 +11,7 @@
 
   let {
     connection,
+    backTo,
     onback,
     onstarted,
     oncreated,
@@ -21,6 +22,7 @@
     ),
   }: {
     connection: ConnectionView_Serialize
+    backTo: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
     oncreated: (name: string) => void
@@ -47,12 +49,7 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title">Start</h1>
-  </header>
+  <NavBar {backTo} title="Start" {onback} topmost />
   <div class="actions" role="group" aria-label="What to start">
     {#each ACTIONS as [name, words] (name)}
       <button
@@ -86,38 +83,7 @@
     gap: var(--inset-wide);
     max-width: 520px;
     margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
-  }
-
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin-left: calc(-1 * var(--inset));
-  }
-
-  .back {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .back:active {
-    background: var(--hover);
-  }
-
-  .title {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 600;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
   .actions {

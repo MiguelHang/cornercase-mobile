@@ -9,14 +9,18 @@
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
+  import { backSwipes, RESTING, translated, watchBackSwipe, type Shift } from './lib/backSwipe'
   import { ChangesState } from './lib/changes.svelte'
   import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
   import { latestWins } from './lib/join'
+  import { titleOf, type Lookups } from './lib/navigation'
+  import { platform } from './lib/platform'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
+  import { prefersReducedMotion } from './lib/ui/motion'
   import ToastStack from './lib/ui/Toasts.svelte'
   import Agent from './routes/agent/Agent.svelte'
   import Board from './routes/board/Board.svelte'
@@ -38,6 +42,7 @@
   let machines = $state<MachineView_Serialize[]>([])
   let barHeight = $state(0)
   let launched = $state('')
+  let shift = $state<Shift>(RESTING)
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
 
@@ -61,6 +66,14 @@
   const reviewed = $derived(router.reviewed)
   const reviewedMachine = $derived(reviewed?.machine ?? null)
   const reviewedWorkspace = $derived(reviewed?.workspace ?? null)
+  const lookups: Lookups = {
+    machineName: (id) => machines.find((machine) => machine.id === id)?.name,
+    agentRow: (opened) =>
+      opened.machine === current.machine ? current.agents?.find((row) => row.pane === opened.pane) : undefined,
+    listed: () => current.agents ?? [],
+  }
+  const backTo = $derived(titleOf(router.below, lookups))
+  const swipeable = $derived(backSwipes(platform, router.below))
   const changes = $derived(
     reviewedMachine === null || reviewedWorkspace === null
       ? null
@@ -156,11 +169,6 @@
     }
   }
 
-  const leaveDiff = () => {
-    changes?.closeDiff()
-    router.back()
-  }
-
   const browse = (workspace: number, title: string) => {
     if (current.machine !== null) {
       router.go({ name: 'files', machine: current.machine, workspace, title })
@@ -180,11 +188,32 @@
     }
   }
 
-  const leaveFile = () => {
-    files?.closeFile()
+  const goBack = () => {
+    const top = router.current.name
+    if (top === 'change') {
+      changes?.closeDiff()
+    }
+    if (top === 'file') {
+      files?.closeFile()
+    }
     router.back()
-    void files?.refresh()
+    if (top === 'file') {
+      void files?.refresh()
+    }
   }
+
+  $effect(() => {
+    if (!swipeable) {
+      return
+    }
+    return watchBackSwipe(document, {
+      enabled: () => !document.documentElement.classList.contains('scanning'),
+      width: () => innerWidth,
+      reduced: prefersReducedMotion,
+      onshift: (next) => (shift = next),
+      onback: goBack,
+    })
+  })
 
   const start = () => {
     if (current.machine !== null) {
@@ -280,88 +309,100 @@
     <Terminal
       machine={viewed.machine}
       row={viewed.row}
-      onback={() => router.back()}
+      {backTo}
+      {shift}
+      onback={goBack}
       onfailed={toasts.failed}
       bind:height={barHeight}
     />
-  {:else if barred}
-    <ConnectionBar
-      connection={current.connection}
-      {machineName}
-      bind:height={barHeight}
-      onmachines={() => router.go({ name: 'machines' })}
-    />
-    {#if route.name === 'home'}
-      <Board
-        machine={current.machine}
-        agents={current.agents}
-        connection={current.connection}
-        below={barHeight}
-        onopen={open}
-        onstart={start}
-      />
-    {:else if chat !== null}
-      <Agent
-        {chat}
-        agents={current.agents}
-        connection={current.connection}
-        below={barHeight}
-        {starting}
-        onback={() => router.back()}
-        onopen={open}
-        onfailed={(message) => toasts.push({ level: 'error', message })}
-        onterminal={terminal}
-        onchanges={review}
-        onfiles={browse}
-      />
-    {/if}
-  {:else if route.name === 'changes'}
-    {#if changes !== null}
-      <Changes title={route.title} {changes} onback={() => router.back()} onopen={change} />
-    {/if}
-  {:else if route.name === 'change'}
-    {#if changes !== null}
-      <Diff path={route.path} {changes} onback={leaveDiff} onfile={whole} />
-    {/if}
-  {:else if route.name === 'files'}
-    {#if files !== null}
-      <Files title={route.title} {files} onback={() => router.back()} onopen={read} />
-    {/if}
-  {:else if route.name === 'file'}
-    {#if files !== null}
-      <File path={route.path} {files} onback={leaveFile} />
-    {/if}
-  {:else if route.name === 'start'}
-    <Start
-      connection={current.connection}
-      onback={() => router.back()}
-      onstarted={started}
-      oncreated={created}
-    />
-  {:else if route.name === 'machines'}
-    <Machines
-      {machines}
-      active={current.machine}
-      connection={current.connection}
-      onback={() => router.back()}
-      onpick={(machine) => void join(machine)}
-      onadded={added}
-      onrouted={reload}
-      onedit={(machine) => router.go({ name: 'machine', id: machine })}
-      onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
-    />
-  {:else if editing !== undefined}
-    <Machine
-      machine={editing}
-      {taken}
-      connection={editing.id === current.machine ? current.connection : null}
-      onback={() => router.back()}
-      onchanged={reload}
-      onremoved={removed}
-      adding={rescanning}
-    />
   {:else}
-    <NoMachines onadded={added} />
+    {#if barred}
+      <ConnectionBar
+        connection={current.connection}
+        {machineName}
+        bind:height={barHeight}
+        onmachines={() => router.go({ name: 'machines' })}
+      />
+    {/if}
+    <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>
+      {#if route.name === 'home'}
+        <Board
+          machine={current.machine}
+          agents={current.agents}
+          connection={current.connection}
+          below={barHeight}
+          onopen={open}
+          onstart={start}
+        />
+      {:else if barred}
+        {#if chat !== null}
+          <Agent
+            {chat}
+            agents={current.agents}
+            connection={current.connection}
+            {backTo}
+            below={barHeight}
+            {starting}
+            onback={goBack}
+            onopen={open}
+            onfailed={(message) => toasts.push({ level: 'error', message })}
+            onterminal={terminal}
+            onchanges={review}
+            onfiles={browse}
+          />
+        {/if}
+      {:else if route.name === 'changes'}
+        {#if changes !== null}
+          <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} />
+        {/if}
+      {:else if route.name === 'change'}
+        {#if changes !== null}
+          <Diff path={route.path} {changes} {backTo} onback={goBack} onfile={whole} />
+        {/if}
+      {:else if route.name === 'files'}
+        {#if files !== null}
+          <Files title={route.title} {files} {backTo} onback={goBack} onopen={read} />
+        {/if}
+      {:else if route.name === 'file'}
+        {#if files !== null}
+          <File path={route.path} {files} {backTo} onback={goBack} />
+        {/if}
+      {:else if route.name === 'start'}
+        <Start
+          connection={current.connection}
+          {backTo}
+          onback={goBack}
+          onstarted={started}
+          oncreated={created}
+        />
+      {:else if route.name === 'machines'}
+        <Machines
+          {machines}
+          active={current.machine}
+          connection={current.connection}
+          {backTo}
+          onback={goBack}
+          onpick={(machine) => void join(machine)}
+          onadded={added}
+          onrouted={reload}
+          onedit={(machine) => router.go({ name: 'machine', id: machine })}
+          onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
+        />
+      {:else if editing !== undefined}
+        <Machine
+          machine={editing}
+          {taken}
+          connection={editing.id === current.machine ? current.connection : null}
+          {backTo}
+          onback={goBack}
+          onchanged={reload}
+          onremoved={removed}
+          adding={rescanning}
+        />
+      {:else}
+        <NoMachines onadded={added} />
+      {/if}
+    </div>
   {/if}
   <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />
 </main>

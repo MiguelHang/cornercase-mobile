@@ -44,6 +44,7 @@ html.scanning #app {
 
 #app {
   position: relative;
+  overflow-x: clip;
 }
 
 .spoken {
@@ -53,6 +54,15 @@ html.scanning #app {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.sliding {
+  background: var(--glass);
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.5);
+}
+
+.settling {
+  transition: transform var(--leave) ease-out;
 }
 
 .pulsing {

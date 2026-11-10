@@ -31,7 +31,7 @@ const browsing = async (folders: Record<string, Folder> = { '': ROOT_FOLDER }, l
 }
 
 const draw = (files: FilesState, title = 'login') =>
-  render(Files, { props: { title, files, onback: () => {}, onopen: () => {} } }).body
+  render(Files, { props: { title, files, backTo: 'Fix the login', onback: () => {}, onopen: () => {} } }).body
 
 const entryRow = (entry: Partial<Entry>, more: Partial<Extract<Row, { kind: 'entry' }>> = {}) =>
   render(EntryRow, {
@@ -71,10 +71,10 @@ const letters = (body: string) =>
 const hits = (body: string) => [...body.matchAll(/<span class="svelte-[\w-]+ hit">([^<]*)<\/span>/g)].map((m) => m[1])
 
 describe('Files', () => {
-  it("heads the tree with the workspace's name, a Back button and the search field", async () => {
+  it("heads the tree with the workspace's name in the shared bar, going back to the chat, and the search field", async () => {
     const body = draw(await browsing())
-    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">login<\/h1>/)
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Fix the login"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">login<\/h1>/)
     expect(body).toMatch(/<input class="query svelte-[\w-]+" type="search" aria-label="Search files"/)
   })
 
@@ -124,7 +124,7 @@ describe('Files', () => {
     expect(notes(body)).toEqual([`${CLOSED}.`])
     expect(body).not.toContain('type="search"')
     expect(body).not.toContain('<ul')
-    expect(body).toContain('aria-label="Back"')
+    expect(body).toContain('aria-label="Back to Fix the login"')
   })
 
   it('searches through the state as the user types, and toggles and opens through it', () => {

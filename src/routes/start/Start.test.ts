@@ -36,7 +36,7 @@ const refusing = (message: string) => () =>
   Promise.resolve({ status: 'error' as const, error: { code: 'failed' as const, message } })
 
 const screen = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED) =>
-  render(Start, { props: { connection, onback: () => {}, onstarted: () => {}, oncreated: () => {}, form } }).body
+  render(Start, { props: { connection, backTo: 'Agents', onback: () => {}, onstarted: () => {}, oncreated: () => {}, form } }).body
 
 const agentForm = (form: StartForm, sendable = true) => render(AgentForm, { props: { form, sendable } }).body
 
@@ -66,10 +66,11 @@ const filled = async (calls: Partial<StartCalls> = {}) => {
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 describe('Start', () => {
-  it('has a header with Back and its title, and starts on Agent', async () => {
+  it('goes back to the agents from a bar with its title, and starts on Agent', async () => {
     const body = screen(await formOf())
-    expect(body).toMatch(/<button class="back svelte-[\w-]+" type="button" aria-label="Back">/)
-    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Start<\/h1>/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Start<\/h1>/)
+    expect(body).not.toContain('class="top')
     expect(body).toMatch(/aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button>/)
     expect(labels(body)).toEqual(['Project', 'Agent', 'Model', 'Prompt', 'Branch'])
   })
@@ -214,7 +215,7 @@ describe('Start wiring', () => {
     const script = flat(startSource)
     expect(script).toContain('(started, agent) => onstarted(started, agent),')
     expect(script).toContain('(name) => oncreated(name),')
-    expect(script).toContain('onclick={onback}')
+    expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
     expect(script).toContain('onclick={() => (action = name)}')
     expect(script).toContain("{#if action === 'agent'} <AgentForm {form} {sendable} /> {:else}")
     expect(script).toContain('{:else} <WorkspaceForm {form} {sendable} />')

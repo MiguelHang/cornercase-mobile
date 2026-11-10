@@ -4,6 +4,7 @@
   import { rows, shownPath } from '../../lib/diff'
   import CodeBox from '../../lib/ui/CodeBox.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import DiffLine from './DiffLine.svelte'
   import Viewed from './Viewed.svelte'
@@ -16,11 +17,13 @@
   let {
     path,
     changes,
+    backTo,
     onback,
     onfile,
   }: {
     path: string
     changes: ChangesState
+    backTo: string | null
     onback: () => void
     onfile: (path: string) => void
   } = $props()
@@ -36,20 +39,21 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
-    {#if whole !== null}
-      <button class="tool" type="button" aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>
-        <Icon name="file-text" size={22} />
-      </button>
-    {/if}
-    {#if open}
-      <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
-    {/if}
-  </header>
+  <NavBar {backTo} {onback} topmost>
+    {#snippet center()}
+      <h1 class="path"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
+    {/snippet}
+    {#snippet right()}
+      {#if whole !== null}
+        <button class="tool" type="button" aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>
+          <Icon name="file-text" size={22} />
+        </button>
+      {/if}
+      {#if open}
+        <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
+      {/if}
+    {/snippet}
+  </NavBar>
   {#if changes.gone}
     <p class="note">{CLOSED}.</p>
   {:else if reading?.kind === 'gone'}
@@ -76,18 +80,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--inset-wide);
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    min-width: 0;
-    margin: 0 calc(-1 * var(--inset));
-  }
-
-  .back,
   .tool {
     display: flex;
     flex: none;
@@ -102,20 +97,17 @@
     color: var(--accent);
   }
 
-  .back:active,
   .tool:active {
     background: var(--hover);
   }
 
-  .title {
-    flex: 1;
-    min-width: 0;
+  .path {
     margin: 0;
     overflow: hidden;
     direction: rtl;
+    color: var(--text);
     font-size: 17px;
     font-weight: 600;
-    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
