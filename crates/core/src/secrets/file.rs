@@ -17,6 +17,8 @@ const VERSION: u32 = 1;
 
 type Entries = BTreeMap<String, String>;
 
+pub(super) type Values = Vec<(String, Vec<u8>)>;
+
 #[derive(Debug)]
 pub struct FileSecrets {
     path: PathBuf,
@@ -41,12 +43,28 @@ impl FileSecrets {
         Self { path, writes: Mutex::new(()) }
     }
 
-    fn entries(&self) -> Result<Entries, Error> {
+    pub(super) fn values(&self) -> Result<Option<Values>, Error> {
+        let Some(entries) = self.stored()? else {
+            return Ok(None);
+        };
+        entries.into_iter().map(|(key, hex)| Ok((key, readable(&hex)?))).collect::<Result<_, _>>().map(Some)
+    }
+
+    pub(super) fn remove(&self) -> Result<(), Error> {
+        let _writing = self.writes.lock().unwrap_or_else(PoisonError::into_inner);
+        fs::remove_file(&self.path).map_err(|error| Error::Secrets(format!("cannot remove the secrets file: {error}")))
+    }
+
+    fn stored(&self) -> Result<Option<Entries>, Error> {
         match fs::read(&self.path) {
-            Ok(text) => entries_in(&text),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Entries::new()),
+            Ok(text) => entries_in(&text).map(Some),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
             Err(error) => Err(Error::Secrets(format!("cannot read the secrets file: {error}"))),
         }
+    }
+
+    fn entries(&self) -> Result<Entries, Error> {
+        self.stored().map(Option::unwrap_or_default)
     }
 
     fn change(&self, edit: impl FnOnce(&mut Entries) -> bool) -> Result<(), Error> {

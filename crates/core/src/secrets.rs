@@ -4,6 +4,7 @@ pub mod file;
 pub mod hex;
 #[cfg(test)]
 pub(crate) mod memory;
+pub mod migrate;
 
 pub trait Secrets: Send + Sync {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Error>;
