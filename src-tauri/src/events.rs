@@ -8,6 +8,7 @@ use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::store::{Change, Changes, Connection, Store};
 use cornercase_core::terminal::grid::Line;
+use cornercase_core::terminal::question::Choice;
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
@@ -57,6 +58,20 @@ pub(crate) struct TerminalChanged {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
+pub(crate) struct QuestionChanged {
+    #[specta(type = u32)]
+    pub(crate) machine: u64,
+    #[specta(type = u32)]
+    pub(crate) tab: u64,
+    #[specta(type = u32)]
+    pub(crate) pane: u64,
+    pub(crate) colours: Colours,
+    pub(crate) rows: Vec<Line>,
+    pub(crate) options: Vec<Choice>,
+    pub(crate) closed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
 pub(crate) struct ChangesChanged {
     #[specta(type = u32)]
     pub(crate) machine: u64,
@@ -86,6 +101,7 @@ pub(crate) enum Emitted {
     Agents(AgentsChanged),
     PaneStatus(PaneStatusChanged),
     Terminal(TerminalChanged),
+    Question(QuestionChanged),
     Changes(ChangesChanged),
     Toast(Toast),
 }
@@ -101,6 +117,7 @@ impl<R: Runtime> Emit for AppHandle<R> {
             Emitted::Agents(changed) => changed.emit(self),
             Emitted::PaneStatus(changed) => changed.emit(self),
             Emitted::Terminal(changed) => changed.emit(self),
+            Emitted::Question(changed) => changed.emit(self),
             Emitted::Changes(changed) => changed.emit(self),
             Emitted::Toast(toast) => toast.emit(self),
         };

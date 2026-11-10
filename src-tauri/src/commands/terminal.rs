@@ -75,7 +75,15 @@ async fn show(machine: MachineId, terminal: Terminal, store: Store, emit: impl E
     tokio::join!(running, by_frame(Batch::new(machine, terminal.tab), heard, emit));
 }
 
-pub(crate) async fn by_frame(mut batch: Batch, mut heard: UnboundedReceiver<Screen>, emit: impl Emit) {
+pub(crate) trait Batching {
+    type Heard;
+
+    fn add(&mut self, heard: Self::Heard);
+
+    fn take(&mut self) -> Vec<Emitted>;
+}
+
+pub(crate) async fn by_frame<B: Batching>(mut batch: B, mut heard: UnboundedReceiver<B::Heard>, emit: impl Emit) {
     while let Some(screen) = heard.recv().await {
         batch.add(screen);
         while let Ok(screen) = heard.try_recv() {
@@ -95,12 +103,10 @@ pub(crate) struct Batch {
     told: Vec<Emitted>,
 }
 
-impl Batch {
-    pub(crate) fn new(machine: MachineId, tab: u64) -> Self {
-        Self { machine, tab, pending: None, told: Vec::new() }
-    }
+impl Batching for Batch {
+    type Heard = Screen;
 
-    pub(crate) fn add(&mut self, screen: Screen) {
+    fn add(&mut self, screen: Screen) {
         match screen {
             Screen::Update(update) => self.join(update),
             Screen::Failed(error) => self.told.push(warned(&error)),
@@ -109,9 +115,15 @@ impl Batch {
         }
     }
 
-    pub(crate) fn take(&mut self) -> Vec<Emitted> {
+    fn take(&mut self) -> Vec<Emitted> {
         let changed = self.pending.take().map(Emitted::Terminal);
         changed.into_iter().chain(self.told.drain(..)).collect()
+    }
+}
+
+impl Batch {
+    pub(crate) fn new(machine: MachineId, tab: u64) -> Self {
+        Self { machine, tab, pending: None, told: Vec::new() }
     }
 
     fn join(&mut self, update: Update) {

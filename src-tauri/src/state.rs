@@ -36,7 +36,6 @@ pub(crate) struct Active {
     forwarder: JoinHandle<()>,
     terminal: Slot,
     changes: Slot,
-    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
     question: Slot,
 }
 
@@ -149,12 +148,10 @@ impl Active {
         self.changes.empty(workspace);
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
     pub(crate) fn ask(&mut self, tab: u64, question: JoinHandle<()>) {
         self.question.fill(tab, question);
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
     pub(crate) fn unask(&mut self, tab: u64) {
         self.question.empty(tab);
     }

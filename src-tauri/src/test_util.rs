@@ -25,7 +25,8 @@ use crate::bindings;
 use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::CommandError;
 use crate::events::{
-    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast,
+    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, QuestionChanged,
+    TerminalChanged, Toast,
 };
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
@@ -82,6 +83,13 @@ impl Recorder {
         self.all()
             .into_iter()
             .filter_map(|event| if let Emitted::Terminal(it) = event { Some(it) } else { None })
+            .collect()
+    }
+
+    pub(crate) fn questions(&self) -> Vec<QuestionChanged> {
+        self.all()
+            .into_iter()
+            .filter_map(|event| if let Emitted::Question(it) = event { Some(it) } else { None })
             .collect()
     }
 
