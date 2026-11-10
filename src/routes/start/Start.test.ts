@@ -45,6 +45,8 @@ const CALLS: StartCalls = {
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
   startIssue: never,
+  issueFlows: never,
+  startFlow: never,
 }
 
 const formOf = async (calls: Partial<StartCalls> = {}) => {
