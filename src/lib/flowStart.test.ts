@@ -105,6 +105,20 @@ describe('FlowStart, reading a project s flows', () => {
     })
   })
 
+  it('offers a name once when a flow of the project is named like another, the one cornercase runs', async () => {
+    const shadowed = flow('Quick', { problems: ['the built-in one is also named `Quick` and runs instead'] })
+    const { flows } = made(() => ok([QUICK, shadowed, SHIP]))
+    await flows.read(8, 'boot-1')
+    const options = flows.options.kind === 'ready' ? flows.options.items : []
+    expect([options.map((option) => [option.name, option.problem]), flows.chosen]).toEqual([
+      [
+        ['Quick', null],
+        ['Ship it', null],
+      ],
+      SHIP,
+    ])
+  })
+
   it('reads a project once while the form lives', async () => {
     const { flows, calls } = made()
     await flows.read(8, 'boot-1')
@@ -475,12 +489,16 @@ describe('FlowStart, starting a flow', () => {
     expect(calls.startFlow).toHaveBeenCalledTimes(1)
   })
 
-  it('refuses to start after cornercase restarts, and reads the flows again', async () => {
+  it('refuses to start after cornercase restarts, and reads the flows again only back on the issue', async () => {
     const { form, flows, calls } = await inFlow({ startProjects: inTurn(booted('boot-1'), booted('boot-2')) })
     await form.refresh()
     await flows.start()
     expect(flows.placeChoices).toEqual({ kind: 'failed', reason: PLACES_STALE })
     expect(calls.startFlow).not.toHaveBeenCalled()
+    await flows.look()
+    await flows.moveTo('project-8')
+    expect(calls.issueFlows.mock.calls).toEqual([[8]])
+    form.forIssue({ ...FROM_SHOP, issue: ISSUE, prompt: '' })
     await flows.look()
     expect(calls.issueFlows.mock.calls).toEqual([[8], [8]])
   })

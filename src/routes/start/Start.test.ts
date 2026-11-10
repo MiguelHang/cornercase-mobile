@@ -514,6 +514,16 @@ describe('Start, a flow on an issue', () => {
     ])
   })
 
+  it('lists once a name two flows share, the one cornercase runs', async () => {
+    const shadowed = { ...FLOWS[1], problems: ['the built-in one is also named `Quick` and runs instead'] }
+    const flows = [...FLOWS.slice(0, 2), shadowed, FLOWS[2]]
+    expect(flowsOf(drawn(await flowing({ issueFlows: () => answer({ flows }) })))).toEqual([
+      '*Ship it · 3 agents · A coder and a tester for the shop, leaving a pull request.',
+      ' Quick · 1 agent',
+      '-Second opinion · 2 agents · `summary` is in no stage',
+    ])
+  })
+
   it("shows the chosen flow's team under it, the orchestrator first", async () => {
     const body = drawn(await flowing())
     const members = body.match(/<ul class="team[^"]*" aria-label="Team">([^]*?)<\/ul>/)?.[1] ?? ''

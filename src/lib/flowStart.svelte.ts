@@ -42,6 +42,9 @@ const optionOf = (flow: FlowChoice): FlowOption => ({
   problem: flow.problems[0] ?? null,
 })
 
+const firstOfEachName = (flows: FlowChoice[]) =>
+  flows.filter((flow, at) => flows.findIndex((other) => other.name === flow.name) === at)
+
 const teamOf = (flow: FlowChoice) => {
   const leads = flow.roles.filter((role) => role.role === ORCHESTRATOR)
   const others = flow.roles.filter((role) => role.role !== ORCHESTRATOR)
@@ -85,7 +88,7 @@ export class FlowStart {
 
   get options(): Choices<FlowOption> {
     const flows = this.flows
-    return flows.kind === 'ready' ? { kind: 'ready', items: flows.items.map(optionOf) } : flows
+    return flows.kind === 'ready' ? { kind: 'ready', items: firstOfEachName(flows.items).map(optionOf) } : flows
   }
 
   get chosen() {
@@ -145,7 +148,7 @@ export class FlowStart {
 
   async look() {
     const place = this.#flowPlace()
-    if (place !== undefined) {
+    if (place !== undefined && this.#form.placesWhere(worktrees).kind === 'ready') {
       await this.read(place.project, this.#form.boot)
     }
   }
