@@ -30,16 +30,33 @@ const ROW: AgentRow = {
 }
 
 const body = render(Terminal, {
-  props: { machine: 1, row: ROW, onback: () => {}, onfailed: () => {} },
+  props: { machine: 1, row: ROW, backTo: 'Fix the login flow', onback: () => {}, onfailed: () => {} },
 }).body.replaceAll('<!---->', '')
 
 const source = terminalSource.replace(/\s+/g, ' ')
 
 describe('the terminal screen', () => {
-  it('names its agent, with the tab and place, under a button back', () => {
-    expect(body).toMatch(/<button class="back svelte-[\w-]+" type="button" aria-label="Back"><svg/)
-    expect(body).toMatch(/<span class="line name svelte-[\w-]+">Fix the login flow<\/span>/)
-    expect(body).toMatch(/<span class="line where svelte-[\w-]+">fix login · app › main<\/span>/)
+  it('goes back to its agent from the start of a bar that is the fixed row of the screen', () => {
+    expect(body).toMatch(
+      /<div class="head svelte-[\w-]+"><div class="bar ios svelte-[\w-]+ edge" style="--below: 0px;"><div class="start svelte-[\w-]+"><button class="back svelte-[\w-]+" type="button" aria-label="Back to Fix the login flow"><svg[^>]*>(<!--[^>]*-->)*<path d="m15 18-6-6 6-6">/,
+    )
+    expect(source).toContain('<div class="head" bind:clientHeight={height}> <NavBar {backTo} title={label(row)} {onback} fixed={false} edge>')
+    expect(source).toContain('.head { flex: none; }')
+    expect(body).not.toContain('<header')
+  })
+
+  it('slides with the edge swipe back, resting when nothing shifts it', () => {
+    expect(source).toContain('shift = RESTING,')
+    expect(source).toContain(
+      'class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}',
+    )
+  })
+
+  it('names its agent as the title, with the tab and place under it, in the middle of the bar', () => {
+    expect(body).toMatch(
+      /<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>(<!--[^>]*-->| )*<p class="where svelte-[\w-]+">fix login · app › main<\/p><\/div>/,
+    )
+    expect(source).toContain('.where { margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;')
   })
 
   it('draws the pane in the space left under its bar', () => {
@@ -165,12 +182,14 @@ describe('fitting the pane to the phone', () => {
     return { open, close, opening, fit: new Fit() }
   }
 
-  it('shows a toggle in the bar, off and named for what it does', () => {
+  it('shows a toggle at the end of the bar, off and named for what it does', () => {
     expect(body).toMatch(
-      /<button class="fit svelte-[\w-]+" type="button" aria-label="Fit to this phone" aria-pressed="false"><svg/,
+      /<div class="end svelte-[\w-]+"><button class="fit svelte-[\w-]+" type="button" aria-label="Fit to this phone" aria-pressed="false"><svg/,
     )
-    expect(source).toContain('aria-pressed={fit.on} onclick={() => fit.toggle()}> <Icon name="smartphone" />')
-    expect(source).toContain('.back, .fit { display: inline-flex;')
+    expect(source).toContain(
+      '{#snippet right()} <button class="fit" type="button" aria-label="Fit to this phone" aria-pressed={fit.on} onclick={() => fit.toggle()} > <Icon name="smartphone" />',
+    )
+    expect(source).toContain('.fit { display: inline-flex;')
     expect(source).toContain("width: 44px; height: 44px;")
   })
 

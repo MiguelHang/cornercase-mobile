@@ -5,6 +5,7 @@
   import Button from '../../lib/ui/Button.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
   import ChatHeader from './ChatHeader.svelte'
@@ -18,6 +19,7 @@
     chat,
     agents,
     connection,
+    backTo,
     below = 0,
     starting = null,
     onback,
@@ -29,6 +31,7 @@
     chat: Chat
     agents: AgentRow[] | null
     connection: ConnectionView_Serialize
+    backTo: string | null
     below?: number
     starting?: string | null
     onback: () => void
@@ -63,14 +66,10 @@
 
 <section class="agent" style:--below="{below}px">
   {#if chat.gone}
+    <NavBar {backTo} {onback} {below} />
     <p class="gone">This agent is no longer running.</p>
-    <div class="actions">
-      <Button tone="plain" onclick={onback}>Back to the board</Button>
-    </div>
   {:else if row === null}
-    <div class="actions">
-      <Button tone="plain" onclick={onback}>Back</Button>
-    </div>
+    <NavBar {backTo} {onback} {below} />
     {#if starting !== null}
       <p class="starting"><Spinner />Starting {starting}…</p>
     {:else}
@@ -79,7 +78,7 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} />
+    <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
@@ -119,11 +118,6 @@
     gap: var(--inset-wide);
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--gap);
   }
 
   .note {

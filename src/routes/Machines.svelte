@@ -7,14 +7,15 @@
   import { ThisDevice } from '../lib/thisDevice.svelte'
   import Button from '../lib/ui/Button.svelte'
   import Glass from '../lib/ui/Glass.svelte'
-  import Icon from '../lib/ui/Icon.svelte'
   import MachineRow from '../lib/ui/MachineRow.svelte'
+  import NavBar from '../lib/ui/NavBar.svelte'
   import MachineForm from './MachineForm.svelte'
 
   let {
     machines,
     active,
     connection,
+    backTo,
     onback,
     onpick,
     onadded,
@@ -27,6 +28,7 @@
     machines: MachineView_Serialize[]
     active: number | null
     connection: ConnectionView_Serialize
+    backTo: string | null
     onback: () => void
     onpick: (machine: number) => void
     onadded: (machine: number) => void
@@ -75,12 +77,7 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title">Machines</h1>
-  </header>
+  <NavBar {backTo} title="Machines" {onback} topmost />
   <Glass>
     <ul class="list">
       {#each machines as machine (machine.id)}
@@ -131,38 +128,7 @@
     gap: var(--inset-wide);
     max-width: 520px;
     margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
-  }
-
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin-left: calc(-1 * var(--inset));
-  }
-
-  .back {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .back:active {
-    background: var(--hover);
-  }
-
-  .title {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 600;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
   .list {

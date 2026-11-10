@@ -56,6 +56,7 @@ const screen = async (
       machines: MACHINES,
       active: 1,
       connection,
+      backTo: 'Agents',
       onback: () => {},
       onpick: () => {},
       onadded: () => {},
@@ -81,10 +82,11 @@ const withRejected = async () => {
 }
 
 describe('Machines', () => {
-  it('has a header with Back and its title', async () => {
-    expect(await screen()).toMatch(
-      /<header class="top svelte-[\w-]+"><button class="back svelte-[\w-]+" type="button" aria-label="Back"><svg[^]*?<\/svg><!----><\/button> <h1 class="title svelte-[\w-]+">Machines<\/h1><\/header>/,
-    )
+  it('goes back to the agents from a bar with its title', async () => {
+    const body = await screen()
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
+    expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Machines<\/h1>/)
+    expect(body).not.toContain('class="top')
   })
 
   it('lists the machines in the order saved', async () => {
@@ -187,7 +189,7 @@ describe('Machines wiring', () => {
 
   it('connects to the one picked, probes one again on Check again, and goes back on Back', () => {
     expect(script).toContain('onpick={() => onpick(machine.id)} oncheck={() => void probes.check([machine.id])}')
-    expect(script).toContain('onclick={onback}')
+    expect(script).toContain('<NavBar {backTo} title="Machines" {onback} topmost />')
     expect(flat(rowSource)).toContain(
       '{:else if !active} <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button> {/if}',
     )

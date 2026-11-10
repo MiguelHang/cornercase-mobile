@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { RESTING, translated, type Shift } from '../../lib/backSwipe'
   import {
     commands,
     events,
@@ -18,16 +19,21 @@
   import TerminalView from '../../lib/terminal/Terminal.svelte'
   import Typist from '../../lib/terminal/Typist.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
 
   let {
     machine,
     row,
+    backTo,
+    shift = RESTING,
     onback,
     onfailed,
     height = $bindable(0),
   }: {
     machine: number
     row: AgentRow
+    backTo: string | null
+    shift?: Shift
     onback: () => void
     onfailed: (error: unknown) => void
     height?: number
@@ -81,20 +87,31 @@
 <section
   class="screen"
   class:keyboard={keyboard.covered}
+  class:sliding={shift.x > 0}
+  class:settling={shift.eased}
+  style:transform={translated(shift)}
   style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}
   style:height={keyboard.covered ? `${keyboard.height}px` : undefined}
 >
   <Typist bind:this={typist} {ctrl} {send} disabled={shown.current.closed} />
-  <header class="bar" bind:clientHeight={height}>
-    <button class="back" type="button" aria-label="Back" onclick={onback}><Icon name="chevron-left" /></button>
-    <span class="lines">
-      <span class="line name">{label(row)}</span>
-      <span class="line where">{row.tab_name} · {place(row)}</span>
-    </span>
-    <button class="fit" type="button" aria-label="Fit to this phone" aria-pressed={fit.on} onclick={() => fit.toggle()}>
-      <Icon name="smartphone" />
-    </button>
-  </header>
+  <div class="head" bind:clientHeight={height}>
+    <NavBar {backTo} title={label(row)} {onback} fixed={false} edge>
+      {#snippet center()}
+        <p class="where">{row.tab_name} · {place(row)}</p>
+      {/snippet}
+      {#snippet right()}
+        <button
+          class="fit"
+          type="button"
+          aria-label="Fit to this phone"
+          aria-pressed={fit.on}
+          onclick={() => fit.toggle()}
+        >
+          <Icon name="smartphone" />
+        </button>
+      {/snippet}
+    </NavBar>
+  </div>
   <div class="view">
     <TerminalView
       pane={shown.current}
@@ -128,18 +145,10 @@
     padding-bottom: 0;
   }
 
-  .bar {
-    box-sizing: border-box;
-    display: flex;
+  .head {
     flex: none;
-    align-items: center;
-    gap: var(--gap);
-    min-height: 44px;
-    padding: 0 var(--inset-wide) 0 var(--gap);
-    border-bottom: 1px solid var(--border);
   }
 
-  .back,
   .fit {
     display: inline-flex;
     flex: none;
@@ -153,7 +162,6 @@
     color: var(--soft);
   }
 
-  .back:active,
   .fit:active {
     color: var(--text);
   }
@@ -162,25 +170,11 @@
     color: var(--accent);
   }
 
-  .lines {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .line {
+  .where {
+    margin: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-  }
-
-  .name {
-    color: var(--text);
-    font-size: 15px;
-  }
-
-  .where {
     color: var(--muted);
     font-size: 12px;
   }
