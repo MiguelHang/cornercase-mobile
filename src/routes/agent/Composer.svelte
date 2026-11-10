@@ -1,21 +1,25 @@
 <script lang="ts">
+  import type { Toast } from '../../lib/bindings'
   import type { Chat } from '../../lib/chat.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
   import KeyRow from './KeyRow.svelte'
   import Question from './Question.svelte'
+  import Thumbnails from './Thumbnails.svelte'
 
   let {
     chat,
     agent,
     below = 0,
     onfailed,
+    ontoast,
   }: {
     chat: Chat
     agent: string
     below?: number
     onfailed: (reason: string) => void
+    ontoast: (toast: Toast) => void
   } = $props()
 
   const attaching = $derived(chat.attachments.attaching)
@@ -25,6 +29,13 @@
     const failed = await chat.attach()
     if (failed !== null) {
       onfailed(failed)
+    }
+  }
+
+  const remove = async (id: number) => {
+    const told = await chat.remove(id)
+    if (told !== null) {
+      ontoast(told)
     }
   }
 
@@ -46,11 +57,7 @@
     <KeyRow {chat} {onfailed} />
   {/if}
   {#if chat.attachments.chips.length > 0}
-    <ul class="chips" aria-label="Attached images">
-      {#each chat.attachments.chips as chip (chip)}
-        <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
-      {/each}
-    </ul>
+    <Thumbnails chips={chat.attachments.chips} onremove={(id) => void remove(id)} />
   {/if}
   <div class="capsule">
     <button
@@ -189,38 +196,5 @@
 
   .lit:active .disc {
     background: var(--brand-hover);
-  }
-
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gap);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .chip {
-    display: flex;
-    gap: 6px;
-    min-width: 0;
-    max-width: 100%;
-    padding: 4px var(--gap);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-chip);
-    background: var(--hover);
-    font-size: 13px;
-  }
-
-  .name {
-    overflow: hidden;
-    color: var(--soft);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .size {
-    flex: none;
-    color: var(--faint);
   }
 </style>

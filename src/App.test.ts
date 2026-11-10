@@ -160,7 +160,7 @@ describe('App wiring', () => {
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} />",
     )
   })
 
@@ -365,7 +365,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

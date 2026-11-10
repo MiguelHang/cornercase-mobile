@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
+  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize, Toast } from '../../lib/bindings'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
@@ -22,6 +22,7 @@
     onback,
     onopen,
     onfailed,
+    ontoast,
     onterminal,
     onchanges,
     onfiles,
@@ -35,6 +36,7 @@
     onback: () => void
     onopen: (pane: number) => void
     onfailed: (reason: string) => void
+    ontoast: (toast: Toast) => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
     onfiles: (workspace: number, title: string) => void
@@ -80,7 +82,7 @@
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
     <Thread {chat} {now} />
-    <Composer {chat} agent={row.agent} {below} {onfailed} />
+    <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />
   {/if}
 </section>
 

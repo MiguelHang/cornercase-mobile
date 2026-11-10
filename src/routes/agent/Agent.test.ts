@@ -47,6 +47,7 @@ const draw = (
       onback: () => {},
       onopen: () => {},
       onfailed: () => {},
+      ontoast: () => {},
       onterminal: () => {},
       onchanges: () => {},
       onfiles: () => {},
@@ -289,7 +290,7 @@ describe('Agent, its composer', () => {
     expect(body).toMatch(/<div class="composer svelte-[\w-]+" style="--below: 0px;">/)
     expect(body).toMatch(/<textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer" placeholder="Answer claude"/)
     expect(body).toContain('go on</textarea>')
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} />')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />')
   })
 
   it('offers no attaching without its agent, nor once it is gone', () => {
@@ -507,7 +508,7 @@ describe('Agent, its keys', () => {
 
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} />')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />')
     expect(flat(threadSource)).toContain('{/each} <AgentLine {chat} {now} /> </div>')
   })
 

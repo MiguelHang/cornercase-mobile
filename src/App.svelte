@@ -431,6 +431,7 @@
             onback={goBack}
             onopen={open}
             onfailed={(message) => toasts.push({ level: 'error', message })}
+            ontoast={(toast) => toasts.push(toast)}
             onterminal={terminal}
             onchanges={review}
             onfiles={browse}

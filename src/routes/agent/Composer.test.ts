@@ -5,9 +5,10 @@ import type { Chat } from '../../lib/chat.svelte'
 import { CHIPS, ROW, chatWith, flat } from './agentFakes'
 import Composer from './Composer.svelte'
 import composerSource from './Composer.svelte?raw'
+import thumbnailsSource from './Thumbnails.svelte?raw'
 
 const draw = (chat: Chat) =>
-  render(Composer, { props: { chat, agent: 'claude', onfailed: () => {} } }).body.replace(/<!--[^>]*-->/g, '')
+  render(Composer, { props: { chat, agent: 'claude', onfailed: () => {}, ontoast: () => {} } }).body.replace(/<!--[^>]*-->/g, '')
 
 const button = (body: string, name: string) =>
   body.match(new RegExp(`<button class="([^"]*)" type="button" aria-label="${name}"([^>]*)>(.*?)</button>`))
@@ -36,6 +37,14 @@ const withChips = (draft = '', chips: Chip[] = CHIPS) => {
   chat.attachments.chips = chips
   return chat
 }
+
+const PICTURE = 'data:image/jpeg;base64,/9j/4AAQ'
+
+const thumbnails = (body: string) =>
+  [...body.matchAll(/<li class="thumbnail svelte-[\w-]+( pasted)?">(.*?)<\/li>/g)].map((found) => ({
+    pasted: found[1] !== undefined,
+    inside: found[2],
+  }))
 
 const opened = (chat: Chat) => {
   chat.toggleKeys()
@@ -220,25 +229,62 @@ describe('Composer, its attachments', () => {
     expect(flat(composerSource)).toContain('onclick={attach}')
   })
 
-  it('shows each attached image as a chip with its name and size, between the keys and the capsule', () => {
-    const body = draw(opened(withChips()))
-    const chips = [...body.matchAll(/<li class="chip svelte-[\w-]+"><span class="name svelte-[\w-]+">([^<]*)<\/span><span class="size svelte-[\w-]+">([^<]*)<\/span><\/li>/g)]
-    expect(chips.map((chip) => [chip[1], chip[2]])).toEqual([
-      ['IMG_0042.jpg', '47 KiB'],
-      ['pasted.png', '900 B'],
-    ])
-    expect(body).toMatch(/<ul class="chips svelte-[\w-]+" aria-label="Attached images">/)
+  it('shows each attached image as a thumbnail named with its name and size, between the keys and the capsule', () => {
+    const chips = [{ ...CHIPS[0], thumbnail: PICTURE }, CHIPS[1]]
+    const body = draw(opened(withChips('', chips)))
+    const shown = thumbnails(body)
+    expect(shown).toHaveLength(2)
+    expect(shown[0].inside).toMatch(
+      new RegExp(`^<img class="picture svelte-[\\w-]+" src="${PICTURE}" alt="IMG_0042.jpg, 47 KiB"/>`),
+    )
+    expect(shown[1].inside).toMatch(/^<span class="picture svelte-[\w-]+" role="img" aria-label="pasted.png, 900 B"><\/span>/)
+    expect(body).toMatch(/<ul class="thumbnails svelte-[\w-]+" aria-label="Attached images">/)
     expect(body.search(KEY_ROW)).toBeLessThan(body.indexOf('aria-label="Attached images"'))
     expect(body.indexOf('aria-label="Attached images"')).toBeLessThan(body.search(/<div class="capsule/))
   })
 
-  it('shows no chips before an image is attached', () => {
+  it('gives each thumbnail a cross of 44 px that removes its own image', () => {
+    const body = draw(withChips())
+    expect(button(body, 'Remove IMG_0042.jpg')?.[1]).toMatch(/^remove svelte-[\w-]+$/)
+    expect(button(body, 'Remove pasted.png')?.[3]).toContain('<path d="M18 6 6 18"></path>')
+    expect(flat(thumbnailsSource)).toContain('aria-label="Remove {chip.name}" onclick={() => onremove(chip.id)}')
+    expect(flat(thumbnailsSource)).toContain('width: 44px; height: 44px;')
+    expect(flat(composerSource)).toContain(
+      '<Thumbnails chips={chat.attachments.chips} onremove={(id) => void remove(id)} />',
+    )
+  })
+
+  it('shows one thumbnail fewer once one is removed, the other kept', async () => {
+    const chat = withChips()
+    await chat.remove(1)
+    const shown = thumbnails(draw(chat))
+    expect(shown).toHaveLength(1)
+    expect(shown[0].inside).toContain('aria-label="pasted.png, 900 B"')
+  })
+
+  it('tells with a toast that a removed image already pasted stays on the Mac', async () => {
+    const chat = withChips('', CHIPS.map((chip, index) => ({ ...chip, pasted: index === 0 })))
+    expect(await chat.remove(1)).toEqual({ level: 'info', message: "The image stays in claude's input on the Mac" })
+    expect(flat(composerSource)).toContain('const told = await chat.remove(id) if (told !== null) { ontoast(told) }')
+  })
+
+  it('marks an image already pasted on the Mac, for the eye and for VoiceOver', () => {
+    const chat = withChips('', CHIPS.map((chip, index) => ({ ...chip, pasted: index === 1 })))
+    const shown = thumbnails(draw(chat))
+    expect(shown.map((thumbnail) => thumbnail.pasted)).toEqual([false, true])
+    expect(shown[1].inside).toContain('aria-label="pasted.png, 900 B, on the Mac"')
+    expect(shown[1].inside).toMatch(/<span class="mark svelte-[\w-]+" aria-hidden="true">On Mac<\/span>/)
+    expect(shown[0].inside).not.toContain('class="mark')
+  })
+
+  it('shows no thumbnails before an image is attached', () => {
     expect(draw(done())).not.toContain('Attached images')
   })
 
-  it('cuts a long name rather than its size', () => {
-    expect(flat(composerSource)).toContain('.name { overflow: hidden; color: var(--soft); text-overflow: ellipsis; white-space: nowrap; }')
-    expect(flat(composerSource)).toContain('.size { flex: none; color: var(--faint); }')
+  it('crops each picture to 56 px and scrolls the row sideways when they do not fit', () => {
+    const source = flat(thumbnailsSource)
+    expect(source).toContain('width: 56px; height: 56px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--hover); object-fit: cover; }')
+    expect(source).toContain('.thumbnails { display: flex; flex: none; gap: var(--gap); margin: 0; padding: 0; overflow-x: auto;')
   })
 })
 
@@ -252,7 +298,7 @@ describe('Composer, its place', () => {
       'max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
     )
     expect(flat(composerSource)).toContain('--over-composer: 132px;')
-    expect(render(Composer, { props: { chat: done(), agent: 'claude', below: 52, onfailed: () => {} } }).body).toMatch(
+    expect(render(Composer, { props: { chat: done(), agent: 'claude', below: 52, onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
       /<div class="composer svelte-[\w-]+" style="--below: 52px;">/,
     )
   })
