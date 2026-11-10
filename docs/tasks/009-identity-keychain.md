@@ -1,6 +1,6 @@
 # 009 — Identidad Ed25519 en el Keychain de iOS ⚠
 
-- Estado: hecha, salvo la prueba en un iPhone (CA3)
+- Estado: hecha (CA3 en un iPhone, comprobado el 2026-11-10 en la 029)
 - Depende de: 001
 - Riesgo: **alto** — `keyring` en iOS desde Tauri (acceso al Keychain, simulador sin entitlements de grupo).
 - Rama: `feat/009-identity` · PR: `feat: create the device identity and keep it in the keychain`

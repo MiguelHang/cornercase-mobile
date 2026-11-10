@@ -1,6 +1,6 @@
 # 028 — Cambio de red en iOS (NWPathMonitor) ⚠
 
-- Estado: hecha (CA4, en un iPhone, queda para el usuario o para la 029)
+- Estado: hecha (CA4 comprobado en un iPhone el 2026-11-10, en la 029)
 - Depende de: 013
 - Riesgo: **alto** — código nativo en Swift dentro de un plugin de Tauri; eventos de red ruidosos.
 - Rama: `feat/028-network-change` · PR: `feat: try the routes again when the phone changes network`

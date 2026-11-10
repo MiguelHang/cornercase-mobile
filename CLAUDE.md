@@ -49,6 +49,12 @@ pnpm test                                         # vitest
   libimobiledevice on `ios init`, ios-deploy on `ios dev`); CocoaPods is `brew install cocoapods`.
 - **`src-tauri/gen/apple` is in git** (`design/architecture.md`): change the Xcode project in its `project.yml`,
   which the Tauri CLI turns into the `.xcodeproj`, and commit both; `.gitignore` leaves out what the builds write.
+- **On an iPhone** (the free Personal Team `22FWTVV94S` in `tauri.conf.json` › `bundle.iOS.developmentTeam`): plug it in,
+  turn on Developer Mode, then `pnpm build && LANG=en_US.UTF-8 pnpm tauri ios dev "<iPhone's name>" --no-watch --features
+  tauri/custom-protocol --config '{"build":{"beforeDevCommand":"","devUrl":null}}'`, which embeds `dist/` and needs no Vite
+  server. The first launch needs the certificate trusted on the phone (Settings › General › VPN & Device Management).
+  A free profile expires after 7 days: install again. `ios build --export-method debugging` fails with a free team
+  ("no devices"): the build has to target the phone.
 - **Android needs JDK 17, the SDK and NDK 29.0.14206865**, without Android Studio and without sudo
   (`design/architecture/android.md`):
   - `brew install openjdk@17`, `brew install --cask android-commandlinetools`, then in the shell's profile

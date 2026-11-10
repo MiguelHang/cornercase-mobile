@@ -33,8 +33,8 @@ const agent = (pane: number, status: string | null, more: Partial<AgentRow> = {}
 
 const ago = (millis: number) => new Date(NOW - millis).toISOString()
 
-const keys = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
-  board.items(rows, expanded).map((item) => item.key)
+const keys = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
+  board.items(rows, expanded, query).map((item) => item.key)
 
 const under = (pane: number, status: string | null, parent: number, depth: number) =>
   agent(pane, status, { parent, depth })
@@ -68,9 +68,12 @@ const named = (pane: number, listed: AgentRow[] = FLOW) => {
 const children = (rows: AgentRow[], pane: number) =>
   board.subagents(rows, pane)?.children.map((item) => [item.row.pane, item.hasChildren, item.hidden, item.attention])
 
-const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
+const totals = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
+  board.items(rows, expanded, query).flatMap((item) => (item.kind === 'row' ? [[item.row.pane, item.total]] : []))
+
+const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
   board
-    .items(rows, expanded)
+    .items(rows, expanded, query)
     .flatMap((item) =>
       item.kind === 'row'
         ? [[item.row.pane, item.depth, item.hasChildren, item.folded, item.hidden, item.attention]]
@@ -141,6 +144,7 @@ describe('items', () => {
         hasChildren: false,
         folded: false,
         hidden: 0,
+        total: 0,
         attention: null,
       },
     ])
@@ -217,8 +221,82 @@ describe('items of a tree', () => {
     expect(shown(chain, new Set([1, 2, 3, 4])).map(([, depth]) => depth)).toEqual([0, 1, 2, 3, 3])
   })
 
+  it.each([
+    ['folded', undefined],
+    ['unfolded', new Set([5, 7, 16])],
+  ])('counts the subagents of every level %s', (_, expanded) => {
+    expect(totals(TEAM, expanded).filter(([pane]) => [5, 7, 16, 20].includes(pane))).toEqual([
+      [5, 3],
+      ...(expanded === undefined ? [] : [[7, 1]]),
+      [16, 2],
+      [20, 0],
+    ])
+  })
+
   it('lists an agent whose parent is not listed as a root', () => {
     expect(keys([under(3, 'working', 99, 1)])).toEqual(['section:Working', 'pane:3'])
+  })
+})
+
+describe('items while searching', () => {
+  it('shows a child that matches under its folded parents, unfolded and without counts', () => {
+    expect(shown(TEAM, undefined, 'agent 9')).toEqual([
+      [5, 0, false, false, 0, null],
+      [7, 1, false, false, 0, null],
+      [9, 2, false, false, 0, null],
+    ])
+  })
+
+  it('hides the siblings and the children that do not match', () => {
+    expect(keys(TEAM, new Set([5, 7, 16]), 'agent 16')).toEqual(['section:Working', 'pane:16'])
+  })
+
+  it('keeps the order of the core and the section of the root', () => {
+    expect(keys(TEAM, undefined, 'agent 1')).toEqual([
+      'section:Waiting',
+      'pane:5',
+      'pane:12',
+      'section:Working',
+      'pane:16',
+      'pane:17',
+      'pane:18',
+    ])
+  })
+
+  it('shows every branch unfolded when every agent matches', () => {
+    expect(keys(TEAM, undefined, 'AGENT')).toEqual(keys(TEAM, new Set([5, 7, 16])))
+  })
+
+  it('leaves out the sections without a match', () => {
+    expect(keys(TEAM, undefined, 'agent 20')).toEqual(['section:Idle', 'pane:20'])
+  })
+
+  it('counts no subagents while it searches', () => {
+    expect(totals(TEAM, undefined, 'agent 9')).toEqual([
+      [5, 0],
+      [7, 0],
+      [9, 0],
+    ])
+  })
+
+  it('stops climbing when two agents name each other as parent', () => {
+    const loop = [agent(1, 'working', { parent: 2 }), agent(2, 'working', { parent: 1 })]
+    expect(board.items(loop, undefined, 'agent')).toEqual([])
+  })
+
+  it('lists nothing when nothing matches', () => {
+    expect(board.items(TEAM, new Set([5]), 'billing')).toEqual([])
+  })
+
+  it('leaves the unfolded agents as they were', () => {
+    const expanded = new Set([5])
+    board.items(TEAM, expanded, 'agent 18')
+    expect([...expanded]).toEqual([5])
+  })
+
+  it.each(['', '  '])('lists the board as before the search for %o', (query) => {
+    const expanded = new Set([5])
+    expect(board.items(TEAM, expanded, query)).toEqual(board.items(TEAM, expanded))
   })
 })
 
@@ -339,6 +417,17 @@ describe('hiddenName', () => {
   })
 })
 
+describe('disclosureName', () => {
+  it.each<[number, boolean, string]>([
+    [3, true, 'Show 3 subagents'],
+    [1, true, 'Show 1 subagent'],
+    [3, false, 'Hide 3 subagents'],
+    [1, false, 'Hide 1 subagent'],
+  ])('names %i subagents folded %s as %s', (count, folded, name) => {
+    expect(board.disclosureName(count, folded)).toBe(name)
+  })
+})
+
 describe('statusName', () => {
   it.each<[string | null | undefined, string]>([
     ['working', 'Working'],
@@ -353,5 +442,65 @@ describe('statusName', () => {
     [undefined, 'Idle'],
   ])('calls %o %s', (status, name) => {
     expect(board.statusName(status)).toBe(name)
+  })
+})
+
+describe('terms', () => {
+  it('splits the query into lower case words without accents', () => {
+    expect(board.terms('  Café   ÁRBOL login ')).toEqual(['cafe', 'arbol', 'login'])
+  })
+
+  it.each(['', '   ', '\t \n'])('is empty for %o', (query) => {
+    expect(board.terms(query)).toEqual([])
+  })
+})
+
+describe('matches', () => {
+  const found = agent(1, 'working', { title: 'Fix the cart', role: 'reviewer' })
+
+  const seen = (query: string, one: AgentRow = found) => board.matches(one, board.terms(query))
+
+  it.each([
+    ['the title', 'cart'],
+    ['the name of the agent', 'claude'],
+    ['the project', 'shop'],
+    ['the workspace', 'login'],
+    ['the role', 'review'],
+  ])('finds an agent by %s', (_, query) => {
+    expect(seen(query)).toBe(true)
+  })
+
+  it.each([
+    ['cafe', 'Café con leche'],
+    ['ÁRBOL', 'arbol de pruebas'],
+  ])('finds %o in %o whatever the case and the accents', (query, title) => {
+    expect(seen(query, agent(1, 'working', { title }))).toBe(true)
+  })
+
+  it.each([
+    ['its title', 'write form'],
+    ['its role, its label', 'coder'],
+  ])('finds a member of a flow by %s', (_, query) => {
+    expect(seen(query, FLOW[1])).toBe(true)
+  })
+
+  it('finds a member without a title by the name of the agent, its label', () => {
+    expect(seen('codex reviewer', FLOW[2])).toBe(true)
+  })
+
+  it('needs every word to be somewhere', () => {
+    expect(seen('shop CART claude')).toBe(true)
+    expect(seen('shop cart billing')).toBe(false)
+  })
+
+  it.each([
+    ['a role', { role: null }],
+    ['a title', { title: null }],
+  ])('skips %s the agent does not have', (_, more) => {
+    expect(seen('reviewer', agent(1, 'working', more))).toBe(false)
+  })
+
+  it('takes every agent when there are no words', () => {
+    expect(seen('   ')).toBe(true)
   })
 })
