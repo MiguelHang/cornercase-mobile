@@ -2,7 +2,7 @@ use cornercase_core::error::Error;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::{press_key, send_message};
+use super::{mark_pane_reviewed, press_key, send_message};
 use crate::commands::error::CommandError;
 use crate::test_util::{Ipc, Studio, connected_with, queueing, written};
 
@@ -61,6 +61,12 @@ async fn pressing(answer: Option<Value>, key: &str) -> (Result<(), Value>, Vec<V
     let (ipc, lines) = queueing(answer).await;
     let pressed = press_key(&ipc.state(), 543, key).await.map_err(|error| json_of(&error));
     (pressed, written(&lines))
+}
+
+async fn reviewing(answer: Option<Value>) -> (Result<(), Value>, Vec<Value>) {
+    let (ipc, lines) = queueing(answer).await;
+    let marked = mark_pane_reviewed(&ipc.state(), 543).await.map_err(|error| json_of(&error));
+    (marked, written(&lines))
 }
 
 pub(super) fn json_of(error: &CommandError) -> Value {
@@ -162,6 +168,33 @@ mod pressing_a_key {
     }
 }
 
+mod marking_it_reviewed {
+    use super::*;
+
+    const NO_AGENT: &str = "there is no agent in pane 543";
+
+    #[tokio::test(start_paused = true)]
+    async fn queues_the_mark_command_without_stdin() {
+        let (marked, written) = reviewing(Some(json!({ "status": 0, "text": "" }))).await;
+        assert_eq!(marked, Ok(()));
+        assert_eq!(written, [json!({ "args": ["mark", "--pane", "543", "--reviewed"] })]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fails_with_the_reason_cornercase_gave() {
+        let refusal = json!({ "status": 1, "error": format!("Error: {NO_AGENT}\n") });
+        let (marked, _) = reviewing(Some(refusal)).await;
+        assert_eq!(marked, Err(json!({ "code": "failed", "message": NO_AGENT })));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn may_have_sent_it_when_the_answer_is_lost() {
+        let (marked, written) = reviewing(None).await;
+        assert_eq!(written.len(), 1);
+        assert_eq!(marked, Err(json_of(&CommandError::maybe_sent())));
+    }
+}
+
 mod without_a_connection {
     use super::*;
 
@@ -176,6 +209,7 @@ mod without_a_connection {
     #[case::sending("send", json!({ "pane": 543, "text": "hello", "force": false }))]
     #[case::attaching("attach", json!({ "pane": 543 }))]
     #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
+    #[case::reviewing("mark_reviewed", json!({ "pane": 543 }))]
     fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
         let refused = ipc.invoke(command, args).expect_err("nowhere to queue");

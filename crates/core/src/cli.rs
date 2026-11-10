@@ -7,6 +7,7 @@ pub mod input;
 pub mod issues;
 pub mod keys;
 pub mod last_message;
+pub mod mark;
 pub mod paste_file;
 pub mod start;
 pub mod status;

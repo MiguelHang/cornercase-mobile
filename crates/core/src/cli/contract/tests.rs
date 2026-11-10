@@ -169,6 +169,12 @@ mod missing {
         assert_eq!(missing(&descriptor), [one("account-list", Kind::Operation, None)]);
     }
 
+    #[test]
+    fn reports_a_server_that_cannot_mark_a_pane_as_reviewed() {
+        let descriptor = real_but(|value| without(value, "operations", "mark"));
+        assert_eq!(missing(&descriptor), [one("mark", Kind::Operation, None)]);
+    }
+
     #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
