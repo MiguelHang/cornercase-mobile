@@ -2,10 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 
+use self::tree::{Item, Node};
 use crate::cli::status::{Pane, Project, Snapshot, Tab, Workspace};
 
 #[cfg(test)]
 pub(crate) mod fixtures;
+mod tree;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -28,15 +30,17 @@ pub struct AgentRow {
     pub title: Option<String>,
     pub status: Option<String>,
     pub since: Option<String>,
+    #[cfg_attr(feature = "specta", specta(type = Option<u32>))]
+    pub parent: Option<u64>,
+    pub depth: u32,
+    pub role: Option<String>,
+    pub rank_status: Option<String>,
 }
 
 pub(crate) fn agents(snapshot: &Snapshot, since: &Since) -> Vec<AgentRow> {
-    let mut rows: Vec<AgentRow> = places(snapshot).filter_map(|place| place.row(since)).collect();
-    rows.sort_by(|a, b| {
-        let ranks = rank(b.status.as_deref()).cmp(&rank(a.status.as_deref()));
-        ranks.then_with(|| a.since.cmp(&b.since))
-    });
-    rows
+    let listed: Vec<Place> = places(snapshot).filter(|place| place.pane.agent.is_some()).collect();
+    let items: Vec<Item> = listed.iter().map(|place| place.item(since)).collect();
+    tree::order(&items).iter().filter_map(|node| listed[node.at].row(&items[node.at], node)).collect()
 }
 
 fn agent_title(title: Option<&str>) -> Option<String> {
@@ -63,8 +67,12 @@ struct Place<'a> {
     pane: &'a Pane,
 }
 
-impl Place<'_> {
-    fn row(&self, since: &Since) -> Option<AgentRow> {
+impl<'a> Place<'a> {
+    fn item(&self, since: &'a Since) -> Item<'a> {
+        Item { pane: self.pane, since: since.of(self.pane.id, self.pane.status.as_deref()) }
+    }
+
+    fn row(&self, item: &Item, node: &Node) -> Option<AgentRow> {
         let agent = self.pane.agent.clone()?;
         let status = self.pane.status.clone();
         Some(AgentRow {
@@ -79,8 +87,12 @@ impl Place<'_> {
             workspace_count: self.project.workspaces.len(),
             agent,
             title: agent_title(self.pane.title.as_deref()),
-            since: since.of(self.pane.id, status.as_deref()).map(str::to_owned),
+            since: item.since.map(str::to_owned),
             status,
+            parent: node.parent,
+            depth: node.depth,
+            role: self.pane.role.clone(),
+            rank_status: node.rank.status.map(str::to_owned),
         })
     }
 }

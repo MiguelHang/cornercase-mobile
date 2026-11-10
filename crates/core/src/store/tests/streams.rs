@@ -215,7 +215,7 @@ mod the_agents {
     #[tokio::test(start_paused = true)]
     async fn take_the_time_of_a_status_event_heard(#[case] late: usize) {
         let lines = [vec![status_event("working")], vec![line(snapshots::WATCH)], vec![line(snapshots::APP)]];
-        assert_eq!(agents_once(lines, late).await, [agent(5, "working", None), agent(4, "working", Some(TIME))]);
+        assert_eq!(agents_once(lines, late).await, [agent(4, "working", Some(TIME)), agent(5, "working", None)]);
     }
 
     #[tokio::test(start_paused = true)]

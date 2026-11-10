@@ -7,12 +7,14 @@
 
   let {
     row,
+    agents,
     below = 0,
     onback,
     onterminal,
     onchanges,
   }: {
     row: AgentRow
+    agents: AgentRow[]
     below?: number
     onback: () => void
     onterminal: (row: AgentRow) => void
@@ -38,7 +40,7 @@
   </button>
   <div class="short" aria-hidden="true">
     <StatusDot status={row.status} />
-    <span class="called">{label(row)}</span>
+    <span class="called">{label(row, agents)}</span>
     <span class="state">{statusName(row.status)}</span>
   </div>
   <button class="tool" type="button" aria-label="Terminal" onclick={() => onterminal(row)} ontouchstart={() => {}}>
@@ -57,7 +59,7 @@
 <header class="head" bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
   <div class="lines">
-    <h1 class="title">{label(row)}</h1>
+    <h1 class="title">{label(row, agents)}</h1>
     <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
   </div>
 </header>

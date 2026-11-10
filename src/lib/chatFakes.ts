@@ -21,6 +21,10 @@ export const row = (pane: number, status: string | null): AgentRow => ({
   title: null,
   status,
   since: null,
+  parent: null,
+  depth: 0,
+  role: null,
+  rank_status: status,
 })
 
 export const message = (text: string): LastMessage => ({ pane: PANE, agent: 'claude', text, written: null, turn_over: true })
