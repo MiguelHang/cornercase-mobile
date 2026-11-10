@@ -1,6 +1,6 @@
 # Android
 
-A topic of [Architecture](../architecture.md). The same app on Android, with nothing new to do (030): the Gradle project `tauri android init` writes, what was changed in it by hand and why, where the emulator finds Vite and the bridge, and what was checked live. Where Android keeps the route tokens until its Keystore is in `design/connection.md` (Identity › Android's route tokens, until 031).
+A topic of [Architecture](../architecture.md). The same app on Android (030): the Gradle project `tauri android init` writes, what was changed in it by hand and why, how the Keystore keeps the secrets (031), where the emulator finds Vite and the bridge, and what was checked live. What the secrets are, and how the route tokens left the file 030 kept them in, is in `design/connection/identity.md`.
 
 ## The project
 
@@ -21,7 +21,19 @@ A topic of [Architecture](../architecture.md). The same app on Android, with not
 
 ## Backups
 
-- **`android:allowBackup="false"`**: `machines.json` and `route-secrets.json`, with the tokens in plain text, live in the app's data folder, and must not leave the phone in a cloud backup or through `adb backup`. From Android 12, with the template's `targetSdk` 37, `allowBackup="false"` no longer stops a device-to-device transfer, so `data_extraction_rules.xml` excludes every domain from both `cloud-backup` and `device-transfer`. Below Android 12, `allowBackup` alone is enough, so there is no `fullBackupContent`.
+- **`android:allowBackup="false"`**: `machines.json` and the preferences that hold the sealed secrets live in the app's data folder, and must not leave the phone in a cloud backup or through `adb backup`. Since 031 no token is in plain text there (030's `route-secrets.json` is moved and removed on the first start), and a sealed secret copied to another phone would not open without this one's Keystore key; the machines' names and addresses still would leave, so backups stay off. From Android 12, with the template's `targetSdk` 37, `allowBackup="false"` no longer stops a device-to-device transfer, so `data_extraction_rules.xml` excludes every domain from both `cloud-backup` and `device-transfer`. Below Android 12, `allowBackup` alone is enough, so there is no `fullBackupContent`.
+
+## The Keystore
+
+How the secrets plugin (`src-tauri/plugins/secrets/android/`, `design/architecture/plugins.md`) keeps a secret. Why a sealed seed and not a key in the Keystore: `design/connection/identity.md`.
+
+- **One AES-256 key in `AndroidKeyStore`**, for encrypting and decrypting only, GCM without padding, made on the first `set` and found by its alias afterwards; a `get` never makes one. It cannot be exported: no call returns its bytes, and on a phone with a TEE they never leave it. The Keystore makes the 12-byte IV of every encryption (a key made this way refuses one from the caller), so an IV is never reused by mistake. GCM's tag also says whether a sealed secret was changed.
+- **The secret's name as associated data**: the name goes into GCM as AAD, so a value moved to another name, by hand or by a bug, does not open (wrong key, rather than the other secret's bytes).
+- **The app's own preferences** (`MODE_PRIVATE`), one entry per secret: its name, and the IV followed by the ciphertext in Base64 (Android's `android.util.Base64`). The names, `identity/ed25519` and `route/<machine>/<address>`, are in clear, as they are in `machines.json`: they are the AAD and say nothing secret. **`commit()`, not `apply()`**: when `set` or `delete` answers, the change is on disk, as the adapters of the other platforms promise; `commit()` blocks for a few milliseconds, which the caller does anyway, since `run_mobile_plugin` waits.
+- **No `setUnlockedDeviceRequired`**: the app reconnects while the screen is locked (a network change, the return of a stream), and with it the key could not be used then. The preferences live in the credential-encrypted storage, which Android opens at the first unlock after a boot, and the key lives in a Keystore that never moves to another phone: together that is iOS's `AfterFirstUnlockThisDeviceOnly` (Identity and secrets › The Keychain). The app does not run before the first unlock (it is not `directBootAware`).
+- **No user authentication** (`setUserAuthenticationRequired`, biometrics): a fingerprint at every start or reconnection, for a seed and development tokens. **No StrongBox** (`setIsStrongBoxBacked`, API 28+): slower per operation, missing on many phones and in the emulator, where it could not be tested, and the TEE is enough for what the key protects.
+- **A lost key** (some makers' phones drop Keystore keys when the screen lock is changed or removed) is an error, never a quiet new identity: a `get` of a secret whose key is gone fails; a later `set` (a new machine) makes a new key for its own secret, and the old ones still do not open, now with the wrong key (`design/connection/identity.md` › A secret that no longer opens).
+- **Threads**: `Secrets` is called from `setup` and from async commands on tokio's workers; each call goes to Kotlin, which keeps no state but the key it found, under `@Synchronized`, and two `commit()`s on the same preferences are serialized by Android.
 
 ## Running it
 
@@ -43,8 +55,16 @@ On 2026-11-10, in an arm64 emulator (Pixel 8 profile, image `android-37.0;google
 
 - `pnpm tauri android dev` builds, installs `dev.usecornercase.mobile.debug`, loads the UI from Vite, and a change to a `.svelte` file shows without a reload.
 - The bridge's code, typed into the form, adds the machine; it connects through the Mac's Tailscale address and shows the live board.
-- `machines.json` and `route-secrets.json` are in the app's data folder, readable only by its user (`-rw-------`), with one key per route. After `am force-stop` and a new start the machine is there and connects again without the code.
-- Machines › This device shows "no secret store on this platform yet" in place of the fingerprint, and the machines load all the same.
+- With 030, `machines.json` and `route-secrets.json` are in the app's data folder, readable only by its user (`-rw-------`), with one key per route. After `am force-stop` and a new start the machine is there and connects again without the code.
+- With 030, Machines › This device shows "no secret store on this platform yet" in place of the fingerprint, and the machines load all the same.
 - The scanner asks for the camera and opens; Cancel goes back. Its viewfinder stays black in the emulator: CameraX binds, but the emulated camera never opens (the AVD has no front camera, and CameraX's check of the lenses fails), so no code was scanned there.
 - Not checked: a real phone, over USB or Wi-Fi and through Tailscale (the ticket's own check, left to the user), scanning a real code, and the release build.
 - Seen and left for later: the status bar's dark text on the dark background, and the WebView staying scrolled after the keyboard hides until the next tap (032's keyboard).
+
+The Keystore (031), on 2026-11-10 in the same emulator and versions (system build CE2A.260420.051.A3), with debug APKs built by `pnpm tauri android build --debug --apk`, after which `git status` is clean:
+
+- **The update from 030**: 030 installed, a machine added from the bridge's code, with three routes (the LAN, and Tailscale's IPv4 and IPv6) and so three tokens in `route-secrets.json`. Once 031 is installed over it, the first start logs `moved 3 route secrets into the store` and then the identity's fingerprint; the machine connects without the code, `route-secrets.json` is gone and `machines.json` stays.
+- **The identity**: its fingerprint is in logcat and in Machines › This device. It is the same after `am force-stop` and a new start (with no second move), and after a cold boot (`adb reboot`), after which the machine connects again. After `adb uninstall` and a new install it is another one.
+- **The preferences** (`run-as … cat shared_prefs/cornercase-secrets.xml`, `-rw-rw----`, which is what `MODE_PRIVATE` gives) hold only the identity and the three tokens, each Base64 that decodes to binary; the bridge's token appears neither in clear nor in hex. Only the names are readable.
+- **The cost**: reading a secret takes tens of milliseconds (the identity's line came 30 to 110 ms after its read began, after a reboot and after a force-stop; the first writes, which make the key, about 80 ms). Loading the machines reads one token per route, so a few routes add a fraction of a second at most to the start.
+- Not checked: a real phone, the case the Keystore changes most between makers (StrongBox or not, a key lost when the screen lock changes), left to the user (`docs/tasks/031-android-keystore.md`); a move that fails, which the core's tests cover; and the release build.
