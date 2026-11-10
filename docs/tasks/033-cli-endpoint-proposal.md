@@ -6,11 +6,14 @@
 - Rama: `docs/033-cli-proposal` · PR: `docs: propose the bridge's format as /cli for cornercase`
 
 ## Decisión (2026-11-09)
-No se guarda en el repo ni lleva PR. El resultado son borradores de issues para cornercase-terminal, agrupadas en
-una épica (issue padre con sub-issues nativas de GitHub), cada una autocontenida para que un agente la coja y la lance en
-su worktree. Entran la propuesta de `/cli` y los huecos de `design/upstream-gaps.md`. No se crea nada sin el OK del
-usuario. Los requisitos del primer análisis están aparcados en `.harness/parked/t033/` (sin versionar). Los criterios de
-abajo describen el contenido; donde dicen fichero o enlaces en `design/`, vale el borrador de la issue.
+No se guarda en el repo ni lleva PR. El resultado son borradores de issues para cornercase-terminal, agrupadas en una
+épica (issue padre con sub-issues nativas de GitHub), cada una autocontenida para que un agente la coja y la lance en su
+worktree. Entran la propuesta de `/cli` y los huecos de `design/upstream-gaps.md`, entre ellos "The pending question is
+not data" (039: `read --pending --pane P --json` o un campo `question` en `status`, con la pregunta, sus opciones con
+número, etiqueta y descripción, la selección, multi-select, las pestañas de varias preguntas, la herramienta de origen y
+el agente). No se crea nada sin el OK del usuario. Los requisitos del primer análisis están aparcados en
+`.harness/parked/t033/` (sin versionar). Los criterios de abajo describen el contenido; donde dicen fichero o enlaces en
+`design/`, vale el borrador de la issue.
 
 ## Objetivo
 Documentar el formato del puente como propuesta para que cornercase-terminal sirva `/cli` en `src/web/`, y la app deje

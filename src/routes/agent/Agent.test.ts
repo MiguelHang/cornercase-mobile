@@ -4,7 +4,7 @@ import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '.
 import type { AttachImage } from '../../lib/attach.svelte'
 import { subagents } from '../../lib/board'
 import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
-import { fakeClock, message, ok } from '../../lib/chatFakes'
+import { fakeAsker, fakeClock, message, ok } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import chatHeaderSource from './ChatHeader.svelte?raw'
@@ -60,12 +60,14 @@ const unpressed: PressKey = () => new Promise(() => {})
 
 const unattached: AttachImage = () => new Promise(() => {})
 
+const unasked = fakeAsker().asker
+
 const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as const, data: null }) }
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const chatWith = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
   if (row !== null) {
     chat.see(1, [row])
   }
@@ -370,6 +372,12 @@ describe('Agent, its field', () => {
 
   it('stays at the bottom of the screen while the message scrolls', () => {
     expect(flat(agentSource)).toContain('.composer { position: sticky; bottom: 0;')
+  })
+
+  it('never grows over the bar and the title, scrolling within itself instead', () => {
+    expect(flat(agentSource)).toContain(
+      'max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
+    )
   })
 })
 
@@ -780,7 +788,7 @@ const clockAt = (millis: number) => {
 }
 
 const lineChat = (status: string | null, since: string | null = ROW.since, clock: Clock = clockAt(LATER).clock) => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, clock)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, clock, unasked)
   chat.see(1, [{ ...ROW, status, since }])
   return chat
 }
@@ -852,7 +860,7 @@ describe('AgentLine', () => {
   })
 
   it('keeps the region while the agent is not seen yet', () => {
-    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers)
+    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
     expect(region(line(chat))).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
   })
 
@@ -962,7 +970,7 @@ describe('Thread', () => {
 
   it('replaces a growing message in its place, without reading it again from the start', async () => {
     const said = ['Reading thread.ts', 'Reading thread.ts and chat.svelte.ts']
-    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unattached, still, timers)
+    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unattached, still, timers, unasked)
     chat.see(1, [{ ...ROW, status: 'working' }])
     await chat.refresh()
     expect(thread(chat)).toContain('Reading thread.ts')

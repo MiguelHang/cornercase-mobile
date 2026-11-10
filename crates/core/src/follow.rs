@@ -32,6 +32,16 @@ pub enum Step<T> {
     Ended(Ended),
 }
 
+impl<T> Step<T> {
+    pub(crate) fn map<U>(self, change: impl FnOnce(T) -> U) -> Step<U> {
+        match self {
+            Self::Changed(changed) => Step::Changed(change(changed)),
+            Self::Warned(error) => Step::Warned(error),
+            Self::Ended(ended) => Step::Ended(ended),
+        }
+    }
+}
+
 pub(crate) struct Lines {
     stdout: mpsc::UnboundedReceiver<String>,
     run: Fuse<BoxFuture<'static, End>>,
