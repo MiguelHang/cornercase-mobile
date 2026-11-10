@@ -155,6 +155,11 @@
   })
 
   $effect(() => {
+    const opened = chat
+    return () => opened?.leave()
+  })
+
+  $effect(() => {
     const state = changes
     if (state === null) {
       return

@@ -17,7 +17,6 @@ use crate::commands::error::CommandError;
 use crate::identity;
 use crate::state::attached::AttachedImages;
 
-#[cfg_attr(not(test), expect(dead_code, reason = "the app empties it at startup from T6 on"))]
 pub(crate) mod attached;
 
 const MACHINES_FILE: &str = "machines.json";

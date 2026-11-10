@@ -11,7 +11,6 @@ import {
   whileShown,
   type PressKey,
   type ReadLast,
-  type SendText,
 } from './chat.svelte'
 import {
   MACHINE,
@@ -230,46 +229,6 @@ describe('Chat, its attachments', () => {
   })
 })
 
-const pastedThenPressing = async (pressKey: PressKey, sendText: SendText = sentOk) => {
-  const chat = seen({ pressKey, sendText })
-  await chat.attach()
-  return chat
-}
-
-describe('Chat, its attachments under the keys', () => {
-  it('drops the chips once Enter submits them, and sends plain again', async () => {
-    const sendText = vi.fn(sentOk)
-    const chat = await pastedThenPressing(pressedOk, sendText)
-    expect(await chat.press('enter')).toBeNull()
-    expect(chat.attachments.chips).toEqual([])
-    chat.draft = 'and now?'
-    await chat.send()
-    expect(sendText.mock.calls).toEqual([[PANE, 'and now?', false]])
-  })
-
-  it('keeps the chips when Enter fails', async () => {
-    const chat = await pastedThenPressing(() => Promise.resolve(refused('nothing was sent', 'not_sent')))
-    expect(await chat.press('enter')).toBe('nothing was sent')
-    expect(chat.attachments.chips.length).toBe(1)
-  })
-
-  it.each<KeyName>(['esc', 'down', 'tab', '1'])('keeps the chips after %s', async (key) => {
-    const chat = await pastedThenPressing(pressedOk)
-    expect(await chat.press(key)).toBeNull()
-    expect(chat.attachments.chips.length).toBe(1)
-  })
-
-  it('keeps an image attached while Enter was on its way', async () => {
-    const pressed = gate<{ status: 'ok'; data: null }>()
-    const chat = await pastedThenPressing(() => pressed.promise)
-    const entered = chat.press('enter')
-    await chat.attach()
-    pressed.open(ok(null))
-    expect(await entered).toBeNull()
-    expect(chat.attachments.chips.length).toBe(1)
-  })
-})
-
 const attachingAnother = async (calls: Calls = {}) => {
   const picked = gate<typeof PASTED>()
   const attachImage = vi.fn<AttachImage>().mockResolvedValueOnce(PASTED).mockReturnValueOnce(picked.promise)
@@ -295,22 +254,9 @@ describe('Chat, while an image is being attached', () => {
     expect([chat.draft, chat.attachments.chips.length]).toEqual(['what is wrong here?', 2])
   })
 
-  it('rests Enter, which sends nothing, taps nothing and keeps every chip', async () => {
-    const pressKey = vi.fn(pressedOk)
-    const haptics = still()
-    const { chat, attached } = await attachingAnother({ pressKey, haptics })
-    expect(chat.canPressKey('enter')).toBe(false)
-    expect(await chat.press('enter')).toBeNull()
-    expect(pressKey).not.toHaveBeenCalled()
-    expect(haptics.impactFeedback).not.toHaveBeenCalled()
-    await attached()
-    expect(chat.attachments.chips.length).toBe(2)
-  })
-
-  it.each<KeyName>(['esc', 'down', '1'])('still sends %s', async (key) => {
+  it.each<KeyName>(['enter', 'esc', 'down', '1'])('still sends %s', async (key) => {
     const pressKey = vi.fn(pressedOk)
     const { chat } = await attachingAnother({ pressKey })
-    expect(chat.canPressKey(key)).toBe(true)
     await chat.press(key)
     expect(pressKey.mock.calls).toEqual([[PANE, key]])
   })
@@ -326,20 +272,6 @@ describe('Chat, while an image is being attached', () => {
     expect(chat.attachments.chips).toEqual([])
   })
 
-  it('presses Enter again once the image is attached, dropping every chip', async () => {
-    const pressKey = vi.fn(pressedOk)
-    const { chat, attached } = await attachingAnother({ pressKey })
-    await attached()
-    expect(chat.canPressKey('enter')).toBe(true)
-    expect(await chat.press('enter')).toBeNull()
-    expect(pressKey.mock.calls).toEqual([[PANE, 'enter']])
-    expect(chat.attachments.chips).toEqual([])
-  })
-
-  it('cannot press Enter without its row, attaching or not', () => {
-    expect(fresh().canPressKey('enter')).toBe(false)
-    expect(fresh().canPressKey('esc')).toBe(false)
-  })
 })
 
 describe('Chat, its reading', () => {

@@ -1,4 +1,5 @@
-use tauri::{AppHandle, Manager, RunEvent, Runtime};
+use tauri::webview::{PageLoadEvent, PageLoadPayload};
+use tauri::{AppHandle, Manager, RunEvent, Runtime, Webview};
 
 use crate::state::AppState;
 
@@ -17,6 +18,18 @@ pub(crate) fn resume<R: Runtime>(app: &AppHandle<R>) {
 pub(crate) fn on_foreground(state: &AppState) {
     if let Some(active) = state.active().as_ref() {
         active.store().resume_now();
+    }
+}
+
+pub(crate) fn on_page_load<R: Runtime>(webview: &Webview<R>, payload: &PageLoadPayload<'_>) {
+    page_loading(webview, payload.event());
+}
+
+pub(crate) fn page_loading<R: Runtime>(manager: &impl Manager<R>, event: PageLoadEvent) {
+    if event == PageLoadEvent::Started
+        && let Some(state) = manager.try_state::<AppState>()
+    {
+        state.attached().clear();
     }
 }
 

@@ -3,6 +3,7 @@ import type {
   commands,
   LastMessage_Serialize as LastMessage,
   PaneStatusChanged_Serialize as PaneStatusChanged,
+  Toast,
 } from './bindings'
 import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
@@ -21,6 +22,8 @@ export type Clock = { after: (ms: number, then: () => void) => () => void; now: 
 export const INTERRUPT_WINDOW_MS = 3000
 
 export const FOLLOW_MS = 10_000
+
+export const staysOnTheMac = (agent: string) => `The image stays in ${agent}'s input on the Mac`
 
 export const timers: Clock = {
   after: (ms, then) => {
@@ -120,6 +123,7 @@ export class Chat {
   #again = false
   #starting = false
   #heard: string | null | undefined = undefined
+  #leftOnTheMac = false
 
   constructor(
     machine: number | null,
@@ -177,10 +181,6 @@ export class Chat {
     return this.row !== null
   }
 
-  canPressKey(key: KeyName) {
-    return this.canPress && !(key === 'enter' && this.attachments.attaching)
-  }
-
   see(machine: number | null, agents: AgentRow[] | null, starting = false) {
     if (this.gone) {
       return
@@ -189,7 +189,7 @@ export class Chat {
     const elsewhere = machine !== this.machine
     const row = agents === null || elsewhere ? null : (agents.find((agent) => agent.pane === this.pane) ?? null)
     if (row === null && (elsewhere || this.#lost(agents))) {
-      this.#leave()
+      this.leave()
       return
     }
     this.#hear(row)
@@ -302,6 +302,7 @@ export class Chat {
       return
     }
     if (failed === null) {
+      this.#leftOnTheMac = false
       this.lastNews = this.#clock.now()
       this.outgoing = { ...bubble, state: 'sent' }
       return
@@ -317,11 +318,22 @@ export class Chat {
         return failed
       }
     }
-    return deliver(() => this.#sendText(this.pane, text, chips.length > 0))
+    const forced = chips.length > 0 || this.#leftOnTheMac
+    return deliver(() => this.#sendText(this.pane, text, forced))
   }
 
   async attach(): Promise<string | null> {
     return this.canPress ? this.attachments.attach() : null
+  }
+
+  async remove(id: number): Promise<Toast | null> {
+    const pasted = this.attachments.chips.some((chip) => chip.id === id && chip.pasted)
+    const failed = await this.attachments.remove(id)
+    if (failed !== null) {
+      return { level: 'error', message: failed }
+    }
+    this.#leftOnTheMac ||= pasted
+    return pasted ? { level: 'info', message: staysOnTheMac(this.row?.agent ?? 'the agent') } : null
   }
 
   #lost(agents: AgentRow[] | null) {
@@ -329,7 +341,7 @@ export class Chat {
   }
 
   async press(key: KeyName): Promise<string | null> {
-    if (!this.canPressKey(key)) {
+    if (!this.canPress) {
       return null
     }
     void tap(this.#haptics)
@@ -338,12 +350,7 @@ export class Chat {
       return null
     }
     this.#disarm()
-    const pasted = key === 'enter' ? this.attachments.chips.length : 0
-    const failed = await deliver(() => this.#pressKey(this.pane, key))
-    if (failed === null && pasted > 0) {
-      this.attachments.clear(pasted)
-    }
-    return failed
+    return deliver(() => this.#pressKey(this.pane, key))
   }
 
   async pressOption(number: number): Promise<string | null> {
@@ -361,7 +368,7 @@ export class Chat {
     this.interrupting = false
   }
 
-  #leave() {
+  leave() {
     this.gone = true
     this.row = null
     this.draft = ''

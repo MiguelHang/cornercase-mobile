@@ -195,6 +195,15 @@ describe('Attachments, removing', () => {
     expect(await attachments.remove(1)).toBe('IPC is gone')
     expect(attachments.chips).toEqual([])
   })
+
+  it('asks nothing for an image already pasted, which the phone no longer keeps', async () => {
+    const discard = vi.fn(discarded)
+    const attachments = await holding(2, { discard })
+    await attachments.paste(attachments.chips[0])
+    expect(await attachments.remove(1)).toBeNull()
+    expect(discard).not.toHaveBeenCalled()
+    expect(attachments.chips.map((chip) => chip.id)).toEqual([2])
+  })
 })
 
 describe('Attachments, releasing', () => {
@@ -214,6 +223,14 @@ describe('Attachments, releasing', () => {
     expect(attachments.chips.length).toBe(2)
   })
 
+  it('forgets only the images not pasted yet', async () => {
+    const discard = vi.fn(discarded)
+    const attachments = await holding(3, { discard })
+    await attachments.paste(attachments.chips[1])
+    expect(await attachments.release()).toBeNull()
+    expect(discard.mock.calls).toEqual([[[1, 3]]])
+  })
+
   it('asks nothing without images', async () => {
     const discard = vi.fn(discarded)
     expect(await new Attachments(PANE, images({ discard })).release()).toBeNull()
@@ -229,19 +246,5 @@ describe('Attachments, taking and giving back', () => {
     await attachments.attach()
     attachments.giveBack(taken)
     expect(attachments.chips.map((chip) => chip.id)).toEqual([1, 2])
-  })
-})
-
-describe('Attachments, clearing', () => {
-  it('drops every chip', async () => {
-    const attachments = await holding(2)
-    attachments.clear()
-    expect(attachments.chips).toEqual([])
-  })
-
-  it('drops only the chips sent, keeping those attached since', async () => {
-    const attachments = await holding(2)
-    attachments.clear(1)
-    expect(attachments.chips.map((chip) => chip.id)).toEqual([2])
   })
 })

@@ -93,19 +93,17 @@ export class Attachments {
   }
 
   async remove(id: number): Promise<string | null> {
+    const removed = this.chips.filter((chip) => chip.id === id)
     this.chips = this.chips.filter((chip) => chip.id !== id)
-    return this.#discard([id])
+    return this.#discard(removed)
   }
 
   async release(chips = this.take()): Promise<string | null> {
-    return this.#discard(chips.map((chip) => chip.id))
+    return this.#discard(chips)
   }
 
-  clear(sent = this.chips.length) {
-    this.chips = this.chips.slice(sent)
-  }
-
-  async #discard(ids: number[]): Promise<string | null> {
+  async #discard(chips: Chip[]): Promise<string | null> {
+    const ids = chips.filter((chip) => !chip.pasted).map((chip) => chip.id)
     if (ids.length === 0) {
       return null
     }

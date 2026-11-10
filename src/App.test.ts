@@ -172,6 +172,10 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
   })
 
+  it('lets the chat go once it is left, so that its images waiting on the phone are dropped', () => {
+    expect(source).toContain('$effect(() => { const opened = chat return () => opened?.leave() })')
+  })
+
   it("names the route below for the back button, from the saved machines and the active machine's rows", () => {
     expect(source).toContain(
       'const lookups: Lookups = { machineName: (id) => machines.find((machine) => machine.id === id)?.name, agentRow: (opened) => opened.machine === current.machine ? current.agents?.find((row) => row.pane === opened.pane) : undefined, listed: () => current.agents ?? [], }',
