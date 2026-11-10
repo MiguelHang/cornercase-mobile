@@ -139,6 +139,12 @@ describe('Composer, its Send', () => {
     expect(body).toContain('></textarea>')
   })
 
+  it('takes no focus from the field on a tap, so the emptied field keeps the keyboard for the next text', () => {
+    const sendSource = flat(composerSource).match(/aria-label="Send".*?<\/button>/)?.[0]
+    expect(sendSource).toContain('onmousedown={(event) => event.preventDefault()}')
+    expect(sendSource).toContain('onclick={() => void chat.send()}')
+  })
+
   it('leaves a failed send to its bubble, with no toast', () => {
     expect(flat(composerSource)).toContain('onclick={() => void chat.send()}')
     expect(flat(composerSource)).not.toContain('await chat.send()')

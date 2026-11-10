@@ -100,6 +100,7 @@
       disabled={!chat.canSend}
       aria-disabled={resting ? 'true' : undefined}
       aria-busy={chat.sending ? 'true' : undefined}
+      onmousedown={(event) => event.preventDefault()}
       onclick={() => void chat.send()}
       ontouchstart={() => {}}
     >
