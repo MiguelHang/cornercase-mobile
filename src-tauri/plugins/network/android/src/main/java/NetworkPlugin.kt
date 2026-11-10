@@ -24,44 +24,58 @@ private data class Path(val kind: String, val expensive: Boolean) {
 
 private val NONE = Path("none", false)
 
-private fun pathOf(capabilities: NetworkCapabilities?): Path {
-    if (capabilities == null) {
-        return NONE
+private data class Seen(val network: Network?, val path: Path, val vpn: Boolean)
+
+private val GONE = Seen(null, NONE, false)
+
+private fun kindOf(capabilities: NetworkCapabilities): String = when {
+    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+    else -> "other"
+}
+
+private fun seenOf(network: Network?, capabilities: NetworkCapabilities?): Seen {
+    if (network == null || capabilities == null) {
+        return GONE
     }
-    val kind = when {
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
-        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-        else -> "other"
-    }
-    return Path(kind, !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED))
+    val expensive = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    val vpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+    return Seen(network, Path(kindOf(capabilities), expensive), vpn)
 }
 
 private object Watcher : ConnectivityManager.NetworkCallback() {
     private var channel: Channel? = null
-    private var last: Path? = null
+    private var last: Seen? = null
 
     @Synchronized
     fun watch(connectivity: ConnectivityManager, next: Channel) {
         channel = next
         if (last == null) {
+            val network = connectivity.activeNetwork
+            last = seenOf(network, network?.let(connectivity::getNetworkCapabilities))
             connectivity.registerDefaultNetworkCallback(this)
-            last = pathOf(connectivity.activeNetwork?.let(connectivity::getNetworkCapabilities))
         }
-        send(last ?: NONE)
+        send((last ?: GONE).path)
     }
 
     override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-        changed(pathOf(capabilities))
-    }
-
-    override fun onLost(network: Network) {
-        changed(NONE)
+        changed(seenOf(network, capabilities))
     }
 
     @Synchronized
-    private fun changed(path: Path) {
-        last = path
-        send(path)
+    override fun onLost(network: Network) {
+        if (last?.network == network) {
+            changed(GONE)
+        }
+    }
+
+    @Synchronized
+    private fun changed(seen: Seen) {
+        if (seen == last) {
+            return
+        }
+        last = seen
+        send(seen.path)
     }
 
     private fun send(path: Path) {

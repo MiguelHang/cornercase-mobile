@@ -97,3 +97,24 @@ del usuario. Eventos del campo oculto leídos por CDP; lo recibido, con `cornerc
   `keyCode` y funcionan.
 - Sin ver en vivo: una composición (escritura deslizando, voz, acentos) y SwiftKey (no está en la imagen); quedan en
   la lista del dispositivo y cubiertas por los tests.
+
+### T9 — cambios de red con el tablero y la terminal abiertos (2026-11-10)
+El mismo AVD (wifi `AndroidWifi` y datos LTE a la vez) y el mismo servidor aislado que en T5, contra el puente por la IP
+de LAN del Mac. La línea `cornercase-mobile: network …` de Rust sale en `logcat` (tag `RustStdoutStderr`), así que
+P6 a) vale: el tiempo se toma desde el `adb shell` hasta que la barra vuelve a nombrar la máquina (tablero, leída por
+CDP) o hasta que el puente recibe el nuevo `surface` (terminal, que no enseña barra).
+
+- **Un valor por cambio**: `svc wifi disable` → `cellular expensive`, `svc data disable` → `none`, `svc data enable` →
+  `cellular expensive`, `svc wifi enable` → `wifi`; modo avión → `none` y, al quitarlo, `cellular expensive` y unos
+  3 s después `wifi`. Nada más: ni repetidos por cambios de capacidades, ni al pasar 30 s en segundo plano y volver
+  (con T8 llegaba un segundo `wifi`). Un solo callback de la app en `dumpsys connectivity` (el otro es de la WebView).
+- **`Offline` y vuelta sola**: sin red, la barra dice `No network` y no reintenta; con red, reconecta sin tocar nada,
+  también en la terminal, que se vuelve a suscribir y enseña lo escrito después en el panel.
+- **Tiempos hasta `connected`**: wifi → datos, 1,5–2,6 s; datos de vuelta, 1,4–1,8 s; wifi de vuelta, 9–12 s, de los
+  que unos 5 s tarda la wifi del emulador en ser la red por defecto y el resto son intentos que el puente corta
+  (`Handshake not finished`, `Connection reset`) antes del bueno; al quitar el modo avión, 2,5 s por datos y otra
+  reconexión al llegar la wifi (10 s en total).
+- **El socket suele caer antes del aviso**: al quitar la wifi la barra pasa por `Retrying in 1 s` antes de que llegue
+  `cellular`, y el cambio de red reconecta igual.
+- Sin ver en vivo: VPN (Tailscale en el teléfono) y pasar de una wifi a otra (el emulador tiene una); van a la lista
+  del dispositivo.
