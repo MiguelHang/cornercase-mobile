@@ -123,8 +123,10 @@
     if (state === null) {
       return
     }
-    const top = untrack(() => router.current)
-    void (top.name === 'file' ? state.open(top.path) : state.start())
+    untrack(() => {
+      const top = router.current
+      void (top.name === 'file' ? state.open(top.path) : state.start())
+    })
     return () => state.stop()
   })
 

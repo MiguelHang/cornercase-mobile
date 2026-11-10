@@ -262,14 +262,14 @@ describe('App wiring', () => {
     )
   })
 
-  it('keeps one state of the browsed workspace under its tree and its file, listing the tree or reading the file it opened on and leaving it after', () => {
+  it('keeps one state of the browsed workspace under its tree and its file, listing the tree or reading the file it opened on untracked, so its own writes do not stop it, and leaving it after', () => {
     expect(source).toContain('const browsedMachine = $derived(browsed?.machine ?? null)')
     expect(source).toContain('const browsedWorkspace = $derived(browsed?.workspace ?? null)')
     expect(source).toContain(
       '{ list: commands.filesList, read: commands.filesRead, search: commands.filesSearch }, (toast) => toasts.push(toast),',
     )
     expect(source).toContain(
-      "const top = untrack(() => router.current) void (top.name === 'file' ? state.open(top.path) : state.start()) return () => state.stop()",
+      "untrack(() => { const top = router.current void (top.name === 'file' ? state.open(top.path) : state.start()) }) return () => state.stop()",
     )
   })
 
