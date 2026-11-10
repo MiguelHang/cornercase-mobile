@@ -19,6 +19,7 @@ import Start from './Start.svelte'
 import startSource from './Start.svelte?raw'
 import WorkspaceForm from './WorkspaceForm.svelte'
 import workspaceSource from './WorkspaceForm.svelte?raw'
+import workspacePickerSource from './WorkspacePicker.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
 
@@ -34,8 +35,8 @@ const CALLS: StartCalls = {
     answer({
       boot: 'boot-1',
       projects: [
-        { id: 1, name: 'web', workspaces: [] },
-        { id: 2, name: 'api', workspaces: [] },
+        { id: 1, name: 'web', workspaces: [{ id: 12, name: 'main' }] },
+        { id: 2, name: 'api', workspaces: [{ id: 9, name: 'Login' }] },
       ],
     }),
   installedAgents: () => answer(installed('claude', 'codex')),
@@ -45,7 +46,7 @@ const CALLS: StartCalls = {
 }
 
 const formOf = async (calls: Partial<StartCalls> = {}) => {
-  const form = new StartForm({ ...CALLS, ...calls }, () => {}, () => {}, { agent: null })
+  const form = new StartForm({ ...CALLS, ...calls }, () => {}, () => {}, { agent: null, workspace: null })
   await form.load()
   return form
 }
@@ -97,6 +98,7 @@ const label = (button: RegExpMatchArray | null) => button?.[2].replace(/<[^>]*>|
 const filled = async (calls: Partial<StartCalls> = {}) => {
   const form = await formOf(calls)
   form.project = 2
+  form.workspace = 9
   form.prompt = 'fix the login'
   form.name = 'login'
   return form
@@ -113,21 +115,14 @@ describe('Start', () => {
     expect(body).toMatch(
       /aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button><button[^>]*aria-pressed="false">Issue<\/button>/,
     )
-    expect(labels(body)).toEqual(['Project', 'Agent', 'Model', 'Prompt', 'Branch'])
-  })
-
-  it('says what happens without a branch, under the branch', async () => {
-    const note = flat(screen(await formOf())).match(/>Branch<\/label>[^]*<p class="note[^"]*">([^<]*)<\/p>/)?.[1]
-    expect(note).toBe(
-      "With a branch, the agent works in its own worktree. Without one, it starts in a new tab in the project's folder.",
-    )
+    expect(labels(body)).toEqual(['Workspace', 'Agent', 'Model', 'Prompt'])
   })
 
   it('shows the projects and the agents loading while the rest can be filled', () => {
-    const body = screen(new StartForm(CALLS, () => {}, () => {}, { agent: null }))
+    const body = screen(new StartForm(CALLS, () => {}, () => {}, { agent: null, workspace: null }))
     const reading = [...body.matchAll(/<p class="state[^"]*"><span class="spinner[^]*?<\/span>(?:<!---->)?([^<]*)</g)]
-    expect(reading.map(([, text]) => text)).toEqual(['Reading the projects…', 'Reading the agents…'])
-    expect(labels(body)).toEqual(['Model', 'Prompt', 'Branch'])
+    expect(reading.map(([, text]) => text)).toEqual(['Reading the workspaces…', 'Reading the agents…'])
+    expect(labels(body)).toEqual(['Model', 'Prompt'])
   })
 
   it('holds Start and says why while not connected', async () => {
@@ -141,18 +136,21 @@ describe('Start', () => {
 })
 
 describe('Start, its agent form', () => {
-  it('lists the projects to choose from, and the agents with the first one chosen', async () => {
+  it('lists the workspaces to choose from under their projects, and the agents with the first one chosen', async () => {
     const body = agentForm(await formOf())
     expect(body).toMatch(
-      /<option disabled="" selected="">Choose…<\/option>[^]*?<option value="1">web<\/option><option value="2">api</,
+      /<option disabled="" selected="">Choose…<\/option>[^]*?<option value="12">web › main<\/option><option value="9">api › Login</,
     )
     expect(body).toMatch(/<option value="claude" selected="">claude<\/option><option value="codex">codex<\/option>/)
   })
 
-  it('chooses the only project', async () => {
-    const projects = [{ id: 5, name: 'web', workspaces: [] }]
+  it('chooses the only workspace', async () => {
+    const projects = [
+      { id: 5, name: 'web', workspaces: [{ id: 12, name: 'main' }] },
+      { id: 2, name: 'api', workspaces: [] },
+    ]
     const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects }) }))
-    expect(body).toMatch(/<select[^>]*>(?:<!--[^>]*-->)*<option value="5" selected="">web<\/option>/)
+    expect(body).toMatch(/<select[^>]*>(?:<!--[^>]*-->)*<option value="12" selected="">web › main<\/option>/)
   })
 
   it('says why the agents could not be read, with Try again', async () => {
@@ -175,8 +173,8 @@ describe('Start, its agent form', () => {
     form.prompt = '   '
     await form.start()
     const body = agentForm(form)
-    expect(['Project', 'Agent', 'Prompt', 'Model'].map((field) => errorOf(body, field))).toEqual([
-      'Choose a project',
+    expect(['Workspace', 'Agent', 'Prompt', 'Model'].map((field) => errorOf(body, field))).toEqual([
+      'Choose a workspace',
       'Choose an agent',
       'Write what the agent should do',
       '',
@@ -190,7 +188,7 @@ describe('Start, its agent form', () => {
     expect(submit(body)?.[1]).toContain('aria-busy="true"')
     expect(submit(body)?.[2]).toContain('class="spinner')
     expect(label(submit(body))).toBe('Starting…')
-    expect(body.match(/<(?:input|textarea|select)[^>]*disabled=""/g)).toHaveLength(5)
+    expect(body.match(/<(?:input|textarea|select)[^>]*disabled=""/g)).toHaveLength(4)
   })
 
   it('shows what the server says and keeps what was typed', async () => {
@@ -329,7 +327,10 @@ describe('Start, on an issue', () => {
   it('hands over the agent it started on the issue', async () => {
     const onstarted = vi.fn()
     const started = { project: 2, workspace: 3, tab: 4, pane: 5, warning: null }
-    const form = new StartForm({ ...CALLS, startIssue: () => answer(started) }, onstarted, () => {}, { agent: null })
+    const form = new StartForm({ ...CALLS, startIssue: () => answer(started) }, onstarted, () => {}, {
+      agent: null,
+      workspace: null,
+    })
     await form.load()
     onIssue(form)
     await form.startIssue()
@@ -372,5 +373,6 @@ describe('Start wiring', () => {
   it('reads again what failed on Try again', () => {
     expect(flat(pickerSource)).toContain('onretry={() => void form.loadAgents()}')
     expect(flat(projectSource)).toContain('onretry={() => void form.loadProjects()}')
+    expect(flat(workspacePickerSource)).toContain('onretry={() => void form.loadProjects()}')
   })
 })

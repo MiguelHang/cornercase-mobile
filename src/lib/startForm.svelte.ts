@@ -18,11 +18,15 @@ export type StartCalls = Pick<
 
 export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; items: T[] }
 
-export type Memory = { agent: string | null }
+export type Memory = { agent: string | null; workspace: number | null }
+
+export type WorkspaceOption = { id: number; project: number; label: string }
 
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export const PROJECT_EMPTY = 'Choose a project'
+export const WORKSPACE_EMPTY = 'Choose a workspace'
+export const BRANCH_EMPTY = 'Name the branch'
 export const AGENT_EMPTY = 'Choose an agent'
 export const PROMPT_EMPTY = 'Write what the agent should do'
 export const NAME_EMPTY = 'Name the workspace'
@@ -32,7 +36,7 @@ export const WORKSPACE_UNANSWERED =
   'cornercase did not answer, so the workspace may exist already: look on the Mac before trying again.'
 export const CHOICES_UNANSWERED = 'cornercase did not answer.'
 
-const remembered: Memory = { agent: null }
+const remembered: Memory = { agent: null, workspace: null }
 
 const reasonOf = (error: CommandError, unanswered: string) =>
   error.code === 'unanswered' ? unanswered : error.message
@@ -59,19 +63,30 @@ const errorIf = (empty: boolean, error: string) => (empty ? error : null)
 
 const worktreeOf = (project: number, branch: string): Place => ({ kind: 'worktree', project, branch })
 
+const optionsOf = (projects: ProjectChoice[]): WorkspaceOption[] =>
+  projects.flatMap((project) =>
+    project.workspaces.map((workspace) => ({
+      id: workspace.id,
+      project: project.id,
+      label: `${project.name} › ${workspace.name}`,
+    })),
+  )
+
 export class StartForm {
   projects = $state<Choices<ProjectChoice>>({ kind: 'loading' })
   agents = $state<Choices<AgentChoice>>({ kind: 'loading' })
   project = $state<number | null>(null)
+  workspace = $state<number | null>(null)
   agent = $state('')
   model = $state('')
   prompt = $state('')
-  worktree = $state('')
   name = $state('')
   ownWorktree = $state(false)
   issue = $state.raw<StartingIssue | null>(null)
   branch = $state('')
   projectError = $state<string | null>(null)
+  workspaceError = $state<string | null>(null)
+  branchError = $state<string | null>(null)
   agentError = $state<string | null>(null)
   promptError = $state<string | null>(null)
   nameError = $state<string | null>(null)
@@ -102,6 +117,11 @@ export class StartForm {
     return this.issue?.issue.branch ?? ''
   }
 
+  get workspaceChoices(): Choices<WorkspaceOption> {
+    const projects = this.projects
+    return projects.kind === 'ready' ? { kind: 'ready', items: optionsOf(projects.items) } : projects
+  }
+
   get noAgents() {
     return this.agents.kind === 'ready' && this.agents.items.length === 0
   }
@@ -110,6 +130,11 @@ export class StartForm {
     this.issue = issue
     this.project = issue.project
     this.branch = issue.issue.branch
+  }
+
+  prefer(workspace: number) {
+    this.workspace = workspace
+    this.#pickWorkspace()
   }
 
   chooseProject() {
@@ -159,6 +184,7 @@ export class StartForm {
     }
     this.projects = choicesOf(projectsOf(reply))
     this.#pickProject()
+    this.#pickWorkspace()
     return reply.ok && this.#restarted(reply.data.boot)
   }
 
@@ -172,16 +198,37 @@ export class StartForm {
     if (this.sending) {
       return
     }
-    this.projectError = errorIf(this.project === null, PROJECT_EMPTY)
-    this.agentError = errorIf(this.agent === '', AGENT_EMPTY)
-    this.promptError = errorIf(this.prompt.trim() === '', PROMPT_EMPTY)
-    this.formError = null
-    const { project, agent, model, prompt, worktree } = this
-    if (project === null || this.agentError !== null || this.promptError !== null) {
+    const place = this.#checkAgent()
+    const { agent, model, prompt, workspace } = this
+    if (place === null) {
       return
     }
-    const form = { place: worktreeOf(project, worktree), agent, model, prompt }
-    await this.#launch(() => this.#calls.startAgent(form), agent)
+    const form = { place, agent, model, prompt }
+    if (await this.#launch(() => this.#calls.startAgent(form), agent)) {
+      this.#memory.workspace = workspace
+    }
+  }
+
+  #checkAgent() {
+    const chosen = this.#chosenWorkspace()
+    this.workspaceError = errorIf(chosen === undefined, WORKSPACE_EMPTY)
+    this.agentError = errorIf(this.agent === '', AGENT_EMPTY)
+    this.promptError = errorIf(this.prompt.trim() === '', PROMPT_EMPTY)
+    this.branchError = errorIf(this.ownWorktree && this.branch.trim() === '', BRANCH_EMPTY)
+    this.formError = null
+    const refused = [this.agentError, this.promptError, this.branchError].some((error) => error !== null)
+    return chosen === undefined || refused ? null : this.#agentPlace(chosen)
+  }
+
+  #agentPlace(chosen: WorkspaceOption): Place {
+    return this.ownWorktree
+      ? worktreeOf(chosen.project, this.branch)
+      : { kind: 'workspace', workspace: chosen.id }
+  }
+
+  #chosenWorkspace() {
+    const choices = this.workspaceChoices
+    return choices.kind === 'ready' ? choices.items.find((choice) => choice.id === this.workspace) : undefined
   }
 
   async startIssue() {
@@ -207,6 +254,7 @@ export class StartForm {
       this.#memory.agent = agent
       this.#onstarted(reply.data, agent)
     }
+    return reply.ok
   }
 
   async create() {
@@ -250,6 +298,26 @@ export class StartForm {
     if (this.project === null && items.length === 1) {
       this.project = items[0].id
     }
+  }
+
+  #pickWorkspace() {
+    const choices = this.workspaceChoices
+    if (choices.kind !== 'ready') {
+      return
+    }
+    const ids = choices.items.map((choice) => choice.id)
+    if (this.workspace !== null && ids.includes(this.workspace)) {
+      return
+    }
+    this.workspace = this.#fallbackWorkspace(ids)
+  }
+
+  #fallbackWorkspace(ids: number[]) {
+    const last = this.#memory.workspace
+    if (last !== null && ids.includes(last)) {
+      return last
+    }
+    return ids.length === 1 ? ids[0] : null
   }
 
   #pickAgent() {

@@ -5,15 +5,18 @@ import type {
   ProjectChoice,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
+  WorkspaceChoice,
 } from './bindings'
 import {
   AGENT_EMPTY,
   AGENT_UNANSWERED,
+  BRANCH_EMPTY,
   CHOICES_UNANSWERED,
   NAME_EMPTY,
   PROJECT_EMPTY,
   PROMPT_EMPTY,
   StartForm,
+  WORKSPACE_EMPTY,
   WORKSPACE_UNANSWERED,
   ask,
   type Memory,
@@ -32,7 +35,17 @@ const UNANSWERED: CommandError = { code: 'unanswered', message: 'the request was
 
 const agent = (name: string) => ({ agent: name, command: name, installed: true })
 
-const project = (id: number, name = `p${id}`): ProjectChoice => ({ id, name, workspaces: [] })
+const workspace = (id: number, name = `w${id}`): WorkspaceChoice => ({ id, name })
+
+const project = (id: number, name = `p${id}`, workspaces: WorkspaceChoice[] = []): ProjectChoice => ({
+  id,
+  name,
+  workspaces,
+})
+
+const SESSION = [project(1, 'web', [workspace(11, 'main')]), project(2, 'api', [workspace(21), workspace(22, 'Login')])]
+
+const FORGETFUL: Memory = { agent: null, workspace: null }
 
 const choices = (projects: ProjectChoice[], boot: string | null = 'boot-1'): StartChoices => ({ boot, projects })
 
@@ -43,14 +56,14 @@ const gate = <T>() => {
 }
 
 const calls = (overrides: Partial<StartCalls> = {}) => ({
-  startProjects: vi.fn(overrides.startProjects ?? (() => ok(choices([project(1), project(2)])))),
+  startProjects: vi.fn(overrides.startProjects ?? (() => ok(choices(SESSION)))),
   installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
   startIssue: vi.fn(overrides.startIssue ?? (() => ok(STARTED))),
   newWorkspace: vi.fn(overrides.newWorkspace ?? (() => ok(STARTED))),
 })
 
-const made = (overrides: Partial<StartCalls> = {}, memory: Memory = { agent: null }) => {
+const made = (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
   const onstarted = vi.fn()
   const oncreated = vi.fn()
   const commands = calls(overrides)
@@ -58,7 +71,7 @@ const made = (overrides: Partial<StartCalls> = {}, memory: Memory = { agent: nul
   return { form, onstarted, oncreated, commands, memory }
 }
 
-const loaded = async (overrides: Partial<StartCalls> = {}, memory: Memory = { agent: null }) => {
+const loaded = async (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
   const built = made(overrides, memory)
   await built.form.load()
   return built
@@ -67,9 +80,10 @@ const loaded = async (overrides: Partial<StartCalls> = {}, memory: Memory = { ag
 const filled = async (overrides: Partial<StartCalls> = {}) => {
   const built = await loaded(overrides)
   built.form.project = 2
+  built.form.workspace = 22
   built.form.model = ' opus '
   built.form.prompt = 'fix the login\nand its tests'
-  built.form.worktree = 'fix-login'
+  built.form.branch = 'fix-login'
   built.form.name = 'login'
   return built
 }
@@ -86,7 +100,7 @@ const TICKET: IssueInfo = {
   branch: 'ada/sc-7/refunds',
 }
 
-const fromIssue = async (overrides: Partial<StartCalls> = {}, memory: Memory = { agent: null }) => {
+const fromIssue = async (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
   const built = made(overrides, memory)
   built.form.forIssue({ project: 9, issue: TICKET, prompt: 'Work on sc-7: Refunds round the wrong way' })
   await built.form.load()
@@ -97,10 +111,11 @@ const issueFields = (form: StartForm) => [form.project, form.agent, form.model, 
 
 const typed = (form: StartForm) => ({
   project: form.project,
+  workspace: form.workspace,
   agent: form.agent,
   model: form.model,
   prompt: form.prompt,
-  worktree: form.worktree,
+  branch: form.branch,
   name: form.name,
   ownWorktree: form.ownWorktree,
 })
@@ -122,7 +137,7 @@ describe('ask', () => {
 describe('StartForm choices', () => {
   it('lists the projects and the installed agents, and picks the first agent', async () => {
     const { form } = await loaded()
-    expect(form.projects).toEqual({ kind: 'ready', items: [project(1), project(2)] })
+    expect(form.projects).toEqual({ kind: 'ready', items: SESSION })
     expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude'), agent('codex')] })
     expect([form.project, form.agent]).toEqual([null, 'claude'])
   })
@@ -133,8 +148,8 @@ describe('StartForm choices', () => {
   })
 
   it('picks the agent last started in the app while it is still installed', async () => {
-    const { form } = await loaded({}, { agent: 'codex' })
-    const gone = await loaded({}, { agent: 'gemini' })
+    const { form } = await loaded({}, { agent: 'codex', workspace: null })
+    const gone = await loaded({}, { agent: 'gemini', workspace: null })
     expect([form.agent, gone.form.agent]).toEqual(['codex', 'claude'])
   })
 
@@ -202,6 +217,68 @@ describe('StartForm choices', () => {
   })
 })
 
+describe('StartForm choosing a workspace', () => {
+  const ONE = [project(1, 'web', [workspace(11, 'main')]), project(3)]
+
+  it('lists every workspace as its project › its name, in the order of the session', async () => {
+    const { form } = await loaded()
+    expect(form.workspaceChoices).toEqual({
+      kind: 'ready',
+      items: [
+        { id: 11, project: 1, label: 'web › main' },
+        { id: 21, project: 2, label: 'api › w21' },
+        { id: 22, project: 2, label: 'api › Login' },
+      ],
+    })
+  })
+
+  it('reads and fails with the projects', async () => {
+    const { form } = made({ startProjects: () => failed('offline') })
+    expect(form.workspaceChoices).toEqual({ kind: 'loading' })
+    await form.load()
+    expect(form.workspaceChoices).toEqual({ kind: 'failed', reason: 'offline' })
+  })
+
+  it.each<[string, ProjectChoice[], number | null, number | null, number | null]>([
+    ['the one of whoever opened it, before the last used', SESSION, 22, 21, 21],
+    ['the last used while it is still in the session', SESSION, 22, null, 22],
+    ['the last used when the one of whoever opened it is gone', SESSION, 22, 99, 22],
+    ['the only one when the last used is gone', ONE, 22, null, 11],
+    ['the only one with none used before', ONE, null, null, 11],
+    ['none among several with none used before', SESSION, null, null, null],
+    ['none without workspaces', [project(1), project(2)], 22, 21, null],
+  ])('picks %s', async (_, session, last, preset, picked) => {
+    const { form } = made({ startProjects: () => ok(choices(session)) }, { agent: null, workspace: last })
+    if (preset !== null) {
+      form.prefer(preset)
+    }
+    await form.load()
+    expect(form.workspace).toBe(picked)
+  })
+
+  it('takes the one of whoever opened it once the choices are read, unless it is gone', async () => {
+    const { form } = await loaded({ startProjects: () => ok(choices(ONE)) })
+    form.prefer(99)
+    expect(form.workspace).toBe(11)
+    const { form: several } = await loaded()
+    several.prefer(21)
+    expect(several.workspace).toBe(21)
+  })
+
+  it('empties a workspace that is gone after the server restarted, and keeps one still there', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices([project(2, 'api', [workspace(21), workspace(23)])], 'boot-2'))]
+    const { form } = await loaded({ startProjects: () => answers.shift() ?? ok(choices(SESSION)) })
+    form.workspace = 22
+    await form.see(false)
+    await form.see(true)
+    expect(form.workspace).toBeNull()
+    form.workspace = 21
+    await form.see(false)
+    await form.see(true)
+    expect(form.workspace).toBe(21)
+  })
+})
+
 describe('StartForm when the connection comes back', () => {
   const reconnect = async (form: StartForm) => {
     await form.see(false)
@@ -252,7 +329,7 @@ describe('StartForm when the connection comes back', () => {
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     const before = typed(form)
     await reconnect(form)
-    expect(typed(form)).toEqual({ ...before, project: null })
+    expect(typed(form)).toEqual({ ...before, project: null, workspace: null })
   })
 
   it('keeps a project that is still there', async () => {
@@ -264,14 +341,14 @@ describe('StartForm when the connection comes back', () => {
 })
 
 describe('StartForm start', () => {
-  it('sends the form and hands over what started, remembering the agent', async () => {
+  it('sends the agent to the chosen workspace and hands over what started, remembering both', async () => {
     const { form, commands, onstarted, memory } = await filled()
     form.agent = 'codex'
     await form.start()
     expect(commands.startAgent.mock.calls).toEqual([
       [
         {
-          place: { kind: 'worktree', project: 2, branch: 'fix-login' },
+          place: { kind: 'workspace', workspace: 22 },
           agent: 'codex',
           model: ' opus ',
           prompt: 'fix the login\nand its tests',
@@ -279,14 +356,33 @@ describe('StartForm start', () => {
       ],
     ])
     expect(onstarted.mock.calls).toEqual([[STARTED, 'codex']])
-    expect(memory.agent).toBe('codex')
+    expect(memory).toEqual({ agent: 'codex', workspace: 22 })
   })
 
-  it.each<[string, (form: StartForm) => void, 'projectError' | 'agentError' | 'promptError', string]>([
-    ['no project', (form) => (form.project = null), 'projectError', PROJECT_EMPTY],
+  it("sends the agent to its own worktree on the branch, in the workspace's project", async () => {
+    const { form, commands, memory } = await filled()
+    form.workspace = 11
+    form.ownWorktree = true
+    await form.start()
+    expect(commands.startAgent.mock.calls[0][0].place).toEqual({ kind: 'worktree', project: 1, branch: 'fix-login' })
+    expect(memory.workspace).toBe(11)
+  })
+
+  type Refusal = 'workspaceError' | 'agentError' | 'promptError' | 'branchError'
+
+  const ownWorktreeOn = (branch: string) => (form: StartForm) => {
+    form.ownWorktree = true
+    form.branch = branch
+  }
+
+  it.each<[string, (form: StartForm) => void, Refusal, string]>([
+    ['no workspace', (form) => (form.workspace = null), 'workspaceError', WORKSPACE_EMPTY],
+    ['a workspace no longer in the session', (form) => (form.workspace = 99), 'workspaceError', WORKSPACE_EMPTY],
     ['no agent', (form) => (form.agent = ''), 'agentError', AGENT_EMPTY],
     ['an empty prompt', (form) => (form.prompt = ''), 'promptError', PROMPT_EMPTY],
     ['a prompt of only spaces', (form) => (form.prompt = ' \n\t '), 'promptError', PROMPT_EMPTY],
+    ['its own worktree without a branch', ownWorktreeOn(''), 'branchError', BRANCH_EMPTY],
+    ['its own worktree on a branch of spaces', ownWorktreeOn('  '), 'branchError', BRANCH_EMPTY],
   ])('refuses %s under its field without sending', async (_, change, field, error) => {
     const { form, commands } = await filled()
     change(form)
@@ -297,12 +393,22 @@ describe('StartForm start', () => {
 
   it('clears the errors of the fields once they are right', async () => {
     const { form } = await filled({ startAgent: () => failed('refused') })
-    form.project = null
+    form.workspace = null
+    form.ownWorktree = true
+    form.branch = ''
     await form.start()
-    form.project = 1
+    form.workspace = 11
+    form.branch = 'fix-login'
     await form.start()
-    const errors = [form.projectError, form.agentError, form.promptError, form.formError]
-    expect(errors).toEqual([null, null, null, 'refused'])
+    const errors = [form.workspaceError, form.agentError, form.promptError, form.branchError, form.formError]
+    expect(errors).toEqual([null, null, null, null, 'refused'])
+  })
+
+  it('needs no branch while the agent works in the workspace', async () => {
+    const { form, commands } = await filled()
+    form.branch = ''
+    await form.start()
+    expect([form.branchError, commands.startAgent.mock.calls.length]).toEqual([null, 1])
   })
 
   it('keeps everything typed and shows what the server says', async () => {
@@ -310,7 +416,7 @@ describe('StartForm start', () => {
     const before = typed(form)
     await form.start()
     expect(typed(form)).toEqual(before)
-    expect([form.formError, form.sending, memory.agent]).toEqual(['the branch exists', false, null])
+    expect([form.formError, form.sending, memory]).toEqual(['the branch exists', false, FORGETFUL])
     expect(onstarted).not.toHaveBeenCalled()
   })
 
@@ -408,7 +514,8 @@ describe('StartForm from an issue', () => {
   })
 
   it("keeps the issue's project and fills the branch with the issue's, leaving the model empty", async () => {
-    const { form } = await fromIssue({ startProjects: () => ok(choices([project(5)])) }, { agent: 'codex' })
+    const memory = { agent: 'codex', workspace: null }
+    const { form } = await fromIssue({ startProjects: () => ok(choices([project(5)])) }, memory)
     expect(issueFields(form)).toEqual([9, 'codex', '', 'ada/sc-7/refunds'])
     expect(form.issueBranch).toBe('ada/sc-7/refunds')
     expect(form.issue?.prompt).toBe('Work on sc-7: Refunds round the wrong way')
