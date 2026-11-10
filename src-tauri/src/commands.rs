@@ -3,6 +3,7 @@ pub(crate) mod chat;
 pub(crate) mod connection;
 pub(crate) mod error;
 pub(crate) mod files;
+pub(crate) mod flows;
 pub(crate) mod history;
 pub(crate) mod identity;
 pub(crate) mod issues;
