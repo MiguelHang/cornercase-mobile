@@ -13,7 +13,7 @@ pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
     or_remove(fs::rename(&temporary, path), &temporary).map_err(|error| failed("cannot replace the file", &error))
 }
 
-fn temporary(path: &Path) -> PathBuf {
+pub(crate) fn temporary(path: &Path) -> PathBuf {
     let name = path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
     path.with_file_name(format!(".{name}.tmp"))
 }

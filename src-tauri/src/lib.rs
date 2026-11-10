@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tauri::Manager;
 
 use crate::state::AppState;
@@ -18,8 +20,10 @@ mod view;
 pub fn run() {
     let specta = bindings::specta();
     let (hear, paths) = network::listen();
-    let builder =
-        tauri::Builder::default().plugin(tauri_plugin_network::init(hear)).plugin(tauri_plugin_photos::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_network::init(hear))
+        .plugin(tauri_plugin_photos::init())
+        .plugin(tauri_plugin_secrets::init());
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_barcode_scanner::init()).plugin(tauri_plugin_haptics::init());
     builder
@@ -27,8 +31,9 @@ pub fn run() {
         .setup(move |app| {
             specta.mount_events(app);
             let data_dir = app.path().app_data_dir();
-            let routes = secrets::routes(data_dir.as_deref().ok());
-            app.manage(AppState::load(data_dir, &secrets::store(), routes));
+            let store = secrets::store(app.handle());
+            let routes = secrets::routes(data_dir.as_deref().ok(), Arc::clone(&store));
+            app.manage(AppState::load(data_dir, &*store, routes));
             network::follow_in_background(app.handle(), paths);
             Ok(())
         })
