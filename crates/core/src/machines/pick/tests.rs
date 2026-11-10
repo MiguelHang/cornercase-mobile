@@ -250,6 +250,16 @@ mod preference {
     #[case::the_first_to_answer_of_the_same_kind(
         vec![(TAILNET_V4, answers_after(50, "{}")), (TAILNET, answers_after(80, "{}"))], TAILNET_V4, 50
     )]
+    #[case::the_first_of_the_same_kind_while_the_lan_is_pending(
+        vec![(TAILNET_V4, answers_after(50, "{}")), (TAILNET, answers_after(80, "{}")), (LAN, hangs())], TAILNET_V4, 200
+    )]
+    #[case::not_a_worse_kind_answering_later_while_the_lan_is_pending(
+        vec![(TAILNET, answers_after(50, "{}")), (PUBLIC, answers_after(80, "{}")), (LAN, hangs())], TAILNET, 200
+    )]
+    #[case::the_better_kind_over_the_best_so_far_within_the_window(
+        vec![(PUBLIC, answers_after(20, "{}")), (TAILNET, answers_after(60, "{}")), (LAN, answers_after(100, "{}"))],
+        LAN, 100
+    )]
     #[tokio::test(start_paused = true)]
     async fn picks(#[case] answers: Vec<(&'static str, FakeTransport)>, #[case] winner: &str, #[case] millis: u64) {
         let (network, routes) = network_of(answers);
