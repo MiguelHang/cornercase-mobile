@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "src-tauri", "src-tauri/plugins/network", "src-tauri/plugins/photos", "bridge"]
+members = ["crates/core", "src-tauri", "src-tauri/plugins/network", "src-tauri/plugins/photos", "src-tauri/plugins/secrets", "bridge"]
 resolver = "2"
 
 [workspace.dependencies]

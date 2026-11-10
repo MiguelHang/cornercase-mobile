@@ -104,4 +104,4 @@ A topic of [Connection](../connection.md). The app notices when the phone change
 ## If the plugin breaks
 
 - **Plan B**, the task's, for a native plugin that does not work: keep the retries on the return to the foreground and on a stream that fails, and lower the transport's silence to 20 s. Not done as well as the plugin, since the plugin works.
-- **Plan C**: upstream's polling in Rust (`design/architecture.md`, Native code). It would replace the plugin if a later iOS or Tauri broke it, before falling back to plan B.
+- **Plan C**: upstream's polling in Rust (`design/architecture/plugins.md`). It would replace the plugin if a later iOS or Tauri broke it, before falling back to plan B.

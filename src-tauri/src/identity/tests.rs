@@ -59,11 +59,12 @@ mod line {
         assert_eq!(line(&Err(error)), format!("cornercase-mobile: no identity: {reason}"));
     }
 
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     #[test]
     fn says_there_is_no_store_on_this_platform() {
+        let app = tauri::test::mock_app();
         assert_eq!(
-            line(&Identity::load_or_create(&crate::secrets::store())),
+            line(&Identity::load_or_create(&*crate::secrets::store(app.handle()))),
             "cornercase-mobile: no identity: the secret store failed: no secret store on this platform yet"
         );
     }
