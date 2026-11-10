@@ -47,6 +47,7 @@ describe('the screens of src/routes', () => {
       '/src/routes/changes/Diff.svelte',
       '/src/routes/files/File.svelte',
       '/src/routes/files/Files.svelte',
+      '/src/routes/issues/Issue.svelte',
       '/src/routes/issues/Issues.svelte',
       '/src/routes/start/Start.svelte',
     ])
@@ -62,6 +63,7 @@ describe('the screens of src/routes', () => {
       '/src/routes/changes/Diff.svelte',
       '/src/routes/files/File.svelte',
       '/src/routes/files/Files.svelte',
+      '/src/routes/issues/Issue.svelte',
       '/src/routes/issues/Issues.svelte',
       '/src/routes/start/Start.svelte',
       '/src/routes/terminal/Terminal.svelte',
