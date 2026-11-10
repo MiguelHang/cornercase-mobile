@@ -37,6 +37,7 @@ export const commands = {
 	filesList: (workspace: number, paths: string[]) => typedError<Listing_Serialize, CommandError>(__TAURI_INVOKE("files_list", { workspace, paths })),
 	filesRead: (workspace: number, path: string) => typedError<FileShown_Serialize, CommandError>(__TAURI_INVOKE("files_read", { workspace, path })),
 	filesSearch: (workspace: number, query: string) => typedError<Searched_Serialize, CommandError>(__TAURI_INVOKE("files_search", { workspace, query })),
+	filesSearchStop: (workspace: number) => __TAURI_INVOKE<void>("files_search_stop", { workspace }),
 };
 
 /** Events */

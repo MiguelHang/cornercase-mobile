@@ -15,7 +15,6 @@ pub use input::Stdin;
 
 const REMOVED: [&str; 3] = ["CORNERCASE_PANE", "CORNERCASE_SERVER", "CORNERCASE_REMOTE"];
 const MESSAGES: usize = 16;
-const TOO_LONG: &str = "a line of output passed 16 MiB";
 
 pub struct Running {
     messages: mpsc::Receiver<BridgeMessage>,

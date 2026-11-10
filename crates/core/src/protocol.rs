@@ -8,6 +8,7 @@ use serde_json::error::Category;
 
 pub const USAGE_EXIT: i32 = 2;
 pub const LONGEST_LINE: usize = 16 << 20;
+pub const LINE_TOO_LONG: &str = "a line of output passed 16 MiB";
 pub const LARGEST_MESSAGE: usize = 1 << 20;
 pub const BRIDGE_ROUTES: &str = "--bridge-routes";
 

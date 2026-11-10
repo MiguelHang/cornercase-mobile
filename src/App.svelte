@@ -99,7 +99,12 @@
       : new FilesState(
           browsedMachine,
           browsedWorkspace,
-          { list: commands.filesList, read: commands.filesRead, search: commands.filesSearch },
+          {
+            list: commands.filesList,
+            read: commands.filesRead,
+            search: commands.filesSearch,
+            stopSearch: commands.filesSearchStop,
+          },
           (toast) => toasts.push(toast),
         ),
   )

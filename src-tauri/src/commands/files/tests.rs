@@ -84,7 +84,7 @@ mod reading_a_file {
 
     #[tokio::test(start_paused = true)]
     async fn says_a_file_past_the_bridge_line_is_too_large_for_the_phone() {
-        let refused = reading(("", "a line of output passed 16 MiB\n", 2)).await;
+        let refused = reading(("", &format!("{LINE_TOO_LONG}\n"), 2)).await;
         assert_eq!(refused, Err(json!({ "code": "too_large_here", "message": "Too large to show on the phone" })));
     }
 
@@ -136,6 +136,30 @@ mod searching {
         let (before, next) = time::timeout(Duration::from_secs(600), both).await.expect("both searches end");
         assert_eq!((before, next), (Ok(Searched::Cancelled), Ok(Searched::Found { found: found() })));
         assert_eq!(streams.running(), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_the_search_of_its_workspace_once_the_screen_leaves() {
+        let streams = Streams::default();
+        let studio = connected_to(streams.on(serving(&[snapshot(BOOT, 7, "first")]), &SOUGHT_BEFORE, &[]));
+        settle().await;
+        let left = async {
+            settle().await;
+            stop_search(&studio.state, 3);
+            settle().await;
+            assert_eq!(streams.running(), 1);
+            stop_search(&studio.state, 2);
+        };
+        let both = async { tokio::join!(search(&studio.state, spawned, 2, "mai"), left) };
+        let (before, ()) = time::timeout(Duration::from_secs(600), both).await.expect("the search ends");
+        assert_eq!(before, Ok(Searched::Cancelled));
+        assert_eq!(streams.running(), 0);
+    }
+
+    #[test]
+    fn stops_nothing_over_ipc_without_a_connection() {
+        let ipc = Ipc::new(Studio::new().reloaded());
+        assert_eq!(ipc.invoke("files_search_stop", json!({ "workspace": 2 })), Ok(Value::Null));
     }
 
     #[tokio::test(start_paused = true)]

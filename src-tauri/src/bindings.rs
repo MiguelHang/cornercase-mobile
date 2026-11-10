@@ -38,6 +38,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
         files::files_list,
         files::files_read,
         files::files_search,
+        files::files_search_stop,
     ]))
 }
 

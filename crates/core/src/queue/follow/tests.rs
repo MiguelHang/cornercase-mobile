@@ -1,6 +1,7 @@
 use rstest::rstest;
 
 use super::*;
+use crate::protocol::LINE_TOO_LONG;
 
 const NO_REQUESTS_COMMAND: &str = "error: unrecognized subcommand 'requests'\n\nUsage: cornercase [OPTIONS]";
 const NO_FOLLOW_FLAG: &str = "error: unexpected argument '--follow' found\n\nUsage: cornercase input";
@@ -27,7 +28,7 @@ mod absent {
     }
 
     #[rstest]
-    #[case::another_usage_error(exit(2, "a line of output passed 16 MiB"))]
+    #[case::another_usage_error(exit(2, LINE_TOO_LONG))]
     #[case::another_code(exit(1, "error: unrecognized subcommand 'requests'"))]
     #[case::a_dropped_server(exit(1, "Error: the connection to cornercase dropped"))]
     #[case::a_clean_end(exit(0, ""))]

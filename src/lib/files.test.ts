@@ -100,6 +100,7 @@ const fakes = (list: Calls['list'], others: Partial<Calls> = {}) => ({
   list: vi.fn<Calls['list']>(list),
   read: vi.fn<Calls['read']>(others.read ?? readsAll),
   search: vi.fn<Calls['search']>(others.search ?? findsAll),
+  stopSearch: vi.fn<Calls['stopSearch']>(others.stopSearch ?? (() => Promise.resolve())),
 })
 
 const browsing = async (list: Calls['list'] = fromTree(TREE), others: Partial<Calls> = {}) => {
@@ -266,6 +267,13 @@ describe('FilesState, coming back to it', () => {
       done({ folders: paths.map((path) => ({ ...TREE[path], path: path === '' ? '.' : `./${path}` })) }),
     )
     await files.toggle('docs')
+    expect(tree(files)).toEqual(['> src', 'v docs', '  a.md', 'notes.txt'])
+  })
+
+  it('pairs each folder with its own path, whatever order the server answers in', async () => {
+    const { files } = await browsing((_, paths) => done({ folders: paths.map((path) => TREE[path]).reverse() }))
+    await files.toggle('docs')
+    await files.refresh()
     expect(tree(files)).toEqual(['> src', 'v docs', '  a.md', 'notes.txt'])
   })
 
@@ -444,6 +452,23 @@ describe('FilesState, searching names', () => {
     await vi.advanceTimersByTimeAsync(SEARCH_DELAY)
     expect([calls.search.mock.calls, files.results]).toEqual([[], null])
   })
+
+  it('stops the search of its workspace on the Mac once left', async () => {
+    const { files, calls } = await browsing()
+    files.find('main')
+    await vi.advanceTimersByTimeAsync(SEARCH_DELAY)
+    files.stop()
+    expect(calls.stopSearch.mock.calls).toEqual([[WORKSPACE]])
+  })
+
+  it('leaves quietly when stopping the search fails', async () => {
+    const { files, tell } = await browsing(fromTree(TREE), {
+      stopSearch: () => Promise.reject(new Error('IPC is gone')),
+    })
+    files.stop()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(tell.mock.calls).toEqual([])
+  })
 })
 
 describe('highlight', () => {
@@ -537,6 +562,15 @@ describe('FilesState, reading a file', () => {
     })
     await files.open('dump.sql')
     expect(files.file?.reading).toEqual({ kind: 'shown', shown })
+  })
+
+  it('says a file past the line of the bridge is too large for the phone, without an error', async () => {
+    const message = 'Too large to show on the phone'
+    const { files, tell } = await browsing(fromTree(TREE), {
+      read: () => refusal(message, 'too_large_here'),
+    })
+    await files.open('dump.png')
+    expect([files.file, tell.mock.calls]).toEqual([{ path: 'dump.png', reading: { kind: 'failed', reason: message } }, []])
   })
 
   it('drops a read that answers once the file is closed', async () => {

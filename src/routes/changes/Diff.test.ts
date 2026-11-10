@@ -163,7 +163,7 @@ describe('Diff', () => {
     expect(flat(diffSource)).toContain(
       "const whole = $derived(open && patch !== null && patch.status !== 'deleted' ? patch.path : null)",
     )
-    expect(flat(diffSource)).toContain('aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>')
+    expect(flat(diffSource)).toContain('<ToolButton label="Whole file" icon="file-text" size={22} onclick={() => onfile(whole)} />')
   })
 
   it("presses the viewed button by the state's mark of the file", () => {

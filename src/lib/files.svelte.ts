@@ -16,6 +16,7 @@ export type Calls = {
   list: typeof commands.filesList
   read: typeof commands.filesRead
   search: typeof commands.filesSearch
+  stopSearch: typeof commands.filesSearchStop
 }
 
 export type Listed = { entries: Entry[]; more: boolean; error: string | null }
@@ -159,6 +160,7 @@ export class FilesState {
     clearTimeout(this.#timer)
     this.#searches += 1
     this.#reads += 1
+    this.#calls.stopSearch(this.workspace).catch(() => undefined)
   }
 
   #usable() {
@@ -227,8 +229,12 @@ export class FilesState {
     if (answer.status === 'ok') {
       this.file = { path, reading: { kind: 'shown', shown: answer.data } }
     } else {
-      this.file = { path, reading: { kind: 'failed', reason: this.#shownError(answer.error.message) } }
+      this.file = { path, reading: { kind: 'failed', reason: this.#unread(answer.error) } }
     }
+  }
+
+  #unread(error: CommandError) {
+    return error.code === 'too_large_here' ? error.message : this.#shownError(error.message)
   }
 
   async #ask<T>(call: () => Promise<Answer<T>>): Promise<Answer<T>> {
@@ -241,7 +247,7 @@ export class FilesState {
 
   #adopt(paths: string[], mine: string[], listing: Listing) {
     this.#update(mine, (shown, path) => {
-      const folder = listing.folders.at(paths.indexOf(path))
+      const folder = listing.folders.find((listed) => listed.path === path) ?? listing.folders.at(paths.indexOf(path))
       return { listed: folder === undefined ? (shown?.listed ?? null) : listedOf(folder), loading: false }
     })
   }

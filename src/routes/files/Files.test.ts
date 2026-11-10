@@ -25,7 +25,7 @@ const answering =
     Promise.resolve({ status: 'ok', data: { folders: paths.map((path) => folders[path] ?? MISSING) } })
 
 const browsing = async (folders: Record<string, Folder> = { '': ROOT_FOLDER }, list = answering(folders)) => {
-  const files = new FilesState(1, listing.workspace, { list, read: never, search: never }, () => {})
+  const files = new FilesState(1, listing.workspace, { list, read: never, search: never, stopSearch: never }, () => {})
   await files.start()
   return files
 }
@@ -79,7 +79,7 @@ describe('Files', () => {
   })
 
   it('spins until the root is listed', () => {
-    const files = new FilesState(1, listing.workspace, { list: never, read: never, search: never }, () => {})
+    const files = new FilesState(1, listing.workspace, { list: never, read: never, search: never, stopSearch: never }, () => {})
     const body = draw(files)
     expect(body).toMatch(/<p class="note svelte-[\w-]+"><span class="spinner[^]*?Reading the files…<\/p>/)
     expect(body).not.toContain('<ul')

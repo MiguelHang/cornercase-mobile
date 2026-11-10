@@ -151,6 +151,10 @@ impl Active {
     pub(crate) fn search(&mut self, workspace: u64, search: JoinHandle<()>) {
         self.search.fill(workspace, search);
     }
+
+    pub(crate) fn unsearch(&mut self, workspace: u64) {
+        self.search.empty(workspace);
+    }
 }
 
 impl Drop for Active {

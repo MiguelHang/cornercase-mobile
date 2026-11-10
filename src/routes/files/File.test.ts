@@ -15,7 +15,7 @@ const TEXT = text as Read
 const PICTURE = picture as Read
 
 const showing = (reading: Reading | null, path = TEXT.path) => {
-  const files = new FilesState(1, 3, { list: never, read: never, search: never }, () => {})
+  const files = new FilesState(1, 3, { list: never, read: never, search: never, stopSearch: never }, () => {})
   files.file = reading === null ? null : { path, reading }
   return files
 }

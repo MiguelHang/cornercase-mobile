@@ -8,6 +8,7 @@ import { fakeClock, message, ok } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import chatHeaderSource from './ChatHeader.svelte?raw'
+import toolButtonSource from '../../lib/ui/ToolButton.svelte?raw'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import Children from './Children.svelte'
@@ -269,9 +270,9 @@ describe('Agent, its sticky header', () => {
 
   it('leaves the compact line the room its icon buttons of 44 by 44 px do not take, centred and cut at the end', () => {
     const source = flat(chatHeaderSource)
-    expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(3)
-    expect(source).toContain('{#snippet right()} <button class="tool" type="button" aria-label="Terminal"')
-    expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
+    expect(source.match(/<ToolButton label="\w+" icon="[\w-]+" onclick=\{.*?\} \/>/g)).toHaveLength(3)
+    expect(source).toContain('{#snippet right()} <ToolButton label="Terminal"')
+    expect(flat(toolButtonSource)).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
     expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 0; overflow: hidden; vertical-align: middle;')
     expect(source).not.toContain('<Button')
   })
@@ -458,8 +459,8 @@ describe('Agent, without its row', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} {onfiles} /> {#key row.pane}')
     const source = flat(chatHeaderSource)
-    expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
-    expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')
+    expect(source).toContain('label="Terminal" icon="square-terminal" onclick={() => onterminal(row)}')
+    expect(source).toContain('label="Changes" icon="git-compare" onclick={() => onchanges(row.workspace, row.workspace_name)}')
   })
 
   it("offers the changes of its agent's workspace, beside its terminal", () => {
@@ -471,7 +472,7 @@ describe('Agent, without its row', () => {
   it("offers the files of its agent's workspace last, titled with the workspace's name", () => {
     const body = draw(chatWith(ROW))
     expect(body.search(FILES)).toBeGreaterThan(body.search(CHANGES))
-    expect(flat(chatHeaderSource)).toContain('aria-label="Files" onclick={() => onfiles(row.workspace, row.workspace_name)}')
+    expect(flat(chatHeaderSource)).toContain('label="Files" icon="folder" onclick={() => onfiles(row.workspace, row.workspace_name)}')
   })
 
   it.each([

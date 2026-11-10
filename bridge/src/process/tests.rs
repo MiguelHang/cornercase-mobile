@@ -6,7 +6,7 @@ use std::time::Duration;
 use rstest::rstest;
 use tokio::time::timeout;
 
-use cornercase_core::protocol::{Input, USAGE_EXIT};
+use cornercase_core::protocol::{Input, LINE_TOO_LONG, USAGE_EXIT};
 
 use super::*;
 use crate::test_util::{TempDir, collect, fake_cornercase, in_time, reaped, wait_until, write_executable};
@@ -94,7 +94,7 @@ mod spawn {
         let mut running = launch(&fake_cornercase(dir.path(), script), &[], 4096).expect("the fake starts");
         let (_, writer) = pids(&mut running).await;
         let rest = collect(&mut running).await;
-        assert_eq!(rest, [BridgeMessage::Stderr(TOO_LONG.to_owned()), BridgeMessage::Exit(USAGE_EXIT)]);
+        assert_eq!(rest, [BridgeMessage::Stderr(LINE_TOO_LONG.to_owned()), BridgeMessage::Exit(USAGE_EXIT)]);
         wait_until(async || gone(writer)).await;
     }
 

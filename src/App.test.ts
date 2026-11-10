@@ -284,7 +284,7 @@ describe('App wiring', () => {
     expect(source).toContain('const browsedMachine = $derived(browsed?.machine ?? null)')
     expect(source).toContain('const browsedWorkspace = $derived(browsed?.workspace ?? null)')
     expect(source).toContain(
-      '{ list: commands.filesList, read: commands.filesRead, search: commands.filesSearch }, (toast) => toasts.push(toast),',
+      '{ list: commands.filesList, read: commands.filesRead, search: commands.filesSearch, stopSearch: commands.filesSearchStop, }, (toast) => toasts.push(toast),',
     )
     expect(source).toContain(
       "untrack(() => { const top = router.current void (top.name === 'file' ? state.open(top.path) : state.start()) }) return () => state.stop()",

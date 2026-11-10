@@ -10,6 +10,7 @@ import Icon from './Icon.svelte'
 import Labelled from './Labelled.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
+import ToolButton from './ToolButton.svelte'
 import buttonSource from './Button.svelte?raw'
 import codeBoxSource from './CodeBox.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
@@ -18,6 +19,7 @@ import glassSource from './Glass.svelte?raw'
 import labelledSource from './Labelled.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
+import toolButtonSource from './ToolButton.svelte?raw'
 import baseSource from '../theme/base.css?raw'
 
 const html = (markup: string) => createRawSnippet(() => ({ render: () => markup }))
@@ -142,6 +144,27 @@ describe('Button', () => {
   it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
     expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
+  })
+})
+
+describe('ToolButton', () => {
+  const tool = (disabled?: boolean) =>
+    render(ToolButton, { props: { label: 'Whole file', icon: 'file-text', size: 22, disabled, onclick: () => {} } }).body
+
+  it('is an icon named for VoiceOver, at the size asked', () => {
+    expect(tool()).toMatch(/<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file">(?:<!--[^>]*-->| )*<svg [^>]*width="22"/)
+  })
+
+  it('takes no tap while disabled, faint', () => {
+    expect(tool(true)).toMatch(/<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file" disabled="">/)
+    expect(flat(toolButtonSource)).toContain('.tool:disabled { color: var(--faint); background: none; }')
+  })
+
+  it('is a target of 44 by 44 px in the accent, shaded while pressed', () => {
+    const source = flat(toolButtonSource)
+    expect(source).toContain('width: 44px; height: 44px; padding: 0; border: 0;')
+    expect(source).toContain('background: none; color: var(--accent); }')
+    expect(source).toContain('.tool:active { background: var(--hover); }')
   })
 })
 

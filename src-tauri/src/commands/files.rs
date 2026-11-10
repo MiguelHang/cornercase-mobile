@@ -1,5 +1,6 @@
 use cornercase_core::cli::files::{self, Found, Listing, Read};
 use cornercase_core::error::Error;
+use cornercase_core::protocol::LINE_TOO_LONG;
 use serde::Serialize;
 use tauri::State;
 use tauri::async_runtime::{self, JoinHandle};
@@ -12,7 +13,6 @@ use crate::state::AppState;
 
 const MOST_BYTES: usize = 1 << 20;
 const MOST_LINES: usize = 20_000;
-const TOO_LONG: &str = "a line of output passed 16 MiB";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "shown", rename_all = "snake_case")]
@@ -79,6 +79,13 @@ pub(crate) async fn files_search(
     search(&state, async_runtime::spawn, workspace, &query).await
 }
 
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn files_search_stop(state: State<'_, AppState>, workspace: u64) {
+    stop_search(&state, workspace);
+}
+
 async fn search(
     state: &AppState,
     spawn: fn(Task) -> JoinHandle<()>,
@@ -109,9 +116,15 @@ fn started(
     Ok(found)
 }
 
+fn stop_search(state: &AppState, workspace: u64) {
+    if let Some(active) = state.active().as_mut() {
+        active.unsearch(workspace);
+    }
+}
+
 fn unread(error: &Error) -> CommandError {
     match error {
-        Error::Failed { stderr, .. } if stderr.contains(TOO_LONG) => CommandError::too_large_here(),
+        Error::Failed { stderr, .. } if stderr.contains(LINE_TOO_LONG) => CommandError::too_large_here(),
         _ => CommandError::reason(error),
     }
 }

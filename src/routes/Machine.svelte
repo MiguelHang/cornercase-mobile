@@ -6,8 +6,8 @@
   import Button from '../lib/ui/Button.svelte'
   import Field from '../lib/ui/Field.svelte'
   import Glass from '../lib/ui/Glass.svelte'
-  import Icon from '../lib/ui/Icon.svelte'
   import NavBar from '../lib/ui/NavBar.svelte'
+  import ToolButton from '../lib/ui/ToolButton.svelte'
   import UrlField from '../lib/ui/UrlField.svelte'
 
   let {
@@ -97,36 +97,27 @@
           {#each machine.routes as route, index (route.url)}
             <li class="change">
               <span class="address">{routeAddress(route.url)}</span>
-              <button
-                class="tool"
-                type="button"
-                aria-label="Move up"
+              <ToolButton
+                label="Move up"
+                icon="chevron-up"
+                size={20}
                 disabled={edit.busy || index === 0}
                 onclick={() => void edit.move(route.url, 'up')}
-                ontouchstart={() => {}}
-              >
-                <Icon name="chevron-up" size={20} />
-              </button>
-              <button
-                class="tool"
-                type="button"
-                aria-label="Move down"
+              />
+              <ToolButton
+                label="Move down"
+                icon="chevron-down"
+                size={20}
                 disabled={edit.busy || index === machine.routes.length - 1}
                 onclick={() => void edit.move(route.url, 'down')}
-                ontouchstart={() => {}}
-              >
-                <Icon name="chevron-down" size={20} />
-              </button>
-              <button
-                class="tool"
-                type="button"
-                aria-label="Remove route"
+              />
+              <ToolButton
+                label="Remove route"
+                icon="trash-2"
+                size={20}
                 disabled={edit.busy || machine.routes.length === 1}
                 onclick={() => void edit.remove(route.url)}
-                ontouchstart={() => {}}
-              >
-                <Icon name="trash-2" size={20} />
-              </button>
+              />
             </li>
           {/each}
         </ul>
@@ -183,29 +174,6 @@
     max-width: 520px;
     margin: 0 auto;
     padding: var(--gap) var(--inset-wide) 40px;
-  }
-
-  .tool {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .tool:active {
-    background: var(--hover);
-  }
-
-  .tool:disabled {
-    color: var(--faint);
-    background: none;
   }
 
   .form {

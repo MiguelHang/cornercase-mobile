@@ -3,9 +3,9 @@
   import { CLOSED, goneMessage, type ChangesState } from '../../lib/changes.svelte'
   import { rows, shownPath } from '../../lib/diff'
   import CodeBox from '../../lib/ui/CodeBox.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
+  import ToolButton from '../../lib/ui/ToolButton.svelte'
   import DiffLine from './DiffLine.svelte'
   import Viewed from './Viewed.svelte'
 
@@ -45,9 +45,7 @@
     {/snippet}
     {#snippet right()}
       {#if whole !== null}
-        <button class="tool" type="button" aria-label="Whole file" onclick={() => onfile(whole)} ontouchstart={() => {}}>
-          <Icon name="file-text" size={22} />
-        </button>
+        <ToolButton label="Whole file" icon="file-text" size={22} onclick={() => onfile(whole)} />
       {/if}
       {#if open}
         <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
@@ -81,24 +79,6 @@
     flex-direction: column;
     gap: var(--inset-wide);
     padding: var(--gap) var(--inset-wide) 40px;
-  }
-
-  .tool {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .tool:active {
-    background: var(--hover);
   }
 
   .path {

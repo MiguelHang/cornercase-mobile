@@ -306,6 +306,19 @@ mod an_active_store {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn stops_the_search_of_its_workspace_only_and_keeps_both() {
+        let Both { mut active, changes, terminal } = both();
+        let search = Arc::new(());
+        active.search(2, task(&search));
+        active.unsearch(3);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&search));
+        active.unsearch(2);
+        released(&search).await;
+        assert!(holds(&changes) && holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn stops_both_when_dropped() {
         let Both { active, changes, terminal } = both();
         drop(active);
