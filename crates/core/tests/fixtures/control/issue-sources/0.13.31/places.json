@@ -1,0 +1,157 @@
+{
+  "closed": false,
+  "places": [
+    {
+      "here": true,
+      "label": "shop",
+      "project": 4,
+      "workspace": null,
+      "worktree": true
+    },
+    {
+      "here": false,
+      "label": "notes › journal",
+      "project": 8,
+      "workspace": 7,
+      "worktree": false
+    },
+    {
+      "here": false,
+      "label": "notes › drafts",
+      "project": 8,
+      "workspace": 11,
+      "worktree": false
+    }
+  ],
+  "project": 4,
+  "sources": [
+    {
+      "fields": [
+        "assignee",
+        "author"
+      ],
+      "from": "gh",
+      "missing": [],
+      "name": "GitHub",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": true,
+      "source": "github",
+      "state": "connected",
+      "tab": true
+    },
+    {
+      "fields": [
+        "assignee",
+        "author"
+      ],
+      "missing": [
+        "token"
+      ],
+      "name": "GitLab",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": true,
+      "source": "gitlab",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": [
+        "owner",
+        "requester"
+      ],
+      "missing": [
+        "token"
+      ],
+      "name": "Shortcut",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": false,
+      "source": "shortcut",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": [
+        "assignee",
+        "creator"
+      ],
+      "missing": [
+        "token"
+      ],
+      "name": "Linear",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": false,
+      "source": "linear",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": [
+        "assignee",
+        "reporter"
+      ],
+      "missing": [
+        "site",
+        "email",
+        "token"
+      ],
+      "name": "Jira",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": false,
+      "source": "jira",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": [
+        "assignee",
+        "creator"
+      ],
+      "missing": [
+        "workspace",
+        "token"
+      ],
+      "name": "Plane",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": false,
+      "source": "plane",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": [
+        "assignee",
+        "creator"
+      ],
+      "missing": [
+        "token"
+      ],
+      "name": "Asana",
+      "people": [
+        "anyone",
+        "anyone"
+      ],
+      "repository": false,
+      "source": "asana",
+      "state": "missing",
+      "tab": true
+    }
+  ]
+}

@@ -10,7 +10,7 @@
     value = $bindable(),
     of,
     error,
-    reading,
+    reading = '',
     empty,
     disabled = false,
     onretry,
@@ -20,10 +20,10 @@
     value: V
     of: (item: T) => { value: V; name: string }
     error: string | null
-    reading: string
+    reading?: string
     empty: string
     disabled?: boolean
-    onretry: () => void
+    onretry?: () => void
   } = $props()
 
   const id = $props.id()
@@ -54,7 +54,9 @@
     {:else if choices.kind === 'failed'}
       <div class="failed">
         <p class="state reason">{choices.reason}</p>
-        <Button tone="plain" onclick={onretry}>Try again</Button>
+        {#if onretry !== undefined}
+          <Button tone="plain" onclick={onretry}>Try again</Button>
+        {/if}
       </div>
     {:else}
       <p class="state">{empty}</p>

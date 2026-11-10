@@ -20,7 +20,6 @@ where
     pub(super) async fn connect(&mut self) -> Result<Picked, Failure> {
         self.learn();
         let picked = pick_route(&self.machine, &self.factory, self.config).await.map_err(classify)?;
-        self.machine.last_route = Some(picked.route.address().clone());
         let descriptor = Descriptor::from_value(picked.contract.clone())
             .map_err(|error| Failure::Stop(Connection::Incompatible(error)))?;
         self.shared.restarted(descriptor.boot());

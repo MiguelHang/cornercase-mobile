@@ -119,3 +119,30 @@ mod the_connection_state {
         assert_eq!(json_of(&state), json!({ "machine": 7, "connection": { "state": "unauthorized" } }));
     }
 }
+
+mod a_project_choice {
+    use super::*;
+
+    fn project(value: &Value) -> Project {
+        serde_json::from_value(value.clone()).expect("a project of the session")
+    }
+
+    #[test]
+    fn names_its_workspaces_as_the_mac_does_in_the_order_of_the_session() {
+        let project = project(&json!({ "id": 5, "name": "web", "workspaces": [
+            { "id": 12, "name": "main", "custom_name": null, "worktree": false },
+            { "id": 9, "name": "fix-login", "custom_name": "Login", "worktree": true },
+        ] }));
+        let expected = json!({ "id": 5, "name": "web", "workspaces": [
+            { "id": 12, "name": "main" },
+            { "id": 9, "name": "Login" },
+        ] });
+        assert_eq!(json_of(&ProjectChoice::from(&project)), expected);
+    }
+
+    #[test]
+    fn without_workspaces_lists_none() {
+        let project = project(&json!({ "id": 2, "name": "api", "custom_name": "API" }));
+        assert_eq!(json_of(&ProjectChoice::from(&project)), json!({ "id": 2, "name": "API", "workspaces": [] }));
+    }
+}

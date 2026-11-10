@@ -27,6 +27,7 @@
     onterminal,
     onchanges,
     onfiles,
+    onstart,
   }: {
     chat: Chat
     agents: AgentRow[] | null
@@ -41,6 +42,7 @@
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
     onfiles: (workspace: number, title: string) => void
+    onstart: (workspace: number) => void
   } = $props()
 
   let now = $state(untrack(() => chat.now()))
@@ -95,10 +97,12 @@
       {backTo}
       {below}
       boxed={seen !== null}
+      sendable={connection.state === 'connected'}
       {onback}
       {onterminal}
       {onchanges}
       {onfiles}
+      {onstart}
     />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />

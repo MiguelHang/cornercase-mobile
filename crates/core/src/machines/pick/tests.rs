@@ -15,6 +15,7 @@ use crate::transport::{Closed, Exit, Out};
 const CONTRACT: &[&str] = &["contract", "--json"];
 const LAN: &str = "192.168.1.20";
 const TAILNET: &str = "fd7a:115c:a1e0::1";
+const TAILNET_V4: &str = "100.101.102.103";
 const PUBLIC: &str = "studio.example.com";
 const GONE: &str = "10.0.0.9";
 
@@ -78,8 +79,25 @@ fn answers_after(millis: u64, contract: &'static str) -> FakeTransport {
     after(Duration::from_millis(millis), contract, 0)
 }
 
+fn fails_after(millis: u64) -> FakeTransport {
+    after(Duration::from_millis(millis), "", 1)
+}
+
 fn hangs() -> FakeTransport {
     FakeTransport::default().script(CONTRACT, |_, _| future::pending())
+}
+
+fn network_of(answers: Vec<(&'static str, FakeTransport)>) -> (Network, Vec<Route>) {
+    let routes = answers.iter().map(|(host, _)| route(host)).collect();
+    let network =
+        answers.into_iter().fold(Network::default(), |network, (host, transport)| network.with(host, transport));
+    (network, routes)
+}
+
+async fn races(network: &Network, machine: Machine, config: PickConfig) -> (Route, Duration) {
+    let started = Instant::now();
+    let picked = network.pick_from(machine, config).await.expect("a route answers");
+    (picked.route, started.elapsed())
 }
 
 fn all_failed_at_the_deadline(result: Result<Picked, PickError>, started: Instant, errors: Vec<(Address, Error)>) {
@@ -112,11 +130,11 @@ mod pick_route {
     #[tokio::test(start_paused = true)]
     async fn gives_the_fastest_route_with_its_transport_and_its_contract() {
         let network = Network::default()
-            .with(LAN, answers_after(200, r#"{"from":"lan"}"#))
+            .with(LAN, answers_after(300, r#"{"from":"lan"}"#))
             .with(TAILNET, answers_after(50, r#"{"from":"tailnet"}"#));
         let started = Instant::now();
         let picked = network.pick(vec![route(LAN), route(TAILNET)]).await.expect("a route answers");
-        assert_eq!(started.elapsed(), Duration::from_millis(50));
+        assert_eq!(started.elapsed(), Duration::from_millis(200));
         assert_eq!((picked.route.clone(), picked.contract.clone()), (route(TAILNET), json!({"from":"tailnet"})));
         let again =
             transport::json::<Value>(picked.transport.as_ref(), vec!["contract".to_owned(), "--json".to_owned()]);
@@ -124,14 +142,14 @@ mod pick_route {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn is_not_held_up_by_a_route_that_fails_or_one_that_hangs() {
+    async fn is_held_up_only_for_the_window_by_a_better_route_that_hangs() {
         let network = Network::default()
             .with(LAN, FakeTransport::default().fail(CONTRACT, Error::Connect("refused".to_owned())))
             .with(TAILNET, hangs())
             .with(PUBLIC, answers_after(1000, "{}"));
         let started = Instant::now();
         let picked = network.pick(vec![route(LAN), route(TAILNET), route(PUBLIC)]).await.expect("a route answers");
-        assert_eq!((picked.route, started.elapsed()), (route(PUBLIC), Duration::from_secs(1)));
+        assert_eq!((picked.route, started.elapsed()), (route(PUBLIC), Duration::from_millis(1150)));
     }
 
     #[tokio::test(start_paused = true)]
@@ -139,8 +157,9 @@ mod pick_route {
         let dropped = Arc::new(AtomicBool::new(false));
         let network =
             Network::default().with(LAN, hangs_until_dropped(&dropped)).with(TAILNET, answers_after(10, "{}"));
+        let started = Instant::now();
         let picked = network.pick(vec![route(LAN), route(TAILNET)]).await.expect("a route answers");
-        assert_eq!(picked.route, route(TAILNET));
+        assert_eq!((picked.route, started.elapsed()), (route(TAILNET), Duration::from_millis(160)));
         assert!(dropped.load(Ordering::SeqCst));
     }
 
@@ -182,7 +201,9 @@ mod pick_route {
     async fn fails_a_route_without_a_token_before_reaching_it() {
         let network = Network::default().with(LAN, answers_after(0, "{}")).with(TAILNET, answers_after(0, "{}"));
         let routes = vec![bridge(LAN, 8765, None), route(TAILNET)];
+        let started = Instant::now();
         assert_eq!(network.pick(routes).await.map(|picked| picked.route), Ok(route(TAILNET)));
+        assert_eq!(started.elapsed(), Duration::ZERO);
         assert_eq!(network.calls(), [TAILNET]);
         let result = network.pick(vec![bridge(LAN, 8765, None)]).await.map(|picked| picked.route);
         assert_eq!(result, Err(PickError::AllFailed(vec![(address(LAN), Error::NoToken)])));
@@ -198,73 +219,85 @@ mod pick_route {
     }
 
     #[test]
-    fn waits_five_seconds_and_gives_the_saved_route_300_ms_by_default() {
-        let expected = PickConfig { deadline: Duration::from_secs(5), head_start: Duration::from_millis(300) };
+    fn waits_five_seconds_and_150_ms_for_a_better_route_by_default() {
+        let expected = PickConfig { deadline: Duration::from_secs(5), window: Duration::from_millis(150) };
         assert_eq!(PickConfig::default(), expected);
     }
 }
 
-mod head_start {
+mod preference {
     use super::*;
 
     #[rstest]
-    #[case::to_the_saved_route_when_both_are_as_fast(50, 50, TAILNET, 50)]
-    #[case::to_the_saved_route_even_when_another_is_a_little_faster(100, 50, TAILNET, 100)]
-    #[case::to_a_faster_route_once_the_saved_one_takes_longer(1000, 50, LAN, 350)]
-    #[case::to_the_saved_route_when_it_answers_late_but_first(400, 200, TAILNET, 400)]
+    #[case::the_lan_alone(vec![(LAN, answers_after(50, "{}"))], LAN, 50)]
+    #[case::tailscale_alone_without_the_window(vec![(TAILNET, answers_after(50, "{}"))], TAILNET, 50)]
+    #[case::the_lan_answering_within_the_window(
+        vec![(TAILNET, answers_after(50, "{}")), (LAN, answers_after(120, "{}"))], LAN, 120
+    )]
+    #[case::tailscale_at_the_end_of_the_window_when_the_lan_is_slower(
+        vec![(TAILNET, answers_after(50, "{}")), (LAN, answers_after(400, "{}"))], TAILNET, 200
+    )]
+    #[case::tailscale_at_once_when_the_lan_failed_before(
+        vec![(TAILNET, answers_after(50, "{}")), (LAN, fails_after(10))], TAILNET, 50
+    )]
+    #[case::tailscale_as_soon_as_the_lan_fails_within_the_window(
+        vec![(TAILNET, answers_after(50, "{}")), (LAN, fails_after(100))], TAILNET, 100
+    )]
+    #[case::tailscale_over_the_rest_within_the_window(
+        vec![(PUBLIC, answers_after(50, "{}")), (TAILNET, answers_after(120, "{}"))], TAILNET, 120
+    )]
+    #[case::tailscale_over_the_rest_at_the_end_of_the_window_while_the_lan_hangs(
+        vec![(PUBLIC, answers_after(50, "{}")), (TAILNET, answers_after(120, "{}")), (LAN, hangs())], TAILNET, 200
+    )]
+    #[case::the_first_to_answer_of_the_same_kind(
+        vec![(TAILNET_V4, answers_after(50, "{}")), (TAILNET, answers_after(80, "{}"))], TAILNET_V4, 50
+    )]
+    #[case::the_first_of_the_same_kind_while_the_lan_is_pending(
+        vec![(TAILNET_V4, answers_after(50, "{}")), (TAILNET, answers_after(80, "{}")), (LAN, hangs())], TAILNET_V4, 200
+    )]
+    #[case::not_a_worse_kind_answering_later_while_the_lan_is_pending(
+        vec![(TAILNET, answers_after(50, "{}")), (PUBLIC, answers_after(80, "{}")), (LAN, hangs())], TAILNET, 200
+    )]
+    #[case::the_better_kind_over_the_best_so_far_within_the_window(
+        vec![(PUBLIC, answers_after(20, "{}")), (TAILNET, answers_after(60, "{}")), (LAN, answers_after(100, "{}"))],
+        LAN, 100
+    )]
     #[tokio::test(start_paused = true)]
-    async fn gives_the_race(
-        #[case] saved_millis: u64,
-        #[case] lan_millis: u64,
-        #[case] winner: &str,
-        #[case] elapsed_millis: u64,
-    ) {
-        let network = Network::default()
-            .with(LAN, answers_after(lan_millis, r#"{"from":"lan"}"#))
-            .with(TAILNET, answers_after(saved_millis, r#"{"from":"tailnet"}"#));
-        let started = Instant::now();
-        let picked = network
-            .pick_from(saved(vec![route(LAN), route(TAILNET)], TAILNET), PickConfig::default())
-            .await
-            .expect("a route answers");
-        assert_eq!((picked.route, started.elapsed()), (route(winner), Duration::from_millis(elapsed_millis)));
+    async fn picks(#[case] answers: Vec<(&'static str, FakeTransport)>, #[case] winner: &str, #[case] millis: u64) {
+        let (network, routes) = network_of(answers);
+        let picked = races(&network, machine(routes), PickConfig::default()).await;
+        assert_eq!(picked, (route(winner), Duration::from_millis(millis)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn picks_the_lan_over_a_saved_tailscale_route_that_answers_first() {
+        let (network, routes) = network_of(vec![(TAILNET, answers_after(20, "{}")), (LAN, answers_after(100, "{}"))]);
+        let picked = races(&network, saved(routes, TAILNET), PickConfig::default()).await;
+        assert_eq!(picked, (route(LAN), Duration::from_millis(100)));
     }
 
     #[rstest]
-    #[case::when_the_saved_route_fails_at_once(route(TAILNET), TAILNET)]
-    #[case::when_the_saved_route_has_no_token(bridge(TAILNET, 8765, None), TAILNET)]
-    #[case::when_the_machine_has_no_route_at_the_saved_address(route(TAILNET), GONE)]
+    #[case::by_default(PickConfig::default(), 4900, 5000)]
+    #[case::when_the_window_is_longer(
+        PickConfig { deadline: Duration::from_secs(1), window: Duration::from_secs(2) }, 500, 1000
+    )]
     #[tokio::test(start_paused = true)]
-    async fn lets_the_others_start_at_once(#[case] tailnet: Route, #[case] saved_host: &str) {
-        let network = Network::default()
-            .with(LAN, answers_after(50, "{}"))
-            .with(TAILNET, FakeTransport::default().fail(CONTRACT, Error::Connect("refused".to_owned())));
-        let started = Instant::now();
-        let picked = network
-            .pick_from(saved(vec![route(LAN), tailnet], saved_host), PickConfig::default())
-            .await
-            .expect("a route answers");
-        assert_eq!((picked.route, started.elapsed()), (route(LAN), Duration::from_millis(50)));
+    async fn ends_the_window_at_the_deadline(#[case] config: PickConfig, #[case] tailnet: u64, #[case] millis: u64) {
+        let (network, routes) = network_of(vec![(TAILNET, answers_after(tailnet, "{}")), (LAN, hangs())]);
+        let picked = races(&network, machine(routes), config).await;
+        assert_eq!(picked, (route(TAILNET), Duration::from_millis(millis)));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn still_counts_the_deadline_from_the_start() {
-        let network = Network::default().with(LAN, answers_after(4800, "{}")).with(TAILNET, hangs());
-        let started = Instant::now();
-        let result = network.pick_from(saved(vec![route(LAN), route(TAILNET)], TAILNET), PickConfig::default()).await;
-        let errors = vec![(address(LAN), Error::Timeout), (address(TAILNET), Error::Timeout)];
-        all_failed_at_the_deadline(result, started, errors);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn never_lasts_past_the_deadline() {
-        let network = Network::default().with(LAN, answers_after(10, "{}")).with(TAILNET, hangs());
-        let config = PickConfig { deadline: Duration::from_secs(1), head_start: Duration::from_secs(2) };
-        let started = Instant::now();
-        let result = network.pick_from(saved(vec![route(LAN), route(TAILNET)], TAILNET), config).await;
-        let errors = vec![(address(LAN), Error::Timeout), (address(TAILNET), Error::Timeout)];
-        assert_eq!(result.map(|picked| picked.route), Err(PickError::AllFailed(errors)));
-        assert_eq!(started.elapsed(), config.deadline);
+    async fn lets_go_of_a_route_that_answered_within_the_window_and_lost() {
+        let (network, routes) = network_of(vec![
+            (TAILNET, answers_after(50, r#"{"from":"tailnet"}"#)),
+            (LAN, answers_after(120, r#"{"from":"lan"}"#)),
+        ]);
+        let picked = network.pick(routes).await.expect("a route answers");
+        assert_eq!((picked.route.clone(), picked.contract.clone()), (route(LAN), json!({"from":"lan"})));
+        let (_, tailnet) = network.transports.iter().find(|(host, _)| *host == TAILNET).expect("the tailnet transport");
+        assert_eq!(Arc::strong_count(tailnet), 1);
     }
 }
 

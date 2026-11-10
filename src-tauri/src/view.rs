@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use cornercase_core::cli::contract::Missing;
-use cornercase_core::cli::status::Project;
+use cornercase_core::cli::status::{Project, Workspace};
 use cornercase_core::machines::registry::{Machines, Merged};
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
@@ -120,6 +120,14 @@ pub(crate) struct ProjectChoice {
     #[specta(type = u32)]
     pub(crate) id: u64,
     pub(crate) name: String,
+    pub(crate) workspaces: Vec<WorkspaceChoice>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct WorkspaceChoice {
+    #[specta(type = u32)]
+    pub(crate) id: u64,
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -182,7 +190,17 @@ impl From<&Connection> for ConnectionView {
 
 impl From<&Project> for ProjectChoice {
     fn from(project: &Project) -> Self {
-        Self { id: project.id, name: project.custom_name.clone().unwrap_or_else(|| project.name.clone()) }
+        Self {
+            id: project.id,
+            name: project.custom_name.clone().unwrap_or_else(|| project.name.clone()),
+            workspaces: project.workspaces.iter().map(WorkspaceChoice::from).collect(),
+        }
+    }
+}
+
+impl From<&Workspace> for WorkspaceChoice {
+    fn from(workspace: &Workspace) -> Self {
+        Self { id: workspace.id, name: workspace.custom_name.clone().unwrap_or_else(|| workspace.name.clone()) }
     }
 }
 

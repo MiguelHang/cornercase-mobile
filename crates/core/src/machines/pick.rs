@@ -8,8 +8,8 @@ use futures_util::stream::FuturesUnordered;
 use serde_json::Value;
 use tokio::time::{self, Instant};
 
-use super::Machine;
 use super::route::{Address, Route};
+use super::{Machine, Reach, reach};
 use crate::error::Error;
 use crate::transport::bridge::{BridgeConfig, BridgeTransport};
 use crate::transport::{self, Transport};
@@ -17,12 +17,12 @@ use crate::transport::{self, Transport};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PickConfig {
     pub deadline: Duration,
-    pub head_start: Duration,
+    pub window: Duration,
 }
 
 impl Default for PickConfig {
     fn default() -> Self {
-        Self { deadline: Duration::from_secs(5), head_start: Duration::from_millis(300) }
+        Self { deadline: Duration::from_secs(5), window: Duration::from_millis(150) }
     }
 }
 
@@ -59,27 +59,13 @@ where
     if machine.routes.is_empty() {
         return Err(PickError::NoRoutes);
     }
-    let started = Instant::now();
-    let deadline = started + config.deadline;
-    let favourite = favourite(machine);
-    let mut failures = vec![None; machine.routes.len()];
-    let mut racing = FuturesUnordered::new();
-    let mut others = Vec::new();
-    for (index, route) in machine.routes.iter().enumerate() {
-        match connect(route, &factory) {
-            Ok(transport) if favourite == Some(index) => racing.push(attempt(index, route, transport)),
-            Ok(transport) => others.push(attempt(index, route, transport)),
-            Err(error) => failures[index] = Some(error),
-        }
-    }
-    if let Some(picked) = race(&mut racing, deadline.min(started + config.head_start), &mut failures).await {
-        return Ok(picked);
-    }
-    racing.extend(others);
-    match race(&mut racing, deadline, &mut failures).await {
-        Some(picked) => Ok(picked),
-        None => Err(PickError::AllFailed(timed_out(machine, failures))),
-    }
+    let deadline = Instant::now() + config.deadline;
+    let mut race = Race::start(machine, &factory);
+    let Some(first) = race.first(deadline).await else {
+        return Err(PickError::AllFailed(timed_out(machine, race.failures)));
+    };
+    let until = deadline.min(Instant::now() + config.window);
+    Ok(race.prefer(first, until).await)
 }
 
 pub fn bridge_transports(config: BridgeConfig) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> {
@@ -87,11 +73,6 @@ pub fn bridge_transports(config: BridgeConfig) -> impl Fn(&Route) -> Result<Arc<
         let transport: Arc<dyn Transport> = Arc::new(BridgeTransport::new(route.connection_url()?, config));
         Ok(transport)
     }
-}
-
-fn favourite(machine: &Machine) -> Option<usize> {
-    let saved = machine.last_route.as_ref()?;
-    machine.routes.iter().position(|route| route.address() == saved)
 }
 
 fn connect<F>(route: &Route, factory: &F) -> Result<Arc<dyn Transport>, Error>
@@ -112,18 +93,66 @@ fn attempt(index: usize, route: &Route, transport: Arc<dyn Transport>) -> Attemp
     })
 }
 
-async fn race(
-    racing: &mut FuturesUnordered<Attempt<'_>>,
-    deadline: Instant,
-    failures: &mut [Option<Error>],
-) -> Option<Picked> {
-    while let Ok(Some((index, result))) = time::timeout_at(deadline, racing.next()).await {
-        match result {
-            Ok(picked) => return Some(picked),
-            Err(error) => failures[index] = Some(error),
+struct Race<'a> {
+    racing: FuturesUnordered<Attempt<'a>>,
+    pending: Vec<Option<Reach>>,
+    failures: Vec<Option<Error>>,
+}
+
+impl<'a> Race<'a> {
+    fn start<F>(machine: &'a Machine, factory: &F) -> Self
+    where
+        F: Fn(&Route) -> Result<Arc<dyn Transport>, Error>,
+    {
+        let count = machine.routes.len();
+        let mut race =
+            Self { racing: FuturesUnordered::new(), pending: vec![None; count], failures: vec![None; count] };
+        for (index, route) in machine.routes.iter().enumerate() {
+            match connect(route, factory) {
+                Ok(transport) => {
+                    race.pending[index] = Some(reach(route.address()));
+                    race.racing.push(attempt(index, route, transport));
+                }
+                Err(error) => race.failures[index] = Some(error),
+            }
         }
+        race
     }
-    None
+
+    async fn next(&mut self, until: Instant) -> Option<(usize, Result<Picked, Error>)> {
+        let (index, result) = time::timeout_at(until, self.racing.next()).await.ok()??;
+        self.pending[index] = None;
+        Some((index, result))
+    }
+
+    async fn first(&mut self, deadline: Instant) -> Option<Picked> {
+        while let Some((index, result)) = self.next(deadline).await {
+            match result {
+                Ok(picked) => return Some(picked),
+                Err(error) => self.failures[index] = Some(error),
+            }
+        }
+        None
+    }
+
+    async fn prefer(&mut self, mut best: Picked, until: Instant) -> Picked {
+        let mut best_reach = reach(best.route.address());
+        while self.better_pending(best_reach) {
+            match self.next(until).await {
+                Some((_, Ok(picked))) if reach(picked.route.address()) < best_reach => {
+                    best_reach = reach(picked.route.address());
+                    best = picked;
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+        best
+    }
+
+    fn better_pending(&self, than: Reach) -> bool {
+        self.pending.iter().flatten().any(|pending| *pending < than)
+    }
 }
 
 fn timed_out(machine: &Machine, failures: Vec<Option<Error>>) -> Vec<(Address, Error)> {

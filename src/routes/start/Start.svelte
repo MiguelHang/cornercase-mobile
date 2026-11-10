@@ -8,37 +8,31 @@
   import AgentForm from './AgentForm.svelte'
   import IssueForm from './IssueForm.svelte'
   import ShowIssues from './ShowIssues.svelte'
-  import WorkspaceForm from './WorkspaceForm.svelte'
 
-  type Action = 'agent' | 'workspace' | 'issue'
+  type Action = 'agent' | 'issue'
 
   let {
     connection,
     issue,
+    workspace,
     backTo,
     onback,
     onstarted,
-    oncreated,
     onissues,
-    form = new StartForm(
-      commands,
-      (started, agent) => onstarted(started, agent),
-      (name) => oncreated(name),
-    ),
+    form = new StartForm(commands, (started, agent) => onstarted(started, agent)),
   }: {
     connection: ConnectionView_Serialize
     issue?: StartingIssue
+    workspace?: number
     backTo: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
-    oncreated: (name: string) => void
-    onissues: (project: number) => void
+    onissues: () => void
     form?: StartForm
   } = $props()
 
   const ACTIONS: [Action, string][] = [
     ['agent', 'Agent'],
-    ['workspace', 'Workspace'],
     ['issue', 'Issue'],
   ]
 
@@ -47,6 +41,9 @@
   untrack(() => {
     if (issue !== undefined) {
       form.forIssue(issue)
+    }
+    if (workspace !== undefined) {
+      form.prefer(workspace)
     }
   })
 
@@ -88,10 +85,8 @@
       <IssueForm {form} {sendable} />
     {:else if action === 'agent'}
       <AgentForm {form} {sendable} />
-    {:else if action === 'workspace'}
-      <WorkspaceForm {form} {sendable} />
     {:else}
-      <ShowIssues {form} {sendable} onshow={onissues} />
+      <ShowIssues {sendable} onshow={onissues} />
     {/if}
   </Glass>
 </section>

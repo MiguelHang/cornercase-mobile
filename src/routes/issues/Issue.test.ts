@@ -22,7 +22,14 @@ const reads = (change: Partial<ReadIssue> = {}): IssueReading => ({ kind: 'read'
 
 const drawn = (reading: IssueReading) =>
   render(Issue, {
-    props: { issue: holding(reading), backTo: 'Issues', onback: () => {}, onstart: () => {}, now: AT },
+    props: {
+      issue: holding(reading),
+      where: { project: 7, places: [] },
+      backTo: 'Issues',
+      onback: () => {},
+      onstart: () => {},
+      now: AT,
+    },
   }).body
 
 const all = (body: string, kind: string) =>
@@ -85,10 +92,10 @@ describe('Issue', () => {
     expect(all(drawn(reads({ body: ' \n' })), 'note')).toEqual(['No description'])
   })
 
-  it("starts on the project of the list with the issue under its row's tracker and key and the prompt cornercase will use", () => {
+  it("starts where it may with the issue under its row's tracker and key and the prompt cornercase will use", () => {
     expect(drawn(reads())).toMatch(/<button class="button primary svelte-[\w-]+"[^>]*>[^]*?Start[^]*?<\/button>/)
     expect(flat(issueSource)).toContain('const chosen = { ...read.issue, source: issue.source, key: issue.key }')
-    expect(flat(issueSource)).toContain('onstart({ project: issue.project, issue: chosen, prompt: read.prompt })')
+    expect(flat(issueSource)).toContain('onstart({ ...where, issue: chosen, prompt: read.prompt })')
     expect(flat(issueSource)).toContain('<Button onclick={start}>Start</Button>')
   })
 })

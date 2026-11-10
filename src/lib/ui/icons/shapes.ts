@@ -55,6 +55,10 @@ export const icons = {
     { kind: 'line', x1: 14, y1: 11, x2: 14, y2: 17 },
   ],
   check: [{ kind: 'path', d: 'M20 6 9 17l-5-5' }],
+  plus: [
+    { kind: 'path', d: 'M5 12h14' },
+    { kind: 'path', d: 'M12 5v14' },
+  ],
   'circle-alert': [
     { kind: 'circle', cx: 12, cy: 12, r: 10 },
     { kind: 'line', x1: 12, y1: 8, x2: 12, y2: 12 },
@@ -128,10 +132,6 @@ export const icons = {
     { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
     { kind: 'circle', cx: 9, cy: 9, r: 2 },
     { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
-  ],
-  plus: [
-    { kind: 'path', d: 'M5 12h14' },
-    { kind: 'path', d: 'M12 5v14' },
   ],
   x: [
     { kind: 'path', d: 'M18 6 6 18' },

@@ -36,17 +36,19 @@ const FILES = { name: 'files', machine: 1, workspace: 3, title: 'feature' } as c
 const FILE = { name: 'file', machine: 1, workspace: 3, path: 'src/main.rs' } as const
 const WHOLE = { name: 'file', machine: 1, workspace: 2, path: 'src/app.rs' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
-const ISSUES = { name: 'issues', machine: 1, project: 4 } as const
-const ISSUE = { name: 'issue', machine: 1, project: 4, key: '#41', source: 'github' } as const
+const ISSUES = { name: 'issues', machine: 1 } as const
+const ISSUE = { name: 'issue', machine: 1, project: 4, repository: true, key: '#41', source: 'github' } as const
 const ON_ISSUE: Route = {
   name: 'start',
   machine: 1,
   issue: {
     project: 4,
+    places: [],
     issue: {
       source: 'github',
       key: '#41',
       title: 'Checkout forgets the coupon',
+      url: 'https://github.com/acme/shop/issues/41',
       state: 'open',
       closed: false,
       labels: [],
@@ -482,6 +484,29 @@ describe('Router, the issues of a project', () => {
     router.settle(STARTING)
     expect(router.latest('issues')).toBeNull()
     expect(router.latest('issue')).toBeNull()
+  })
+})
+
+describe('Router, starting from an agent', () => {
+  const IN_WORKSPACE: Route = { name: 'start', machine: 1, workspace: 2 }
+
+  it("stacks Start with the agent's workspace on its chat and goes back to the chat", () => {
+    const router = routed(AGENT, IN_WORKSPACE)
+    expect(router.current).toEqual({ name: 'start', machine: 1, workspace: 2 })
+    expect(router.latest('start')).toBe(router.current)
+    expect(router.below).toEqual(AGENT)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+    expect(router.opened).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it('leaves only the agent it started on the base, so going back reaches the board', () => {
+    const router = routed(AGENT, IN_WORKSPACE)
+    const started = { name: 'agent', machine: 1, pane: 9, starting: true } as const
+    router.settle(started)
+    expect(router.below).toEqual(HOME)
+    expect(router.opened).toEqual({ machine: 1, pane: 9 })
+    expect(router.latest('start')).toBeNull()
   })
 })
 

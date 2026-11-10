@@ -30,10 +30,23 @@ pub struct SourceInfo {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default)]
+pub struct PlaceInfo {
+    #[cfg_attr(feature = "specta", specta(type = u32))]
+    pub project: u64,
+    #[cfg_attr(feature = "specta", specta(type = Option<u32>))]
+    pub workspace: Option<u64>,
+    pub label: String,
+    pub worktree: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(default)]
 pub struct Sources {
     #[cfg_attr(feature = "specta", specta(type = u32))]
     pub project: u64,
     pub sources: Vec<SourceInfo>,
+    pub places: Vec<PlaceInfo>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -43,6 +56,7 @@ pub struct IssueInfo {
     pub source: String,
     pub key: String,
     pub title: String,
+    pub url: String,
     pub state: String,
     pub closed: bool,
     pub labels: Vec<String>,
