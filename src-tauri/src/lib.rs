@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tauri::Manager;
 
 use crate::state::AppState;
@@ -29,8 +31,9 @@ pub fn run() {
         .setup(move |app| {
             specta.mount_events(app);
             let data_dir = app.path().app_data_dir();
-            let routes = secrets::routes(data_dir.as_deref().ok());
-            app.manage(AppState::load(data_dir, &secrets::store(), routes));
+            let store = secrets::store(app.handle());
+            let routes = secrets::routes(data_dir.as_deref().ok(), Arc::clone(&store));
+            app.manage(AppState::load(data_dir, &*store, routes));
             network::follow_in_background(app.handle(), paths);
             Ok(())
         })
