@@ -258,7 +258,7 @@ mod the_forwarder {
 
     #[tokio::test(start_paused = true)]
     async fn says_why_the_route_that_worked_was_not_saved() {
-        let state = AppState::load(NO_FOLDER, Arc::new(on_mock(mock_store())));
+        let state = AppState::load(NO_FOLDER, &on_mock(mock_store()), Arc::new(on_mock(mock_store())));
         let id = MachineId(5);
         let recorder = watched(id, serving(&[snapshot(BOOT, 7, "first")]), state.shared_machines());
         settle().await;

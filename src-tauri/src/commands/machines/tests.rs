@@ -60,7 +60,7 @@ mod adding_a_machine {
         let dir = TempDir::new();
         fs::write(dir.path().join("machines.json"), "{ not json").expect("write the machines file");
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
-        let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets);
+        let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets.as_ref(), Arc::clone(&secrets));
         let error = add(&state, BRIDGE, "studio").expect_err("the machines are not loaded");
         assert_eq!(error.code, ErrorCode::MachinesNotLoaded);
     }
