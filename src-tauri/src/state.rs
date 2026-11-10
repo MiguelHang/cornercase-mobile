@@ -36,6 +36,7 @@ pub(crate) struct Active {
     forwarder: JoinHandle<()>,
     terminal: Slot,
     changes: Slot,
+    search: Slot,
 }
 
 #[derive(Default)]
@@ -112,7 +113,15 @@ impl SharedMachines {
 
 impl Active {
     pub(crate) fn new(machine: MachineId, store: Store, driver: JoinHandle<()>, forwarder: JoinHandle<()>) -> Self {
-        Self { machine, store, driver, forwarder, terminal: Slot::default(), changes: Slot::default() }
+        Self {
+            machine,
+            store,
+            driver,
+            forwarder,
+            terminal: Slot::default(),
+            changes: Slot::default(),
+            search: Slot::default(),
+        }
     }
 
     pub(crate) fn machine(&self) -> MachineId {
@@ -137,6 +146,10 @@ impl Active {
 
     pub(crate) fn unfollow(&mut self, workspace: u64) {
         self.changes.empty(workspace);
+    }
+
+    pub(crate) fn search(&mut self, workspace: u64, search: JoinHandle<()>) {
+        self.search.fill(workspace, search);
     }
 }
 

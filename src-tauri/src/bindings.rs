@@ -37,6 +37,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
         changes::changes_unfollow,
         files::files_list,
         files::files_read,
+        files::files_search,
     ]))
 }
 

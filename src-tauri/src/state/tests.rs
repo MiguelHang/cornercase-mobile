@@ -296,6 +296,16 @@ mod an_active_store {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn stops_the_search_before_a_new_one_and_keeps_both() {
+        let Both { mut active, changes, terminal } = both();
+        let (before, next) = (Arc::new(()), Arc::new(()));
+        active.search(2, task(&before));
+        active.search(2, task(&next));
+        released(&before).await;
+        assert!(holds(&next) && holds(&changes) && holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn stops_both_when_dropped() {
         let Both { active, changes, terminal } = both();
         drop(active);

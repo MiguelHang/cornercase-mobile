@@ -1,16 +1,23 @@
+use std::time::Duration;
+
 use cornercase_core::cli::files::ReadKind;
 use rstest::rstest;
 use serde_json::{Value, json};
+use tokio::time;
 
 use super::*;
-use crate::test_util::{Ipc, Studio, connected_with};
+use crate::test_util::{BOOT, Ipc, Streams, Studio, connected_to, connected_with, serving, settle, snapshot, spawned};
 
 const LISTING: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/control/files/v1/listing.json"));
 const TEXT: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/control/files/v1/text.json"));
+const SEARCH: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/control/files/v1/search.json"));
 const LIST: [&str; 8] = ["files", "list", "--workspace", "2", "--json", "--", ".", "./src"];
 const READ: [&str; 7] = ["files", "read", "--workspace", "2", "--json", "--", "./src/main.rs"];
+const SOUGHT: [&str; 8] = ["files", "search", "--names", "--workspace", "2", "--json", "--", "main"];
+const SOUGHT_BEFORE: [&str; 8] = ["files", "search", "--names", "--workspace", "2", "--json", "--", "mai"];
 
 async fn invoked(argv: &[&str], answer: (&str, &str, i32), command: &str, input: Value) -> Result<Value, Value> {
     let (stdout, stderr, code) = answer;
@@ -22,6 +29,10 @@ async fn invoked(argv: &[&str], answer: (&str, &str, i32), command: &str, input:
 
 async fn reading(answer: (&str, &str, i32)) -> Result<Value, Value> {
     invoked(&READ, answer, "files_read", json!({ "workspace": 2, "path": "src/main.rs" })).await
+}
+
+fn found() -> Found {
+    serde_json::from_str(SEARCH).expect("the fixture parses")
 }
 
 fn text(text: &str) -> Read {
@@ -91,6 +102,58 @@ mod reading_a_file {
     }
 }
 
+mod searching {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn answers_the_names_cornercase_found() {
+        let args = json!({ "workspace": 2, "query": "main" });
+        let searched = invoked(&SOUGHT, (SEARCH, "", 0), "files_search", args).await.expect("a search");
+        assert_eq!(searched, serde_json::to_value(Searched::Found { found: found() }).expect("a search serializes"));
+        assert_eq!(searched["searched"], "found");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn fails_with_the_reason_cornercase_gave_without_json() {
+        let args = json!({ "workspace": 2, "query": "main" });
+        let refused = invoked(&SOUGHT, ("", "Error: no workspace 2\n", 1), "files_search", args).await;
+        assert_eq!(refused, Err(json!({ "code": "failed", "message": "no workspace 2" })));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancels_the_search_before_and_ends_its_process() {
+        let streams = Streams::default();
+        let serving = serving(&[snapshot(BOOT, 7, "first")]);
+        let lines: Vec<&str> = SEARCH.lines().collect();
+        let studio = connected_to(streams.on(serving, &SOUGHT_BEFORE, &[]).answer(&SOUGHT, &lines, &[], 0));
+        settle().await;
+        let next = async {
+            settle().await;
+            assert_eq!(streams.running(), 1);
+            search(&studio.state, spawned, 2, "main").await
+        };
+        let both = async { tokio::join!(search(&studio.state, spawned, 2, "mai"), next) };
+        let (before, next) = time::timeout(Duration::from_secs(600), both).await.expect("both searches end");
+        assert_eq!((before, next), (Ok(Searched::Cancelled), Ok(Searched::Found { found: found() })));
+        assert_eq!(streams.running(), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancels_a_search_whose_machine_went_away() {
+        let streams = Streams::default();
+        let studio = connected_to(streams.on(serving(&[snapshot(BOOT, 7, "first")]), &SOUGHT_BEFORE, &[]));
+        settle().await;
+        let gone = async {
+            settle().await;
+            *studio.state.active() = None;
+        };
+        let both = async { tokio::join!(search(&studio.state, spawned, 2, "mai"), gone) };
+        let (before, ()) = time::timeout(Duration::from_secs(600), both).await.expect("the search ends");
+        assert_eq!(before, Ok(Searched::Cancelled));
+        assert_eq!(streams.running(), 0);
+    }
+}
+
 mod the_limit_of_the_phone {
     use super::*;
 
@@ -122,6 +185,7 @@ mod without_a_connection {
     #[rstest]
     #[case::listing("files_list", json!({ "workspace": 2, "paths": [""] }))]
     #[case::reading_a_file("files_read", json!({ "workspace": 2, "path": "src/main.rs" }))]
+    #[case::searching("files_search", json!({ "workspace": 2, "query": "main" }))]
     fn says_it_is_not_connected_rather_than_asking(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());
         let refused = ipc.invoke(command, args).expect_err("no machine");

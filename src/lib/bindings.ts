@@ -36,6 +36,7 @@ export const commands = {
 	changesUnfollow: (workspace: number) => __TAURI_INVOKE<void>("changes_unfollow", { workspace }),
 	filesList: (workspace: number, paths: string[]) => typedError<Listing_Serialize, CommandError>(__TAURI_INVOKE("files_list", { workspace, paths })),
 	filesRead: (workspace: number, path: string) => typedError<FileShown_Serialize, CommandError>(__TAURI_INVOKE("files_read", { workspace, path })),
+	filesSearch: (workspace: number, query: string) => typedError<Searched_Serialize, CommandError>(__TAURI_INVOKE("files_search", { workspace, query })),
 };
 
 /** Events */
@@ -320,6 +321,52 @@ export type Folder_Serialize = {
 	error: string | null,
 };
 
+export type Found = Found_Serialize | Found_Deserialize;
+
+export type FoundFile = FoundFile_Serialize | FoundFile_Deserialize;
+
+export type FoundFile_Deserialize = {
+	path?: string,
+	lines?: FoundLine_Deserialize[],
+};
+
+export type FoundFile_Serialize = {
+	path: string,
+	lines: FoundLine_Serialize[],
+};
+
+export type FoundLine = FoundLine_Serialize | FoundLine_Deserialize;
+
+export type FoundLine_Deserialize = {
+	number?: number,
+	text?: string,
+	ranges?: ([number, number])[],
+};
+
+export type FoundLine_Serialize = {
+	number: number,
+	text: string,
+	ranges: ([number, number])[],
+};
+
+export type Found_Deserialize = {
+	query?: string,
+	mode?: SearchMode_Deserialize,
+	names?: Name_Deserialize[],
+	files?: FoundFile_Deserialize[],
+	matches?: number,
+	capped?: boolean,
+};
+
+export type Found_Serialize = {
+	query: string,
+	mode: SearchMode_Serialize,
+	names: Name_Serialize[],
+	files: FoundFile_Serialize[],
+	matches: number,
+	capped: boolean,
+};
+
 export type Hunk = Hunk_Serialize | Hunk_Deserialize;
 
 export type Hunk_Deserialize = {
@@ -545,6 +592,18 @@ export type Mouse_Serialize = {
 	mods?: Modifier[],
 };
 
+export type Name = Name_Serialize | Name_Deserialize;
+
+export type Name_Deserialize = {
+	path?: string,
+	indices?: number[],
+};
+
+export type Name_Serialize = {
+	path: string,
+	indices: number[],
+};
+
 export type NewWorkspace = {
 	project: number,
 	name: string,
@@ -650,6 +709,18 @@ export type Run_Serialize = {
 };
 
 export type SameWhy = "address" | "boot" | "name";
+
+export type SearchMode = SearchMode_Serialize | SearchMode_Deserialize;
+
+export type SearchMode_Deserialize = "text" | "names" | string;
+
+export type SearchMode_Serialize = "text" | "names" | "other";
+
+export type Searched = Searched_Serialize | Searched_Deserialize;
+
+export type Searched_Deserialize = { searched: "found"; found: Found_Deserialize } | { searched: "cancelled" };
+
+export type Searched_Serialize = { searched: "found"; found: Found_Serialize } | { searched: "cancelled" };
 
 export type Shape = Shape_Serialize | Shape_Deserialize;
 
