@@ -6,14 +6,14 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 /** Commands */
 export const commands = {
 	machinesList: () => typedError<MachineList_Serialize, CommandError>(__TAURI_INVOKE("machines_list")),
-	machineAdd: (url: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { url, name })),
+	machineAdd: (code: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { code, name })),
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
 	machineRename: (id: number, name: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_rename", { id, name })),
-	machineRouteAdd: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_add", { id, url })),
+	machineMerge: (id: number, code: string) => typedError<MergeView, CommandError>(__TAURI_INVOKE("machine_merge", { id, code })),
 	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
 	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),
 	machineProbe: (id: number) => typedError<ProbeView, CommandError>(__TAURI_INVOKE("machine_probe", { id })),
-	machineMatch: (url: string, name: string) => typedError<MatchView, CommandError>(__TAURI_INVOKE("machine_match", { url, name })),
+	machineMatch: (code: string, name: string) => typedError<MatchView, CommandError>(__TAURI_INVOKE("machine_match", { code, name })),
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
@@ -258,7 +258,7 @@ export type Cursor_Serialize = {
 
 export type Direction = "up" | "down";
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest";
 
 export type Fold = Fold_Serialize | Fold_Deserialize;
 
@@ -378,11 +378,17 @@ export type MachineView_Serialize = {
 	last_route: string | null,
 };
 
-export type MatchFound = { kind: "none" } | { kind: "already_saved"; machine: number } | { kind: "same"; machine: number; name: string; why: SameWhy };
+export type MatchFound = { kind: "none" } | { kind: "same"; machine: number; name: string; why: SameWhy } | { kind: "merge"; machine: number; name: string };
 
 export type MatchView = {
 	found: MatchFound,
 	checked: boolean,
+};
+
+export type MergeView = {
+	added: string[],
+	token_updated: boolean,
+	skipped: string[],
 };
 
 export type Missing = Missing_Serialize | Missing_Deserialize;
@@ -533,7 +539,7 @@ export type Run_Serialize = {
 	style: Style_Serialize,
 };
 
-export type SameWhy = "address" | "token" | "boot" | "name";
+export type SameWhy = "address" | "boot" | "name";
 
 export type Shape = Shape_Serialize | Shape_Deserialize;
 

@@ -14,6 +14,7 @@ use crate::transport::{Exit, OutSink, Stdin};
 
 mod boot;
 mod connect;
+mod learn;
 mod offline;
 mod resume;
 mod retry;

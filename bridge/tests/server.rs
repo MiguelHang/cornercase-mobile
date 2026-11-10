@@ -306,6 +306,66 @@ mod opening {
     }
 }
 
+mod routes {
+    use super::*;
+
+    const ASKED: &str = r#"{"argv":["--bridge-routes"]}"#;
+    const ANSWER: &str = r#"{"stdout":"{\"routes\":[{\"host\":\"192.168.1.20\",\"port\":8765},{\"host\":\"fd7a:115c:a1e0::1\",\"port\":8765}]}"}"#;
+
+    fn listening(dir: &TempDir) -> impl FnOnce(&mut Config) {
+        let fake = faking(dir, WITNESS);
+        move |config| {
+            fake(config);
+            config.addresses = ["192.168.1.20:8765", "[fd7a:115c:a1e0::1]:8765"]
+                .map(|address| address.parse().expect("an address"))
+                .to_vec();
+        }
+    }
+
+    #[rstest]
+    #[case::alone(vec![Message::text(ASKED)])]
+    #[case::then_eof(vec![Message::text(ASKED), Message::text(EOF)])]
+    #[tokio::test]
+    async fn answers_the_addresses_it_listens_on_without_running_cornercase(#[case] sent: Vec<Message>) {
+        let dir = TempDir::new();
+        let served = Served::start(listening(&dir)).await;
+        assert_eq!(served.exchange(sent).await, Exchange::of(&[ANSWER, EXITED]));
+        assert!(!ran(dir.path()));
+    }
+
+    #[tokio::test]
+    async fn never_answers_the_token() {
+        let dir = TempDir::new();
+        let served = Served::start(listening(&dir)).await;
+        let exchange = served.exchange(vec![Message::text(ASKED)]).await;
+        assert!(exchange.texts.iter().all(|text| !text.contains(TOKEN)), "{exchange:?}");
+    }
+
+    #[rstest]
+    #[case::with_an_argument(
+        r#"{"argv":["--bridge-routes","status"]}"#,
+        "`--bridge-routes` is not allowed through the bridge"
+    )]
+    #[case::another_flag(r#"{"argv":["--bridge-route"]}"#, "`--bridge-route` is not allowed through the bridge")]
+    #[tokio::test]
+    async fn refuses_any_other_flag_as_before(#[case] argv: &str, #[case] reason: &str) {
+        let dir = TempDir::new();
+        let served = Served::start(listening(&dir)).await;
+        assert_eq!(served.exchange(vec![Message::text(argv)]).await, Exchange::of(&[&stderr(reason), USAGE]));
+        assert!(!ran(dir.path()));
+    }
+
+    #[rstest]
+    #[case::no_token("/")]
+    #[case::a_wrong_token("/?token=wrong")]
+    #[tokio::test]
+    async fn needs_the_token_like_any_command(#[case] target: &str) {
+        let dir = TempDir::new();
+        let served = Served::start(listening(&dir)).await;
+        assert_eq!(served.upgrade(target).await, StatusCode::UNAUTHORIZED);
+    }
+}
+
 mod running {
     use super::*;
 

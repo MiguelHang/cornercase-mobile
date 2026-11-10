@@ -6,6 +6,7 @@ use std::time::Duration;
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
+use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
 use cornercase_core::transport::fake::FakeTransport;
@@ -157,13 +158,17 @@ impl Studio {
         let dir = TempDir::new();
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), Arc::clone(&secrets));
-        let added = state.machines(|machines| machines.add("studio", route()).map_err(CommandError::from));
+        let added = state.machines(|machines| machines.add("studio", &code()).map_err(CommandError::from));
         Self { id: added.expect("the studio is added"), dir, secrets, state }
     }
 
     pub(crate) fn reloaded(&self) -> AppState {
         AppState::load(Ok::<_, &str>(self.dir.path().to_path_buf()), Arc::clone(&self.secrets))
     }
+}
+
+pub(crate) fn code() -> MachineCode {
+    MachineCode::parse(BRIDGE).expect("a bridge code")
 }
 
 pub(crate) fn route() -> Route {

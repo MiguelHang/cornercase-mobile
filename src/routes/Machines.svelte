@@ -60,6 +60,7 @@
   }
 
   onMount(() => {
+    onrouted()
     void probes.open(
       machines.map(({ id }) => id),
       active,
@@ -100,7 +101,12 @@
   {#if adding}
     <Glass>
       <h2 class="heading adding">Add machine</h2>
-      <MachineForm onadded={added} onrouted={routed} oncancel={() => (adding = false)} />
+      <MachineForm
+        taken={machines.map((machine) => machine.name)}
+        onadded={added}
+        onrouted={routed}
+        oncancel={() => (adding = false)}
+      />
     </Glass>
   {:else}
     <div class="actions">

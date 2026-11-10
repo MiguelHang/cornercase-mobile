@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use cornercase_core::cli::contract::Missing;
 use cornercase_core::cli::status::Project;
-use cornercase_core::machines::registry::Machines;
+use cornercase_core::machines::registry::{Machines, Merged};
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::store::Connection;
@@ -80,15 +80,16 @@ pub(crate) struct MatchView {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum MatchFound {
     None,
-    AlreadySaved {
-        #[specta(type = u32)]
-        machine: u64,
-    },
     Same {
         #[specta(type = u32)]
         machine: u64,
         name: String,
         why: SameWhy,
+    },
+    Merge {
+        #[specta(type = u32)]
+        machine: u64,
+        name: String,
     },
 }
 
@@ -96,9 +97,15 @@ pub(crate) enum MatchFound {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SameWhy {
     Address,
-    Token,
     Boot,
     Name,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MergeView {
+    pub(crate) added: Vec<String>,
+    pub(crate) token_updated: bool,
+    pub(crate) skipped: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -145,6 +152,16 @@ impl From<&Route> for RouteView {
     fn from(route: &Route) -> Self {
         match route {
             Route::Bridge { .. } => Self::Bridge { url: route.address().to_string(), has_token: route.has_token() },
+        }
+    }
+}
+
+impl From<&Merged> for MergeView {
+    fn from(merged: &Merged) -> Self {
+        Self {
+            added: merged.added.iter().map(ToString::to_string).collect(),
+            token_updated: merged.token_updated,
+            skipped: merged.skipped.iter().map(ToString::to_string).collect(),
         }
     }
 }

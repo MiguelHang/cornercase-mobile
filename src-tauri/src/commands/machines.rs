@@ -1,5 +1,5 @@
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::code::MachineCode;
 use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
@@ -17,8 +17,8 @@ pub(crate) fn machines_list(state: State<'_, AppState>) -> Result<MachineList, C
 #[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machine_add(state: State<'_, AppState>, url: String, name: String) -> Result<u64, CommandError> {
-    add(&state, &url, &name).map(|id| id.0)
+pub(crate) fn machine_add(state: State<'_, AppState>, code: String, name: String) -> Result<u64, CommandError> {
+    add(&state, &code, &name).map(|id| id.0)
 }
 
 #[tauri::command(async)]
@@ -43,9 +43,9 @@ pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
     state.machines(|machines| Ok(MachineList::from(&*machines)))
 }
 
-pub(crate) fn add(state: &AppState, url: &str, name: &str) -> Result<MachineId, CommandError> {
-    let route = Route::parse(url)?;
-    state.machines(|machines| machines.add(name, route).map_err(CommandError::from))
+pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId, CommandError> {
+    let code = MachineCode::parse(code)?;
+    state.machines(|machines| machines.add(name, &code).map_err(CommandError::from))
 }
 
 pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {

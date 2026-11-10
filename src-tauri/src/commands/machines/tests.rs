@@ -5,6 +5,7 @@ use std::thread;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
+use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
 use rstest::rstest;
 use tauri::async_runtime::{self, JoinHandle};
@@ -20,6 +21,8 @@ use crate::test_util::{
 use crate::view::{MachineView, RouteView};
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+const LAPTOP_CODE: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA&also=100.101.102.103&name=Laptop";
+const LAPTOP_TOKEN: &str = "bGFwdG9wLXNlY3JldA";
 
 static GATE: Mutex<Option<(Sender<()>, Receiver<()>)>> = Mutex::new(None);
 
@@ -60,6 +63,21 @@ mod adding_a_machine {
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets);
         let error = add(&state, BRIDGE, "studio").expect_err("the machines are not loaded");
         assert_eq!(error.code, ErrorCode::MachinesNotLoaded);
+    }
+
+    #[test]
+    fn saves_every_route_of_a_code_under_one_machine_with_its_token() {
+        let studio = Studio::new();
+        let laptop = add(&studio.state, LAPTOP_CODE, "laptop").expect("the laptop is added");
+        let machines = list(&studio.reloaded()).expect("the machines load").machines;
+        let routes = ["ws://laptop.lan:9000/", "ws://100.101.102.103:9000/"];
+        let views = routes.map(|url| RouteView::Bridge { url: url.to_owned(), has_token: true });
+        assert_eq!(names(&studio.state), ["studio", "laptop"]);
+        assert_eq!(machines[1].routes, views);
+        for url in routes {
+            let saved = studio.secrets.get(&format!("route/{}/{url}", laptop.0)).expect("the keychain answers");
+            assert_eq!(saved.as_deref(), Some(LAPTOP_TOKEN.as_bytes()));
+        }
     }
 
     #[test]
@@ -221,7 +239,7 @@ mod over_ipc {
     fn adds_a_machine_and_answers_its_id() {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
-        let id = ipc.invoke("machine_add", json!({ "url": LAPTOP, "name": "laptop" })).expect("the machine is added");
+        let id = ipc.invoke("machine_add", json!({ "code": LAPTOP, "name": "laptop" })).expect("the machine is added");
         assert_eq!(names(&ipc.state()), ["studio", "laptop"]);
         assert_eq!(list(&ipc.state()).expect("the machines load").machines[1].id, id.as_u64().expect("an id"));
     }
@@ -240,7 +258,7 @@ mod over_ipc {
     fn says_why_it_did_not_add_a_machine() {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
-        let refused = ipc.invoke("machine_add", json!({ "url": "ws://laptop.lan:9000/", "name": "laptop" }));
+        let refused = ipc.invoke("machine_add", json!({ "code": "ws://laptop.lan:9000/", "name": "laptop" }));
         assert_eq!(refused.expect_err("the url is refused")["code"], "route_no_token");
     }
 

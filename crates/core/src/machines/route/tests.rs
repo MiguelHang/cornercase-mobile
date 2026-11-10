@@ -111,6 +111,10 @@ mod route_error {
             RouteError::EmptyToken,
             RouteError::TokenTwice,
             RouteError::TokenCharacters,
+            RouteError::AlsoEmpty,
+            RouteError::AlsoInvalid,
+            RouteError::NameEncoding,
+            RouteError::NameTwice,
         ];
         let messages: HashSet<String> = reasons.iter().map(ToString::to_string).collect();
         assert_eq!(messages.len(), reasons.len());

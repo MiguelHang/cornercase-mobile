@@ -36,6 +36,7 @@ type Stop = watch::Receiver<bool>;
 pub struct Config {
     pub token: String,
     pub binary: PathBuf,
+    pub addresses: Vec<SocketAddr>,
     pub ping: Duration,
     pub silence: Duration,
     pub hello: Duration,
@@ -49,6 +50,7 @@ impl Config {
         Self {
             token,
             binary,
+            addresses: Vec::new(),
             ping: PING,
             silence: SILENCE,
             hello: HELLO,
@@ -56,6 +58,12 @@ impl Config {
             connections: CONNECTIONS,
             handshakes: HANDSHAKES,
         }
+    }
+
+    #[must_use]
+    pub fn with_addresses(mut self, addresses: Vec<SocketAddr>) -> Self {
+        self.addresses = addresses;
+        self
     }
 }
 
