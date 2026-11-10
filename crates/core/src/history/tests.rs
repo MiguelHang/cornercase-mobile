@@ -49,7 +49,7 @@ fn ids(entries: &[HistoryEntry]) -> Vec<(u64, &'static str)> {
 }
 
 fn budget_for(entries: &[HistoryEntry]) -> usize {
-    entries.iter().map(|entry| size(entry).expect("measure the entry")).sum()
+    entries.iter().map(|entry| serde_json::to_vec(entry).expect("measure the entry").len() + 1).sum()
 }
 
 mod capped {
@@ -99,6 +99,32 @@ mod capped {
         let budget = budget_for(&[you(2, "short"), agent(3, "reply")]) + 100;
         let kept = capped(&entries, budget).expect("cap");
         assert_eq!(ids(&kept), [(1, "gap"), (2, "you"), (3, "agent")]);
+    }
+
+    #[test]
+    fn drops_an_entry_when_the_whole_history_is_one_byte_over_the_budget() {
+        let entries = turns(4);
+        let kept = capped(&entries, budget_for(&entries) - 1).expect("cap");
+        assert!(matches!(kept[0], HistoryEntry::Gap { .. }), "{kept:?}");
+        assert!(kept.len() < entries.len() + 1);
+    }
+
+    #[test]
+    fn counts_the_gap_it_adds_against_the_bytes_it_may_take() {
+        let entries = [you(0, &"a".repeat(500)), agent(1, &"b".repeat(500)), you(2, "short"), agent(3, "reply")];
+        let gap_size = size(&gap(0)).expect("measure the gap");
+        let budget = budget_for(&[you(2, "short"), agent(3, "reply")]) + gap_size - 1;
+        let kept = capped(&entries, budget).expect("cap");
+        assert_eq!(ids(&kept), [(2, "gap"), (3, "agent")]);
+    }
+
+    #[test]
+    fn adds_no_gap_in_front_of_a_gap_that_the_cut_reaches() {
+        let mut entries = vec![you(0, "ask"), you(1, "ask"), gap(2)];
+        entries.extend((3..201).map(|id| agent(id, "answer")));
+        let kept = capped(&entries, usize::MAX).expect("cap");
+        assert_eq!(kept.len(), 199);
+        assert_eq!(ids(&kept[..2]), [(2, "gap"), (3, "agent")]);
     }
 
     #[test]
