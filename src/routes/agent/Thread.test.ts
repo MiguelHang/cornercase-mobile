@@ -2,18 +2,13 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import { Chat, timers, type Outgoing } from '../../lib/chat.svelte'
 import { message, ok } from '../../lib/chatFakes'
-import { LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unpressed, unread, unsent } from './agentFakes'
+import { CHIPS, LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unpressed, unread, unsent } from './agentFakes'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import Sent from './Sent.svelte'
 import sentSource from './Sent.svelte?raw'
 import Thread from './Thread.svelte'
 import threadSource from './Thread.svelte?raw'
-
-const CHIPS = [
-  { name: 'IMG_0042.jpg', size: '47 KiB' },
-  { name: 'pasted.png', size: '900 B' },
-]
 
 const outgoing = (state: Outgoing['state'], fields: Partial<Outgoing> = {}): Outgoing => ({
   text: 'what is wrong here?',

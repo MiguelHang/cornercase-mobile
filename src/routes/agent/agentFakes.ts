@@ -1,5 +1,5 @@
 import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
-import type { AttachImage } from '../../lib/attach.svelte'
+import type { Chip, Images } from '../../lib/attach.svelte'
 import { Chat, timers, type Clock, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
 import { fakeAsker, fakeClock } from '../../lib/chatFakes'
 
@@ -29,9 +29,18 @@ export const unsent: SendText = () => new Promise(() => {})
 
 export const unpressed: PressKey = () => new Promise(() => {})
 
-export const unattached: AttachImage = () => new Promise(() => {})
+export const unattached: Images = {
+  attach: () => new Promise(() => {}),
+  paste: () => new Promise(() => {}),
+  discard: () => Promise.resolve(),
+}
 
 export const unasked = fakeAsker().asker
+
+export const CHIPS: Chip[] = [
+  { id: 1, name: 'IMG_0042.jpg', size: '47 KiB', thumbnail: null, pasted: false },
+  { id: 2, name: 'pasted.png', size: '900 B', thumbnail: null, pasted: false },
+]
 
 export const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as const, data: null }) }
 

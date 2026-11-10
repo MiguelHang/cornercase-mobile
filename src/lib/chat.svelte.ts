@@ -4,7 +4,7 @@ import type {
   LastMessage_Serialize as LastMessage,
   PaneStatusChanged_Serialize as PaneStatusChanged,
 } from './bindings'
-import { Attachments, type AttachImage, type Chip } from './attach.svelte'
+import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import { digitOf, type KeyName } from './keys'
 import { Questions, type Asker } from './question.svelte'
@@ -127,7 +127,7 @@ export class Chat {
     readLast: ReadLast,
     sendText: SendText,
     pressKey: PressKey,
-    attachImage: AttachImage,
+    images: Images,
     haptics: HapticsApi,
     clock: Clock,
     asker: Asker,
@@ -137,7 +137,7 @@ export class Chat {
     this.#readLast = readLast
     this.#sendText = sendText
     this.#pressKey = pressKey
-    this.attachments = new Attachments(pane, attachImage)
+    this.attachments = new Attachments(pane, images)
     this.#questions = new Questions(machine, pane, asker)
     this.#haptics = haptics
     this.#clock = clock
@@ -292,13 +292,13 @@ export class Chat {
   }
 
   async #deliver(text: string) {
-    const chips = [...this.attachments.chips]
-    this.attachments.clear()
+    const chips = this.attachments.take()
     const shown = this.reading.kind === 'message' ? { ...this.reading.message } : null
     const bubble: Outgoing = { text, chips, state: 'sending', reason: null, answered: shown }
     this.outgoing = bubble
-    const failed = await deliver(() => this.#sendText(this.pane, text, chips.length > 0))
+    const failed = await this.#handOver(text, chips)
     if (this.gone) {
+      void this.attachments.release(chips)
       return
     }
     if (failed === null) {
@@ -306,8 +306,18 @@ export class Chat {
       this.outgoing = { ...bubble, state: 'sent' }
       return
     }
-    this.attachments.chips = [...chips, ...this.attachments.chips]
+    this.attachments.giveBack(chips)
     this.outgoing = { ...bubble, state: 'failed', reason: failed }
+  }
+
+  async #handOver(text: string, chips: Chip[]): Promise<string | null> {
+    for (const chip of chips.filter((chip) => !chip.pasted)) {
+      const failed = await this.attachments.paste(chip)
+      if (failed !== null || this.gone) {
+        return failed
+      }
+    }
+    return deliver(() => this.#sendText(this.pane, text, chips.length > 0))
   }
 
   async attach(): Promise<string | null> {
@@ -356,7 +366,7 @@ export class Chat {
     this.row = null
     this.draft = ''
     this.outgoing = null
-    this.attachments.clear()
+    void this.attachments.release()
     this.#asked += 1
     this.#again = false
     this.#pace()

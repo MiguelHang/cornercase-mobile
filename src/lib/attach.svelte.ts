@@ -1,9 +1,17 @@
-import type { commands, Pasted_Serialize as Pasted } from './bindings'
-import { messageOf } from './toasts'
+import type { AttachedImage_Serialize as AttachedImage, commands } from './bindings'
+import { deliver, messageOf } from './toasts'
 
 export type AttachImage = typeof commands.attach
 
-export type Chip = { name: string; size: string }
+export type PasteAttached = typeof commands.pasteAttached
+
+export type Discard = typeof commands.discard
+
+export type Images = { attach: AttachImage; paste: PasteAttached; discard: Discard }
+
+export type Chip = { id: number; name: string; size: string; thumbnail: string | null; pasted: boolean }
+
+export const MAX_ATTACHED = 4
 
 const UNITS = ['B', 'KiB', 'MiB', 'GiB']
 
@@ -22,26 +30,36 @@ export const formatBytes = (bytes: number) => {
 
 export const nameOf = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 
-const chipOf = (pasted: Pasted): Chip => ({ name: nameOf(pasted.path), size: formatBytes(pasted.bytes) })
+const chipOf = (image: AttachedImage): Chip => ({
+  id: image.id,
+  name: image.name,
+  size: formatBytes(image.bytes),
+  thumbnail: image.thumbnail,
+  pasted: false,
+})
 
 export class Attachments {
   readonly pane: number
   attaching = $state(false)
   chips = $state<Chip[]>([])
-  #attachImage: AttachImage
+  #images: Images
 
-  constructor(pane: number, attachImage: AttachImage) {
+  constructor(pane: number, images: Images) {
     this.pane = pane
-    this.#attachImage = attachImage
+    this.#images = images
+  }
+
+  get full() {
+    return this.chips.length >= MAX_ATTACHED
   }
 
   async attach(): Promise<string | null> {
-    if (this.attaching) {
+    if (this.attaching || this.full) {
       return null
     }
     this.attaching = true
     try {
-      const answer = await this.#attachImage(this.pane)
+      const answer = await this.#images.attach(this.pane)
       if (answer.status === 'error') {
         return answer.error.message
       }
@@ -56,7 +74,46 @@ export class Attachments {
     }
   }
 
+  async paste(chip: Chip): Promise<string | null> {
+    const failed = await deliver(() => this.#images.paste(this.pane, chip.id))
+    if (failed === null) {
+      chip.pasted = true
+    }
+    return failed
+  }
+
+  take(): Chip[] {
+    const taken = this.chips
+    this.chips = []
+    return taken
+  }
+
+  giveBack(chips: Chip[]) {
+    this.chips = [...chips, ...this.chips]
+  }
+
+  async remove(id: number): Promise<string | null> {
+    this.chips = this.chips.filter((chip) => chip.id !== id)
+    return this.#discard([id])
+  }
+
+  async release(chips = this.take()): Promise<string | null> {
+    return this.#discard(chips.map((chip) => chip.id))
+  }
+
   clear(sent = this.chips.length) {
     this.chips = this.chips.slice(sent)
+  }
+
+  async #discard(ids: number[]): Promise<string | null> {
+    if (ids.length === 0) {
+      return null
+    }
+    try {
+      await this.#images.discard(ids)
+      return null
+    } catch (error) {
+      return messageOf(error)
+    }
   }
 }

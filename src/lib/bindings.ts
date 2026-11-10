@@ -21,7 +21,7 @@ export const commands = {
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
-	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
+	attach: (pane: number) => typedError<AttachedImage_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
 	pasteAttached: (pane: number, id: number) => typedError<Pasted_Serialize, CommandError>(__TAURI_INVOKE("paste_attached", { pane, id })),
 	discard: (ids: number[]) => __TAURI_INVOKE<void>("discard", { ids }),
 	questionOpen: (tab: number, pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("question_open", { tab, pane })),
@@ -126,6 +126,22 @@ export type AgentsChanged_Deserialize = {
 export type AgentsChanged_Serialize = {
 	machine: number,
 	agents: AgentRow_Serialize[] | null,
+};
+
+export type AttachedImage = AttachedImage_Serialize | AttachedImage_Deserialize;
+
+export type AttachedImage_Deserialize = {
+	id: number,
+	name: string,
+	bytes: number,
+	thumbnail?: string | null,
+};
+
+export type AttachedImage_Serialize = {
+	id: number,
+	name: string,
+	bytes: number,
+	thumbnail: string | null,
 };
 
 export type Button = "left" | "middle" | "right";

@@ -5,7 +5,7 @@ import { subagents } from '../../lib/board'
 import type { Chat } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
-import { ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
+import { CHIPS, ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
 import chatHeaderSource from './ChatHeader.svelte?raw'
 import toolButtonSource from '../../lib/ui/ToolButton.svelte?raw'
 import Children from './Children.svelte'
@@ -446,17 +446,12 @@ describe('Agent, without its row', () => {
   })
 })
 
-const ATTACHED = [
-  { name: 'IMG_0042.jpg', size: '47 KiB' },
-  { name: 'pasted.png', size: '900 B' },
-]
-
 const attachButton = (body: string) =>
   body.match(/<button class="([^"]*)" type="button"([^>]*) aria-label="Attach image"[^>]*>(.*?)<\/button>/)
 
 const withChips = (draft = '') => {
   const chat = chatWith({ ...ROW, status: 'done' }, draft)
-  chat.attachments.chips = ATTACHED
+  chat.attachments.chips = CHIPS
   return chat
 }
 

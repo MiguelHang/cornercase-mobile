@@ -25,6 +25,7 @@ import {
   sentOk,
   pressedOk,
   attachedOk,
+  discardedOk,
   still,
   fakeClock,
   type Calls,
@@ -34,6 +35,7 @@ import {
   settle,
   PASTED,
   attached,
+  THUMBNAIL,
   FakePage,
 } from './chatFakes'
 import type { KeyName } from './keys'
@@ -159,7 +161,9 @@ describe('Chat, its attachments', () => {
     const chat = seen({ attachImage })
     expect(await chat.attach()).toBeNull()
     expect(attachImage.mock.calls).toEqual([[PANE]])
-    expect(chat.attachments.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KiB' }])
+    expect(chat.attachments.chips).toEqual([
+      { id: 1, name: 'IMG_0042.jpg', size: '47 KiB', thumbnail: THUMBNAIL, pasted: false },
+    ])
   })
 
   it('gives the reason the image was not attached', async () => {
@@ -216,10 +220,13 @@ describe('Chat, its attachments', () => {
     expect((await attached(sentOk, 'waiting')).canSend).toBe(false)
   })
 
-  it('drops its chips once gone', async () => {
-    const chat = await attached()
+  it('drops its chips once gone, and forgets their images on the phone', async () => {
+    const discard = vi.fn(discardedOk)
+    const chat = seen({ discard })
+    await chat.attach()
     chat.see(MACHINE, null)
     expect(chat.attachments.chips).toEqual([])
+    expect(discard.mock.calls).toEqual([[[1]]])
   })
 })
 

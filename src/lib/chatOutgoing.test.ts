@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { AttachImage, PasteAttached } from './attach.svelte'
 import type { ReadLast, SendText } from './chat.svelte'
 import {
   MACHINE,
@@ -10,6 +11,9 @@ import {
   gate,
   sentOk,
   attachedOk,
+  pastedOk,
+  discardedOk,
+  image,
   fakeClock,
   type Calls,
   fresh,
@@ -63,7 +67,7 @@ describe('Chat, what you sent', () => {
     const chat = await attached()
     chat.draft = 'what is wrong here?'
     await chat.send()
-    expect(chat.outgoing?.chips).toEqual([{ name: 'IMG_0042.jpg', size: '47 KiB' }])
+    expect(chat.outgoing?.chips.map((chip) => [chip.name, chip.size])).toEqual([['IMG_0042.jpg', '47 KiB']])
   })
 
   it.each<[string, SendText, string]>([
@@ -102,6 +106,84 @@ describe('Chat, what you sent', () => {
     chat.draft = 'something else'
     await chat.send()
     expect([chat.outgoing?.text, chat.outgoing?.state]).toEqual(['something else', 'sent'])
+  })
+})
+
+type Pasted = Awaited<ReturnType<PasteAttached>>
+
+const PASTE = ok({ pane: PANE, path: '/tmp/IMG_0042.jpg', bytes: 48213 })
+
+const twoImages = (): AttachImage => {
+  let last = 0
+  return () => Promise.resolve(ok(image(++last)))
+}
+
+const holdingTwo = async (calls: Calls) => {
+  const chat = await opened(calls.sendText ?? sentOk, { attachImage: twoImages(), ...calls })
+  await chat.attach()
+  await chat.attach()
+  return chat
+}
+
+describe('Chat, the images kept on the phone', () => {
+  it('pastes each one in the order attached, then forces the text past them', async () => {
+    const calls: unknown[][] = []
+    const pasteAttached = vi.fn<PasteAttached>((pane, id) => (calls.push(['paste', pane, id]), pastedOk(pane, id)))
+    const sendText = vi.fn<SendText>((...args) => (calls.push(['send', ...args]), sentOk(...args)))
+    const chat = await holdingTwo({ pasteAttached, sendText })
+    chat.draft = 'what is wrong here?'
+    await chat.send()
+    expect(calls).toEqual([
+      ['paste', PANE, 1],
+      ['paste', PANE, 2],
+      ['send', PANE, 'what is wrong here?', true],
+    ])
+    expect([chat.outgoing?.state, chat.outgoing?.chips.length, chat.attachments.chips]).toEqual(['sent', 2, []])
+  })
+
+  it('shows one bubble, sending, while the images are pasted', async () => {
+    const pasted = gate<Pasted>()
+    const sendText = vi.fn(sentOk)
+    const chat = await holdingTwo({ pasteAttached: () => pasted.promise, sendText })
+    chat.draft = 'look'
+    const sent = chat.send()
+    expect([chat.outgoing?.text, chat.outgoing?.state, chat.outgoing?.chips.length]).toEqual(['look', 'sending', 2])
+    expect(chat.attachments.chips).toEqual([])
+    expect(chat.canSend).toBe(false)
+    pasted.open(PASTE)
+    await sent
+    expect(sendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('pastes an image sent alone, then sends the empty text, which presses Enter', async () => {
+    const pasteAttached = vi.fn(pastedOk)
+    const sendText = vi.fn(sentOk)
+    const chat = await opened(sendText, { pasteAttached })
+    await chat.attach()
+    await chat.send()
+    expect(pasteAttached.mock.calls).toEqual([[PANE, 1]])
+    expect(sendText.mock.calls).toEqual([[PANE, '', true]])
+  })
+
+  it('pastes nothing for text alone', async () => {
+    const pasteAttached = vi.fn(pastedOk)
+    const chat = await failedWith(sentOk, 'go on', { pasteAttached })
+    expect([chat.outgoing?.state, pasteAttached.mock.calls]).toEqual(['sent', []])
+  })
+
+  it('sends no text once a paste fails, and says why', async () => {
+    const pasteAttached = vi.fn<PasteAttached>(() => Promise.resolve(refused('pane 12 is busy')))
+    const sendText = vi.fn(sentOk)
+    const chat = await holdingTwo({ pasteAttached, sendText })
+    chat.draft = 'look'
+    await chat.send()
+    expect(pasteAttached).toHaveBeenCalledTimes(1)
+    expect(sendText).not.toHaveBeenCalled()
+    expect([chat.outgoing?.state, chat.outgoing?.reason, chat.attachments.chips.length]).toEqual([
+      'failed',
+      'pane 12 is busy',
+      2,
+    ])
   })
 })
 
@@ -215,10 +297,11 @@ describe('Chat, a send on its way when the agent goes', () => {
   it.each<[string, Sent]>([
     ['succeeds', ok(null)],
     ['fails', refused('nothing was sent', 'not_sent')],
-  ])('drops the bubble, and touches nothing when it %s', async (_, outcome) => {
+  ])('drops the bubble, forgets the image, and touches nothing when it %s', async (_, outcome) => {
     const answer = gate<Sent>()
     const { clock, tick } = fakeClock()
-    const chat = await opened(() => answer.promise, { attachImage: attachedOk, clock })
+    const discard = vi.fn(discardedOk)
+    const chat = await opened(() => answer.promise, { attachImage: attachedOk, discard, clock })
     await chat.attach()
     chat.draft = 'look'
     const sent = chat.send()
@@ -228,6 +311,19 @@ describe('Chat, a send on its way when the agent goes', () => {
     answer.open(outcome)
     await sent
     expect([chat.outgoing, chat.draft, chat.attachments.chips, chat.lastNews]).toEqual([null, '', [], left])
+    expect(discard.mock.calls).toEqual([[[1]]])
+  })
+
+  it('pastes none of the images left once it is gone', async () => {
+    const pasted = gate<Pasted>()
+    const pasteAttached = vi.fn<PasteAttached>(() => pasted.promise)
+    const sendText = vi.fn(sentOk)
+    const chat = await holdingTwo({ pasteAttached, sendText })
+    const sent = chat.send()
+    chat.see(MACHINE, [row(3, 'working')])
+    pasted.open(PASTE)
+    await sent
+    expect([pasteAttached.mock.calls.length, sendText.mock.calls.length]).toEqual([1, 0])
   })
 })
 
