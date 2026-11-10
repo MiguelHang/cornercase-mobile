@@ -42,10 +42,14 @@ pub(crate) struct Active {
 struct Slot(Option<(u64, JoinHandle<()>)>);
 
 impl AppState {
-    pub(crate) fn load(data_dir: Result<PathBuf, impl Display>, secrets: Arc<dyn Secrets>) -> Self {
-        let identity = identity::announce(secrets.as_ref());
+    pub(crate) fn load(
+        data_dir: Result<PathBuf, impl Display>,
+        identity: &dyn Secrets,
+        routes: Arc<dyn Secrets>,
+    ) -> Self {
+        let identity = identity::announce(identity);
         let machines = match data_dir {
-            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), secrets)
+            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), routes)
                 .map_err(|error| CommandError::machines_not_loaded(&error)),
             Err(reason) => Err(CommandError::no_data_dir(reason)),
         };
