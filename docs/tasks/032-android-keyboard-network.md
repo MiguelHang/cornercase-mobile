@@ -25,7 +25,7 @@ Que la terminal y el chat funcionen con los teclados de Android y que el cambio 
 - [x] CA4 — El plugin de red de 028 gana parte Android (`ConnectivityManager.NetworkCallback`) con el mismo evento.
   Solo manda si cambia la red por defecto, `kind`, `expensive` o la VPN (`design/connection/network.md` › The
   Android plugin). Comprobado en el emulador con wifi, datos y modo avión.
-- [ ] CA5 — Probado en un dispositivo real: criterios de éxito 2, 3 y 6 en Android. Pendiente del usuario (lista de
+- [x] CA5 — Probado en un dispositivo real: criterios de éxito 2, 3 y 6 en Android. Pendiente del usuario (lista de
   abajo).
 
 ## Para el Android real (CA5)
