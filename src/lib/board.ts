@@ -177,3 +177,20 @@ export const place = (agent: AgentRow, listed: AgentRow[] = []) => {
 
 export const label = (agent: AgentRow, listed: AgentRow[] = []) =>
   (member(agent, listed) ? agent.role : null) ?? named(agent)
+
+const normalized = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+
+export const terms = (query: string) =>
+  normalized(query)
+    .split(/\s+/)
+    .filter((term) => term !== '')
+
+export const matches = (agent: AgentRow, wanted: string[]) => {
+  const fields = [agent.title, agent.agent, agent.project_name, agent.workspace_name, agent.role]
+  const words = fields.map((field) => normalized(field ?? ''))
+  return wanted.every((term) => words.some((word) => word.includes(term)))
+}

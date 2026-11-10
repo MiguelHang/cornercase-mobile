@@ -355,3 +355,63 @@ describe('statusName', () => {
     expect(board.statusName(status)).toBe(name)
   })
 })
+
+describe('terms', () => {
+  it('splits the query into lower case words without accents', () => {
+    expect(board.terms('  Café   ÁRBOL login ')).toEqual(['cafe', 'arbol', 'login'])
+  })
+
+  it.each(['', '   ', '\t \n'])('is empty for %o', (query) => {
+    expect(board.terms(query)).toEqual([])
+  })
+})
+
+describe('matches', () => {
+  const found = agent(1, 'working', { title: 'Fix the cart', role: 'reviewer' })
+
+  const seen = (query: string, one: AgentRow = found) => board.matches(one, board.terms(query))
+
+  it.each([
+    ['the title', 'cart'],
+    ['the name of the agent', 'claude'],
+    ['the project', 'shop'],
+    ['the workspace', 'login'],
+    ['the role', 'review'],
+  ])('finds an agent by %s', (_, query) => {
+    expect(seen(query)).toBe(true)
+  })
+
+  it.each([
+    ['cafe', 'Café con leche'],
+    ['ÁRBOL', 'arbol de pruebas'],
+  ])('finds %o in %o whatever the case and the accents', (query, title) => {
+    expect(seen(query, agent(1, 'working', { title }))).toBe(true)
+  })
+
+  it.each([
+    ['its title', 'write form'],
+    ['its role, its label', 'coder'],
+  ])('finds a member of a flow by %s', (_, query) => {
+    expect(seen(query, FLOW[1])).toBe(true)
+  })
+
+  it('finds a member without a title by the name of the agent, its label', () => {
+    expect(seen('codex reviewer', FLOW[2])).toBe(true)
+  })
+
+  it('needs every word to be somewhere', () => {
+    expect(seen('shop CART claude')).toBe(true)
+    expect(seen('shop cart billing')).toBe(false)
+  })
+
+  it.each([
+    ['a role', { role: null }],
+    ['a title', { title: null }],
+  ])('skips %s the agent does not have', (_, more) => {
+    expect(seen('reviewer', agent(1, 'working', more))).toBe(false)
+  })
+
+  it('takes every agent when there are no words', () => {
+    expect(seen('   ')).toBe(true)
+  })
+})
