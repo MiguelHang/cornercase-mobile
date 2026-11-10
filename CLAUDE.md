@@ -70,8 +70,9 @@ pnpm test                                         # vitest
   - **The emulator reaches the bridge** at the Mac's LAN or Tailscale address the bridge prints, not at `10.0.2.2`
     (`--loopback` prints `127.0.0.1`, which is the emulator itself). Paste the code into the form, or type it with
     `adb shell "input text '<piece>'"`, 16 characters at a time: longer text gets cut.
-- **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest and the two files of
-  `res/xml/` are changed by hand. `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
+- **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest, the two files of
+  `res/xml/` and `MainActivity.kt` (the keyboard's insets) are changed by hand. `minSdk` and the debug suffix live
+  in `tauri.conf.json` › `bundle.android`.
 
 ## Structure
 - `crates/core/`: pure, testable logic: transport trait, bridge protocol, CLI types over `--json`,

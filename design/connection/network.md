@@ -2,29 +2,40 @@
 
 A topic of [Connection](../connection.md). The app notices when the phone changes network and tells the active machine's `Store`, which then picks a route again within a second or two. Without this it would wait for the backoff (up to 15 s), or for the transport's 45 s of silence on a half-open socket.
 
-- **The path of a change**: the Swift plugin hears a new `NWPath` and sends `{kind, expensive}` through a channel to the plugin's Rust, which calls the app's callback. A task in the app reads those paths. The core's `Debounce` turns them into a `Decision`, which goes to `AppState` and to the active `Store`.
+- **The path of a change**: the plugin hears a new network, in Swift on iOS (`NWPath`) and in Kotlin on Android (`ConnectivityManager`), and sends `{kind, expensive}` through a channel to the plugin's Rust, which calls the app's callback. A task in the app reads those paths. The core's `Debounce` turns them into a `Decision`, which goes to `AppState` and to the active `Store`.
 
 ## The iOS plugin
 
-- **A Tauri plugin of our own in Swift** (`src-tauri/plugins/network/`, a crate of the workspace). The decision to go native, and the alternative rejected, are in `design/architecture.md`.
+- **A Tauri plugin of our own in Swift** (`src-tauri/plugins/network/`, a crate of the workspace). The decision to go native, and the alternative rejected, are in `design/architecture/plugins.md`.
   - **What it sends**: `NetworkPlugin.swift` starts an `NWPathMonitor` on a queue of its own. Each path that differs from the last one sent goes out as `{kind, expensive}`, the first path the monitor gives included.
   - **`kind`**: `none` when the path is not `satisfied`; otherwise the first interface type the path uses, checked as `wifi`, then `cellular`, then `other` (wired, loopback or a VPN alone).
   - **`expensive`** is the path's `isExpensive`.
   - **Only Rust talks to it**: the crate is laid out like `tauri plugin new --ios`, but with no JavaScript API, no commands and no permissions.
   - **Generated files stay out of git**: `build.rs` declares no commands, so the permissions `tauri-plugin` writes are ignored (`.gitignore`). So are `.tauri/`, where the build copies Tauri's Swift package, and `ios/.build`.
-- **A channel made in Rust**: `ios.rs` registers the plugin in its `setup`. It builds a `tauri::ipc::Channel` with `Channel::new`, whose handler reads the path and calls the app's callback, and hands it to Swift's `watch` with `run_mobile_plugin`.
+- **A channel made in Rust**: `mobile.rs`, shared by both phones, registers the plugin in its `setup` through the platform's `registered` (`ios.rs`, `android.rs`, which hold nothing else). It builds a `tauri::ipc::Channel` with `Channel::new`, whose handler reads the path and calls the app's callback, and hands it to the native `watch` with `run_mobile_plugin`.
   - Rejected: Swift's `trigger`. Its events reach only listeners that the WebView registers with `addPluginListener`, so every network change would go through the WebView and back.
-- **The callback holds no logic**: `init(on_path)` takes an `Fn(Network)`. The app's callback (`network::listen`) puts each path on an unbounded channel, read by a task on Tauri's runtime that `setup` starts once `AppState` is managed. Swift calls the callback on the monitor's queue, so nothing slow runs there.
+- **The callback holds no logic**: `init(on_path)` takes an `Fn(Network)`. The app's callback (`network::listen`) puts each path on an unbounded channel, read by a task on Tauri's runtime that `setup` starts once `AppState` is managed. Swift calls the callback on the monitor's queue, and Kotlin on a Binder thread, so nothing slow runs there.
 - **Other platforms build a stub** (`other.rs`), which registers the plugin and sends nothing.
   - Linux CI therefore compiles and tests the crate and the app.
   - With no paths, the app never thinks the network is down.
-  - Android's `ConnectivityManager` (032) becomes an `android.rs` behind the same callback, and reuses the debounce and the decisions.
-- **Swift is checked only on a Mac**: CI runs on Linux and never compiles it. Two local checks cover `ios.rs` and the package:
+- **Swift and Kotlin are checked only on a Mac**: CI runs on Linux and compiles neither. Local checks cover `mobile.rs`, `ios.rs`, `android.rs` and the native code:
   - `cargo clippy -p tauri-plugin-network --target aarch64-apple-ios-sim --all-targets`, and the same command for `cornercase-mobile`;
-  - a build for the simulator.
-  - Neither `scripts/check-rules.mjs` nor jscpd reads Swift, so its rule against comments is kept by hand (`design/code-layout.md`).
+  - a build for the simulator;
+  - for Android, the same clippy with `--target aarch64-linux-android` and the NDK's compiler (`CLAUDE.md`), and an APK built with `tauri android build`, which compiles the Kotlin.
+  - Neither `scripts/check-rules.mjs` nor jscpd reads Swift or Kotlin, so their rule against comments is kept by hand (`design/code-layout.md`).
   - `import Network` links the framework on its own, so `project.yml` is unchanged.
   - The package asks for swift-tools 5.9 and iOS 15, the app's minimum.
+
+## The Android plugin
+
+- **The same plugin in Kotlin** (032): an Android library in `android/`, laid out like `secrets`' (031), with `NetworkPlugin.kt`, and the same callback, debounce and decisions as iOS. The library's manifest asks for `ACCESS_NETWORK_STATE`, which `activeNetwork` and the callback need, though the app's asks for it too (the merger keeps one), so the plugin does not lean on the app's manifest. No JavaScript API, commands or Tauri permissions either.
+- **The default network, through one callback**: `registerDefaultNetworkCallback` (API 24, the app's `minSdk`) follows the network the system routes through, which is the one the app's sockets use; `onCapabilitiesChanged` gives its kind and cost, `onLost` its end. Rejected: `registerNetworkCallback` with a request, which hears every network and not which one wins; the old `CONNECTIVITY_ACTION` broadcast, deprecated since API 28.
+- **`kind` and `expensive`**: `wifi`, `cellular` or `other` by the first transport the capabilities have, in iOS's order; `none` once the default network is lost. `expensive` is "not `NOT_METERED`", which on Android is what may cost money, so a wifi marked as metered counts as expensive too.
+- **The first value by hand**: the callback says nothing at registration when there is no network, so `watch` reads `activeNetwork` and its capabilities before it registers, keeps them as the last value once the registration succeeds, then sends them (`none` without one). The callback's first value, the same network, is dropped as equal (below), so the start sends one value, as on iOS.
+- **Only meaningful changes** (`Seen`: the default `Network`, `kind`, `expensive` and whether a VPN is in it): `onCapabilitiesChanged` comes again and again for the same network as its signal or bandwidth moves, and `Changed` reconnects even when the value is the same as the last one (above), so each of those would cost a reconnection. A value equal to the last one sent is dropped; a new `Network` is sent even with the same `{kind, expensive}`, as iOS sends a new `NWPath`: one wifi to another, and entering or leaving Tailscale, which makes the VPN the default network (`TRANSPORT_VPN` with the transport underneath). `onLost` sends `none` only for the network last sent: the old default's loss, when another already took its place, says nothing. Rejected: sending every callback and leaving it to the debounce, which merges a burst but not a callback that comes alone later (seen in the emulator: a second `wifi` some 20 s after going to the background).
+- **One callback for the process**: the watcher is an `object` with its methods `@Synchronized`, registered by the first `watch` only; a later one, from an activity made again (`singleTask`) or another plugin instance, takes the new channel and sends it the last value. Unchecked live: the emulator never made the activity again.
+- **A failed send is logged** (`Logger.error`) and dropped, as in Swift.
+- **A failed registration is logged too** (a `RuntimeException`: a `SecurityException`, or too many callbacks for the app), and `watch` still resolves and sends the current network; the last value stays unset, so the next `watch` tries again. Rejected: letting it throw, which rejects the `watch`, fails the plugin's `setup` and with it the app's start, for a watcher the app can do without (it still reconnects on coming back to the foreground or when a stream drops; task 032's review).
 
 ## The debounce and the decisions
 
@@ -46,7 +57,7 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - `Changed` after a `none` calls `online()`; any other `Changed` calls `network_changed()`.
   - `Baseline` changes nothing in the `Store`.
   - Without an active `Store`, only `AppState` changes.
-- **One line per decision** on stderr, `cornercase-mobile: network <kind>[ expensive]`. On iOS it goes to the unified log, next to the connection's changes, so the time from a change to `connected` can be measured on an iPhone.
+- **One line per decision** on stderr, `cornercase-mobile: network <kind>[ expensive]`. On iOS it goes to the unified log, next to the connection's changes, and on Android to `logcat` under the tag `RustStdoutStderr`, so the time from a change to `connected` can be measured on a phone without a logger of its own (the task's P6).
 - **Tests**: `network::follow` and `apply` run on Tauri's `MockRuntime` with `FakeTransport`, on a paused clock. Only the simulator check below covers what CI cannot run: `follow_in_background`, the wiring in `run`, the plugin's `ios.rs` and the Swift.
 
 ## Offline
@@ -81,6 +92,7 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - Swift compares the whole `NWPath` (`Equatable`), not `{kind, expensive}`, so it does send that path.
   - The debounce counts every settled path after the baseline as a change, so that path reconnects like any other.
   - With Tailscale as the only network, `kind` is `other`, and the same holds.
+  - On Android the VPN becomes the default network, a new `Network` with `TRANSPORT_VPN`, so the plugin sends it (The Android plugin); its capabilities should also carry the transport underneath, which gives `kind`, else it is `other`. Unchecked live.
 - **False `none`**: `NWPathMonitor` sometimes reports `unsatisfied` for an instant, and in the simulator after the Mac sleeps.
   - The debounce keeps one that lasts less than a second from showing "No network". The path that follows it still settles as a change, so it costs a reconnection of about a second: the debounce cannot tell a false `none` from a move to another wifi, which looks the same.
   - A longer one shows "No network" until the next path, or until the return to the foreground (Offline, above).
@@ -94,12 +106,20 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - On the return from the background, the three old commands ended on the Mac and three new ones were running within half a second, none left over. No `network` line appeared: the monitor sends nothing on a return.
   - After `xcrun simctl terminate`, the next launch connects to the saved machine on its own.
   - So none of 013's checks regressed (Store › Checked live).
-- **Not checked: a real change of network.** The simulator shares the Mac's network and cannot move to cellular, and turning the Mac's wifi off would cut everything else running on it.
+- **Not checked on iOS: a real change of network.** The simulator shares the Mac's network and cannot move to cellular, and turning the Mac's wifi off would cut everything else running on it.
 - **Pending, for the user on an iPhone** (CA9 of task 028, or 029 if nobody does it before), each time measured from the `network` line to `connected`:
   - wifi → cellular with Tailscale, and cellular → wifi, with the board and the terminal open;
   - `none` and "No network" in the UI;
   - a change while an attempt is running;
   - entering and leaving Tailscale.
+
+- **In an Android emulator** on 2026-11-10 (arm64, Android 17, API 37, wifi and LTE at once, a debug APK, Tauri 2.12.5), against the bridge on the Mac's LAN address and a cornercase 0.13.19 of its own, with the board and then the terminal open:
+  - One value per change and nothing else: wifi off gives `cellular expensive`, data off `none`, data on `cellular expensive`, wifi on `wifi`; airplane mode gives `none`, then on its end `cellular expensive` and about 3 s later `wifi`. None in 30 s in the background nor on the way back. One callback of the app in `dumpsys connectivity`.
+  - With no network the bar says "No network" and does not retry; with one back the app reconnects on its own, the terminal too, which subscribes again and shows what was typed after.
+  - Time to `connected`: wifi → cellular 1.5–2.6 s; cellular back 1.4–1.8 s; wifi back 9–12 s, of which about 5 s is the emulator's wifi becoming the default network and the rest attempts the bridge cut (`Handshake not finished`, `Connection reset`) before the good one; airplane mode off, 2.5 s over cellular and one more reconnection once the wifi comes (10 s in all).
+  - The socket often drops before the change arrives: with the wifi gone the bar shows `Retrying in 1 s` before `cellular` comes, and the change reconnects all the same.
+- **After the review's fixes** (same day, emulator and versions, a debug APK without the bridge): the merged manifest asks for `ACCESS_NETWORK_STATE` once, and the registration in its `try` still gives one value per change (`cellular expensive` at the start, then `wifi`, wifi off `cellular expensive`, wifi on `wifi`). A failed registration was not provoked.
+- **Pending, on an Android phone**: the same changes with real radios, entering and leaving Tailscale, and one wifi to another (the emulator has one wifi and no VPN app).
 
 ## If the plugin breaks
 

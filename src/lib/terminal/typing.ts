@@ -3,7 +3,9 @@ import { pasted, physical, type InputEvent, type Pressed, type StickyCtrl } from
 
 export const SENTINEL = ' '
 
-export type Keydown = Pressed & Pick<KeyboardEvent, 'isComposing'>
+export type Keydown = Pressed & Pick<KeyboardEvent, 'isComposing' | 'keyCode'>
+
+const PROCESSED_BY_IME = 229
 
 export type Typed = Pick<globalThis.InputEvent, 'inputType' | 'data' | 'isComposing'> & {
   dataTransfer: Pick<DataTransfer, 'getData'> | null
@@ -46,7 +48,7 @@ export class Typing {
 
   keydown(pressed: Keydown): Step {
     this.#pressed = undefined
-    if (this.#composing || pressed.isComposing) return PASSED
+    if (this.#composing || pressed.isComposing || pressed.keyCode === PROCESSED_BY_IME) return PASSED
     const event = physical(pressed)
     if (event === null) return PASSED
     if ('key' in event) this.#pressed = event.key?.code

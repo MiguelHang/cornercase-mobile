@@ -1,17 +1,18 @@
 # Plugins of our own
 
-A topic of [Architecture](../architecture.md). Native code goes into Tauri plugins of our own, each a crate of the workspace in `src-tauri/plugins/` with its Swift or Kotlin, while Rust keeps the logic: `network` and `photos` on iOS, `secrets` on Android.
+A topic of [Architecture](../architecture.md). Native code goes into Tauri plugins of our own, each a crate of the workspace in `src-tauri/plugins/` with its Swift or Kotlin, while Rust keeps the logic: `network` on iOS and Android, `photos` on iOS, `secrets` on Android.
 
 - **Why a plugin**: a plugin is how Tauri 2 builds Swift and Kotlin into the app, with a stub on the other platforms so Linux CI compiles everything else; the logic stays in Rust, and the native code only reports or does what only the system can. None has a JavaScript API, commands or permissions: the WebView never sees them. Their cost is native code that CI does not test.
 
 ## `network`
 
-- **`src-tauri/plugins/network`** is the first, a crate with a Swift package in `ios/` that hears `NWPathMonitor` and hands each path to a callback of the app (`design/connection/network.md`). The debounce is in the core; the plugin only reports.
+- **`src-tauri/plugins/network`** is the first, a crate with a Swift package in `ios/` that hears `NWPathMonitor` and, since 032, an Android library in `android/` whose Kotlin hears `ConnectivityManager`, each handing every network to a callback of the app (`design/connection/network.md`). The debounce is in the core; the plugin only reports.
+- **One Rust for both phones**: the channel and the `watch` call are `mobile.rs`; `ios.rs` and `android.rs` only register the native class, so the two phones cannot drift.
 - Rejected, and kept as plan C: noticing the change from Rust without native code, as upstream does in `src/host/network.rs`, asking every ~2 s for the source address the system would use toward each route, through a `UdpSocket::connect` that sends nothing. It polls (it wakes the phone every 2 s instead of hearing an event), knows neither the kind of network nor its cost, and with Tailscale up its `utun` interface keeps an address with no network underneath, so it never sees `none`.
 
 ## `photos`
 
-- **`src-tauri/plugins/photos`** is the second: iOS's photo picker (`PHPickerViewController`) and the shrinking of the image chosen with ImageIO, in Swift, which hands Rust a file in the app's temporary folder (`design/chat.md` › Attaching an image). It is registered on every platform, not under `#[cfg(mobile)]`: off iOS its stub answers that only the iOS app has a photo picker, so the `attach` command builds and is tested on Linux CI (Android brings its own with 030–032). Like `network`, it has no JavaScript API nor permissions, so neither the image's bytes nor its path ever reach the WebView.
+- **`src-tauri/plugins/photos`** is the second: iOS's photo picker (`PHPickerViewController`) and the shrinking of the image chosen with ImageIO, in Swift, which hands Rust a file in the app's temporary folder (`design/chat.md` › Attaching an image). It is registered on every platform, not under `#[cfg(mobile)]`: off iOS its stub answers that only the iOS app has a photo picker, so the `attach` command builds and is tested on Linux CI (Android has no picker yet: none of 030–032 brought one). Like `network`, it has no JavaScript API nor permissions, so neither the image's bytes nor its path ever reach the WebView.
 - Rejected for the photos: Tauri's `tauri-plugin-dialog` (its image picker) with the `image` crate shrinking in Rust. Its picker copies the file as it is, and most photos of an iPhone's camera are HEIC, which `image` does not read and Claude does not take, so they would end in a refusal; it leaves the copy in Caches without removing it; the WebView calls it, so the path goes through JavaScript and needs a permission in `capabilities/`; and decoding a 48 MP photo whole in Rust takes about 190 MB of RGBA, where ImageIO's thumbnail reads only what the smaller image needs. ImageIO also applies the EXIF orientation and writes no metadata, with no new Rust dependency.
 
 ## `secrets`

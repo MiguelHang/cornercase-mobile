@@ -124,6 +124,7 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('a keyboard opening and closing', () => {
   const viewport = { height: FULL, offsetTop: 0, resized: () => {} }
   const screen = {
+    innerWidth: 411,
     innerHeight: FULL,
     visualViewport: {
       get height() {

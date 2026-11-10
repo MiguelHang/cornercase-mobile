@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ShownCtrl } from './ctrl.svelte'
 import Typist from './Typist.svelte'
 import typistSource from './Typist.svelte?raw'
+import { Typing, type Step } from './typing'
 
 const typist = (disabled = false) =>
   render(Typist, { props: { ctrl: new ShownCtrl(), send: () => {}, disabled } }).body
@@ -51,4 +52,85 @@ describe('Typist', () => {
       expect(flat(typistSource)).toContain(text)
     },
   )
+
+  it('cancels an event only when Typing says so', () => {
+    expect(typistSource).toContain('if (step.prevent) event.preventDefault()')
+  })
+})
+
+type Fired =
+  | ['keydown', string, number]
+  | ['keyup']
+  | ['beforeinput', string, string | null]
+  | ['compositionstart']
+  | ['compositionend', string]
+
+const BOARD: Fired[] = [
+  ...[...'ls '].flatMap((data): Fired[] => [
+    ['keydown', 'Unidentified', 229],
+    ['beforeinput', 'insertText', data],
+    ['keyup'],
+  ]),
+  ['keydown', 'Backspace', 8],
+  ['keyup'],
+  ['keydown', 'Unidentified', 229],
+  ['compositionstart'],
+  ['beforeinput', 'insertCompositionText', '-'],
+  ['beforeinput', 'insertCompositionText', '-a'],
+  ['compositionend', '-a'],
+  ['keyup'],
+  ['keydown', 'Enter', 229],
+  ['beforeinput', 'insertLineBreak', null],
+  ['keyup'],
+  ['keydown', 'Enter', 13],
+  ['keyup'],
+]
+
+const replayed = (fired: Fired[]) => {
+  const typing = new Typing(new ShownCtrl())
+  const step = (event: Fired): Step | null => {
+    if (event[0] === 'keydown') {
+      const [, key, keyCode] = event
+      const held = { ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, isComposing: false }
+      return typing.keydown({ key, keyCode, ...held })
+    }
+    if (event[0] === 'beforeinput') {
+      const [, inputType, data] = event
+      return typing.beforeinput({ inputType, data, isComposing: inputType.includes('Composition'), dataTransfer: null })
+    }
+    if (event[0] === 'compositionend') return typing.compositionend(event[1])
+    if (event[0] === 'compositionstart') typing.compositionstart()
+    else typing.keyup()
+    return null
+  }
+  return fired.map((event) => ({ event: event.slice(0, 2).join(' '), step: step(event) }))
+}
+
+describe('Typist with an Android keyboard: GBoard on the emulator, a composition and a processed Enter', () => {
+  const steps = replayed(BOARD)
+
+  it('sends each character, the delete, the composition and each of its two Enters once, in order', () => {
+    expect(steps.flatMap(({ step }) => step?.send ?? [])).toEqual([
+      { text: 'l' },
+      { text: 's' },
+      { text: ' ' },
+      { key: { code: 'backspace' } },
+      { text: '-a' },
+      { key: { code: 'enter' } },
+      { key: { code: 'enter' } },
+    ])
+  })
+
+  it('cancels no keydown the keyboard is still processing, so its input still comes', () => {
+    const processing = steps.filter((_, at) => {
+      const fired = BOARD[at]
+      return fired[0] === 'keydown' && fired[2] === 229
+    })
+    expect(processing.map(({ step }) => step?.prevent)).toEqual([false, false, false, false, false])
+  })
+
+  it('cancels no input of a composition, which the WebView cannot cancel', () => {
+    const composing = steps.filter(({ event }) => event === 'beforeinput insertCompositionText')
+    expect(composing.map(({ step }) => step?.prevent)).toEqual([false, false])
+  })
 })

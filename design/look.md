@@ -4,7 +4,7 @@ Follows cornercase-gpui's `design/widgets.md` and `src/theme.rs`: usecornercase.
 
 Topics, in `design/look/`:
 
-- [Navigation](look/navigation.md) (`src/lib/router.svelte.ts`, `src/lib/navigation.ts`, `src/lib/platform.ts`, `src/lib/backSwipe.ts`, `src/lib/edge.svelte.ts`): the router as state and its base, the ways in and back, the back button and its label, one `goBack`, the iOS edge swipe (thresholds, touch events, the shared edge, `translateX`, lifting), Android's variant, what was checked live and what was rejected.
+- [Navigation](look/navigation.md) (`src/lib/router.svelte.ts`, `src/lib/navigation.ts`, `src/lib/platform.ts`, `src/lib/backSwipe.ts`, `src/lib/edge.svelte.ts`, `src/lib/backButton.ts`): the router as state and its base, the ways in and back, the back button and its label, one `goBack`, the iOS edge swipe (thresholds, touch events, the shared edge, `translateX`, lifting), Android's variant and its system back, what was checked live and what was rejected.
 
 ## Tokens
 
