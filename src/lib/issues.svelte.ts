@@ -5,6 +5,7 @@ import type {
   SourceInfo_Serialize as SourceInfo,
   commands,
 } from './bindings'
+import { CAP } from './issueSweep'
 import { CHOICES_UNANSWERED, ask, type Reply } from './startForm.svelte'
 
 export type IssueCalls = Pick<typeof commands, 'issueSources' | 'issueList'>
@@ -21,7 +22,7 @@ export type WantedIssue = { project: number; source: string; key: string }
 
 export type IssueReading = { kind: 'reading' } | { kind: 'read'; read: ReadIssue } | { kind: 'failed'; reason: string }
 
-export const CAP = 100
+export { CAP }
 
 export const ANY_FILTERS: Filters = { closed: false, mine: false, source: null }
 
