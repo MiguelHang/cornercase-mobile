@@ -253,23 +253,25 @@ mod an_active_store {
         Arc::strong_count(marker) > 1
     }
 
-    struct Both {
+    struct Held {
         active: Active,
         changes: Arc<()>,
         terminal: Arc<()>,
+        question: Arc<()>,
     }
 
-    fn both() -> Both {
+    fn held() -> Held {
         let Running { mut active, .. } = running(1, idle);
-        let (changes, terminal) = (Arc::new(()), Arc::new(()));
+        let (changes, terminal, question) = (Arc::new(()), Arc::new(()), Arc::new(()));
         active.follow(2, task(&changes));
         active.show(3, task(&terminal));
-        Both { active, changes, terminal }
+        active.ask(3, task(&question));
+        Held { active, changes, terminal, question }
     }
 
     #[tokio::test(start_paused = true)]
     async fn keeps_following_changes_while_a_terminal_comes_and_goes() {
-        let Both { mut active, changes, terminal } = both();
+        let Held { mut active, changes, terminal, .. } = held();
         active.hide(3);
         released(&terminal).await;
         assert!(holds(&changes));
@@ -277,7 +279,7 @@ mod an_active_store {
 
     #[tokio::test(start_paused = true)]
     async fn keeps_the_terminal_while_changes_are_followed_again_and_dropped() {
-        let Both { mut active, changes, terminal } = both();
+        let Held { mut active, changes, terminal, .. } = held();
         let next = Arc::new(());
         active.follow(4, task(&next));
         released(&changes).await;
@@ -287,19 +289,46 @@ mod an_active_store {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn keeps_both_when_another_workspace_is_unfollowed_or_another_tab_hidden() {
-        let Both { mut active, changes, terminal } = both();
-        active.unfollow(3);
-        active.hide(2);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        assert!(holds(&changes) && holds(&terminal));
+    async fn keeps_the_question_of_a_tab_while_its_terminal_is_hidden() {
+        let Held { mut active, terminal, question, .. } = held();
+        active.hide(3);
+        released(&terminal).await;
+        assert!(holds(&question));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn stops_both_when_dropped() {
-        let Both { active, changes, terminal } = both();
+    async fn keeps_the_terminal_of_a_tab_while_its_question_is_dropped() {
+        let Held { mut active, terminal, question, .. } = held();
+        active.unask(3);
+        released(&question).await;
+        assert!(holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ends_the_previous_question_when_another_is_asked() {
+        let Held { mut active, terminal, question, .. } = held();
+        let next = Arc::new(());
+        active.ask(4, task(&next));
+        released(&question).await;
+        assert!(holds(&next) && holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_all_three_when_another_workspace_is_unfollowed_or_another_tab_hidden_or_unasked() {
+        let Held { mut active, changes, terminal, question } = held();
+        active.unfollow(3);
+        active.hide(2);
+        active.unask(2);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&changes) && holds(&terminal) && holds(&question));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_all_three_when_dropped() {
+        let Held { active, changes, terminal, question } = held();
         drop(active);
         released(&changes).await;
         released(&terminal).await;
+        released(&question).await;
     }
 }

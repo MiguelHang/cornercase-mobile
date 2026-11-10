@@ -36,6 +36,8 @@ pub(crate) struct Active {
     forwarder: JoinHandle<()>,
     terminal: Slot,
     changes: Slot,
+    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
+    question: Slot,
 }
 
 #[derive(Default)]
@@ -112,7 +114,15 @@ impl SharedMachines {
 
 impl Active {
     pub(crate) fn new(machine: MachineId, store: Store, driver: JoinHandle<()>, forwarder: JoinHandle<()>) -> Self {
-        Self { machine, store, driver, forwarder, terminal: Slot::default(), changes: Slot::default() }
+        Self {
+            machine,
+            store,
+            driver,
+            forwarder,
+            terminal: Slot::default(),
+            changes: Slot::default(),
+            question: Slot::default(),
+        }
     }
 
     pub(crate) fn machine(&self) -> MachineId {
@@ -137,6 +147,16 @@ impl Active {
 
     pub(crate) fn unfollow(&mut self, workspace: u64) {
         self.changes.empty(workspace);
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
+    pub(crate) fn ask(&mut self, tab: u64, question: JoinHandle<()>) {
+        self.question.fill(tab, question);
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "the question commands use it in the next change"))]
+    pub(crate) fn unask(&mut self, tab: u64) {
+        self.question.empty(tab);
     }
 }
 
