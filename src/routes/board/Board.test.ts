@@ -213,7 +213,7 @@ describe('Board', () => {
     expect(body.indexOf('</button>', fold)).toBeLessThan(body.indexOf('<button class="row'))
     expect(body.indexOf('<span class="folded')).toBeLessThan(body.indexOf('<button class="row'))
     expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
-    expect(flat(rowSource)).toContain('.fold { display: flex; flex: none; align-items: center; justify-content: center; min-width: 44px;')
+    expect(flat(rowSource)).toContain('.fold { display: flex; flex: 1; align-items: center; padding: 0 0 0 6px;')
     expect(flat(boardSource)).toContain('<AgentRow {item} {agents} {now} {onopen} onfold={fold} />')
     expect(flat(boardSource)).toContain('if (machine !== null) { folds.toggle(machine, boot, pane) }')
   })
@@ -264,7 +264,18 @@ describe('Board', () => {
     expect(body.match(/<div class="lead svelte-[\w-]+">/g)).toHaveLength(3)
     expect(body).not.toContain('slot')
     expect(rowSource).not.toContain('slot')
-    expect(flat(rowSource)).toContain('.lead { display: flex; flex: none; align-items: center; min-width: 44px; }')
+    expect(flat(rowSource)).toContain('.lead { position: relative; display: flex; flex: none; align-items: center; width: 60px; }')
+  })
+
+  it('lays the hidden count over the disclosure, so a tap on it folds and the column keeps its width', () => {
+    const body = draw(BRANCH)
+    const fold = body.indexOf('<button class="fold')
+    const count = body.indexOf('<span class="count')
+    expect(body.indexOf('</button>', fold)).toBeLessThan(count)
+    expect(body.indexOf('<span class="folded', count)).toBeGreaterThan(count)
+    expect(count).toBeLessThan(body.indexOf('<button class="row'))
+    expect(flat(rowSource)).toContain('.count { position: absolute; left: 24px; pointer-events: none; }')
+    expect(flat(rowSource)).toContain('.count :global(.marks) { gap: 4px; }')
   })
 
   it('leaves only the time on the right edge, and lets it shrink when the row runs out of room', () => {

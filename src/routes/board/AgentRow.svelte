@@ -41,7 +41,9 @@
           <Icon name="chevron-right" size={18} />
         </span>
       </button>
-      <Hidden hidden={item.hidden} attention={item.attention} />
+      <span class="count">
+        <Hidden hidden={item.hidden} attention={item.attention} />
+      </span>
     {/if}
   </div>
   <button class="row" type="button" onclick={() => onopen(row.pane)} ontouchstart={() => {}}>
@@ -90,20 +92,29 @@
   }
 
   .lead {
+    position: relative;
     display: flex;
     flex: none;
     align-items: center;
-    min-width: 44px;
+    width: 60px;
   }
 
   .fold {
     display: flex;
-    flex: none;
+    flex: 1;
     align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    padding: 0;
+    padding: 0 0 0 6px;
     color: var(--soft);
+  }
+
+  .count {
+    position: absolute;
+    left: 24px;
+    pointer-events: none;
+  }
+
+  .count :global(.marks) {
+    gap: 4px;
   }
 
   .chevron {
