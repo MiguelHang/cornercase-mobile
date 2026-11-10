@@ -120,6 +120,7 @@ mod blocks {
     #[case::with_one_row(&["Pick one"], vec![text("Pick one")])]
     #[case::with_a_row_wrapped_to_the_pane(&["Pick a", "fruit"], vec![text("Pick a fruit")])]
     #[case::with_a_row_that_ends_short(&["Hi", "there"], vec![text("Hi\nthere")])]
+    #[case::with_a_word_that_fits_only_without_the_space(&["abc", "defgh"], vec![text("abc defgh")])]
     #[case::with_an_indented_row_wrapped_inside_its_margin(&["  Hi", "  there"], vec![text("Hi there")])]
     #[case::with_a_blank_row_between_paragraphs(&["Pick", "", "", "Now"], vec![text("Pick"), text("Now")])]
     #[case::with_a_rule_dropped(&["────────", "Pick", "────────", "Now"], vec![text("Pick"), text("Now")])]
