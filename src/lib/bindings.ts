@@ -22,7 +22,9 @@ export const commands = {
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	markReviewed: (pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("mark_reviewed", { pane })),
-	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
+	attach: (pane: number) => typedError<AttachedImage_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
+	pasteAttached: (pane: number, id: number) => typedError<Pasted_Serialize, CommandError>(__TAURI_INVOKE("paste_attached", { pane, id })),
+	discard: (ids: number[]) => __TAURI_INVOKE<void>("discard", { ids }),
 	questionOpen: (tab: number, pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("question_open", { tab, pane })),
 	questionClose: (tab: number, pane: number) => __TAURI_INVOKE<void>("question_close", { tab, pane }),
 	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
@@ -124,6 +126,22 @@ export type AgentsChanged_Deserialize = {
 export type AgentsChanged_Serialize = {
 	machine: number,
 	agents: AgentRow_Serialize[] | null,
+};
+
+export type AttachedImage = AttachedImage_Serialize | AttachedImage_Deserialize;
+
+export type AttachedImage_Deserialize = {
+	id: number,
+	name: string,
+	bytes: number,
+	thumbnail?: string | null,
+};
+
+export type AttachedImage_Serialize = {
+	id: number,
+	name: string,
+	bytes: number,
+	thumbnail: string | null,
 };
 
 export type Button = "left" | "middle" | "right";
@@ -316,7 +334,7 @@ export type Entry_Serialize = {
 	status: Status_Serialize | null,
 };
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
 
 export type FileShown = FileShown_Serialize | FileShown_Deserialize;
 

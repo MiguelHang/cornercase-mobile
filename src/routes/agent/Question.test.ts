@@ -5,6 +5,7 @@ import { MACHINE, PANE, asked, fakeAsker, fresh, row, settle } from '../../lib/c
 import type { Question as Asked } from '../../lib/question.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
+import composerSource from './Composer.svelte?raw'
 import Question from './Question.svelte'
 import questionSource from './Question.svelte?raw'
 
@@ -37,6 +38,7 @@ const screen = (chat: Chat) =>
       connection: { state: 'connected', route: 'ws://mac:7000' },
       agents: null,
       onfailed: () => {},
+      ontoast: () => {},
       backTo: 'Agents',
       onback: () => {},
       onopen: () => {},
@@ -80,10 +82,10 @@ describe('Agent, its question', () => {
   })
 
   it('presses the option tapped and hands the reason of a failure over, to be told', () => {
-    expect(flat(agentSource)).toContain(
+    expect(flat(composerSource)).toContain(
       'const choose = async (number: number) => { const failed = await chat.pressOption(number) if (failed !== null) { onfailed(failed) } }',
     )
-    expect(flat(agentSource)).toContain('onoption={(number) => void choose(number)}')
+    expect(flat(composerSource)).toContain('onoption={(number) => void choose(number)}')
     expect(flat(questionSource)).toContain('onclick={() => onoption(option.number)}')
   })
 })

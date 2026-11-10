@@ -278,7 +278,7 @@ pub(crate) async fn connected_with(scripted: impl FnOnce(FakeTransport) -> FakeT
     settle().await;
     Ipc::new(state)
 }
-fn requests(fake: FakeTransport, answer: Option<Value>, lines: &Sender<String>) -> FakeTransport {
+pub(crate) fn requests(fake: FakeTransport, answer: Option<Value>, lines: &Sender<String>) -> FakeTransport {
     let lines = lines.clone();
     fake.script(REQUESTS, move |stdin, out| answer_lines(lines.clone(), answer.clone(), stdin, out))
 }

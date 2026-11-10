@@ -6,11 +6,13 @@
     label,
     value = $bindable(''),
     error,
+    bare = false,
     ...rest
   }: {
     label: string
     value?: string
     error?: string | null
+    bare?: boolean
   } & Omit<HTMLTextareaAttributes, 'value'> = $props()
 
   const id = $props.id()
@@ -18,7 +20,7 @@
 </script>
 
 {#snippet area()}
-  <div class="grow" data-value={value}>
+  <div class="grow" class:framed={!bare} data-value={value}>
     <textarea
       id={field ? `${id}-input` : undefined}
       class="area"
@@ -60,25 +62,35 @@
     box-sizing: border-box;
     min-height: 44px;
     max-height: 152px;
-    padding: 10px 12px;
-    border: 1px solid var(--edge);
+    padding: 11px 4px;
+    border: none;
     font: inherit;
     font-size: 16px;
     line-height: 22px;
   }
 
+  .framed .area,
+  .framed::after {
+    padding: 10px 12px;
+    border: 1px solid var(--edge);
+  }
+
   .area {
     overflow-y: auto;
     resize: none;
-    border-radius: var(--radius-control);
     outline: none;
-    background: var(--field);
+    background: none;
     color: var(--text);
     -webkit-user-select: text;
     user-select: text;
   }
 
-  .area:focus {
+  .framed .area {
+    border-radius: var(--radius-control);
+    background: var(--field);
+  }
+
+  .framed .area:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent);
   }

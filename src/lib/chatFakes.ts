@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { AttachImage } from './attach.svelte'
+import type { AttachImage, Discard, Images, PasteAttached } from './attach.svelte'
 import type {
   AgentRow_Serialize as AgentRow,
   CommandError,
@@ -77,7 +77,15 @@ export const fakeMarker = (answer: () => ReturnType<MarkReviewed> = () => marked
 
 export const PASTED_PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
 
-export const attachedOk: AttachImage = (pane) => Promise.resolve(ok({ pane, path: PASTED_PATH, bytes: 48213 }))
+export const THUMBNAIL = 'data:image/jpeg;base64,/9j/2w=='
+
+export const image = (id: number) => ({ id, name: 'IMG_0042.jpg', bytes: 48213, thumbnail: THUMBNAIL })
+
+export const attachedOk: AttachImage = () => Promise.resolve(ok(image(1)))
+
+export const pastedOk: PasteAttached = (pane) => Promise.resolve(ok({ pane, path: PASTED_PATH, bytes: 48213 }))
+
+export const discardedOk: Discard = () => Promise.resolve()
 
 export const still = (): HapticsApi => ({ impactFeedback: vi.fn(() => Promise.resolve(ok(null))) })
 
@@ -150,21 +158,31 @@ export type Calls = {
   pressKey?: PressKey
   markReviewed?: MarkReviewed
   attachImage?: AttachImage
+  pasteAttached?: PasteAttached
+  discard?: Discard
   haptics?: HapticsApi
   clock?: Clock
   asker?: Asker
 }
 
-export const fresh = ({
-  readLast = noRead,
-  sendText = sentOk,
-  pressKey = pressedOk,
-  markReviewed = markedOk,
-  attachImage = attachedOk,
-  haptics = still(),
-  clock = fakeClock().clock,
-  asker = fakeAsker().asker,
-}: Calls = {}) => new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, attachImage, haptics, clock, asker)
+const imagesOf = ({ attachImage = attachedOk, pasteAttached = pastedOk, discard = discardedOk }: Calls): Images => ({
+  attach: attachImage,
+  paste: pasteAttached,
+  discard,
+})
+
+export const fresh = (calls: Calls = {}) => {
+  const {
+    readLast = noRead,
+    sendText = sentOk,
+    pressKey = pressedOk,
+    markReviewed = markedOk,
+    haptics = still(),
+    clock = fakeClock().clock,
+    asker = fakeAsker().asker,
+  } = calls
+  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, imagesOf(calls), haptics, clock, asker)
+}
 
 export const seen = (calls: Calls = {}, status: string | null = 'done') => {
   const chat = fresh(calls)
@@ -177,7 +195,7 @@ export const ready = (sendText: SendText = sentOk, status: string | null = 'done
 
 export const settle = () => new Promise((resolve) => setTimeout(resolve))
 
-export const PASTED = ok({ pane: PANE, path: PASTED_PATH, bytes: 48213 })
+export const PASTED = ok(image(1))
 
 export const attached = async (sendText: SendText = sentOk, status: string | null = 'done') => {
   const chat = ready(sendText, status)

@@ -11,6 +11,7 @@
     backTo,
     agents,
     below = 0,
+    boxed = false,
     sendable,
     onback,
     onterminal,
@@ -22,6 +23,7 @@
     backTo: string | null
     agents: AgentRow[]
     below?: number
+    boxed?: boolean
     sendable: boolean
     onback: () => void
     onterminal: (row: AgentRow) => void
@@ -33,7 +35,7 @@
   let scrolled = $state(0)
   let tall = $state(0)
 
-  const compact = $derived(compactHeader(scrolled, tall))
+  const compact = $derived(boxed || compactHeader(scrolled, tall))
 
   $effect(() => {
     const seen = () => (scrolled = window.scrollY)
@@ -58,7 +60,7 @@
     <ToolButton label="New agent" icon="plus" disabled={!sendable} onclick={() => onstart(row.workspace)} />
   {/snippet}
 </NavBar>
-<header class="head" bind:clientHeight={tall}>
+<header class="head" class:spoken={boxed} bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
   <div class="lines">
     <h1 class="title">{label(row, agents)}</h1>

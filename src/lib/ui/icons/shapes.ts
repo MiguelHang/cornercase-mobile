@@ -54,13 +54,6 @@ export const icons = {
     { kind: 'line', x1: 10, y1: 11, x2: 10, y2: 17 },
     { kind: 'line', x1: 14, y1: 11, x2: 14, y2: 17 },
   ],
-  'image-plus': [
-    { kind: 'path', d: 'M16 5h6' },
-    { kind: 'path', d: 'M19 2v6' },
-    { kind: 'path', d: 'M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5' },
-    { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
-    { kind: 'circle', cx: 9, cy: 9, r: 2 },
-  ],
   check: [{ kind: 'path', d: 'M20 6 9 17l-5-5' }],
   plus: [
     { kind: 'path', d: 'M5 12h14' },
@@ -139,6 +132,21 @@ export const icons = {
     { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
     { kind: 'circle', cx: 9, cy: 9, r: 2 },
     { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
+  ],
+  x: [
+    { kind: 'path', d: 'M18 6 6 18' },
+    { kind: 'path', d: 'm6 6 12 12' },
+  ],
+  keyboard: [
+    { kind: 'path', d: 'M10 8h.01' },
+    { kind: 'path', d: 'M12 12h.01' },
+    { kind: 'path', d: 'M14 8h.01' },
+    { kind: 'path', d: 'M16 12h.01' },
+    { kind: 'path', d: 'M18 8h.01' },
+    { kind: 'path', d: 'M6 8h.01' },
+    { kind: 'path', d: 'M7 16h10' },
+    { kind: 'path', d: 'M8 12h.01' },
+    { kind: 'rect', x: 2, y: 4, width: 20, height: 16, rx: 2 },
   ],
 } satisfies Record<string, Shape[]>
 

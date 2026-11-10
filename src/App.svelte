@@ -9,6 +9,7 @@
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
+  import type { Images } from './lib/attach.svelte'
   import { backPressed, handled, watchBackButton } from './lib/backButton'
   import { backSwipes, RESTING, translated, watchBackSwipe, type Shift } from './lib/backSwipe'
   import { ChangesState } from './lib/changes.svelte'
@@ -52,6 +53,7 @@
   let shift = $state<Shift>(RESTING)
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
+  const images: Images = { attach: commands.attach, paste: commands.pasteAttached, discard: commands.discard }
   const asker: Asker = {
     open: commands.questionOpen,
     close: commands.questionClose,
@@ -73,7 +75,7 @@
           commands.send,
           commands.keys,
           commands.markReviewed,
-          commands.attach,
+          images,
           haptics,
           timers,
           asker,
@@ -152,6 +154,11 @@
     if (chat !== null && seen) {
       untrack(() => chat.refresh())
     }
+  })
+
+  $effect(() => {
+    const opened = chat
+    return () => opened?.leave()
   })
 
   $effect(() => {
@@ -436,6 +443,7 @@
             onback={goBack}
             onopen={open}
             onfailed={(message) => toasts.push({ level: 'error', message })}
+            ontoast={(toast) => toasts.push(toast)}
             onterminal={terminal}
             onchanges={review}
             onfiles={browse}
