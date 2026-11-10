@@ -3,12 +3,13 @@ import type {
   AgentChoice_Serialize as AgentChoice,
   CommandError,
   Place,
+  PlaceInfo_Serialize as PlaceInfo,
   ProjectChoice,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
   commands,
 } from './bindings'
-import type { StartingIssue } from './router.svelte'
+import type { StartingIssue, Where } from './router.svelte'
 import { messageOf } from './toasts'
 
 export type StartCalls = Pick<
@@ -25,6 +26,7 @@ export type WorkspaceOption = { id: number; project: number; label: string }
 export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export const WORKSPACE_EMPTY = 'Choose a workspace'
+export const PLACE_EMPTY = 'Choose where to start'
 export const BRANCH_EMPTY = 'Name the branch'
 export const AGENT_EMPTY = 'Choose an agent'
 export const PROMPT_EMPTY = 'Write what the agent should do'
@@ -59,6 +61,20 @@ const errorIf = (empty: boolean, error: string) => (empty ? error : null)
 
 const worktreeOf = (project: number, branch: string): Place => ({ kind: 'worktree', project, branch })
 
+export const placeKey = (place: PlaceInfo) =>
+  place.workspace === null ? `project-${place.project}` : `workspace-${place.workspace}`
+
+const placeOf = (place: PlaceInfo, branch: string): Place =>
+  place.workspace === null ? worktreeOf(place.project, branch) : { kind: 'workspace', workspace: place.workspace }
+
+const startedIn = ({ places, project, workspace }: Where) => {
+  const opened = places.find((place) => place.workspace !== null && place.workspace === workspace)
+  if (opened !== undefined || project !== null) {
+    return opened ?? places.find((place) => place.worktree && place.project === project)
+  }
+  return places.length === 1 ? places[0] : undefined
+}
+
 const optionsOf = (projects: ProjectChoice[]): WorkspaceOption[] =>
   projects.flatMap((project) =>
     project.workspaces.map((workspace) => ({
@@ -79,6 +95,8 @@ export class StartForm {
   ownWorktree = $state(false)
   issue = $state.raw<StartingIssue | null>(null)
   branch = $state('')
+  place = $state<string | null>(null)
+  placeError = $state<string | null>(null)
   workspaceError = $state<string | null>(null)
   branchError = $state<string | null>(null)
   agentError = $state<string | null>(null)
@@ -107,6 +125,22 @@ export class StartForm {
     return this.issue?.issue.branch ?? ''
   }
 
+  get placeChoices(): Choices<PlaceInfo> {
+    return { kind: 'ready', items: this.issue?.places ?? [] }
+  }
+
+  get chosenPlace() {
+    return this.issue?.places.find((place) => placeKey(place) === this.place)
+  }
+
+  placeName(place: PlaceInfo) {
+    if (!place.worktree) {
+      return `${place.label} · new tab`
+    }
+    const branch = this.branch.trim() === '' ? this.issueBranch : this.branch.trim()
+    return branch === '' ? `${place.label} · new worktree` : `${place.label} · new worktree on ${branch}`
+  }
+
   get workspaceChoices(): Choices<WorkspaceOption> {
     const projects = this.projects
     return projects.kind === 'ready' ? { kind: 'ready', items: optionsOf(projects.items) } : projects
@@ -125,6 +159,8 @@ export class StartForm {
     this.issue = issue
     this.project = issue.project
     this.branch = issue.issue.branch
+    const place = startedIn(issue)
+    this.place = place === undefined ? null : placeKey(place)
   }
 
   prefer(workspace: number) {
@@ -225,15 +261,16 @@ export class StartForm {
     if (this.sending || issue === null) {
       return
     }
+    const chosen = this.chosenPlace
+    this.placeError = errorIf(chosen === undefined, PLACE_EMPTY)
     this.agentError = errorIf(this.agent === '', AGENT_EMPTY)
     this.formError = null
     const { agent, model, branch, issueBranch } = this
-    if (this.agentError !== null) {
+    if (chosen === undefined || this.agentError !== null) {
       return
     }
     const { key, source } = issue.issue
-    const place = worktreeOf(issue.project, branch)
-    const form = { place, agent, model, key, source, issue_branch: issueBranch }
+    const form = { place: placeOf(chosen, branch), agent, model, key, source, issue_branch: issueBranch }
     await this.#launch(() => this.#calls.startIssue(form), agent)
   }
 

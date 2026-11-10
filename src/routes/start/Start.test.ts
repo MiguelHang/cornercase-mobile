@@ -53,7 +53,11 @@ const refusing = (message: string) => () =>
 
 const READ = comments as ReadIssue
 
-const COUPON: StartingIssue = { project: 2, issue: READ.issue, prompt: READ.prompt }
+const API = { project: 2, workspace: null, label: 'api', worktree: true }
+
+const LOGIN = { project: 2, workspace: 9, label: 'api › Login', worktree: false }
+
+const COUPON: StartingIssue = { project: 2, places: [LOGIN, API], issue: READ.issue, prompt: READ.prompt }
 
 const screen = (
   form: StartForm,
@@ -74,8 +78,13 @@ const screen = (
     },
   }).body
 
-const onIssue = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED) =>
-  screen(form, connection, COUPON)
+const onIssue = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED, issue = COUPON) =>
+  screen(form, connection, issue)
+
+const OPTION = /<option value="([^"]*)"( selected)?[^>]*>([^<]*)<\/option>/g
+
+const optionsOf = (body: string) =>
+  [...body.matchAll(OPTION)].map(([, value, selected, name]) => `${selected === undefined ? ' ' : '*'}${value} ${name}`)
 
 const showIssues = (sendable = true) => render(ShowIssues, { props: { sendable, onshow: () => {} } }).body
 
@@ -276,7 +285,7 @@ describe('Start, on an issue', () => {
     const body = onIssue(await formOf())
     expect(body).not.toContain('aria-label="What to start"')
     expect(body).not.toContain('Show issues')
-    expect(labels(body)).toEqual(['Agent', 'Model', 'Branch'])
+    expect(labels(body)).toEqual(['Where', 'Branch', 'Agent', 'Model'])
     expect(body).not.toContain('<textarea')
     expect(label(submit(body))).toBe('Start')
   })
@@ -295,6 +304,41 @@ describe('Start, on an issue', () => {
     )
   })
 
+  it("offers where to start it, at first in a new worktree of the issue's project, on the issue's branch", async () => {
+    const body = onIssue(await formOf())
+    expect(optionsOf(body).filter((option) => option.includes('workspace-') || option.includes('project-'))).toEqual([
+      ' workspace-9 api › Login · new tab',
+      '*project-2 api · new worktree on issue-41-checkout-forgets-the-coupon',
+    ])
+  })
+
+  it('starts it in the workspace Start was opened on, in a new tab with no branch', async () => {
+    const body = flat(onIssue(await formOf(), CONNECTED, { ...COUPON, workspace: 9 }))
+    expect(optionsOf(body)).toContain('*workspace-9 api › Login · new tab')
+    expect(labels(body)).toEqual(['Where', 'Agent', 'Model'])
+    expect(body).toMatch(/<p class="note[^"]*">The agent starts in a new tab there.<\/p>/)
+  })
+
+  it('says cornercase names the branch when the issue has none', async () => {
+    const body = flat(onIssue(await formOf(), CONNECTED, { ...COUPON, issue: { ...READ.issue, branch: '' } }))
+    expect(body).toMatch(/<p class="note[^"]*">Left empty, cornercase names the branch.<\/p>/)
+  })
+
+  it('asks where to start it under Where when no place is chosen', async () => {
+    const form = await formOf()
+    onIssue(form, CONNECTED, { ...COUPON, project: null, places: [LOGIN, API] })
+    await form.startIssue()
+    const body = screen(form)
+    expect(errorOf(body, 'Where')).toBe('Choose where to start')
+    expect(labels(body)).toEqual(['Where', 'Agent', 'Model'])
+    expect(body).not.toContain('note')
+  })
+
+  it('says there is nowhere to start it when there is no place', async () => {
+    const body = onIssue(await formOf(), CONNECTED, { ...COUPON, places: [] })
+    expect(body).toContain('There is no place to start an agent on this issue.')
+  })
+
   it('folds the prompt cornercase will use, to read and not to change', async () => {
     const body = onIssue(await formOf())
     expect(body).toMatch(
@@ -309,7 +353,7 @@ describe('Start, on an issue', () => {
     void form.startIssue()
     expect(submit(body())?.[1]).toContain('aria-busy="true"')
     expect(label(submit(body()))).toBe('Starting…')
-    expect(body().match(/<(?:input|select)[^>]*disabled=""/g)).toHaveLength(3)
+    expect(body().match(/<(?:input|select)[^>]*disabled=""/g)).toHaveLength(4)
   })
 
   it('shows what the server says and keeps the branch typed', async () => {
@@ -340,6 +384,23 @@ describe('Start, on an issue', () => {
     onIssue(form)
     await form.startIssue()
     expect(onstarted.mock.calls).toEqual([[started, 'claude']])
+  })
+
+  it("sends a new worktree of the issue's project, or the workspace chosen", async () => {
+    const startIssue = vi.fn(() => answer({ project: 2, workspace: 3, tab: 4, pane: 5, warning: null }))
+    const sent = async (place: string) => {
+      const form = await formOf({ startIssue })
+      onIssue(form)
+      form.place = place
+      await form.startIssue()
+    }
+    await sent('project-2')
+    await sent('workspace-9')
+    const issue = { agent: 'claude', model: '', key: '#41', source: 'github', issue_branch: READ.issue.branch }
+    expect(startIssue.mock.calls).toEqual([
+      [{ ...issue, place: { kind: 'worktree', project: 2, branch: READ.issue.branch } }],
+      [{ ...issue, place: { kind: 'workspace', workspace: 9 } }],
+    ])
   })
 })
 

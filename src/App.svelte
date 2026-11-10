@@ -20,7 +20,7 @@
   import { latestWins } from './lib/join'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
-  import { openedTerminal, Router, routeFor, type StartingIssue } from './lib/router.svelte'
+  import { openedTerminal, Router, routeFor, type Route, type StartingIssue, type Where } from './lib/router.svelte'
   import type { Asker } from './lib/question.svelte'
   import { openScanner } from './lib/scanner.svelte'
   import { Toasts } from './lib/toasts.svelte'
@@ -308,9 +308,13 @@
 
   const openIssue = (row: Found) => {
     if (issues !== null) {
-      router.go({ name: 'issue', machine: issues.machine, project: row.project, key: row.key, source: row.source })
+      const { project, repository, key, source } = row
+      router.go({ name: 'issue', machine: issues.machine, project, repository, key, source })
     }
   }
+
+  const whereOf = (shown: Extract<Route, { name: 'issue' }>): Where =>
+    issues?.whereOf(shown, router.latest('start')?.workspace) ?? { project: null, places: [] }
 
   const startOn = (starting: StartingIssue) => {
     if (issue !== null) {
@@ -461,7 +465,7 @@
         {/if}
       {:else if route.name === 'issue'}
         {#if issue !== null}
-          <Issue {issue} {backTo} onback={goBack} onstart={startOn} />
+          <Issue {issue} where={whereOf(route)} {backTo} onback={goBack} onstart={startOn} />
         {/if}
       {:else if route.name === 'machines'}
         <Machines

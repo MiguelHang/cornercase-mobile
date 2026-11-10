@@ -20,6 +20,7 @@ import {
   type Swept,
   type Wanted,
 } from './issueSweep'
+import type { Where } from './router.svelte'
 import { CHOICES_UNANSWERED, ask, type Reply } from './startForm.svelte'
 
 export type IssueCalls = Pick<typeof commands, 'startProjects' | 'issueSources' | 'issueList'>
@@ -133,8 +134,10 @@ export class IssuesState {
     return this.#projects.find((known) => known.id === project)?.name ?? `${project}`
   }
 
-  placesOf(project: number | null) {
-    return project === null ? this.places : this.places.filter((place) => place.project === project)
+  whereOf(issue: { project: number; repository: boolean }, workspace?: number): Where {
+    const project = issue.repository ? issue.project : null
+    const places = project === null ? this.places : this.places.filter((place) => place.project === project)
+    return { project, places, workspace }
   }
 
   load() {

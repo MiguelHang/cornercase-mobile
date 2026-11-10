@@ -259,7 +259,7 @@ describe('IssuesState across projects', () => {
     ])
   })
 
-  it('gives the places of a project, or every place', async () => {
+  it('starts an issue of GitHub or GitLab only in its project, and one of a tracker of the account anywhere', async () => {
     const place = (project: number, workspace: number | null, label: string): PlaceInfo => ({
       project,
       workspace,
@@ -272,7 +272,15 @@ describe('IssuesState across projects', () => {
       answered({ ...sources(tracker('github')), project, places }),
     )
     const { state } = await opened(calls)
-    expect([state.placesOf(null), state.placesOf(NOTES), state.placesOf(99)]).toEqual([places, [places[1]], []])
+    expect([
+      state.whereOf({ project: NOTES, repository: false }, 3),
+      state.whereOf({ project: NOTES, repository: true }, 3),
+      state.whereOf({ project: 99, repository: true }),
+    ]).toEqual([
+      { project: null, places, workspace: 3 },
+      { project: NOTES, places: [places[1]], workspace: 3 },
+      { project: 99, places: [], workspace: undefined },
+    ])
   })
 })
 

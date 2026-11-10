@@ -1,4 +1,8 @@
-import type { AgentRow_Serialize as AgentRow, IssueInfo_Serialize as IssueInfo } from './bindings'
+import type {
+  AgentRow_Serialize as AgentRow,
+  IssueInfo_Serialize as IssueInfo,
+  PlaceInfo_Serialize as PlaceInfo,
+} from './bindings'
 import type { Screen } from './connection'
 
 export type Route =
@@ -14,9 +18,11 @@ export type Route =
   | { name: 'files'; machine: number; workspace: number; title: string }
   | { name: 'file'; machine: number; workspace: number; path: string }
   | { name: 'issues'; machine: number }
-  | { name: 'issue'; machine: number; project: number; key: string; source: string }
+  | { name: 'issue'; machine: number; project: number; repository: boolean; key: string; source: string }
 
-export type StartingIssue = { project: number; issue: IssueInfo; prompt: string }
+export type Where = { project: number | null; places: PlaceInfo[]; workspace?: number }
+
+export type StartingIssue = Where & { issue: IssueInfo; prompt: string }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 

@@ -192,18 +192,21 @@ describe('App wiring', () => {
     )
   })
 
-  it('lists the issues on the machine of Start, opens a tapped one with its project and starts on it', () => {
+  it('lists the issues on the machine of Start, opens a tapped one with its project and starts on it where it may, from the workspace Start was opened on', () => {
     expect(source).toContain(
       "const listIssues = () => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine }) } }",
     )
     expect(source).toContain(
-      "const openIssue = (row: Found) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: row.project, key: row.key, source: row.source }) } }",
+      "const openIssue = (row: Found) => { if (issues !== null) { const { project, repository, key, source } = row router.go({ name: 'issue', machine: issues.machine, project, repository, key, source }) } }",
+    )
+    expect(source).toContain(
+      "const whereOf = (shown: Extract<Route, { name: 'issue' }>): Where => issues?.whereOf(shown, router.latest('start')?.workspace) ?? { project: null, places: [] }",
     )
     expect(source).toContain(
       "const startOn = (starting: StartingIssue) => { if (issue !== null) { router.go({ name: 'start', machine: issue.machine, issue: starting }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'issues'} {#if issues !== null} <Issues {issues} {backTo} onback={goBack} onopen={openIssue} /> {/if} {:else if route.name === 'issue'} {#if issue !== null} <Issue {issue} {backTo} onback={goBack} onstart={startOn} /> {/if} {:else if route.name === 'machines'}",
+      "{:else if route.name === 'issues'} {#if issues !== null} <Issues {issues} {backTo} onback={goBack} onopen={openIssue} /> {/if} {:else if route.name === 'issue'} {#if issue !== null} <Issue {issue} where={whereOf(route)} {backTo} onback={goBack} onstart={startOn} /> {/if} {:else if route.name === 'machines'}",
     )
   })
 
