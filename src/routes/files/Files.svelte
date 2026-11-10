@@ -1,8 +1,8 @@
 <script lang="ts">
   import { CLOSED } from '../../lib/changes.svelte'
   import { ROOT, type FilesState, type Row } from '../../lib/files.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
+  import SearchField from '../../lib/ui/SearchField.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import EntryRow from './EntryRow.svelte'
   import SearchResults from './SearchResults.svelte'
@@ -34,22 +34,11 @@
   {#if files.gone}
     <p class="note">{CLOSED}.</p>
   {:else}
-    <label class="search">
-      <Icon name="search" size={18} />
-      <input
-        class="query"
-        type="search"
-        aria-label="Search files"
-        placeholder="Search files"
-        autocomplete="off"
-        autocapitalize="off"
-        autocorrect="off"
-        spellcheck="false"
-        enterkeyhint="search"
-        value={files.query}
-        oninput={(event) => files.find(event.currentTarget.value)}
-      />
-    </label>
+    <SearchField
+      label="Search files"
+      value={files.query}
+      oninput={(event) => files.find(event.currentTarget.value)}
+    />
     {#if files.results !== null}
       <SearchResults results={files.results} {onopen} />
     {:else if rows.length > 0}
@@ -72,43 +61,6 @@
     flex-direction: column;
     gap: var(--inset-wide);
     padding: var(--gap) var(--inset-wide) 40px;
-  }
-
-  .search {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid var(--edge);
-    border-radius: var(--radius-control);
-    background: var(--field);
-    color: var(--faint);
-  }
-
-  .search:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent);
-  }
-
-  .query {
-    flex: 1;
-    min-width: 0;
-    min-height: 42px;
-    padding: 0;
-    border: none;
-    outline: none;
-    background: none;
-    color: var(--text);
-    font: inherit;
-    font-size: 16px;
-    -webkit-user-select: text;
-    user-select: text;
-  }
-
-  .query::placeholder {
-    color: var(--faint);
   }
 
   .entries {

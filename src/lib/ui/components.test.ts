@@ -8,6 +8,7 @@ import Field from './Field.svelte'
 import Glass from './Glass.svelte'
 import Icon from './Icon.svelte'
 import Labelled from './Labelled.svelte'
+import SearchField from './SearchField.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
 import ToolButton from './ToolButton.svelte'
@@ -17,6 +18,7 @@ import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import labelledSource from './Labelled.svelte?raw'
+import searchFieldSource from './SearchField.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
 import toolButtonSource from './ToolButton.svelte?raw'
@@ -210,6 +212,39 @@ describe('Field', () => {
     '.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
   ])('holds %s', (text) => {
     expect(flat(fieldSource)).toContain(text)
+  })
+})
+
+describe('SearchField', () => {
+  const body = render(SearchField, { props: { label: 'Search issues', value: 'pay' } }).body
+
+  it('draws the search icon before a search input named and hinted by its label', () => {
+    expect(body).toMatch(/<label class="search svelte-[\w-]+"><svg [^>]*width="18"[^]*?<\/svg>(?:<!--[^>]*-->| )*<input /)
+    expect(body).toMatch(
+      /<input class="query svelte-[\w-]+" type="search" aria-label="Search issues" placeholder="Search issues"/,
+    )
+    expect(body).toContain('value="pay"')
+  })
+
+  it('stops iOS from correcting or completing the query, and offers Search on the return key', () => {
+    expect(body).toContain(
+      'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"',
+    )
+  })
+
+  it('binds its value and passes each input on', () => {
+    expect(searchFieldSource).toContain("value = $bindable('')")
+    expect(flat(searchFieldSource)).toContain('bind:value {oninput} />')
+  })
+
+  it.each([
+    'min-height: 44px; padding: 0 12px; border: 1px solid var(--edge);',
+    '.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
+    'font-size: 16px;',
+    '-webkit-user-select: text; user-select: text;',
+    '.query::placeholder { color: var(--faint); }',
+  ])('holds %s', (text) => {
+    expect(flat(searchFieldSource)).toContain(text)
   })
 })
 
