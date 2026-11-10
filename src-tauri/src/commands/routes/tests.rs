@@ -270,11 +270,12 @@ mod removing_a_route {
     async fn of_another_machine_keeps_the_connection() {
         let studio = Studio::new();
         let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
-        add_route(&studio.state, Recorder::default(), &recording().0, laptop, NEW_TOKEN).expect("added");
+        let tailscale = "ws://100.101.102.103:9000/?token=bGFwdG9wLXNlY3JldA";
+        add_route(&studio.state, Recorder::default(), &recording().0, laptop, tailscale).expect("added");
         let recorder = Recorder::default();
         start(&studio.state, recorder.clone(), &recording().0, studio.id).expect("connecting");
         settle().await;
-        remove_route(&studio.state, recorder.clone(), &recording().0, laptop, ADDRESS).expect("removed");
+        remove_route(&studio.state, recorder.clone(), &recording().0, laptop, TAILSCALE_ADDRESS).expect("removed");
         settle().await;
         assert_eq!(urls(&studio.state, laptop), [LAPTOP_ADDRESS]);
         assert_eq!(recorder.connections(), once_connected(&studio));
