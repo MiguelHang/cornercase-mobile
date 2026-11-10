@@ -1,6 +1,7 @@
 use crate::error::Error;
 
 pub mod file;
+pub mod hex;
 #[cfg(test)]
 pub(crate) mod memory;
 

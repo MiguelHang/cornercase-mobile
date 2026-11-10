@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -10,6 +9,7 @@ use serde_json::Value;
 use serde_json::error::Category;
 
 use super::Secrets;
+use super::hex::{decoded, encoded};
 use crate::error::Error;
 use crate::files::write_atomically;
 
@@ -63,7 +63,7 @@ impl FileSecrets {
 
 impl Secrets for FileSecrets {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Error> {
-        self.entries()?.get(key).map(|hex| decoded(hex)).transpose()
+        self.entries()?.get(key).map(|hex| readable(hex)).transpose()
     }
 
     fn set(&self, key: &str, value: &[u8]) -> Result<(), Error> {
@@ -86,6 +86,10 @@ fn entries_in(text: &[u8]) -> Result<Entries, Error> {
     serde_json::from_value(stored.secrets).map_err(|error| shapeless(&error))
 }
 
+fn readable(hex: &str) -> Result<Vec<u8>, Error> {
+    decoded(hex).map_err(|_| Error::Secrets("a secret in the secrets file is not hex".to_owned()))
+}
+
 fn shapeless(error: &serde_json::Error) -> Error {
     match error.classify() {
         Category::Data => Error::Secrets("the secrets file does not hold the expected fields".to_owned()),
@@ -93,29 +97,6 @@ fn shapeless(error: &serde_json::Error) -> Error {
             Error::Secrets(format!("the secrets file is not JSON (line {}, column {})", error.line(), error.column()))
         }
     }
-}
-
-fn encoded(value: &[u8]) -> String {
-    value.iter().fold(String::with_capacity(value.len() * 2), |mut text, byte| {
-        let _ = write!(text, "{byte:02x}");
-        text
-    })
-}
-
-fn decoded(hex: &str) -> Result<Vec<u8>, Error> {
-    let (pairs, rest) = hex.as_bytes().as_chunks::<2>();
-    let bytes: Option<Vec<u8>> = pairs.iter().copied().map(byte).collect();
-    bytes
-        .filter(|_| rest.is_empty())
-        .ok_or_else(|| Error::Secrets("a secret in the secrets file is not hex".to_owned()))
-}
-
-fn byte([high, low]: [u8; 2]) -> Option<u8> {
-    Some((nibble(high)? << 4) | nibble(low)?)
-}
-
-fn nibble(digit: u8) -> Option<u8> {
-    char::from(digit).to_digit(16).and_then(|value| u8::try_from(value).ok())
 }
 
 #[cfg(test)]
