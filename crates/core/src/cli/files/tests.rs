@@ -3,6 +3,7 @@ use serde_json::{Value, json};
 
 use super::*;
 use crate::cli::files::fixtures::{IMAGE, LISTING, SEARCH, TEXT};
+use crate::transport::fake::FakeTransport;
 
 fn listing(text: &str) -> Listing {
     serde_json::from_str(text).expect("a files listing")
@@ -197,5 +198,104 @@ mod leniency {
             (image.format.as_str(), image.width, image.height, image.data.as_str()),
             ("WEBP", None, None, "UklG")
         );
+    }
+}
+
+mod the_arguments {
+    use super::*;
+
+    #[test]
+    fn list_the_root_as_a_dot() {
+        assert_eq!(list_args(3, &[""]), ["files", "list", "--workspace", "3", "--json", "--", "."]);
+    }
+
+    #[test]
+    fn list_several_folders_in_one_call() {
+        let argv = list_args(3, &["", "src", "src/cli"]);
+        assert_eq!(argv[6..], [".", "./src", "./src/cli"]);
+    }
+
+    #[rstest]
+    #[case::a_name_like_an_option("-x", "./-x")]
+    #[case::a_name_like_the_home("~/x", "./~/x")]
+    #[case::a_folder_named_like_the_home("~", "./~")]
+    #[case::a_name_with_spaces("my notes.txt", "./my notes.txt")]
+    fn read_a_file_as_a_path_inside_the_workspace(#[case] path: &str, #[case] expected: &str) {
+        assert_eq!(read_args(7, path), ["files", "read", "--workspace", "7", "--json", "--", expected]);
+    }
+
+    #[test]
+    fn list_a_folder_named_like_an_option_inside_the_workspace() {
+        assert_eq!(list_args(3, &["-x", "~/x"])[6..], ["./-x", "./~/x"]);
+    }
+
+    #[rstest]
+    #[case::a_word("main", "main")]
+    #[case::a_query_like_an_option("-rf", "-rf")]
+    #[case::a_query_like_the_home("~/x", "~/x")]
+    fn search_names_with_the_query_after_the_dashes(#[case] query: &str, #[case] expected: &str) {
+        let argv = search_args(9, query);
+        assert_eq!(argv, ["files", "search", "--names", "--workspace", "9", "--json", "--", expected]);
+    }
+}
+
+mod a_partial_answer {
+    use super::*;
+
+    const LIST: [&str; 7] = ["files", "list", "--workspace", "1", "--json", "--", "."];
+    const READ: [&str; 7] = ["files", "read", "--workspace", "1", "--json", "--", "./gone.txt"];
+
+    async fn listed(fake: &FakeTransport) -> Result<Listing, Error> {
+        partial_json(fake, list_args(1, &[""])).await
+    }
+
+    #[tokio::test]
+    async fn reads_a_listing_that_exits_with_0() {
+        let fake = FakeTransport::default().answer(&LIST, &[LISTING], &[], 0);
+        assert_eq!(listed(&fake).await, Ok(listing(LISTING)));
+    }
+
+    #[tokio::test]
+    async fn reads_a_listing_whose_folder_failed_with_exit_3() {
+        let fake = FakeTransport::default().answer(&LIST, &[LISTING], &["cannot list missing: no such folder"], 3);
+        let read = listed(&fake).await.expect("the listing");
+        assert_eq!(read.folders[1].error.as_deref(), Some("no such folder"));
+    }
+
+    #[tokio::test]
+    async fn reads_a_missing_file_that_exits_with_1() {
+        let line = json!({ "path": "./gone.txt", "kind": "missing" }).to_string();
+        let fake = FakeTransport::default().answer(&READ, &[&line], &["gone.txt: no such file"], 1);
+        let read: Read = partial_json(&fake, read_args(1, "gone.txt")).await.expect("the read file");
+        assert_eq!((read.path.as_str(), read.kind), ("./gone.txt", ReadKind::Missing));
+    }
+
+    #[rstest]
+    #[case::no_output(&[])]
+    #[case::not_json(&["error: no such workspace"])]
+    #[tokio::test]
+    async fn fails_with_the_stderr_when_it_prints_no_json(#[case] stdout: &[&str]) {
+        let fake = FakeTransport::default().answer(&LIST, stdout, &["error: no such workspace"], 2);
+        let failed = Error::Failed { code: 2, stderr: "error: no such workspace".to_owned() };
+        assert_eq!(listed(&fake).await, Err(failed));
+    }
+
+    #[tokio::test]
+    async fn calls_a_stale_boot_so_even_with_json() {
+        let fake = FakeTransport::default().answer(&LIST, &["{}"], &["error: stale boot"], 4);
+        assert_eq!(listed(&fake).await, Err(Error::StaleBoot("error: stale boot".to_owned())));
+    }
+
+    #[tokio::test]
+    async fn names_bad_json_after_a_success() {
+        let fake = FakeTransport::default().answer(&LIST, &["{\"folders\": 1}"], &[], 0);
+        let error = listed(&fake).await.expect_err("not a listing");
+        assert!(matches!(error, Error::Json(_)), "{error:?}");
+    }
+
+    #[tokio::test]
+    async fn passes_the_transport_error_on() {
+        let fake = FakeTransport::default().fail(&LIST, Error::Unauthorized);
+        assert_eq!(listed(&fake).await, Err(Error::Unauthorized));
     }
 }
