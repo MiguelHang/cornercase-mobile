@@ -3654,6 +3654,7 @@ version = "0.1.0"
 dependencies = [
  "cornercase-core",
  "rstest",
+ "serde",
  "tauri",
  "tauri-plugin",
 ]
