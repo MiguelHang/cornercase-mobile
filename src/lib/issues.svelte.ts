@@ -1,6 +1,7 @@
 import type {
   IssueInfo_Serialize as IssueInfo,
   Lists_Serialize as Lists,
+  ReadIssue_Serialize as ReadIssue,
   SourceInfo_Serialize as SourceInfo,
   commands,
 } from './bindings'
@@ -8,11 +9,17 @@ import { CHOICES_UNANSWERED, ask, type Reply } from './startForm.svelte'
 
 export type IssueCalls = Pick<typeof commands, 'issueSources' | 'issueList'>
 
+export type ReadCalls = Pick<typeof commands, 'issueRead'>
+
 export type Trackers = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; sources: SourceInfo[] }
 
 export type Filters = { closed: boolean; mine: boolean; source: string | null }
 
 export type Failure = { source: string; name: string; error: string }
+
+export type WantedIssue = { project: number; source: string; key: string }
+
+export type IssueReading = { kind: 'reading' } | { kind: 'read'; read: ReadIssue } | { kind: 'failed'; reason: string }
 
 export const CAP = 100
 
@@ -28,6 +35,19 @@ const matches = (issue: IssueInfo, terms: string[]) => {
 const sameFilters = (one: Filters, other: Filters) =>
   one.closed === other.closed && one.mine === other.mine && one.source === other.source
 
+class Sight {
+  #boot: string | null = null
+  #connected: boolean | null = null
+
+  changed(connected: boolean, boot: string | null) {
+    const back = connected && this.#connected === false
+    const restarted = boot !== null && this.#boot !== null && boot !== this.#boot
+    this.#connected = connected
+    this.#boot = boot ?? this.#boot
+    return back || restarted
+  }
+}
+
 export class IssuesState {
   readonly machine: number
   readonly project: number
@@ -41,8 +61,7 @@ export class IssuesState {
   #left = false
   #sourcesAsked = 0
   #listsAsked = 0
-  #boot: string | null = null
-  #connected: boolean | null = null
+  #sight = new Sight()
 
   constructor(machine: number, project: number, calls: IssueCalls) {
     this.machine = machine
@@ -123,11 +142,7 @@ export class IssuesState {
   }
 
   async see(connected: boolean, boot: string | null) {
-    const back = connected && this.#connected === false
-    const restarted = boot !== null && this.#boot !== null && boot !== this.#boot
-    this.#connected = connected
-    this.#boot = boot ?? this.#boot
-    if (back || restarted) {
+    if (this.#sight.changed(connected, boot)) {
       await this.refresh()
     }
   }
@@ -184,6 +199,64 @@ export class IssuesState {
     if (source !== null && !this.connected.some((tracker) => tracker.source === source)) {
       this.filters = { ...this.filters, source: null }
       this.lists = null
+    }
+  }
+}
+
+export class IssueState {
+  readonly machine: number
+  readonly project: number
+  readonly source: string
+  readonly key: string
+  reading = $state.raw<IssueReading>({ kind: 'reading' })
+  #calls: ReadCalls
+  #left = false
+  #asked = 0
+  #sight = new Sight()
+
+  constructor(machine: number, wanted: WantedIssue, calls: ReadCalls) {
+    this.machine = machine
+    this.project = wanted.project
+    this.source = wanted.source
+    this.key = wanted.key
+    this.#calls = calls
+  }
+
+  load() {
+    if (this.#left) {
+      return Promise.resolve()
+    }
+    this.reading = { kind: 'reading' }
+    return this.#read()
+  }
+
+  retry() {
+    return this.load()
+  }
+
+  async see(connected: boolean, boot: string | null) {
+    if (this.#sight.changed(connected, boot)) {
+      await this.#read()
+    }
+  }
+
+  stop() {
+    this.#left = true
+  }
+
+  async #read() {
+    if (this.#left) {
+      return
+    }
+    const asked = ++this.#asked
+    const reply = await ask(() => this.#calls.issueRead(this.project, this.source, this.key), CHOICES_UNANSWERED)
+    if (asked !== this.#asked || this.#left) {
+      return
+    }
+    if (reply.ok) {
+      this.reading = { kind: 'read', read: reply.data }
+    } else if (this.reading.kind !== 'read') {
+      this.reading = { kind: 'failed', reason: reply.error }
     }
   }
 }

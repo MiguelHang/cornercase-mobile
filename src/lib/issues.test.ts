@@ -5,10 +5,11 @@ import type {
   ListedInfo_Serialize as ListedInfo,
   ListFilter_Deserialize as ListFilter,
   Lists_Serialize as Lists,
+  ReadIssue_Serialize as ReadIssue,
   SourceInfo_Serialize as SourceInfo,
   Sources_Serialize as Sources,
 } from './bindings'
-import { ANY_FILTERS, CAP, IssuesState, type IssueCalls } from './issues.svelte'
+import { ANY_FILTERS, CAP, IssueState, IssuesState, type IssueCalls, type ReadCalls } from './issues.svelte'
 import { CHOICES_UNANSWERED } from './startForm.svelte'
 
 const MACHINE = 1
@@ -389,5 +390,160 @@ describe('IssuesState reading again', () => {
     await state.refresh()
     expect(state.trackers.kind).toBe('ready')
     expect([state.issues, state.error]).toEqual([[ACME_41, ACME_38], 'offline'])
+  })
+})
+
+const WANTED = { project: PROJECT, source: 'github', key: '#41' }
+
+const readIssue = (body: string): ReadIssue => ({
+  issue: ACME_41,
+  body,
+  comments: [{ author: 'linus', created_at: '2026-11-09T10:00:00Z', body: 'Seen on Safari too.' }],
+  prompt: `Work on #41: ${body}`,
+})
+
+const FIRST = readIssue('The coupon disappears at the last step.')
+const SECOND = readIssue('The coupon disappears, steps attached.')
+
+const reader = (answer: ReadCalls['issueRead'] = () => answered(FIRST)) => ({
+  issueRead: vi.fn<ReadCalls['issueRead']>(answer),
+})
+
+const shown = async (calls = reader()) => {
+  const state = new IssueState(MACHINE, WANTED, calls)
+  await state.load()
+  return { state, calls }
+}
+
+describe('IssueState reading', () => {
+  it('reads the issue it was asked for', async () => {
+    const { state, calls } = await shown()
+    expect(calls.issueRead).toHaveBeenCalledWith(PROJECT, 'github', '#41')
+    expect(state.reading).toEqual({ kind: 'read', read: FIRST })
+  })
+
+  it('says it is reading until cornercase answers', () => {
+    const pending = held<ReadIssue>()
+    const state = new IssueState(MACHINE, WANTED, reader(pending.call))
+    void state.load()
+    expect(state.reading).toEqual({ kind: 'reading' })
+  })
+
+  it.each<[string, () => Promise<Answer<ReadIssue>>, string]>([
+    ['the reason cornercase gives', () => refusal('there is no issue #41'), 'there is no issue #41'],
+    ['that cornercase did not answer', () => refusal('lost', 'unanswered'), CHOICES_UNANSWERED],
+    ['what the call threw', () => Promise.reject(new Error('bridge down')), 'bridge down'],
+  ])('says %s when the issue cannot be read', async (_, answer, reason) => {
+    const { state } = await shown(reader(answer))
+    expect(state.reading).toEqual({ kind: 'failed', reason })
+  })
+
+  it('reads the issue again on Try again', async () => {
+    const calls = reader(() => refusal('offline'))
+    const { state } = await shown(calls)
+    calls.issueRead.mockImplementation(() => answered(FIRST))
+    const again = state.retry()
+    expect(state.reading).toEqual({ kind: 'reading' })
+    await again
+    expect(state.reading).toEqual({ kind: 'read', read: FIRST })
+  })
+})
+
+describe('IssueState stale answers', () => {
+  it('drops an answer that arrives after a newer read', async () => {
+    const pending = held<ReadIssue>()
+    const state = new IssueState(MACHINE, WANTED, reader(pending.call))
+    void state.load()
+    void state.retry()
+    pending.answer(1, SECOND)
+    pending.answer(0, FIRST)
+    await settled()
+    expect(state.reading).toEqual({ kind: 'read', read: SECOND })
+  })
+
+  it('drops the answer once the screen left the issue', async () => {
+    const pending = held<ReadIssue>()
+    const state = new IssueState(MACHINE, WANTED, reader(pending.call))
+    void state.load()
+    state.stop()
+    pending.answer(0, FIRST)
+    await settled()
+    expect(state.reading).toEqual({ kind: 'reading' })
+  })
+
+  it('asks nothing once the screen left the issue', async () => {
+    const calls = reader()
+    const state = new IssueState(MACHINE, WANTED, calls)
+    state.stop()
+    await state.load()
+    await state.see(true, 'boot-1')
+    expect(calls.issueRead).not.toHaveBeenCalled()
+  })
+})
+
+describe('IssueState reading again', () => {
+  it.each<[string, [boolean, string | null][], number]>([
+    [
+      'the connection comes back',
+      [
+        [true, 'boot-1'],
+        [false, 'boot-1'],
+        [true, 'boot-1'],
+      ],
+      2,
+    ],
+    [
+      'the server restarted',
+      [
+        [true, 'boot-1'],
+        [true, 'boot-2'],
+      ],
+      2,
+    ],
+    [
+      'the boot is not known for a while',
+      [
+        [true, 'boot-1'],
+        [true, null],
+        [true, 'boot-1'],
+      ],
+      1,
+    ],
+    [
+      'nothing changed',
+      [
+        [true, 'boot-1'],
+        [true, 'boot-1'],
+      ],
+      1,
+    ],
+  ])('reads as many times as it should when %s', async (_, seen, times) => {
+    const { state, calls } = await shown()
+    for (const [connected, boot] of seen) {
+      await state.see(connected, boot)
+    }
+    expect(calls.issueRead).toHaveBeenCalledTimes(times)
+  })
+
+  it('keeps the issue it shows while it reads it again', async () => {
+    const pending = held<ReadIssue>()
+    const calls = reader()
+    const { state } = await shown(calls)
+    calls.issueRead.mockImplementation(pending.call)
+    await state.see(true, 'boot-1')
+    void state.see(true, 'boot-2')
+    expect(state.reading).toEqual({ kind: 'read', read: FIRST })
+    pending.answer(0, SECOND)
+    await settled()
+    expect(state.reading).toEqual({ kind: 'read', read: SECOND })
+  })
+
+  it('keeps the issue it shows when reading it again fails', async () => {
+    const calls = reader()
+    const { state } = await shown(calls)
+    calls.issueRead.mockImplementation(() => refusal('offline'))
+    await state.see(true, 'boot-1')
+    await state.see(true, 'boot-2')
+    expect(state.reading).toEqual({ kind: 'read', read: FIRST })
   })
 })
