@@ -2,6 +2,7 @@ import type { Answer } from './addMachine.svelte'
 import type {
   AgentChoice_Serialize as AgentChoice,
   CommandError,
+  Place,
   ProjectChoice,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
@@ -55,6 +56,8 @@ const projectsOf = (reply: Reply<StartChoices>): Reply<ProjectChoice[]> =>
   reply.ok ? { ok: true, data: reply.data.projects } : reply
 
 const errorIf = (empty: boolean, error: string) => (empty ? error : null)
+
+const worktreeOf = (project: number, branch: string): Place => ({ kind: 'worktree', project, branch })
 
 export class StartForm {
   projects = $state<Choices<ProjectChoice>>({ kind: 'loading' })
@@ -177,7 +180,7 @@ export class StartForm {
     if (project === null || this.agentError !== null || this.promptError !== null) {
       return
     }
-    const form = { project, agent, model, prompt, worktree }
+    const form = { place: worktreeOf(project, worktree), agent, model, prompt }
     await this.#launch(() => this.#calls.startAgent(form), agent)
   }
 
@@ -193,7 +196,8 @@ export class StartForm {
       return
     }
     const { key, source } = issue.issue
-    const form = { project: issue.project, agent, model, key, source, branch, issue_branch: issueBranch }
+    const place = worktreeOf(issue.project, branch)
+    const form = { place, agent, model, key, source, issue_branch: issueBranch }
     await this.#launch(() => this.#calls.startIssue(form), agent)
   }
 

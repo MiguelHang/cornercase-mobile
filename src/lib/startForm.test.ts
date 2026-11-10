@@ -269,7 +269,14 @@ describe('StartForm start', () => {
     form.agent = 'codex'
     await form.start()
     expect(commands.startAgent.mock.calls).toEqual([
-      [{ project: 2, agent: 'codex', model: ' opus ', prompt: 'fix the login\nand its tests', worktree: 'fix-login' }],
+      [
+        {
+          place: { kind: 'worktree', project: 2, branch: 'fix-login' },
+          agent: 'codex',
+          model: ' opus ',
+          prompt: 'fix the login\nand its tests',
+        },
+      ],
     ])
     expect(onstarted.mock.calls).toEqual([[STARTED, 'codex']])
     expect(memory.agent).toBe('codex')
@@ -392,12 +399,11 @@ describe('StartForm choosing a project for its issues', () => {
 
 describe('StartForm from an issue', () => {
   const sent = (branch: string, agent = 'claude', model = '') => ({
-    project: 9,
+    place: { kind: 'worktree', project: 9, branch },
     agent,
     model,
     key: 'sc-7',
     source: 'shortcut',
-    branch,
     issue_branch: 'ada/sc-7/refunds',
   })
 

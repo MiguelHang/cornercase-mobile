@@ -6,27 +6,38 @@ use crate::transport::json_error;
 #[cfg(test)]
 pub(crate) mod fixtures;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Place {
+    Workspace {
+        #[cfg_attr(feature = "specta", specta(type = u32))]
+        workspace: u64,
+    },
+    Worktree {
+        #[cfg_attr(feature = "specta", specta(type = u32))]
+        project: u64,
+        branch: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct StartAgent {
-    #[cfg_attr(feature = "specta", specta(type = u32))]
-    pub project: u64,
+    pub place: Place,
     pub agent: String,
     pub model: String,
     pub prompt: String,
-    pub worktree: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct StartIssue {
-    #[cfg_attr(feature = "specta", specta(type = u32))]
-    pub project: u64,
+    pub place: Place,
     pub agent: String,
     pub model: String,
     pub key: String,
     pub source: String,
-    pub branch: String,
     pub issue_branch: String,
 }
 
@@ -54,10 +65,27 @@ pub struct Started {
     pub warning: Option<String>,
 }
 
+impl Place {
+    fn target(&self) -> [String; 2] {
+        match self {
+            Self::Workspace { workspace } => ["--workspace".to_owned(), workspace.to_string()],
+            Self::Worktree { project, .. } => ["--project".to_owned(), project.to_string()],
+        }
+    }
+
+    fn branch(&self) -> &str {
+        match self {
+            Self::Workspace { .. } => "",
+            Self::Worktree { branch, .. } => branch,
+        }
+    }
+}
+
 impl StartAgent {
     pub fn argv(&self) -> Vec<String> {
-        let mut argv = words(&["start", self.agent.trim(), "--project", &self.project.to_string()]);
-        argv.extend(optional("--worktree", &self.worktree));
+        let mut argv = words(&["start", self.agent.trim()]);
+        argv.extend(self.place.target());
+        argv.extend(optional("--worktree", self.place.branch()));
         argv.extend(optional("--model", &self.model));
         argv.push(format!("--prompt={}", self.prompt.trim()));
         argv.extend(words(&["--placed", "--json"]));
@@ -67,7 +95,8 @@ impl StartAgent {
 
 impl StartIssue {
     pub fn argv(&self) -> Vec<String> {
-        let mut argv = words(&["start", self.agent.trim(), "--project", &self.project.to_string()]);
+        let mut argv = words(&["start", self.agent.trim()]);
+        argv.extend(self.place.target());
         argv.push(format!("--issue={}", self.key.trim()));
         argv.extend(optional("--source", &self.source));
         argv.extend(optional("--worktree", self.other_branch()));
@@ -77,7 +106,7 @@ impl StartIssue {
     }
 
     fn other_branch(&self) -> &str {
-        let branch = self.branch.trim();
+        let branch = self.place.branch().trim();
         if branch == self.issue_branch.trim() { "" } else { branch }
     }
 }

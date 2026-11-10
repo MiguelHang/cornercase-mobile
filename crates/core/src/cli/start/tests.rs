@@ -4,30 +4,34 @@ use serde_json::{Value, json};
 use super::*;
 use crate::cli::start::fixtures::{NEW_WORKSPACE, START};
 
-fn agent(model: &str, worktree: &str) -> StartAgent {
+fn worktree(branch: &str) -> Place {
+    Place::Worktree { project: 3, branch: branch.to_owned() }
+}
+
+const WORKSPACE: Place = Place::Workspace { workspace: 12 };
+
+fn agent(model: &str, branch: &str) -> StartAgent {
     StartAgent {
-        project: 3,
+        place: worktree(branch),
         agent: "claude".to_owned(),
         model: model.to_owned(),
         prompt: "fix the login".to_owned(),
-        worktree: worktree.to_owned(),
-    }
-}
-
-fn issue(model: &str, branch: &str) -> StartIssue {
-    StartIssue {
-        project: 3,
-        agent: "claude".to_owned(),
-        model: model.to_owned(),
-        key: "#41".to_owned(),
-        source: "github".to_owned(),
-        branch: branch.to_owned(),
-        issue_branch: "issue-41-checkout".to_owned(),
     }
 }
 
 fn workspace(name: &str, worktree: bool) -> NewWorkspace {
     NewWorkspace { project: 7, name: name.to_owned(), worktree }
+}
+
+fn issue(model: &str, branch: &str) -> StartIssue {
+    StartIssue {
+        place: worktree(branch),
+        agent: "claude".to_owned(),
+        model: model.to_owned(),
+        key: "#41".to_owned(),
+        source: "github".to_owned(),
+        issue_branch: "issue-41-checkout".to_owned(),
+    }
 }
 
 mod start {
@@ -39,6 +43,13 @@ mod start {
     #[case::worktree(agent("", "fix/login"), &["start", "claude", "--project", "3", "--worktree=fix/login", "--prompt=fix the login", "--placed", "--json"])]
     #[case::both(agent("opus", "fix/login"), &["start", "claude", "--project", "3", "--worktree=fix/login", "--model=opus", "--prompt=fix the login", "--placed", "--json"])]
     fn sends_the_model_and_the_branch_only_when_given(#[case] form: StartAgent, #[case] expected: &[&str]) {
+        assert_eq!(form.argv(), expected);
+    }
+
+    #[rstest]
+    #[case::without_a_model(StartAgent { place: WORKSPACE, ..agent("", "") }, &["start", "claude", "--workspace", "12", "--prompt=fix the login", "--placed", "--json"])]
+    #[case::with_a_model(StartAgent { place: WORKSPACE, ..agent("opus", "") }, &["start", "claude", "--workspace", "12", "--model=opus", "--prompt=fix the login", "--placed", "--json"])]
+    fn opens_a_tab_in_a_workspace_that_exists(#[case] form: StartAgent, #[case] expected: &[&str]) {
         assert_eq!(form.argv(), expected);
     }
 
@@ -57,11 +68,10 @@ mod start {
     #[test]
     fn trims_every_value() {
         let form = StartAgent {
-            project: 3,
+            place: worktree(" fix/it "),
             agent: " codex\n".to_owned(),
             model: "  gpt-5.5 ".to_owned(),
             prompt: "\n  fix it \n".to_owned(),
-            worktree: " fix/it ".to_owned(),
         };
         let expected = [
             "start",
@@ -111,6 +121,16 @@ mod start_issue {
         assert_eq!(form.argv(), after_the_head(rest));
     }
 
+    #[rstest]
+    #[case::without_a_model(issue("", "issue-41-checkout"), &["--placed", "--json"])]
+    #[case::with_a_model(issue("opus", ""), &["--model=opus", "--placed", "--json"])]
+    fn opens_a_tab_in_a_workspace_that_exists_without_a_branch(#[case] form: StartIssue, #[case] rest: &[&str]) {
+        let form = StartIssue { place: WORKSPACE, ..form };
+        let head = ["start", "claude", "--workspace", "12", "--issue=#41", "--source=github"];
+        let expected: Vec<&str> = head.iter().chain(rest).copied().collect();
+        assert_eq!(form.argv(), expected);
+    }
+
     #[test]
     fn leaves_out_a_blank_tracker() {
         let form = StartIssue { source: " ".to_owned(), ..issue("", "") };
@@ -140,6 +160,23 @@ mod new_workspace {
     #[case::spaces(workspace("  experiments \n", true), &["new-workspace", "--project", "7", "--worktree", "--json", "--", "experiments"])]
     fn names_the_workspace_after_a_double_dash(#[case] form: NewWorkspace, #[case] expected: &[&str]) {
         assert_eq!(form.argv(), expected);
+    }
+}
+
+mod place {
+    use super::*;
+
+    #[rstest]
+    #[case::workspace(json!({ "kind": "workspace", "workspace": 12 }), WORKSPACE)]
+    #[case::worktree(json!({ "kind": "worktree", "project": 3, "branch": "fix/login" }), worktree("fix/login"))]
+    fn reads_the_kind_of_place_the_app_sends(#[case] sent: Value, #[case] expected: Place) {
+        assert_eq!(serde_json::from_value::<Place>(sent).expect("a place"), expected);
+    }
+
+    #[test]
+    fn refuses_a_place_of_no_known_kind() {
+        let sent = json!({ "kind": "folder", "project": 3 });
+        assert!(serde_json::from_value::<Place>(sent).is_err());
     }
 }
 

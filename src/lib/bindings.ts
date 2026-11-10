@@ -749,6 +749,8 @@ export type Patch_Serialize = {
 	hunks: Hunk_Serialize[],
 } & ChangedFile_Serialize;
 
+export type Place = { kind: "workspace"; workspace: number } | { kind: "worktree"; project: number; branch: string };
+
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
@@ -928,11 +930,10 @@ export type Staged_Deserialize = "no" | "partly" | "yes" | string;
 export type Staged_Serialize = "no" | "partly" | "yes" | "other";
 
 export type StartAgent = {
-	project: number,
+	place: Place,
 	agent: string,
 	model: string,
 	prompt: string,
-	worktree: string,
 };
 
 export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;
@@ -948,12 +949,11 @@ export type StartChoices_Serialize = {
 };
 
 export type StartIssue = {
-	project: number,
+	place: Place,
 	agent: string,
 	model: string,
 	key: string,
 	source: string,
-	branch: string,
 	issue_branch: string,
 };
 
