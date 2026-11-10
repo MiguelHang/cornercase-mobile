@@ -9,6 +9,7 @@ import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import { digitOf, type KeyName } from './keys'
 import { Questions, type Asker } from './question.svelte'
+import { arrowsTo } from './questionTabs'
 import { deliver, messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
@@ -420,6 +421,16 @@ export class Chat {
   async pressOption(number: number): Promise<string | null> {
     const digit = digitOf(number)
     return digit === null ? null : this.press(digit)
+  }
+
+  async openTab(target: number): Promise<string | null> {
+    const keys = arrowsTo(this.question?.card?.open ?? null, target)
+    if (!this.canPress || keys.length === 0) {
+      return null
+    }
+    void tap(this.#haptics)
+    this.#disarm()
+    return deliver(() => this.#pressKey(this.pane, keys))
   }
 
   #arm() {

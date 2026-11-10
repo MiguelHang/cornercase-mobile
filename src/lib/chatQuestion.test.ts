@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { QuestionChanged_Serialize as QuestionChanged } from './bindings'
+import type { Card_Serialize as Card, QuestionChanged_Serialize as QuestionChanged } from './bindings'
 import { whileShown } from './chat.svelte'
 import {
   MACHINE,
@@ -22,9 +22,17 @@ const QUESTION = ['Which colour?', '❯ 1. Red', '  2. Green', '  3. Blue']
 
 const MENU = ['Which colour?', '1. Red', '2. Green', '3. Blue']
 
-const watching = async (status: string | null = 'waiting') => {
+const tabbed = (open: number | null): Card => ({
+  tabs: ['Colour', 'Size', 'Shape', 'Submit'].map((label) => ({ label, answered: false })),
+  open,
+  blocks: [{ kind: 'text', text: 'Which colour?' }],
+  options: [{ number: 1, label: 'Red', detail: null, selected: true }],
+  help: ['Enter to select'],
+})
+
+const watching = async (status: string | null = 'waiting', calls: Parameters<typeof fresh>[0] = {}) => {
   const told = fakeAsker()
-  const chat = fresh({ asker: told.asker })
+  const chat = fresh({ ...calls, asker: told.asker })
   chat.see(MACHINE, [row(3, 'working'), row(PANE, status)])
   const stop = chat.watchQuestion()
   await settle()
@@ -64,11 +72,16 @@ describe('Chat, its question', () => {
     expect(asker.open.mock.calls).toEqual([[TAB, PANE]])
   })
 
-  it('shows the rows, the options and the colours of the question told', async () => {
+  it('shows the rows, the options, the colours and the card of the question told', async () => {
     const { chat, tell } = await watching()
-    const changed = asked(MENU)
+    const changed = asked(MENU, { card: tabbed(0) })
     tell(changed)
-    expect(chat.question).toEqual({ rows: changed.rows, options: changed.options, colours: changed.colours })
+    expect(chat.question).toEqual({
+      rows: changed.rows,
+      options: changed.options,
+      colours: changed.colours,
+      card: tabbed(0),
+    })
     expect(chat.question?.options.map((choice) => choice.label)).toEqual(['Red', 'Green', 'Blue'])
   })
 
@@ -214,6 +227,56 @@ describe('Chat, its options', () => {
     const chat = fresh({ pressKey })
     chat.see(MACHINE, [row(PANE, 'waiting')])
     expect([await chat.pressOption(number), pressKey.mock.calls.length]).toEqual([null, 0])
+  })
+})
+
+describe('Chat, the tabs of its question', () => {
+  const tabsOf = async (open: number | null, answer: typeof pressedOk = pressedOk) => {
+    const pressKey = vi.fn(answer)
+    const haptics = still()
+    const { chat, tell } = await watching('waiting', { pressKey, haptics })
+    tell(asked(MENU, { card: tabbed(open) }))
+    return { chat, pressKey, haptics }
+  }
+
+  it('presses the arrows to the tab on its pane in one call, with a light tap', async () => {
+    const { chat, pressKey, haptics } = await tabsOf(1)
+    expect(await chat.openTab(3)).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, ['right', 'right']]])
+    expect(vi.mocked(haptics.impactFeedback).mock.calls).toEqual([['light']])
+  })
+
+  it('presses the arrows back to an earlier tab', async () => {
+    const { chat, pressKey } = await tabsOf(2)
+    await chat.openTab(0)
+    expect(pressKey.mock.calls).toEqual([[PANE, ['left', 'left']]])
+  })
+
+  it('gives the reason the arrows were not pressed', async () => {
+    const { chat } = await tabsOf(0, () => Promise.resolve(refused('no pane 12')))
+    expect(await chat.openTab(1)).toBe('no pane 12')
+  })
+
+  it.each<[string, number | null, number]>([
+    ['the open tab', 2, 2],
+    ['a tab while none is open', null, 1],
+  ])('presses nothing and taps nothing for %s', async (_, open, target) => {
+    const { chat, pressKey, haptics } = await tabsOf(open)
+    expect(await chat.openTab(target)).toBeNull()
+    expect([pressKey.mock.calls.length, vi.mocked(haptics.impactFeedback).mock.calls.length]).toEqual([0, 0])
+  })
+
+  it('presses nothing once its agent is gone', async () => {
+    const { chat, pressKey } = await tabsOf(0)
+    chat.see(MACHINE, [row(3, 'working')])
+    await settle()
+    expect([await chat.openTab(2), pressKey.mock.calls.length]).toEqual([null, 0])
+  })
+
+  it('presses nothing without a question', async () => {
+    const pressKey = vi.fn(pressedOk)
+    const { chat } = await watching('waiting', { pressKey })
+    expect([await chat.openTab(1), pressKey.mock.calls.length]).toEqual([null, 0])
   })
 })
 

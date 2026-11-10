@@ -14,8 +14,8 @@ const MENU = ['Which colour?', '1. Red', '2. Green', '3. Blue']
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const questionOf = (lines: string[]): Asked => {
-  const { rows, options, colours } = asked(lines)
-  return { rows, options, colours }
+  const { rows, options, colours, card } = asked(lines)
+  return { rows, options, colours, card }
 }
 
 const drawn = (question: Asked, agent = 'claude') =>
