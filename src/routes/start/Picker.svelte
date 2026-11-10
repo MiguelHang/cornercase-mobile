@@ -18,7 +18,7 @@
     label: string
     choices: Choices<T>
     value: V
-    of: (item: T) => { value: V; name: string }
+    of: (item: T) => { value: V; name: string; disabled?: boolean }
     error: string | null
     reading?: string
     empty: string
@@ -45,7 +45,7 @@
         <option value={value} disabled>Choose…</option>
       {/if}
       {#each options as option (option.value)}
-        <option value={option.value}>{option.name}</option>
+        <option value={option.value} disabled={option.disabled}>{option.name}</option>
       {/each}
     </select>
   {:else}

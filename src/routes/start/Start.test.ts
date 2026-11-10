@@ -4,14 +4,18 @@ import comments from '../../../crates/core/tests/fixtures/control/issue-read/v1/
 import type {
   AgentChoice_Serialize,
   ConnectionView_Serialize,
+  FlowChoice_Serialize as FlowChoice,
   Place,
   ReadIssue_Serialize as ReadIssue,
 } from '../../lib/bindings'
+import { FlowStart } from '../../lib/flowStart.svelte'
 import type { StartingIssue } from '../../lib/router.svelte'
 import { StartForm, type StartCalls } from '../../lib/startForm.svelte'
 import AgentForm from './AgentForm.svelte'
 import agentSource from './AgentForm.svelte?raw'
 import pickerSource from './AgentPicker.svelte?raw'
+import flowPickerSource from './FlowPicker.svelte?raw'
+import IssueForm from './IssueForm.svelte'
 import issueSource from './IssueForm.svelte?raw'
 import Picker from './Picker.svelte'
 import Segmented from './Segmented.svelte'
@@ -411,6 +415,180 @@ describe('Start, on an issue', () => {
   })
 })
 
+describe('Start, a flow on an issue', () => {
+  const team = (...members: string[]) =>
+    members.map((member) => {
+      const [role, agent] = member.split(' · ')
+      return { role, agent }
+    })
+
+  const FLOWS: FlowChoice[] = [
+    {
+      name: 'Ship it',
+      description: 'A coder and a tester for the shop, leaving a pull request.',
+      roles: team('coder · codex', 'orchestrator · claude', 'tester · claude'),
+      problems: [],
+      default: true,
+    },
+    { name: 'Quick', description: '', roles: team('orchestrator · claude'), problems: [], default: false },
+    {
+      name: 'Second opinion',
+      description: 'Two reviewers compare notes.',
+      roles: team('orchestrator · claude', 'reviewer · codex'),
+      problems: ['`summary` is in no stage', 'no reviewer'],
+      default: false,
+    },
+  ]
+
+  const ORCHESTRATOR = { project: 2, workspace: 3, tab: 6, pane: 7, warning: 'check the coder' }
+
+  const opened = async (calls: Partial<StartCalls> = {}, issue = COUPON, onstarted = vi.fn()) => {
+    const all = { ...CALLS, issueFlows: () => answer({ flows: FLOWS }), ...calls }
+    const form = new StartForm(all, onstarted, { agent: null, workspace: null })
+    await form.load()
+    form.forIssue(issue)
+    return { form, flows: new FlowStart(form, all, { flow: null }), onstarted }
+  }
+
+  const looked = async (calls: Partial<StartCalls> = {}, issue = COUPON) => {
+    const opening = await opened(calls, issue)
+    await opening.flows.look()
+    return opening
+  }
+
+  const flowing = async (calls: Partial<StartCalls> = {}) => {
+    const opening = await looked(calls)
+    await opening.flows.use('flow')
+    return opening
+  }
+
+  const drawn = ({ form, flows }: { form: StartForm; flows: FlowStart }) =>
+    render(IssueForm, { props: { form, sendable: true, flows } }).body
+
+  const modes = (body: string) =>
+    body
+      .match(/<div class="actions[^"]*" role="group" aria-label="Who works">([^]*?)<\/div>/)?.[1]
+      .match(/aria-pressed="\w+"[^>]*>\w+/g)
+      ?.map((button) => button.replace(/aria-pressed="(\w+)"[^>]*>/, '$1 '))
+
+  const flowsOf = (body: string) =>
+    [...body.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)]
+      .filter(([, value]) => FLOWS.some((flow) => flow.name === value))
+      .map(([, , attributes, words]) => `${attributes.includes('selected') ? '*' : attributes.includes('disabled') ? '-' : ' '}${words}`)
+
+  it('offers Agent and Flow above Where, on Agent, once the project has a flow', async () => {
+    const body = drawn(await looked())
+    expect(modes(body)).toEqual(['true Agent', 'false Flow'])
+    expect(body.indexOf('aria-label="Who works"')).toBeLessThan(body.indexOf('>Where</label>'))
+    expect(labels(body)).toEqual(['Where', 'Branch', 'Agent', 'Model'])
+  })
+
+  it.each<[string, Partial<StartCalls>, StartingIssue]>([
+    ['without a place for a new worktree', {}, { ...COUPON, places: [LOGIN] }],
+    ['when the project has none', { issueFlows: () => answer({ flows: [] }) }, COUPON],
+  ])('offers no Flow %s', async (_, calls, issue) => {
+    expect(drawn(await looked(calls, issue))).not.toContain('aria-label="Who works"')
+  })
+
+  it('offers no Flow while the flows are read', async () => {
+    const opening = await opened({ issueFlows: never })
+    void opening.flows.look()
+    expect(drawn(opening)).not.toContain('aria-label="Who works"')
+  })
+
+  it("in Flow asks for no agent nor model, keeps Branch and offers only the project's new worktree", async () => {
+    const body = drawn(await flowing())
+    expect(modes(body)).toEqual(['false Agent', 'true Flow'])
+    expect(labels(body)).toEqual(['Where', 'Branch', 'Flow'])
+    expect(optionsOf(body).filter((option) => option.includes('workspace-') || option.includes('project-'))).toEqual([
+      '*project-2 api · new worktree on issue-41-checkout-forgets-the-coupon',
+    ])
+    expect(flat(body)).toMatch(/<p class="note[^"]*">The flow's team works in its own worktree on this branch.<\/p>/)
+  })
+
+  it('lists each flow with its name, its agents and its description, the one with problems held with the first', async () => {
+    expect(flowsOf(drawn(await flowing()))).toEqual([
+      '*Ship it · 3 agents · A coder and a tester for the shop, leaving a pull request.',
+      ' Quick · 1 agent',
+      '-Second opinion · 2 agents · `summary` is in no stage',
+    ])
+  })
+
+  it("shows the chosen flow's team under it, the orchestrator first", async () => {
+    const body = drawn(await flowing())
+    const members = body.match(/<ul class="team[^"]*" aria-label="Team">([^]*?)<\/ul>/)?.[1] ?? ''
+    expect([...members.matchAll(/<li class="member[^"]*">([^<]*)<\/li>/g)].map(([, member]) => member)).toEqual([
+      'orchestrator · claude',
+      'coder · codex',
+      'tester · claude',
+    ])
+  })
+
+  it('says why the flows could not be read, with Try again', async () => {
+    const body = drawn(await flowing({ issueFlows: refusing('no project 2') }))
+    expect(body).toMatch(/<p class="label[^"]*">Flow<\/p>/)
+    expect(body).toMatch(/<p class="state reason[^"]*">no project 2<\/p> (?:<!--\[0-->)?<button class="button plain[^"]*"[^>]*>[^]*?Try again/)
+  })
+
+  it('folds the prompt cornercase will use', async () => {
+    expect(drawn(await flowing())).toMatch(/<summary class="summary[^"]*">Prompt cornercase will use<\/summary>/)
+  })
+
+  it('tells a missing place and a missing flow under each', async () => {
+    const opening = await flowing()
+    opening.form.place = null
+    opening.flows.flow = null
+    await opening.flows.start()
+    const body = drawn(opening)
+    expect(['Where', 'Flow'].map((field) => errorOf(body, field))).toEqual(['Choose where to start', 'Choose a flow'])
+  })
+
+  it('turns the button into a spinner with Starting… and holds the fields while it sends', async () => {
+    const opening = await flowing({ startFlow: never })
+    void opening.flows.start()
+    const body = drawn(opening)
+    expect(submit(body)?.[1]).toContain('aria-busy="true"')
+    expect(label(submit(body))).toBe('Starting…')
+    expect(body.match(/<(?:input|select)[^>]*disabled=""/g)).toHaveLength(3)
+    expect(body.match(/<button[^>]*aria-pressed="\w+" disabled=""/g)).toHaveLength(2)
+  })
+
+  it('shows what cornercase refused over the button and keeps the branch typed', async () => {
+    const opening = await flowing({ startFlow: refusing('workspace 17 already runs a flow, and a workspace runs one at a time') })
+    opening.form.branch = 'coupon-fix'
+    await opening.flows.start()
+    const body = drawn(opening)
+    expect(body).toMatch(
+      /<p class="problem[^"]*" role="alert">workspace 17 already runs a flow, and a workspace runs one at a time<\/p>(?:<!--[^>]*-->)* <div class="buttons/,
+    )
+    expect(body).toContain('value="coupon-fix"')
+    expect(label(submit(body))).toBe('Start')
+  })
+
+  it("sends the chosen flow on the issue's branch and hands over its orchestrator", async () => {
+    const startFlow = vi.fn(() => answer({ started: ORCHESTRATOR, agent: 'claude' }))
+    const startIssue = vi.fn(never)
+    const { flows, onstarted } = await flowing({ startFlow, startIssue })
+    await flows.start()
+    const branch = READ.issue.branch
+    expect(startFlow.mock.calls).toEqual([
+      [{ project: 2, name: 'Ship it', key: '#41', source: 'github', branch, issue_branch: branch }],
+    ])
+    expect(startIssue).not.toHaveBeenCalled()
+    expect(onstarted.mock.calls).toEqual([[ORCHESTRATOR, 'claude']])
+  })
+
+  it('goes back on Agent to the agent and its model, where it was', async () => {
+    const opening = await looked()
+    opening.form.place = 'workspace-9'
+    await opening.flows.use('flow')
+    await opening.flows.use('agent')
+    const body = drawn(opening)
+    expect(labels(body)).toEqual(['Where', 'Agent', 'Model'])
+    expect(optionsOf(body)).toContain('*workspace-9 api › Login · new tab')
+  })
+})
+
 describe('Switch', () => {
   const toggle = (props: { label: string; checked?: boolean; disabled?: boolean }) => render(Switch, { props }).body
 
@@ -488,11 +666,21 @@ describe('Start wiring', () => {
 
   it('sends each form with its own action', () => {
     expect(flat(agentSource)).toContain('void form.start()')
-    expect(flat(issueSource)).toContain('onsubmit={() => void form.startIssue()}')
+    expect(flat(issueSource)).toContain('const send = () => void (inFlow ? flows.start() : form.startIssue())')
+    expect(flat(issueSource)).toContain('<FormFrame problem={form.formError} onsubmit={send}>')
+  })
+
+  it("reads the flows of the place on opening and after each read of the projects, and again on a move in Flow", () => {
+    const script = flat(issueSource)
+    expect(script).toContain('flows = new FlowStart(form, commands),')
+    expect(script).toContain('$effect(() => { void form.projects untrack(() => void flows.look()) })')
+    expect(script).toContain('bind:value={() => flows.mode, (mode) => void flows.use(mode)}')
+    expect(script).toContain('bind:value={() => form.place, (place) => void flows.moveTo(place)}')
   })
 
   it('reads again what failed on Try again', () => {
     expect(flat(pickerSource)).toContain('onretry={() => void form.loadAgents()}')
     expect(flat(workspacePickerSource)).toContain('onretry={() => void form.loadProjects()}')
+    expect(flat(flowPickerSource)).toContain('onretry={() => void flows.retry()}')
   })
 })
