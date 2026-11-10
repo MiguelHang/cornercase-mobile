@@ -108,7 +108,6 @@ impl AppState {
         boots
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "the chat commands keep their images here from T4 on"))]
     pub(crate) fn attached(&self) -> &AttachedImages {
         &self.attached
     }

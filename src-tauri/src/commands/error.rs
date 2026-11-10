@@ -67,6 +67,7 @@ pub(crate) enum ErrorCode {
     TooLargeHere,
     #[cfg_attr(not(test), expect(dead_code, reason = "the chat commands keep their images here from T4 on"))]
     AttachedFull,
+    AttachedGone,
 }
 
 impl CommandError {
@@ -110,6 +111,10 @@ impl CommandError {
     #[cfg_attr(not(test), expect(dead_code, reason = "the chat commands keep their images here from T4 on"))]
     pub(crate) fn attached_too_large() -> Self {
         Self::new(ErrorCode::AttachedFull, "the images waiting to be sent take too much memory")
+    }
+
+    pub(crate) fn attached_gone() -> Self {
+        Self::new(ErrorCode::AttachedGone, "the image is no longer waiting to be sent")
     }
 
     pub(crate) fn maybe_sent() -> Self {

@@ -18,12 +18,14 @@ mod storing {
     use super::*;
 
     #[test]
-    fn keeps_the_image_until_it_is_taken() {
+    fn keeps_the_image_until_it_is_discarded() {
         let images = AttachedImages::default();
         let id = images.store(PANE, "photo.jpg".to_owned(), vec![1, 2, 3]).expect("the image is stored");
-        let taken = images.take(PANE, id).expect("the image is there");
-        assert_eq!(taken, Attached { id, pane: PANE, name: "photo.jpg".to_owned(), bytes: vec![1, 2, 3] });
-        assert_eq!(images.take(PANE, id), None);
+        let kept = Attached { id, pane: PANE, name: "photo.jpg".to_owned(), bytes: vec![1, 2, 3] };
+        assert_eq!(images.get(PANE, id), Some(kept.clone()));
+        assert_eq!(images.get(PANE, id), Some(kept));
+        images.discard(&[id]);
+        assert_eq!(images.get(PANE, id), None);
     }
 
     #[test]
@@ -100,22 +102,22 @@ mod the_limit_in_bytes {
     }
 }
 
-mod taking {
+mod getting {
     use super::*;
 
     #[test]
     fn leaves_the_image_of_another_pane() {
         let images = AttachedImages::default();
         let id = store(&images, PANE, "photo.jpg");
-        assert_eq!(images.take(OTHER_PANE, id), None);
-        assert!(images.take(PANE, id).is_some());
+        assert_eq!(images.get(OTHER_PANE, id), None);
+        assert!(images.get(PANE, id).is_some());
     }
 
     #[test]
     fn finds_nothing_for_an_unknown_id() {
         let images = AttachedImages::default();
         store(&images, PANE, "photo.jpg");
-        assert_eq!(images.take(PANE, 99), None);
+        assert_eq!(images.get(PANE, 99), None);
     }
 }
 
@@ -128,8 +130,8 @@ mod discarding {
         let kept = store(&images, PANE, "kept.jpg");
         let gone = store(&images, PANE, "gone.jpg");
         images.discard(&[gone, 99, 100]);
-        assert_eq!(images.take(PANE, gone), None);
-        assert!(images.take(PANE, kept).is_some());
+        assert_eq!(images.get(PANE, gone), None);
+        assert!(images.get(PANE, kept).is_some());
     }
 
     #[test]

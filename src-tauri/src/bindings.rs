@@ -38,6 +38,8 @@ macro_rules! app_commands {
             chat::send,
             chat::keys,
             chat::attach::attach::<Wry>,
+            chat::attach::paste_attached,
+            chat::attach::discard,
             chat::question::question_open::<Wry>,
             chat::question::question_close,
             terminal::terminal_open::<Wry>,

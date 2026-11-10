@@ -26,6 +26,19 @@ pub(crate) async fn attach<R: Runtime>(
     attach_image(&state, pane, move || app.state::<Photos<R>>().pick()).await
 }
 
+#[tauri::command(async)]
+#[specta::specta]
+pub(crate) async fn paste_attached(state: State<'_, AppState>, pane: u64, id: u64) -> Result<Pasted, CommandError> {
+    paste_image(&state, pane, id).await
+}
+
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn discard(state: State<'_, AppState>, ids: Vec<u64>) {
+    state.attached().discard(&ids);
+}
+
 pub(crate) async fn attach_image<P>(state: &AppState, pane: u64, pick: P) -> Result<Option<Pasted>, CommandError>
 where
     P: FnOnce() -> Result<Option<Picked>, Error> + Send + 'static,
@@ -35,7 +48,19 @@ where
         return Ok(None);
     };
     let output = asked(state, paste_file::args(pane, &image.name), Some(Stdin::Bytes(image.bytes))).await?;
-    serde_json::from_str(&output).map(Some).map_err(|error| CommandError::from(Error::Json(error.to_string())))
+    parsed(&output).map(Some)
+}
+
+pub(crate) async fn paste_image(state: &AppState, pane: u64, id: u64) -> Result<Pasted, CommandError> {
+    queue(state)?;
+    let image = state.attached().get(pane, id).ok_or_else(CommandError::attached_gone)?;
+    let output = asked(state, paste_file::args(pane, &image.name), Some(Stdin::Bytes(image.bytes))).await?;
+    state.attached().discard(&[id]);
+    parsed(&output)
+}
+
+fn parsed(output: &str) -> Result<Pasted, CommandError> {
+    serde_json::from_str(output).map_err(|error| CommandError::from(Error::Json(error.to_string())))
 }
 
 async fn picked<P>(pick: P) -> Result<Option<Image>, CommandError>

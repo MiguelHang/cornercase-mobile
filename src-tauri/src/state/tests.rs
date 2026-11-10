@@ -197,7 +197,7 @@ mod the_attached_images {
     fn are_kept_by_the_app_state() {
         let state = folderless();
         let id = state.attached().store(7, "photo.jpg".to_owned(), vec![1]).expect("the image is stored");
-        assert_eq!(state.attached().take(7, id).map(|image| image.bytes), Some(vec![1]));
+        assert_eq!(state.attached().get(7, id).map(|image| image.bytes), Some(vec![1]));
     }
 }
 

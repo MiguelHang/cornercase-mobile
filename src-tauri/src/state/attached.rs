@@ -37,10 +37,8 @@ impl AttachedImages {
         Ok(id)
     }
 
-    pub(crate) fn take(&self, pane: u64, id: u64) -> Option<Attached> {
-        let mut held = self.held();
-        let index = held.images.iter().position(|image| image.id == id && image.pane == pane)?;
-        Some(held.images.remove(index))
+    pub(crate) fn get(&self, pane: u64, id: u64) -> Option<Attached> {
+        self.held().images.iter().find(|image| image.id == id && image.pane == pane).cloned()
     }
 
     pub(crate) fn discard(&self, ids: &[u64]) {
