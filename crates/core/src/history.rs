@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 use crate::machines::store::versioned;
 
+pub mod store;
+
 const VERSION: u32 = 1;
 const MOST_ENTRIES: usize = 200;
 const MOST_BYTES: usize = 1 << 20;
@@ -48,9 +50,9 @@ pub enum SendState {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct PaneFile {
-    pub boot: String,
-    pub entries: Vec<HistoryEntry>,
+struct PaneFile {
+    boot: String,
+    entries: Vec<HistoryEntry>,
 }
 
 #[derive(Serialize)]
@@ -73,13 +75,13 @@ impl HistoryEntry {
     }
 }
 
-pub fn written(boot: &str, entries: &[HistoryEntry]) -> Result<Vec<u8>, Error> {
+fn written(boot: &str, entries: &[HistoryEntry]) -> Result<Vec<u8>, Error> {
     let envelope = serialized(&Written { version: VERSION, boot, entries: &[] })?.len();
     let kept = capped(entries, MOST_BYTES.saturating_sub(envelope))?;
     serialized(&Written { version: VERSION, boot, entries: &kept })
 }
 
-pub fn parsed(text: &[u8]) -> Result<PaneFile, Error> {
+fn parsed(text: &[u8]) -> Result<PaneFile, Error> {
     let Read { boot, entries } = versioned(text, VERSION)?;
     Ok(PaneFile { boot, entries })
 }

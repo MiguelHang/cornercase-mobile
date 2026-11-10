@@ -86,7 +86,7 @@ pub(crate) fn versioned<T: DeserializeOwned>(text: &[u8], expected: u32) -> Resu
     serde_json::from_slice(text).map_err(|error| unreadable(&error))
 }
 
-fn io_error(what: &str, error: &io::Error) -> Error {
+pub(crate) fn io_error(what: &str, error: &io::Error) -> Error {
     Error::Store(format!("{what}: {error}"))
 }
 
