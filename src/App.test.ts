@@ -169,6 +169,13 @@ describe('App wiring', () => {
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
   })
 
+  it('watches the chat for done only while its agent or its terminal is on top and the page shows', () => {
+    expect(source).toContain('const inView = $derived(chatOf(route) === null ? null : chat)')
+    expect(source).toContain(
+      '$effect(() => { const watched = inView if (watched !== null) { return untrack(() => whileShown(document, () => watched.watchDone())) } })',
+    )
+  })
+
   it("names the route below for the back button, from the saved machines and the active machine's rows", () => {
     expect(source).toContain(
       'const lookups: Lookups = { machineName: (id) => machines.find((machine) => machine.id === id)?.name, agentRow: (opened) => opened.machine === current.machine ? current.agents?.find((row) => row.pane === opened.pane) : undefined, listed: () => current.agents ?? [], }',

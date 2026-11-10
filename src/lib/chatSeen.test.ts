@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MarkReviewed } from './chat.svelte'
-import { MACHINE, PANE, fakeMarker, fresh, refused, row, settle } from './chatFakes'
+import { whileShown, type MarkReviewed } from './chat.svelte'
+import { FakePage, MACHINE, PANE, fakeMarker, fresh, refused, row, settle } from './chatFakes'
 
 const OTHER_MACHINE = 2
 
@@ -115,6 +115,45 @@ describe('Chat, marking a done agent reviewed while it is in view', () => {
 
     expect(chat.gone).toBe(true)
     expect(marked).toEqual([])
+  })
+})
+
+const paged = (visibility: DocumentVisibilityState, status: string) => {
+  const page = new FakePage(visibility)
+  const { chat, marked } = opened(status)
+  whileShown(page, () => chat.watchDone())
+  return { page, chat, marked }
+}
+
+describe('Chat, marking a done agent reviewed while the page shows', () => {
+  it('marks nothing while the page hides, and marks once it shows on a row still done', () => {
+    const { page, chat, marked } = paged('hidden', 'working')
+    turned(chat, 'done')
+
+    expect(marked).toEqual([])
+
+    page.turn('visible')
+
+    expect(marked).toEqual([PANE])
+  })
+
+  it('marks nothing on coming back once the row left done', () => {
+    const { page, chat, marked } = paged('hidden', 'done')
+    turned(chat, 'idle')
+    page.turn('visible')
+
+    expect(marked).toEqual([])
+  })
+
+  it('marks again when the page shows again on a row still done', () => {
+    const { page, marked } = paged('visible', 'done')
+    page.turn('hidden')
+
+    expect(marked).toEqual([PANE])
+
+    page.turn('visible')
+
+    expect(marked).toEqual([PANE, PANE])
   })
 })
 
