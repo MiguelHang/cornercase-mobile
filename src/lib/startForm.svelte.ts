@@ -19,7 +19,7 @@ export type StartCalls = Pick<
 
 export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; items: T[] }
 
-export type Memory = { agent: string | null; workspace: number | null }
+export type Memory = { agent: string | null; workspace: { boot: string; id: number } | null }
 
 export type WorkspaceOption = { id: number; project: number; label: string }
 
@@ -69,10 +69,8 @@ const placeOf = (place: PlaceInfo, branch: string): Place =>
 
 const startedIn = ({ places, project, workspace }: Where) => {
   const opened = places.find((place) => place.workspace !== null && place.workspace === workspace)
-  if (opened !== undefined || project !== null) {
-    return opened ?? places.find((place) => place.worktree && place.project === project)
-  }
-  return places.length === 1 ? places[0] : undefined
+  const own = places.find((place) => place.worktree && place.project === project)
+  return opened ?? own ?? (places.length === 1 ? places[0] : undefined)
 }
 
 const optionsOf = (projects: ProjectChoice[]): WorkspaceOption[] =>
@@ -208,9 +206,13 @@ export class StartForm {
     if (asked !== this.#projectsAsked) {
       return false
     }
+    const restarted = reply.ok && this.#restarted(reply.data.boot)
+    if (restarted) {
+      this.#forgetIds()
+    }
     this.projects = choicesOf(projectsOf(reply))
     this.#pickWorkspace()
-    return reply.ok && this.#restarted(reply.data.boot)
+    return restarted
   }
 
   #restarted(boot: string | null) {
@@ -219,18 +221,24 @@ export class StartForm {
     return known !== null && boot !== null && boot !== known
   }
 
+  #forgetIds() {
+    this.workspace = null
+    this.place = null
+  }
+
   async start() {
     if (this.sending) {
       return
     }
-    const place = this.#checkAgent()
-    const { agent, model, prompt, workspace } = this
-    if (place === null) {
+    const chosen = this.#checkAgent()
+    const { agent, model, prompt } = this
+    if (chosen === null) {
       return
     }
-    const form = { place, agent, model, prompt }
+    const form = { place: this.#agentPlace(chosen), agent, model, prompt }
+    const boot = this.#boot
     if (await this.#launch(() => this.#calls.startAgent(form), agent)) {
-      this.#memory.workspace = workspace
+      this.#memory.workspace = boot === null ? null : { boot, id: chosen.id }
     }
   }
 
@@ -242,7 +250,7 @@ export class StartForm {
     this.branchError = errorIf(this.ownWorktree && this.branch.trim() === '', BRANCH_EMPTY)
     this.formError = null
     const refused = [this.agentError, this.promptError, this.branchError].some((error) => error !== null)
-    return chosen === undefined || refused ? null : this.#agentPlace(chosen)
+    return chosen === undefined || refused ? null : chosen
   }
 
   #agentPlace(chosen: WorkspaceOption): Place {
@@ -307,8 +315,8 @@ export class StartForm {
 
   #fallbackWorkspace(ids: number[]) {
     const last = this.#memory.workspace
-    if (last !== null && ids.includes(last)) {
-      return last
+    if (last !== null && last.boot === this.#boot && ids.includes(last.id)) {
+      return last.id
     }
     return ids.length === 1 ? ids[0] : null
   }

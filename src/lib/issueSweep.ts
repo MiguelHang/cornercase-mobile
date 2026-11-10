@@ -69,8 +69,12 @@ export const placesIn = (answers: Sources[]): PlaceInfo[] =>
 const sameIssue = (found: Found) =>
   found.url !== '' ? found.url : `${found.source}\n${found.key}\n${found.project}`
 
-const newestFirst = (one: Found, other: Found) =>
-  one.updated_at === other.updated_at ? 0 : one.updated_at > other.updated_at ? -1 : 1
+const instant = (at: string) => {
+  const time = Date.parse(at.replace(/([+-]\d{2})(\d{2})$/, '$1:$2'))
+  return Number.isNaN(time) ? 0 : time
+}
+
+const newestFirst = (one: Found, other: Found) => instant(other.updated_at) - instant(one.updated_at)
 
 export const gathered = (swept: Swept[]): Found[] => {
   const found = swept.flatMap(({ wanted, lists }) =>

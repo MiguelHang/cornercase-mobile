@@ -192,6 +192,23 @@ describe('the gathered issues', () => {
     expect(keysOf(gathered([swept(wanted(SHOP, 'linear'), [one, two])]))).toEqual([`ENG-1@${SHOP}`, `ENG-2@${SHOP}`])
   })
 
+  it.each<[string, [string, string], [string, string]]>([
+    ["Jira's offset without a colon", ['github', '2026-11-09T09:45:00Z'], ['jira', '2026-11-09T10:30:00.000+0100']],
+    ['milliseconds next to whole seconds', ['gitlab', '2026-11-09T10:00:00.123Z'], ['github', '2026-11-09T10:00:00Z']],
+    ['an offset with a colon', ['linear', '2026-11-09T05:30:00-05:00'], ['github', '2026-11-09T10:15:00Z']],
+  ])('are ordered by the instant they were updated, with %s', (_, [newSource, newer], [oldSource, older]) => {
+    const old = swept(wanted(SHOP, oldSource), [issue(oldSource, 'OLD', older)])
+    const found = gathered([old, swept(wanted(NOTES, newSource), [issue(newSource, 'NEW', newer)])])
+    expect(keysOf(found)).toEqual([`NEW@${NOTES}`, `OLD@${SHOP}`])
+  })
+
+  it('put an issue whose time cannot be read last', () => {
+    const unread = issue('plane', 'WEB-2', 'yesterday')
+    const dated = issue('github', '#41', '2026-11-09T10:00:00Z')
+    const found = gathered([swept(wanted(SHOP, 'plane'), [unread]), swept(wanted(NOTES, 'github'), [dated])])
+    expect(keysOf(found)).toEqual([`#41@${NOTES}`, `WEB-2@${SHOP}`])
+  })
+
   it('are none when nothing was listed', () => {
     expect(gathered([])).toEqual([])
   })

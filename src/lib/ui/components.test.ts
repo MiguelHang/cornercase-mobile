@@ -10,7 +10,6 @@ import Icon from './Icon.svelte'
 import Labelled from './Labelled.svelte'
 import SearchField from './SearchField.svelte'
 import Spinner from './Spinner.svelte'
-import Switch from './Switch.svelte'
 import TextArea from './TextArea.svelte'
 import ToolButton from './ToolButton.svelte'
 import buttonSource from './Button.svelte?raw'
@@ -21,7 +20,6 @@ import glassSource from './Glass.svelte?raw'
 import labelledSource from './Labelled.svelte?raw'
 import searchFieldSource from './SearchField.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
-import switchSource from './Switch.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
 import toolButtonSource from './ToolButton.svelte?raw'
 import baseSource from '../theme/base.css?raw'
@@ -169,29 +167,6 @@ describe('ToolButton', () => {
     expect(source).toContain('width: 44px; height: 44px; padding: 0; border: 0;')
     expect(source).toContain('background: none; color: var(--accent); }')
     expect(source).toContain('.tool:active { background: var(--hover); }')
-  })
-})
-
-describe('Switch', () => {
-  const toggle = (props: { label: string; checked?: boolean; disabled?: boolean }) => render(Switch, { props }).body
-
-  it('labels a checkbox that reads as a switch, off unless checked', () => {
-    const off = toggle({ label: 'Own worktree' })
-    expect(off).toMatch(/<label class="switch svelte-[\w-]+"><span class="words svelte-[\w-]+">Own worktree<\/span> /)
-    expect(off).toMatch(/<input class="toggle svelte-[\w-]+" type="checkbox" role="switch"\/><\/label>/)
-    const on = toggle({ label: 'Own worktree', checked: true, disabled: true })
-    expect(on).toContain('role="switch" checked="" disabled=""/>')
-  })
-
-  it.each([
-    'min-height: 44px;',
-    'width: 51px; height: 31px;',
-    '-webkit-appearance: none; appearance: none;',
-    '.toggle:checked { background: var(--brand); }',
-    '.toggle:checked::after { transform: translateX(20px); }',
-    '.toggle:disabled { opacity: 0.6; }',
-  ])('holds %s', (text) => {
-    expect(flat(switchSource)).toContain(text)
   })
 })
 

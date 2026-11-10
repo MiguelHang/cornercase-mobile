@@ -2,7 +2,7 @@
   import type { StartForm } from '../../lib/startForm.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Field from '../../lib/ui/Field.svelte'
-  import Switch from '../../lib/ui/Switch.svelte'
+  import Switch from './Switch.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
   import AgentPicker from './AgentPicker.svelte'
   import FormFrame from './FormFrame.svelte'

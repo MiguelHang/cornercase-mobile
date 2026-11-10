@@ -34,10 +34,8 @@
       bind:value={form.place}
       of={(place) => ({ value: placeKey(place), name: form.placeName(place) })}
       error={form.placeError}
-      reading="Reading the places…"
       empty="There is no place to start an agent on this issue."
       disabled={form.sending}
-      onretry={() => {}}
     />
     {#if chosen?.worktree}
       <Field label="Branch" placeholder={form.issueBranch} bind:value={form.branch} disabled={form.sending} />

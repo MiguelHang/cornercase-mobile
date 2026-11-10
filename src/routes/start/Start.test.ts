@@ -13,10 +13,13 @@ import AgentForm from './AgentForm.svelte'
 import agentSource from './AgentForm.svelte?raw'
 import pickerSource from './AgentPicker.svelte?raw'
 import issueSource from './IssueForm.svelte?raw'
+import Picker from './Picker.svelte'
 import ShowIssues from './ShowIssues.svelte'
 import showSource from './ShowIssues.svelte?raw'
 import Start from './Start.svelte'
 import startSource from './Start.svelte?raw'
+import Switch from './Switch.svelte'
+import switchSource from './Switch.svelte?raw'
 import workspacePickerSource from './WorkspacePicker.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
@@ -170,7 +173,7 @@ describe('Start, its agent form', () => {
     const body = agentForm(await formOf({ installedAgents: refusing('account list failed') }))
     expect(body).toMatch(/<p class="label[^"]*">Agent<\/p>/)
     expect(body).toMatch(
-      /<p class="state reason[^"]*">account list failed<\/p> <button class="button plain[^"]*"[^>]*>[^]*?Try again/,
+      /<p class="state reason[^"]*">account list failed<\/p> (?:<!--\[0-->)?<button class="button plain[^"]*"[^>]*>[^]*?Try again/,
     )
   })
 
@@ -401,6 +404,39 @@ describe('Start, on an issue', () => {
       [{ ...issue, place: { kind: 'worktree', project: 2, branch: READ.issue.branch } }],
       [{ ...issue, place: { kind: 'workspace', workspace: 9 } }],
     ])
+  })
+})
+
+describe('Switch', () => {
+  const toggle = (props: { label: string; checked?: boolean; disabled?: boolean }) => render(Switch, { props }).body
+
+  it('labels a checkbox that reads as a switch, off unless checked', () => {
+    const off = toggle({ label: 'Own worktree' })
+    expect(off).toMatch(/<label class="switch svelte-[\w-]+"><span class="words svelte-[\w-]+">Own worktree<\/span> /)
+    expect(off).toMatch(/<input class="toggle svelte-[\w-]+" type="checkbox" role="switch"\/><\/label>/)
+    const on = toggle({ label: 'Own worktree', checked: true, disabled: true })
+    expect(on).toContain('role="switch" checked="" disabled=""/>')
+  })
+
+  it.each([
+    'min-height: 44px;',
+    'width: 51px; height: 31px;',
+    '-webkit-appearance: none; appearance: none;',
+    '.toggle:checked { background: var(--brand); }',
+    '.toggle:checked::after { transform: translateX(20px); }',
+    '.toggle:disabled { opacity: 0.6; }',
+  ])('holds %s', (text) => {
+    expect(flat(switchSource)).toContain(text)
+  })
+})
+
+
+describe('Picker', () => {
+  it('offers no Try again when nothing can be read again', () => {
+    const props = { label: 'Where', choices: { kind: 'failed' as const, reason: 'gone' }, value: null, error: null }
+    const body = render(Picker, { props: { ...props, of: () => ({ value: null, name: '' }), empty: 'None' } }).body
+    expect(body).toContain('gone')
+    expect(body).not.toContain('Try again')
   })
 })
 

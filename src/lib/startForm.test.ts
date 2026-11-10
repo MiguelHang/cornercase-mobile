@@ -108,6 +108,7 @@ const NOTES = place(9, null, 'notes')
 const SHOP = place(2, null, 'shop')
 const LOGIN = place(2, 22, 'shop › Login')
 const JOURNAL = place(9, 31, 'notes › journal')
+const CART = place(2, 23, 'shop › Cart')
 
 const ANYWHERE: Where = { project: null, places: [NOTES] }
 
@@ -266,7 +267,8 @@ describe('StartForm choosing a workspace', () => {
     ['none among several with none used before', SESSION, null, null, null],
     ['none without workspaces', [project(1), project(2)], 22, 21, null],
   ])('picks %s', async (_, session, last, preset, picked) => {
-    const { form } = made({ startProjects: () => ok(choices(session)) }, { agent: null, workspace: last })
+    const memory = { agent: null, workspace: last === null ? null : { boot: 'boot-1', id: last } }
+    const { form } = made({ startProjects: () => ok(choices(session)) }, memory)
     if (preset !== null) {
       form.prefer(preset)
     }
@@ -283,17 +285,34 @@ describe('StartForm choosing a workspace', () => {
     expect(several.workspace).toBe(21)
   })
 
-  it('empties a workspace that is gone after the server restarted, and keeps one still there', async () => {
-    const answers = [ok(choices(SESSION)), ok(choices([project(2, 'api', [workspace(21), workspace(23)])], 'boot-2'))]
-    const { form } = await loaded({ startProjects: () => answers.shift() ?? ok(choices(SESSION)) })
+  it('keeps the workspace chosen on the same boot, and empties it after the server restarted', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices(SESSION)), ok(choices(SESSION, 'boot-2'))]
+    const { form } = await loaded({ startProjects: () => answers.shift() ?? ok(choices(SESSION, 'boot-2')) })
     form.workspace = 22
     await form.see(false)
     await form.see(true)
-    expect(form.workspace).toBeNull()
-    form.workspace = 21
+    expect(form.workspace).toBe(22)
     await form.see(false)
     await form.see(true)
-    expect(form.workspace).toBe(21)
+    expect(form.workspace).toBeNull()
+  })
+
+  it('takes the only workspace after the server restarted', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices(ONE, 'boot-2'))]
+    const { form } = await loaded({ startProjects: () => answers.shift() ?? ok(choices(ONE, 'boot-2')) })
+    form.workspace = 22
+    await form.see(false)
+    await form.see(true)
+    expect(form.workspace).toBe(11)
+  })
+
+  it.each<[string, string | null]>([
+    ['a server that restarted since', 'boot-2'],
+    ['a server whose boot is unknown', null],
+  ])('does not take the last used workspace of another boot, on %s', async (_, boot) => {
+    const memory = { agent: null, workspace: { boot: 'boot-1', id: 22 } }
+    const { form } = await loaded({ startProjects: () => ok(choices(SESSION, boot)) }, memory)
+    expect(form.workspace).toBeNull()
   })
 })
 
@@ -342,7 +361,7 @@ describe('StartForm when the connection comes back', () => {
     expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude')] })
   })
 
-  it('empties only a workspace that is gone', async () => {
+  it('empties only the workspace after a restart', async () => {
     const answers = [ok(choices(SESSION)), ok(choices([project(1), project(3)], 'boot-2'))]
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     const before = typed(form)
@@ -350,11 +369,20 @@ describe('StartForm when the connection comes back', () => {
     expect(typed(form)).toEqual({ ...before, workspace: null })
   })
 
-  it('keeps a workspace that is still there', async () => {
+  it('empties the workspace after a restart even when its id is still there, as ids are given again', async () => {
     const answers = [ok(choices(SESSION)), ok(choices([SESSION[1]], 'boot-2'))]
     const { form } = await filled({ startProjects: () => answers.shift() ?? ok(choices([])) })
     await reconnect(form)
-    expect(form.workspace).toBe(22)
+    expect(form.workspace).toBeNull()
+  })
+
+  it('empties the place of an issue after a restart', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices(SESSION, 'boot-2'))]
+    const where = { project: null, places: [LOGIN], workspace: 22 }
+    const { form } = await fromIssue({ startProjects: () => answers.shift() ?? ok(choices(SESSION)) }, { ...FORGETFUL }, where)
+    expect(form.place).toBe('workspace-22')
+    await reconnect(form)
+    expect(form.place).toBeNull()
   })
 })
 
@@ -374,7 +402,7 @@ describe('StartForm start', () => {
       ],
     ])
     expect(onstarted.mock.calls).toEqual([[STARTED, 'codex']])
-    expect(memory).toEqual({ agent: 'codex', workspace: 22 })
+    expect(memory).toEqual({ agent: 'codex', workspace: { boot: 'boot-1', id: 22 } })
   })
 
   it("sends the agent to its own worktree on the branch, in the workspace's project", async () => {
@@ -383,7 +411,13 @@ describe('StartForm start', () => {
     form.ownWorktree = true
     await form.start()
     expect(commands.startAgent.mock.calls[0][0].place).toEqual({ kind: 'worktree', project: 1, branch: 'fix-login' })
-    expect(memory.workspace).toBe(11)
+    expect(memory.workspace).toEqual({ boot: 'boot-1', id: 11 })
+  })
+
+  it('remembers no workspace while the boot is unknown', async () => {
+    const { form, memory } = await filled({ startProjects: () => ok(choices(SESSION, null)) })
+    await form.start()
+    expect(memory).toEqual({ agent: 'claude', workspace: null })
   })
 
   type Refusal = 'workspaceError' | 'agentError' | 'promptError' | 'branchError'
@@ -575,7 +609,8 @@ describe('StartForm, where an issue starts', () => {
     ['in the workspace Start was opened on', { project: 2, places: [SHOP, LOGIN], workspace: 22 }, 'workspace-22'],
     ['in a new worktree of its project', { project: 2, places: [LOGIN, SHOP], workspace: 31 }, 'project-2'],
     ['in a new worktree of its project, opened on no workspace', { project: 2, places: [LOGIN, SHOP] }, 'project-2'],
-    ['nowhere, when its project has no new worktree', { project: 2, places: [LOGIN] }, null],
+    ['in the only place there is, when its project has no new worktree', { project: 2, places: [LOGIN] }, 'workspace-22'],
+    ['nowhere, when its project has no new worktree and several workspaces', { project: 2, places: [LOGIN, CART] }, null],
   ])('starts one of GitHub or GitLab %s', async (_, where, expected) => {
     expect(await placed(where)).toBe(expected)
   })
