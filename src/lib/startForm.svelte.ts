@@ -129,6 +129,10 @@ export class StartForm {
     this.#memory = memory
   }
 
+  get boot() {
+    return this.#boot
+  }
+
   get issueBranch() {
     return this.issue?.issue.branch ?? ''
   }

@@ -1,14 +1,30 @@
 import { SvelteMap } from 'svelte/reactivity'
 import type { FlowChoice_Serialize as FlowChoice } from './bindings'
-import { CHOICES_UNANSWERED, ask, type Choices, type StartCalls } from './startForm.svelte'
+import {
+  CHOICES_UNANSWERED,
+  ask,
+  placeKey,
+  type Choices,
+  type Keep,
+  type StartCalls,
+  type StartForm,
+} from './startForm.svelte'
 
-export type FlowCalls = Pick<StartCalls, 'issueFlows'>
+export type FlowCalls = Pick<StartCalls, 'issueFlows' | 'startFlow'>
+
+export type StartMode = 'agent' | 'flow'
 
 export type FlowMemory = { flow: string | null }
 
 export type FlowOption = { name: string; agents: string; description: string; problem: string | null }
 
+export const FLOW_EMPTY = 'Choose a flow'
+export const FLOW_UNANSWERED =
+  'cornercase did not answer, so the flow may have started: look at the board before trying again.'
+
 const ORCHESTRATOR = 'orchestrator'
+
+const worktrees: Keep = (place) => place.worktree
 
 const remembered: FlowMemory = { flow: null }
 
@@ -35,6 +51,10 @@ const teamOf = (flow: FlowChoice) => {
 export class FlowStart {
   flows = $state.raw<Choices<FlowChoice>>({ kind: 'loading' })
   flow = $state<string | null>(null)
+  flowError = $state<string | null>(null)
+  #mode = $state<StartMode>('agent')
+  #left: { [mode in StartMode]?: string | null } = {}
+  #form: StartForm
   #calls: FlowCalls
   #memory: FlowMemory
   #read = new SvelteMap<number, FlowChoice[]>()
@@ -42,9 +62,25 @@ export class FlowStart {
   #boot: string | null = null
   #asked = 0
 
-  constructor(calls: FlowCalls, memory: FlowMemory = remembered) {
+  constructor(form: StartForm, calls: FlowCalls, memory: FlowMemory = remembered) {
+    this.#form = form
     this.#calls = calls
     this.#memory = memory
+  }
+
+  get mode() {
+    return this.#mode
+  }
+
+  get offered() {
+    const flows = this.flows
+    const listed = flows.kind === 'failed' || (flows.kind === 'ready' && flows.items.length > 0)
+    const places = this.#form.placesWhere(worktrees)
+    return this.#mode === 'flow' || (listed && places.kind === 'ready' && places.items.length > 0)
+  }
+
+  get placeChoices() {
+    return this.#mode === 'flow' ? this.#form.placesWhere(worktrees) : this.#form.placeChoices
   }
 
   get options(): Choices<FlowOption> {
@@ -84,6 +120,65 @@ export class FlowStart {
 
   remember(name: string) {
     this.#memory.flow = name
+  }
+
+  async use(mode: StartMode) {
+    const form = this.#form
+    if (mode === this.#mode) {
+      return
+    }
+    this.#left[this.#mode] = form.place
+    this.#mode = mode
+    form.place = this.#placeFor(mode)
+    form.placeError = null
+    form.formError = null
+    this.flowError = null
+    await this.look()
+  }
+
+  async moveTo(place: string | null) {
+    this.#form.place = place
+    if (this.#mode === 'flow') {
+      await this.look()
+    }
+  }
+
+  async look() {
+    const place = this.#flowPlace()
+    if (place !== undefined) {
+      await this.read(place.project, this.#form.boot)
+    }
+  }
+
+  async start() {
+    const form = this.#form
+    const issue = form.issue
+    if (issue === null || !form.canStartIssue) {
+      return
+    }
+    const place = form.checkPlace()
+    const chosen = this.chosen
+    this.flowError = chosen === undefined ? FLOW_EMPTY : null
+    if (place === undefined || chosen === undefined) {
+      return
+    }
+    const { key, source } = issue.issue
+    const { branch, issueBranch } = form
+    const run = { project: place.project, name: chosen.name, key, source, branch, issue_branch: issueBranch }
+    if (await form.launch(() => this.#calls.startFlow(run), FLOW_UNANSWERED)) {
+      this.remember(chosen.name)
+    }
+  }
+
+  #placeFor(mode: StartMode) {
+    const left = this.#left[mode]
+    return left === undefined ? this.#form.defaultPlace(mode === 'flow' ? worktrees : undefined) : left
+  }
+
+  #flowPlace() {
+    const key = this.#mode === 'flow' ? this.#form.place : this.#placeFor('flow')
+    const places = (this.#form.issue?.places ?? []).filter(worktrees)
+    return places.find((place) => placeKey(place) === key) ?? places[0]
   }
 
   #restarted(boot: string | null) {
