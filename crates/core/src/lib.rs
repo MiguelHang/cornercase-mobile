@@ -4,6 +4,7 @@ pub mod cli;
 pub mod error;
 mod files;
 pub mod follow;
+pub mod history;
 pub mod identity;
 pub mod machines;
 pub mod network;
