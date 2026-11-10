@@ -48,7 +48,6 @@ macro_rules! app_commands {
             start::installed_agents,
             start::start_agent,
             start::start_issue,
-            start::new_workspace,
             changes::changes_file,
             changes::changes_viewed,
             changes::changes_follow::<Wry>,

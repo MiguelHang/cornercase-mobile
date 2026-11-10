@@ -1,5 +1,5 @@
 use cornercase_core::cli::agents::{self, AgentChoice};
-use cornercase_core::cli::start::{self, NewWorkspace, StartAgent, StartIssue, Started};
+use cornercase_core::cli::start::{self, StartAgent, StartIssue, Started};
 use cornercase_core::error::Error;
 use cornercase_core::queue::Outcome;
 use tauri::State;
@@ -33,12 +33,6 @@ pub(crate) async fn start_agent(state: State<'_, AppState>, form: StartAgent) ->
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn start_issue(state: State<'_, AppState>, form: StartIssue) -> Result<Started, CommandError> {
-    run(&state, form.argv()).await
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn new_workspace(state: State<'_, AppState>, form: NewWorkspace) -> Result<Started, CommandError> {
     run(&state, form.argv()).await
 }
 

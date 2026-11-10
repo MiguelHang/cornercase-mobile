@@ -182,7 +182,7 @@ describe('App wiring', () => {
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} {backTo} onback={goBack} onstarted={started} oncreated={created} onissues={listIssues} /> {:else if route.name === 'issues'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} {backTo} onback={goBack} onstarted={started} onissues={listIssues} /> {:else if route.name === 'issues'}",
     )
   })
 
@@ -228,12 +228,6 @@ describe('App wiring', () => {
     )
     expect(source).toContain(
       "const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)",
-    )
-  })
-
-  it('tells the workspace it made and goes back to the board only from Start', () => {
-    expect(source).toContain(
-      "const created = (name: string) => { toasts.push({ level: 'info', message: `Workspace ${name} created` }) if (router.current.name === 'start') { router.back() } }",
     )
   })
 

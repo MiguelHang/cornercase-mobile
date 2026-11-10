@@ -15,10 +15,6 @@ const ACCOUNTS: &str = include_str!(concat!(
 
 const STARTED: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/control/start/0.13.19.json"));
-const CREATED: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../crates/core/tests/fixtures/control/new-workspace/0.13.19.json"
-));
 const START: [&str; 8] =
     ["start", "claude", "--project", "5", "--worktree=fix-login", "--model=opus", "--prompt=Fix the login", "--placed"];
 
@@ -218,18 +214,6 @@ mod agent {
     }
 }
 
-mod workspace {
-    use super::*;
-
-    #[tokio::test(start_paused = true)]
-    async fn sends_the_form_as_cornercase_s_new_workspace_and_answers_its_ids() {
-        let argv = ["new-workspace", "--project", "2", "--worktree", "--json", "--", "fix-login"];
-        let studio = connected(serving(&[two_projects()]).answer(&argv, &[CREATED], &[], 0)).await;
-        let form = NewWorkspace { project: 2, name: " fix-login ".to_owned(), worktree: true };
-        assert_eq!(run(&studio.state, form.argv()).await, Ok(ids(7, 13, 41, 58)));
-    }
-}
-
 mod issue {
     use super::*;
 
@@ -329,18 +313,16 @@ mod over_ipc {
     }
 
     #[test]
-    fn reads_the_three_forms_and_refuses_them_without_a_connected_machine() {
+    fn reads_both_forms_and_refuses_them_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
         let agent = json!({ "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix" });
         let started = ipc.invoke("start_agent", json!({ "form": agent })).expect_err("no machine");
-        let workspace = json!({ "project": 5, "name": "fix", "worktree": false });
-        let created = ipc.invoke("new_workspace", json!({ "form": workspace })).expect_err("no machine");
         let issue = json!({
             "place": { "kind": "worktree", "project": 5, "branch": "issue-41" }, "agent": "claude", "model": "",
             "key": "#41", "source": "github", "issue_branch": "issue-41"
         });
         let from_issue = ipc.invoke("start_issue", json!({ "form": issue })).expect_err("no machine");
-        let codes = [&started["code"], &created["code"], &from_issue["code"]];
-        assert_eq!(codes, [&json!("not_connected"); 3]);
+        let codes = [&started["code"], &from_issue["code"]];
+        assert_eq!(codes, [&json!("not_connected"); 2]);
     }
 }

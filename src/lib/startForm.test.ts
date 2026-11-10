@@ -12,12 +12,10 @@ import {
   AGENT_UNANSWERED,
   BRANCH_EMPTY,
   CHOICES_UNANSWERED,
-  NAME_EMPTY,
   PROJECT_EMPTY,
   PROMPT_EMPTY,
   StartForm,
   WORKSPACE_EMPTY,
-  WORKSPACE_UNANSWERED,
   ask,
   type Memory,
   type StartCalls,
@@ -60,15 +58,13 @@ const calls = (overrides: Partial<StartCalls> = {}) => ({
   installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
   startIssue: vi.fn(overrides.startIssue ?? (() => ok(STARTED))),
-  newWorkspace: vi.fn(overrides.newWorkspace ?? (() => ok(STARTED))),
 })
 
 const made = (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
   const onstarted = vi.fn()
-  const oncreated = vi.fn()
   const commands = calls(overrides)
-  const form = new StartForm(commands, onstarted, oncreated, memory)
-  return { form, onstarted, oncreated, commands, memory }
+  const form = new StartForm(commands, onstarted, memory)
+  return { form, onstarted, commands, memory }
 }
 
 const loaded = async (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
@@ -84,7 +80,6 @@ const filled = async (overrides: Partial<StartCalls> = {}) => {
   built.form.model = ' opus '
   built.form.prompt = 'fix the login\nand its tests'
   built.form.branch = 'fix-login'
-  built.form.name = 'login'
   return built
 }
 
@@ -116,7 +111,6 @@ const typed = (form: StartForm) => ({
   model: form.model,
   prompt: form.prompt,
   branch: form.branch,
-  name: form.name,
   ownWorktree: form.ownWorktree,
 })
 
@@ -437,10 +431,9 @@ describe('StartForm start', () => {
     const first = form.start()
     expect(form.sending).toBe(true)
     await form.start()
-    await form.create()
     answer.open({ status: 'ok', data: STARTED })
     await first
-    expect([commands.startAgent.mock.calls.length, commands.newWorkspace.mock.calls.length]).toEqual([1, 0])
+    expect(commands.startAgent).toHaveBeenCalledTimes(1)
   })
 
   it('says the agent may have started when the request is left unanswered, and does not try again', async () => {
@@ -448,52 +441,6 @@ describe('StartForm start', () => {
     await form.start()
     expect([form.formError, form.sending]).toEqual([AGENT_UNANSWERED, false])
     expect(commands.startAgent).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('StartForm create', () => {
-  it('sends the workspace and hands over what was made with its trimmed name', async () => {
-    const { form, commands, oncreated } = await filled()
-    form.name = ' -login '
-    form.ownWorktree = true
-    await form.create()
-    expect(commands.newWorkspace.mock.calls).toEqual([[{ project: 2, name: ' -login ', worktree: true }]])
-    expect(oncreated.mock.calls).toEqual([['-login']])
-  })
-
-  it.each<[string, string]>([
-    ['an empty name', ''],
-    ['a name of only spaces', '   '],
-  ])('refuses %s under its field without sending', async (_, name) => {
-    const { form, commands } = await filled()
-    form.name = name
-    await form.create()
-    expect(form.nameError).toBe(NAME_EMPTY)
-    expect(commands.newWorkspace).not.toHaveBeenCalled()
-  })
-
-  it('refuses no project under its field', async () => {
-    const { form, commands } = await filled()
-    form.project = null
-    await form.create()
-    expect(form.projectError).toBe(PROJECT_EMPTY)
-    expect(commands.newWorkspace).not.toHaveBeenCalled()
-  })
-
-  it('keeps everything typed and shows what the server says', async () => {
-    const { form, oncreated } = await filled({ newWorkspace: () => failed('not a git repository') })
-    const before = typed(form)
-    await form.create()
-    expect(typed(form)).toEqual(before)
-    expect([form.formError, form.sending]).toEqual(['not a git repository', false])
-    expect(oncreated).not.toHaveBeenCalled()
-  })
-
-  it('says the workspace may exist when the request is left unanswered', async () => {
-    const { form, commands } = await filled({ newWorkspace: () => refused(UNANSWERED) })
-    await form.create()
-    expect(form.formError).toBe(WORKSPACE_UNANSWERED)
-    expect(commands.newWorkspace).toHaveBeenCalledTimes(1)
   })
 })
 

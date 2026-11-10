@@ -18,8 +18,6 @@ import ShowIssues from './ShowIssues.svelte'
 import showSource from './ShowIssues.svelte?raw'
 import Start from './Start.svelte'
 import startSource from './Start.svelte?raw'
-import WorkspaceForm from './WorkspaceForm.svelte'
-import workspaceSource from './WorkspaceForm.svelte?raw'
 import workspacePickerSource from './WorkspacePicker.svelte?raw'
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://mac:7000' }
@@ -43,11 +41,10 @@ const CALLS: StartCalls = {
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
   startIssue: never,
-  newWorkspace: never,
 }
 
 const formOf = async (calls: Partial<StartCalls> = {}) => {
-  const form = new StartForm({ ...CALLS, ...calls }, () => {}, () => {}, { agent: null, workspace: null })
+  const form = new StartForm({ ...CALLS, ...calls }, () => {}, { agent: null, workspace: null })
   await form.load()
   return form
 }
@@ -67,7 +64,6 @@ const screen = (form: StartForm, connection: ConnectionView_Serialize = CONNECTE
       backTo: 'Agents',
       onback: () => {},
       onstarted: () => {},
-      oncreated: () => {},
       onissues: () => {},
       form,
     },
@@ -80,8 +76,6 @@ const showIssues = (form: StartForm, sendable = true) =>
   render(ShowIssues, { props: { form, sendable, onshow: () => {} } }).body
 
 const agentForm = (form: StartForm, sendable = true) => render(AgentForm, { props: { form, sendable } }).body
-
-const workspaceForm = (form: StartForm, sendable = true) => render(WorkspaceForm, { props: { form, sendable } }).body
 
 const LABEL = /<label class="label[^"]*" for="[^"]+">([^<]+)<\/label>/g
 
@@ -101,26 +95,25 @@ const filled = async (calls: Partial<StartCalls> = {}) => {
   form.project = 2
   form.workspace = 9
   form.prompt = 'fix the login'
-  form.name = 'login'
   return form
 }
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 describe('Start', () => {
-  it('goes back to the agents from a bar with its title, and starts on Agent', async () => {
+  it('goes back to the agents from a bar with its title, and starts on Agent, with Issue as the only other action', async () => {
     const body = screen(await formOf())
     expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
     expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Start<\/h1>/)
     expect(body).not.toContain('class="top')
     expect(body).toMatch(
-      /aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button><button[^>]*aria-pressed="false">Issue<\/button>/,
+      /<div class="actions[^"]*" role="group" aria-label="What to start"><!--\[-->(<!--[^>]*-->)?<button[^>]*aria-pressed="true">Agent<\/button>(<!--[^>]*-->)?<button[^>]*aria-pressed="false">Issue<\/button>(<!--[^>]*-->)?<!--]--><\/div>/,
     )
     expect(labels(body)).toEqual(['Workspace', 'Agent', 'Model', 'Prompt'])
   })
 
   it('shows the projects and the agents loading while the rest can be filled', () => {
-    const body = screen(new StartForm(CALLS, () => {}, () => {}, { agent: null, workspace: null }))
+    const body = screen(new StartForm(CALLS, () => {}, { agent: null, workspace: null }))
     const reading = [...body.matchAll(/<p class="state[^"]*"><span class="spinner[^]*?<\/span>(?:<!---->)?([^<]*)</g)]
     expect(reading.map(([, text]) => text)).toEqual(['Reading the workspaces…', 'Reading the agents…'])
     expect(labels(body)).toEqual(['Model', 'Prompt'])
@@ -252,48 +245,6 @@ describe('Start, where its agent works', () => {
   })
 })
 
-describe('Start, its workspace form', () => {
-  it('has the project, the Own worktree switch off, the name and Create workspace', async () => {
-    const body = workspaceForm(await formOf())
-    expect(labels(body)).toEqual(['Project', 'Name'])
-    expect(body).toMatch(/">Own worktree<\/span> <input class="toggle[^"]*" type="checkbox" role="switch"\/>/)
-    expect(label(submit(body))).toBe('Createworkspace')
-  })
-
-  it('asks for a branch once the switch is on', async () => {
-    const form = await formOf()
-    form.ownWorktree = true
-    const body = workspaceForm(form)
-    expect(body).toMatch(/role="switch" checked=""\/>/)
-    expect(labels(body)).toEqual(['Project', 'Branch'])
-  })
-
-  it('tells a missing name under it', async () => {
-    const form = await formOf()
-    await form.create()
-    expect(errorOf(workspaceForm(form), 'Name')).toBe('Name the workspace')
-  })
-
-  it('turns the button into a spinner with Creating… while it sends', async () => {
-    const form = await filled()
-    void form.create()
-    const body = workspaceForm(form)
-    expect(submit(body)?.[1]).toContain('aria-busy="true"')
-    expect(label(submit(body))).toBe('Creating…')
-    expect(body.match(/<(?:input|select)[^>]*disabled=""/g)).toHaveLength(3)
-  })
-
-  it('shows what the server says', async () => {
-    const form = await filled({ newWorkspace: refusing('not a git repository') })
-    await form.create()
-    expect(workspaceForm(form)).toMatch(/<p class="problem[^"]*" role="alert">not a git repository<\/p>/)
-  })
-
-  it('holds Create workspace while not connected', async () => {
-    expect(submit(workspaceForm(await formOf(), false))?.[1]).toContain('disabled=""')
-  })
-})
-
 describe('Start, its way to the issues', () => {
   it('chooses the project and offers Show issues', async () => {
     const body = showIssues(await formOf())
@@ -378,7 +329,7 @@ describe('Start, on an issue', () => {
   it('hands over the agent it started on the issue', async () => {
     const onstarted = vi.fn()
     const started = { project: 2, workspace: 3, tab: 4, pane: 5, warning: null }
-    const form = new StartForm({ ...CALLS, startIssue: () => answer(started) }, onstarted, () => {}, {
+    const form = new StartForm({ ...CALLS, startIssue: () => answer(started) }, onstarted, {
       agent: null,
       workspace: null,
     })
@@ -397,14 +348,12 @@ describe('Start wiring', () => {
     expect(script).toContain('$effect(() => { const connected = sendable untrack(() => void form.see(connected)) })')
   })
 
-  it('hands over what started or was made, goes back on Back and switches between the two forms', () => {
+  it('hands over what started, goes back on Back and switches between the agent form and the issues', () => {
     const script = flat(startSource)
-    expect(script).toContain('(started, agent) => onstarted(started, agent),')
-    expect(script).toContain('(name) => oncreated(name),')
+    expect(script).toContain('form = new StartForm(commands, (started, agent) => onstarted(started, agent)),')
     expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
     expect(script).toContain('onclick={() => (action = name)}')
     expect(script).toContain("{:else if action === 'agent'} <AgentForm {form} {sendable} />")
-    expect(script).toContain("{:else if action === 'workspace'} <WorkspaceForm {form} {sendable} />")
     expect(script).toContain('{:else} <ShowIssues {form} {sendable} onshow={onissues} />')
   })
 
@@ -417,7 +366,6 @@ describe('Start wiring', () => {
 
   it('sends each form with its own action', () => {
     expect(flat(agentSource)).toContain('void form.start()')
-    expect(flat(workspaceSource)).toContain('void form.create()')
     expect(flat(issueSource)).toContain('onsubmit={() => void form.startIssue()}')
   })
 

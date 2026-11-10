@@ -164,6 +164,12 @@ mod missing {
     }
 
     #[test]
+    fn does_not_need_a_server_that_makes_workspaces() {
+        let descriptor = real_but(|value| without(value, "operations", "new-workspace"));
+        assert_eq!(missing(&descriptor), []);
+    }
+
+    #[test]
     fn reports_a_server_that_cannot_list_the_agents() {
         let descriptor = real_but(|value| without(value, "operations", "account-list"));
         assert_eq!(missing(&descriptor), [one("account-list", Kind::Operation, None)]);

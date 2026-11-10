@@ -41,15 +41,6 @@ pub struct StartIssue {
     pub issue_branch: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub struct NewWorkspace {
-    #[cfg_attr(feature = "specta", specta(type = u32))]
-    pub project: u64,
-    pub name: String,
-    pub worktree: bool,
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default)]
@@ -108,15 +99,6 @@ impl StartIssue {
     fn other_branch(&self) -> &str {
         let branch = self.place.branch().trim();
         if branch == self.issue_branch.trim() { "" } else { branch }
-    }
-}
-
-impl NewWorkspace {
-    pub fn argv(&self) -> Vec<String> {
-        let mut argv = words(&["new-workspace", "--project", &self.project.to_string()]);
-        argv.extend(self.worktree.then(|| "--worktree".to_owned()));
-        argv.extend(words(&["--json", "--", self.name.trim()]));
-        argv
     }
 }
 

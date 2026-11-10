@@ -13,7 +13,7 @@ import { messageOf } from './toasts'
 
 export type StartCalls = Pick<
   typeof commands,
-  'startProjects' | 'installedAgents' | 'startAgent' | 'startIssue' | 'newWorkspace'
+  'startProjects' | 'installedAgents' | 'startAgent' | 'startIssue'
 >
 
 export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string } | { kind: 'ready'; items: T[] }
@@ -29,11 +29,8 @@ export const WORKSPACE_EMPTY = 'Choose a workspace'
 export const BRANCH_EMPTY = 'Name the branch'
 export const AGENT_EMPTY = 'Choose an agent'
 export const PROMPT_EMPTY = 'Write what the agent should do'
-export const NAME_EMPTY = 'Name the workspace'
 export const AGENT_UNANSWERED =
   'cornercase did not answer, so the agent may have started: look at the board before trying again.'
-export const WORKSPACE_UNANSWERED =
-  'cornercase did not answer, so the workspace may exist already: look on the Mac before trying again.'
 export const CHOICES_UNANSWERED = 'cornercase did not answer.'
 
 const remembered: Memory = { agent: null, workspace: null }
@@ -80,7 +77,6 @@ export class StartForm {
   agent = $state('')
   model = $state('')
   prompt = $state('')
-  name = $state('')
   ownWorktree = $state(false)
   issue = $state.raw<StartingIssue | null>(null)
   branch = $state('')
@@ -89,12 +85,10 @@ export class StartForm {
   branchError = $state<string | null>(null)
   agentError = $state<string | null>(null)
   promptError = $state<string | null>(null)
-  nameError = $state<string | null>(null)
   formError = $state<string | null>(null)
   sending = $state(false)
   #calls: StartCalls
   #onstarted: (started: Started, agent: string) => void
-  #oncreated: (name: string) => void
   #memory: Memory
   #boot: string | null = null
   #connected: boolean | null = null
@@ -104,12 +98,10 @@ export class StartForm {
   constructor(
     calls: StartCalls,
     onstarted: (started: Started, agent: string) => void,
-    oncreated: (name: string) => void,
     memory: Memory = remembered,
   ) {
     this.#calls = calls
     this.#onstarted = onstarted
-    this.#oncreated = oncreated
     this.#memory = memory
   }
 
@@ -260,26 +252,6 @@ export class StartForm {
       this.#onstarted(reply.data, agent)
     }
     return reply.ok
-  }
-
-  async create() {
-    if (this.sending) {
-      return
-    }
-    this.projectError = errorIf(this.project === null, PROJECT_EMPTY)
-    this.nameError = errorIf(this.name.trim() === '', NAME_EMPTY)
-    this.formError = null
-    const { project, name, ownWorktree } = this
-    if (project === null || this.nameError !== null) {
-      return
-    }
-    const reply = await this.#send(
-      () => this.#calls.newWorkspace({ project, name, worktree: ownWorktree }),
-      WORKSPACE_UNANSWERED,
-    )
-    if (reply.ok) {
-      this.#oncreated(name.trim())
-    }
   }
 
   async #send<T>(call: () => Promise<Answer<T>>, unanswered: string) {

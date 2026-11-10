@@ -312,13 +312,6 @@
     }
   }
 
-  const created = (name: string) => {
-    toasts.push({ level: 'info', message: `Workspace ${name} created` })
-    if (router.current.name === 'start') {
-      router.back()
-    }
-  }
-
   const remember = (listed: Listed) => {
     if (listed.status === 'error') {
       toasts.failed(listed.error)
@@ -452,7 +445,6 @@
           {backTo}
           onback={goBack}
           onstarted={started}
-          oncreated={created}
           onissues={listIssues}
         />
       {:else if route.name === 'issues'}

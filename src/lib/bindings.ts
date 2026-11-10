@@ -32,7 +32,6 @@ export const commands = {
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
 	startIssue: (form: StartIssue) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_issue", { form })),
-	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
 	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
 	changesFollow: (workspace: number, mode: Mode) => typedError<null, CommandError>(__TAURI_INVOKE("changes_follow", { workspace, mode })),
@@ -701,12 +700,6 @@ export type Name_Deserialize = {
 export type Name_Serialize = {
 	path: string,
 	indices: number[],
-};
-
-export type NewWorkspace = {
-	project: number,
-	name: string,
-	worktree: boolean,
 };
 
 export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;

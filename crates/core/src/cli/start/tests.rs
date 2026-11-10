@@ -2,7 +2,7 @@ use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
-use crate::cli::start::fixtures::{NEW_WORKSPACE, START};
+use crate::cli::start::fixtures::START;
 
 fn worktree(branch: &str) -> Place {
     Place::Worktree { project: 3, branch: branch.to_owned() }
@@ -17,10 +17,6 @@ fn agent(model: &str, branch: &str) -> StartAgent {
         model: model.to_owned(),
         prompt: "fix the login".to_owned(),
     }
-}
-
-fn workspace(name: &str, worktree: bool) -> NewWorkspace {
-    NewWorkspace { project: 7, name: name.to_owned(), worktree }
 }
 
 fn issue(model: &str, branch: &str) -> StartIssue {
@@ -150,19 +146,6 @@ mod start_issue {
     }
 }
 
-mod new_workspace {
-    use super::*;
-
-    #[rstest]
-    #[case::plain(workspace("experiments", false), &["new-workspace", "--project", "7", "--json", "--", "experiments"])]
-    #[case::worktree(workspace("fix/login", true), &["new-workspace", "--project", "7", "--worktree", "--json", "--", "fix/login"])]
-    #[case::dash(workspace("-rf", false), &["new-workspace", "--project", "7", "--json", "--", "-rf"])]
-    #[case::spaces(workspace("  experiments \n", true), &["new-workspace", "--project", "7", "--worktree", "--json", "--", "experiments"])]
-    fn names_the_workspace_after_a_double_dash(#[case] form: NewWorkspace, #[case] expected: &[&str]) {
-        assert_eq!(form.argv(), expected);
-    }
-}
-
 mod place {
     use super::*;
 
@@ -193,19 +176,15 @@ mod started {
         value.to_string()
     }
 
-    #[rstest]
-    #[case::start(START, ids(3, 12, 40, 57))]
-    #[case::new_workspace(NEW_WORKSPACE, ids(7, 13, 41, 58))]
-    fn reads_the_ids_cornercase_0_13_19_answers(#[case] text: &str, #[case] expected: Started) {
-        assert_eq!(started(text), Ok(expected));
+    #[test]
+    fn reads_the_ids_cornercase_0_13_19_answers() {
+        assert_eq!(started(START), Ok(ids(3, 12, 40, 57)));
     }
 
-    #[rstest]
-    #[case::start(START, ids(3, 12, 40, 57))]
-    #[case::new_workspace(NEW_WORKSPACE, ids(7, 13, 41, 58))]
-    fn keeps_the_warning_when_there_is_one(#[case] text: &str, #[case] ids: Started) {
-        let expected = Started { warning: Some("the setup script failed".to_owned()), ..ids };
-        assert_eq!(started(&with_warning(text)), Ok(expected));
+    #[test]
+    fn keeps_the_warning_when_there_is_one() {
+        let expected = Started { warning: Some("the setup script failed".to_owned()), ..ids(3, 12, 40, 57) };
+        assert_eq!(started(&with_warning(START)), Ok(expected));
     }
 
     #[test]
