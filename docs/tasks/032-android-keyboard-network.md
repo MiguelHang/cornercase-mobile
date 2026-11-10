@@ -76,3 +76,24 @@ terminal y el chat de un agente parado (Claude Code sin trabajar), sin escribir 
 - **Sin cambios de código**: el `top`/`height` de `Terminal.svelte` ya vale en Android (`offsetTop` 0 y la altura del
   visual viewport, la misma que la del layout), y la página no se queda desplazada al cerrar el teclado, así que no
   se añade la vuelta del scroll a 0: lo visto en la 030 era sin los insets del IME de `MainActivity.kt` (T1).
+
+### T5 — escribir con GBoard y con teclas de hardware (2026-11-10)
+Mismo AVD y APK con T4, contra un servidor cornercase 0.13.19 aislado (`HOME`, estado y socket propios) detrás de un
+segundo puente, en la terminal de un agente falso (un `bash` real lanzado como `claude`): nada llegó al servidor
+del usuario. Eventos del campo oculto leídos por CDP; lo recibido, con `cornercase read`.
+
+- **GBoard no compone**: cada letra llega como `keydown` `Unidentified` (229) y un `beforeinput` `insertText` no
+  composición de un carácter, así que el Mac la recibe al momento, no por palabras (P2: queda la a), sin cambios).
+- **La barra de sugerencias sale igual**, aunque la WebView ya pide `NO_SUGGESTIONS` (`inputType` 0x2a00a1:
+  `MULTI_LINE | NO_SUGGESTIONS | WEB_EDIT_TEXT`); GBoard la enseña y no autocorrige (`teh ` llega tal cual). Tocar una
+  sugerencia manda solo lo que falta (`echo` + `insertText` `es `), así que tampoco rompe nada. El flag que la
+  quitaría ya está puesto, así que no se añaden `inputmode` ni `enterkeyhint` (sin probar: no controlan ese flag) y
+  `Typist.svelte` queda igual, sin riesgo para iOS.
+- **Borrar** es un `keydown` `Backspace` (8) por pulsación, sin `beforeinput`: un `backspace` cada uno, la línea
+  vacía en el Mac. **Enter** es un `keydown` `Enter` (13): un solo `enter`, la línea se ejecuta una vez. No se vio
+  ningún `insertText` `'\n'`.
+- **Teclas de hardware** (`input text`, `input keyevent`, como el teclado del host): las letras pasan igual por el
+  IME (229 + `insertText`); `Backspace`, `Enter`, `ArrowUp` (historial) y Ctrl-C llegan como `keydown` con su
+  `keyCode` y funcionan.
+- Sin ver en vivo: una composición (escritura deslizando, voz, acentos) y SwiftKey (no está en la imagen); quedan en
+  la lista del dispositivo y cubiertas por los tests.
