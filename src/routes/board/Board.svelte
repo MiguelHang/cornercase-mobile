@@ -2,6 +2,7 @@
   import { flip } from 'svelte/animate'
   import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
   import { items } from '../../lib/board'
+  import { folds } from '../../lib/folds.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
@@ -10,12 +11,14 @@
   const TICK_MS = 30_000
 
   let {
+    machine,
     agents,
     connection,
     below = 0,
     onopen,
     onstart,
   }: {
+    machine: number | null
     agents: Agent[] | null
     connection: ConnectionView_Serialize
     below?: number
@@ -29,6 +32,16 @@
     const timer = setInterval(() => (now = Date.now()), TICK_MS)
     return () => clearInterval(timer)
   })
+
+  const boot = $derived(agents?.[0]?.boot ?? '')
+
+  const opened = $derived(machine === null ? undefined : folds.expanded(machine, boot))
+
+  const fold = (pane: number) => {
+    if (machine !== null) {
+      folds.toggle(machine, boot, pane)
+    }
+  }
 
   const moving = { duration: prefersReducedMotion() ? 0 : ENTER_MS }
 </script>
@@ -46,12 +59,12 @@
     <p class="empty">No agents running.</p>
   {:else}
     <ul class="items">
-      {#each items(agents) as item (item.key)}
+      {#each items(agents, opened) as item (item.key)}
         <li class="item" animate:flip={moving}>
           {#if item.kind === 'header'}
             <h2 class="section">{item.section}</h2>
           {:else}
-            <AgentRow row={item.row} {now} {onopen} />
+            <AgentRow {item} {agents} {now} {onopen} onfold={fold} />
           {/if}
         </li>
       {/each}

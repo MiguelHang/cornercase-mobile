@@ -77,6 +77,10 @@ export type AgentRow_Deserialize = {
 	title?: string | null,
 	status?: string | null,
 	since?: string | null,
+	parent?: number | null,
+	depth: number,
+	role?: string | null,
+	rank_status?: string | null,
 };
 
 export type AgentRow_Serialize = {
@@ -93,6 +97,10 @@ export type AgentRow_Serialize = {
 	title: string | null,
 	status: string | null,
 	since: string | null,
+	parent: number | null,
+	depth: number,
+	role: string | null,
+	rank_status: string | null,
 };
 
 export type AgentsChanged = AgentsChanged_Serialize | AgentsChanged_Deserialize;
