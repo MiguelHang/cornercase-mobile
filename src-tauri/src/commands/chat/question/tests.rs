@@ -162,6 +162,15 @@ mod over_ipc {
         assert_eq!(refused.expect_err("no machine")["code"], "not_connected");
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn closes_the_surface_of_its_tab() {
+        let asked = Watched::in_tab(942).await;
+        let ipc = Ipc::new(asked.studio.state);
+        assert_eq!(ipc.invoke("question_close", json!({ "tab": 942 })), Ok(Value::Null));
+        settle().await;
+        assert_eq!(asked.surfaces.running(), 0);
+    }
+
     #[test]
     fn closes_nothing_without_a_question() {
         let ipc = Ipc::new(Studio::new().reloaded());
