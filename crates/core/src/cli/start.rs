@@ -90,15 +90,10 @@ impl StartIssue {
         argv.extend(self.place.target());
         argv.push(format!("--issue={}", self.key.trim()));
         argv.extend(optional("--source", &self.source));
-        argv.extend(optional("--worktree", self.other_branch()));
+        argv.extend(optional("--worktree", other_branch(self.place.branch(), &self.issue_branch)));
         argv.extend(optional("--model", &self.model));
         argv.extend(words(&["--placed", "--json"]));
         argv
-    }
-
-    fn other_branch(&self) -> &str {
-        let branch = self.place.branch().trim();
-        if branch == self.issue_branch.trim() { "" } else { branch }
     }
 }
 
@@ -106,11 +101,16 @@ pub fn started(text: &str) -> Result<Started, Error> {
     serde_json::from_str(text).map_err(|error| json_error(&error))
 }
 
-fn words(words: &[&str]) -> Vec<String> {
+pub(crate) fn words(words: &[&str]) -> Vec<String> {
     words.iter().map(|&word| word.to_owned()).collect()
 }
 
-fn optional(name: &str, value: &str) -> Option<String> {
+pub(crate) fn other_branch<'a>(branch: &'a str, issue_branch: &str) -> &'a str {
+    let branch = branch.trim();
+    if branch == issue_branch.trim() { "" } else { branch }
+}
+
+pub(crate) fn optional(name: &str, value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| format!("{name}={value}"))
 }

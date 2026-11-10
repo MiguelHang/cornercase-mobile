@@ -1,0 +1,28 @@
+{
+  "branch": "issue-482-login-form-forgets-the-email",
+  "members": [
+    {
+      "agent": "claude",
+      "pane": 11,
+      "role": "orchestrator",
+      "tab": 14
+    },
+    {
+      "agent": "codex",
+      "pane": 12,
+      "role": "coder",
+      "tab": 15
+    },
+    {
+      "agent": "claude",
+      "pane": 13,
+      "role": "tester",
+      "tab": 16
+    }
+  ],
+  "note": "this project's flow passes --search to `coder`; they run without asking, so check them",
+  "project": 8,
+  "run": 10,
+  "run_dir": "/Users/mara/.local/state/cornercase/runs/2026-11-10-issue-482-login-form-forgets-the-email",
+  "workspace": 9
+}

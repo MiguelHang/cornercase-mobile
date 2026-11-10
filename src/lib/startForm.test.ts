@@ -61,6 +61,8 @@ const calls = (overrides: Partial<StartCalls> = {}) => ({
   installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
   startIssue: vi.fn(overrides.startIssue ?? (() => ok(STARTED))),
+  issueFlows: vi.fn(overrides.issueFlows ?? (() => ok({ flows: [] }))),
+  startFlow: vi.fn(overrides.startFlow ?? (() => ok({ started: STARTED, agent: 'claude' }))),
 })
 
 const made = (overrides: Partial<StartCalls> = {}, memory: Memory = { ...FORGETFUL }) => {
@@ -662,5 +664,51 @@ describe('StartForm, where an issue starts', () => {
   it('offers no place without an issue', async () => {
     const { form } = await loaded()
     expect([form.placeChoices, form.chosenPlace]).toEqual([{ kind: 'ready', items: [] }, undefined])
+  })
+})
+
+describe('StartForm, for another way to start an issue', () => {
+  const WHERE: Where = { project: 2, places: [SHOP, LOGIN], workspace: 22 }
+  const worktrees = (one: PlaceInfo) => one.worktree
+  const FLOW_UNANSWERED = 'cornercase did not answer, so the flow may have started.'
+
+  it('offers only the places it keeps, and picks the default among them by the same rule', async () => {
+    const { form } = await fromIssue({}, { ...FORGETFUL }, WHERE)
+    expect([form.place, form.defaultPlace(worktrees)]).toEqual(['workspace-22', 'project-2'])
+    expect(form.placesWhere(worktrees)).toEqual({ kind: 'ready', items: [SHOP] })
+    expect(form.defaultPlace((one) => one.project === 9)).toBeNull()
+  })
+
+  it('offers and picks no place without an issue, and none after a restart', async () => {
+    const answers = [ok(choices(SESSION)), ok(choices(SESSION, 'boot-2'))]
+    const { form } = await fromIssue({ startProjects: () => answers.shift() ?? ok(choices(SESSION)) }, { ...FORGETFUL }, WHERE)
+    expect(form.canStartIssue).toBe(true)
+    await form.refresh()
+    expect([form.placesWhere(worktrees), form.canStartIssue]).toEqual([{ kind: 'failed', reason: PLACES_STALE }, false])
+    const { form: empty } = await loaded()
+    expect([empty.defaultPlace(), empty.canStartIssue]).toEqual([null, false])
+  })
+
+  it('refuses no place under its field, and hands over the chosen one clearing what was said', async () => {
+    const { form } = await fromIssue({}, { ...FORGETFUL }, { project: null, places: [NOTES, LOGIN] })
+    expect([form.checkPlace(), form.placeError]).toEqual([undefined, PLACE_EMPTY])
+    form.place = 'workspace-22'
+    form.formError = 'refused'
+    expect([form.checkPlace(), form.placeError, form.formError]).toEqual([LOGIN, null, null])
+  })
+
+  it('hands over what started with the agent the answer names, remembering no agent', async () => {
+    const { form, onstarted, memory } = await fromIssue()
+    const launched = await form.launch(() => ok({ started: STARTED, agent: 'codex' }), FLOW_UNANSWERED)
+    expect([launched, form.sending, form.canStartIssue]).toEqual([true, true, false])
+    expect(onstarted.mock.calls).toEqual([[STARTED, 'codex']])
+    expect(memory).toEqual(FORGETFUL)
+  })
+
+  it('says its own text when the request is left unanswered, and can be sent again', async () => {
+    const { form, onstarted } = await fromIssue()
+    const launched = await form.launch(() => refused(UNANSWERED), FLOW_UNANSWERED)
+    expect([launched, form.formError, form.sending, form.canStartIssue]).toEqual([false, FLOW_UNANSWERED, false, true])
+    expect(onstarted).not.toHaveBeenCalled()
   })
 })

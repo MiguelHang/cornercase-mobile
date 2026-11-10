@@ -1,0 +1,21 @@
+{
+  "branch": "fix-login-email",
+  "members": [
+    {
+      "agent": "claude",
+      "pane": 20,
+      "role": "coder",
+      "tab": 23
+    },
+    {
+      "agent": "codex",
+      "pane": 21,
+      "role": "reviewer",
+      "tab": 24
+    }
+  ],
+  "project": 8,
+  "run": 18,
+  "run_dir": "/Users/mara/.local/state/cornercase/runs/2026-11-10-fix-login-email",
+  "workspace": 17
+}

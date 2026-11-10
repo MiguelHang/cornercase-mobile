@@ -182,6 +182,14 @@ mod missing {
     }
 
     #[rstest]
+    #[case::the_flows_of_a_project("flow-list")]
+    #[case::a_flow_run("flow-run")]
+    fn reports_a_server_that_cannot_start_a_flow(#[case] name: &str) {
+        let descriptor = real_but(|value| without(value, "operations", name));
+        assert_eq!(missing(&descriptor), [one(name, Kind::Operation, None)]);
+    }
+
+    #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
     fn reports_a_feature_the_server_lacks(#[case] name: &str) {

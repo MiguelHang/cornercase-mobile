@@ -46,6 +46,8 @@ export const commands = {
 	issueSources: (project: number) => typedError<Sources_Serialize, CommandError>(__TAURI_INVOKE("issue_sources", { project })),
 	issueList: (project: number, filter: ListFilter_Deserialize) => typedError<Lists_Serialize, CommandError>(__TAURI_INVOKE("issue_list", { project, filter })),
 	issueRead: (project: number, source: string, key: string) => typedError<ReadIssue_Serialize, CommandError>(__TAURI_INVOKE("issue_read", { project, source, key })),
+	issueFlows: (project: number) => typedError<Flows_Serialize, CommandError>(__TAURI_INVOKE("issue_flows", { project })),
+	startFlow: (form: StartFlow) => typedError<FlowStarted_Serialize, CommandError>(__TAURI_INVOKE("start_flow", { form })),
 };
 
 /** Events */
@@ -341,6 +343,58 @@ export type FileShown = FileShown_Serialize | FileShown_Deserialize;
 export type FileShown_Deserialize = { shown: "read"; read: Read_Deserialize } | { shown: "too_large_here"; bytes: number; lines: number };
 
 export type FileShown_Serialize = { shown: "read"; read: Read_Serialize } | { shown: "too_large_here"; bytes: number; lines: number };
+
+export type FlowChoice = FlowChoice_Serialize | FlowChoice_Deserialize;
+
+export type FlowChoice_Deserialize = {
+	name?: string,
+	description?: string,
+	roles?: FlowRole_Deserialize[],
+	problems?: string[],
+	default?: boolean,
+};
+
+export type FlowChoice_Serialize = {
+	name: string,
+	description: string,
+	roles: FlowRole_Serialize[],
+	problems: string[],
+	default: boolean,
+};
+
+export type FlowRole = FlowRole_Serialize | FlowRole_Deserialize;
+
+export type FlowRole_Deserialize = {
+	role?: string,
+	agent?: string,
+};
+
+export type FlowRole_Serialize = {
+	role: string,
+	agent: string,
+};
+
+export type FlowStarted = FlowStarted_Serialize | FlowStarted_Deserialize;
+
+export type FlowStarted_Deserialize = {
+	started: Started_Deserialize,
+	agent: string,
+};
+
+export type FlowStarted_Serialize = {
+	started: Started_Serialize,
+	agent: string,
+};
+
+export type Flows = Flows_Serialize | Flows_Deserialize;
+
+export type Flows_Deserialize = {
+	flows?: FlowChoice_Deserialize[],
+};
+
+export type Flows_Serialize = {
+	flows: FlowChoice_Serialize[],
+};
 
 export type Fold = Fold_Serialize | Fold_Deserialize;
 
@@ -979,6 +1033,15 @@ export type StartChoices_Deserialize = {
 export type StartChoices_Serialize = {
 	boot: string | null,
 	projects: ProjectChoice[],
+};
+
+export type StartFlow = {
+	project: number,
+	name: string,
+	key: string,
+	source: string,
+	branch: string,
+	issue_branch: string,
 };
 
 export type StartIssue = {

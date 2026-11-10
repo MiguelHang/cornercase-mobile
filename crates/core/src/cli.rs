@@ -3,6 +3,7 @@ pub mod changes;
 pub mod contract;
 pub mod events;
 pub mod files;
+pub mod flows;
 pub mod input;
 pub mod issues;
 pub mod keys;
