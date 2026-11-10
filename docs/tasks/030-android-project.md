@@ -12,7 +12,7 @@ La misma app corriendo en Android, sin funciones nuevas, con lo específico de i
 - [x] CA1 — `pnpm tauri android init`; `src-tauri/gen/android` versionado (D4); `applicationId`
   `dev.usecornercase.mobile`; `minSdk` elegido y justificado. `minSdk` 24, fijado en `tauri.conf.json`
   (`design/architecture/android.md`).
-- [ ] CA2 — `pnpm tauri android dev` arranca en el emulador y en un dispositivo; conecta al puente y muestra el tablero.
+- [x] CA2 — `pnpm tauri android dev` arranca en el emulador y en un dispositivo; conecta al puente y muestra el tablero.
   Sin marcar: emulador comprobado, dispositivo pendiente del usuario. En el emulador (Android 17, API 37), el
   2026-11-10: hot reload, la máquina añadida con el código del puente, el tablero en vivo por Tailscale y la máquina
   que sigue tras cerrar la app. Pendiente del usuario: un dispositivo real por Tailscale
