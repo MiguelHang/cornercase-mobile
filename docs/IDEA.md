@@ -78,10 +78,11 @@ Binario Rust en el workspace que corre en el Mac. Solo para desarrollo.
    (Esc, Tab, flechas, Ctrl-C, números); adjuntar imágenes con `paste-file`.
 3. **Terminal en vivo**: `view` con el tamaño del móvil + `surface --patches` + `input` + `scroll`, y
    una fila con las teclas que le faltan al teclado del móvil.
-   - Por defecto **pasiva**: no reclama la pestaña; muestra el PTY con el ancho del Mac, con zoom y
-     desplazamiento horizontal. No toca la ventana del Mac.
-   - Botón **"ajustar a este móvil"**: `view-set --claim` mientras esa pantalla está abierta; al
-     salir, la suelta (`--inactive`). Los frames se filtran por `projection`.
+   - Por defecto **ajustada al móvil** (043): al abrirse reclama la pestaña con una `view` del tamaño del
+     móvil, que redimensiona la ventana del Mac mientras se mira; al salir, la suelta. Los frames se
+     filtran por `projection`.
+   - Botón **"ajustar a este móvil"**, encendido al abrir; apagado, la vista es **pasiva**: no reclama la
+     pestaña y muestra el PTY con el ancho del Mac, con zoom y desplazamiento horizontal, sin tocar su ventana.
 4. **Arrancar un agente**: `start --worktree` con prompt, agente y modelo; desde una issue
    (`issue list` / `issue read`); `new-workspace`.
 5. **Cambios del workspace** (`changes list/read`, marcar como visto) y **ficheros**
@@ -124,8 +125,8 @@ Binario Rust en el workspace que corre en el Mac. Solo para desarrollo.
 Desde un iPhone, por Tailscale y con el puente corriendo en el Mac:
 1. El tablero muestra en vivo los agentes de todos los proyectos, con los que esperan arriba.
 2. Se contesta a un agente que espera (texto, tecla o imagen) y se ve que sigue trabajando.
-3. Se abre su terminal en vivo, se escribe y se desplaza sin cambiar el tamaño de la ventana del Mac;
-   con "ajustar a este móvil" se lee al ancho del móvil.
+3. Se abre su terminal en vivo, ya al ancho del móvil, y se escribe y se desplaza; apagando "ajustar a
+   este móvil" se ve al ancho del Mac sin cambiar el tamaño de su ventana.
 4. Se arranca un agente en un worktree desde una issue.
 5. Se ven los cambios y los ficheros de un workspace y se marcan cambios como vistos.
 6. Al salir y volver a la app, o al pasar de wifi a datos, todo se reconecta solo.

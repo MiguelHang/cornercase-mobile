@@ -75,11 +75,11 @@ describe('the terminal screen', () => {
     expect(source).toContain('if (shows(event.payload, machine, row.tab)) { shown.apply(event.payload)')
   })
 
-  it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
+  it('opens the pane of its agent and remembers the zoom on the boot of its server, apart for each mode', () => {
     expect(source).toContain(
       'const open = (size: Size_Deserialize, fitting: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit: fitting })',
     )
-    expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab }}')
+    expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab, fitted: fit.on }}')
   })
 
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {
@@ -183,9 +183,9 @@ describe('fitting the pane to the phone', () => {
     return { open, close, opening, fit: new Fit() }
   }
 
-  it('shows a toggle at the end of the bar, off and named for what it does', () => {
+  it('shows a toggle at the end of the bar, on and named for what it does', () => {
     expect(body).toMatch(
-      /<div class="end svelte-[\w-]+"><button class="fit svelte-[\w-]+" type="button" aria-label="Fit to this phone" aria-pressed="false"><svg/,
+      /<div class="end svelte-[\w-]+"><button class="fit svelte-[\w-]+" type="button" aria-label="Fit to this phone" aria-pressed="true"><svg/,
     )
     expect(source).toContain(
       '{#snippet right()} <button class="fit" type="button" aria-label="Fit to this phone" aria-pressed={fit.on} onclick={() => fit.toggle()} > <Icon name="smartphone" />',
@@ -194,23 +194,41 @@ describe('fitting the pane to the phone', () => {
     expect(source).toContain("width: 44px; height: 44px;")
   })
 
-  it('opens the pane fitted once the toggle is pressed', async () => {
+  it('opens the pane fitted at once, never as it is first', async () => {
+    const { open, opening, fit } = fitting()
+    fit.ask(opening, SIZE)
+    await settled()
+    expect(open.mock.calls).toEqual([[SIZE, true]])
+    expect(source).toContain('const fit = new Fit()')
+  })
+
+  it('opens the pane as it is once the toggle is pressed, and fitted again on the next press', async () => {
     const { open, opening, fit } = fitting()
     fit.ask(opening, SIZE)
     await settled()
     fit.toggle()
     fit.ask(opening, SIZE)
     await settled()
+    fit.toggle()
+    fit.ask(opening, SIZE)
+    await settled()
     expect(open.mock.calls).toEqual([
+      [SIZE, true],
       [SIZE, false],
       [SIZE, true],
     ])
-    expect(source).toContain('const fit = new Fit()')
+  })
+
+  it('opens a new screen fitted even when the last one was turned off', async () => {
+    fitting().fit.toggle()
+    const { open, opening, fit } = fitting()
+    fit.ask(opening, SIZE)
+    await settled()
+    expect(open.mock.calls).toEqual([[SIZE, true]])
   })
 
   it('turns the toggle off when the Mac takes the tab back', () => {
     const { fit } = fitting()
-    fit.toggle()
     fit.unfitted()
     expect(fit.on).toBe(false)
     expect(source).toContain('shown.apply(event.payload) if (event.payload.unfitted) { fit.unfitted() }')
@@ -219,7 +237,6 @@ describe('fitting the pane to the phone', () => {
   it('lets the tab go while the app is in the background, opening nothing, and claims it again on its return', async () => {
     const { open, close, opening, fit } = fitting()
     fit.watch(page)
-    fit.toggle()
     fit.ask(opening, SIZE)
     await settled()
     turn('hidden')

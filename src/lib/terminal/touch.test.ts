@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { anchor, ended, followed, roomIn, slide, Tap } from './touch'
+import { anchor, ended, followed, pinned, roomAt, roomIn, slide, Tap } from './touch'
+import { BASE } from './zoom'
 
 const box = (scrollTop: number, scrollHeight = 1000, clientHeight = 600) => ({ scrollTop, scrollHeight, clientHeight })
 
@@ -16,6 +17,31 @@ describe('roomIn', () => {
 
   it('leaves no room in a grid that fits', () => {
     expect(roomIn(box(0, 500, 600))).toEqual({ up: 0, down: 0 })
+  })
+})
+
+describe('pinned', () => {
+  const FITS = { min: BASE, max: 2 * BASE }
+
+  it.each([
+    ['holds a fitted grid at the base', true, BASE, FITS, true],
+    ['holds a fitted grid pinched back to just over the base', true, BASE + 0.2, FITS, true],
+    ['frees a fitted grid zoomed in', true, BASE + 1, FITS, false],
+    ['frees a fitted grid zoomed in by half a pixel', true, BASE + 0.5, FITS, false],
+    ['frees a passive grid at the base', false, BASE, FITS, false],
+    ['frees a passive grid fitted to the width', false, 2 * BASE, { min: 2 * BASE, max: 2 * BASE }, false],
+  ])('%s', (_, fitted, size, limits, held) => {
+    expect(pinned(fitted, size, limits)).toBe(held)
+  })
+})
+
+describe('roomAt', () => {
+  it('leaves no room in a held grid taller than the box', () => {
+    expect(roomAt(box(400), true)).toEqual({ up: 0, down: 0 })
+  })
+
+  it('leaves the room of the box to a free grid', () => {
+    expect(roomAt(box(150), false)).toEqual({ up: 150, down: 250 })
   })
 })
 

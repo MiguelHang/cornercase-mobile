@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { BASE, clamp, fit, limits, Zooms, type Limits } from './zoom'
 
-const PLACE = { machine: 7, boot: 'b1', tab: 3 }
+const PLACE = { machine: 7, boot: 'b1', tab: 3, fitted: false }
 
 const WIDE: Limits = { min: 6.5, max: 26 }
+
+const FITS: Limits = { min: BASE, max: 2 * BASE }
 
 describe('limits', () => {
   it.each<[string, number, Limits]>([
@@ -68,5 +70,19 @@ describe('Zooms', () => {
     const zooms = new Zooms()
     zooms.remember(PLACE, 20)
     expect(zooms.recall({ ...PLACE, ...other }, WIDE)).toBe(6.5)
+  })
+
+  it('does not recall the passive zoom once fitted', () => {
+    const zooms = new Zooms()
+    zooms.remember(PLACE, 2 * BASE)
+    expect(zooms.recall({ ...PLACE, fitted: true }, FITS)).toBe(BASE)
+  })
+
+  it('remembers the fitted zoom apart', () => {
+    const zooms = new Zooms()
+    zooms.remember({ ...PLACE, fitted: true }, 18)
+    zooms.remember(PLACE, 20)
+    expect(zooms.recall({ ...PLACE, fitted: true }, FITS)).toBe(18)
+    expect(zooms.recall(PLACE, FITS)).toBe(20)
   })
 })
