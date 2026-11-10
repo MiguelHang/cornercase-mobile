@@ -37,16 +37,21 @@ pub(crate) struct Active {
     terminal: Slot,
     changes: Slot,
     search: Slot,
+    question: Slot<(u64, u64)>,
 }
 
 #[derive(Default)]
-struct Slot(Option<(u64, JoinHandle<()>)>);
+struct Slot<K = u64>(Option<(K, JoinHandle<()>)>);
 
 impl AppState {
-    pub(crate) fn load(data_dir: Result<PathBuf, impl Display>, secrets: Arc<dyn Secrets>) -> Self {
-        let identity = identity::announce(secrets.as_ref());
+    pub(crate) fn load(
+        data_dir: Result<PathBuf, impl Display>,
+        identity: &dyn Secrets,
+        routes: Arc<dyn Secrets>,
+    ) -> Self {
+        let identity = identity::announce(identity);
         let machines = match data_dir {
-            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), secrets)
+            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), routes)
                 .map_err(|error| CommandError::machines_not_loaded(&error)),
             Err(reason) => Err(CommandError::no_data_dir(reason)),
         };
@@ -121,6 +126,7 @@ impl Active {
             terminal: Slot::default(),
             changes: Slot::default(),
             search: Slot::default(),
+            question: Slot::default(),
         }
     }
 
@@ -137,7 +143,7 @@ impl Active {
     }
 
     pub(crate) fn hide(&mut self, tab: u64) {
-        self.terminal.empty(tab);
+        self.terminal.empty(&tab);
     }
 
     pub(crate) fn follow(&mut self, workspace: u64, changes: JoinHandle<()>) {
@@ -145,7 +151,15 @@ impl Active {
     }
 
     pub(crate) fn unfollow(&mut self, workspace: u64) {
-        self.changes.empty(workspace);
+        self.changes.empty(&workspace);
+    }
+
+    pub(crate) fn ask(&mut self, tab: u64, pane: u64, question: JoinHandle<()>) {
+        self.question.fill((tab, pane), question);
+    }
+
+    pub(crate) fn unask(&mut self, tab: u64, pane: u64) {
+        self.question.empty(&(tab, pane));
     }
 
     pub(crate) fn search(&mut self, workspace: u64, search: JoinHandle<()>) {
@@ -153,7 +167,7 @@ impl Active {
     }
 
     pub(crate) fn unsearch(&mut self, workspace: u64) {
-        self.search.empty(workspace);
+        self.search.empty(&workspace);
     }
 }
 
@@ -164,18 +178,20 @@ impl Drop for Active {
     }
 }
 
-impl Slot {
-    fn fill(&mut self, key: u64, task: JoinHandle<()>) {
+impl<K: PartialEq> Slot<K> {
+    fn fill(&mut self, key: K, task: JoinHandle<()>) {
         self.stop();
         self.0 = Some((key, task));
     }
 
-    fn empty(&mut self, key: u64) {
-        if self.0.as_ref().is_some_and(|(held, _)| *held == key) {
+    fn empty(&mut self, key: &K) {
+        if self.0.as_ref().is_some_and(|(held, _)| held == key) {
             self.stop();
         }
     }
+}
 
+impl<K> Slot<K> {
     fn stop(&mut self) {
         if let Some((_, task)) = self.0.take() {
             task.abort();
@@ -183,7 +199,7 @@ impl Slot {
     }
 }
 
-impl Drop for Slot {
+impl<K> Drop for Slot<K> {
     fn drop(&mut self) {
         self.stop();
     }

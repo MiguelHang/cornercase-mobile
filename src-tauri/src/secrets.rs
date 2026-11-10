@@ -1,8 +1,11 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use cornercase_core::error::Error;
 use cornercase_core::secrets::Secrets;
+#[cfg(target_os = "android")]
+use cornercase_core::secrets::file::FileSecrets;
 use keyring_core::{CredentialStore, Entry};
 
 #[cfg(target_os = "ios")]
@@ -15,6 +18,9 @@ const SERVICE: &str = "dev.usecornercase.mobile";
 
 #[cfg(not(target_os = "ios"))]
 const NO_STORE: &str = "no secret store on this platform yet";
+
+#[cfg(target_os = "android")]
+const ROUTES_FILE: &str = "route-secrets.json";
 
 type Modifiers = HashMap<&'static str, &'static str>;
 
@@ -37,6 +43,19 @@ impl KeychainSecrets {
 #[cfg(not(target_os = "ios"))]
 pub(crate) fn store() -> KeychainSecrets {
     KeychainSecrets::new(Err(Error::Secrets(NO_STORE.to_owned())), Modifiers::new())
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn routes(data_dir: Option<&Path>) -> Arc<dyn Secrets> {
+    match data_dir {
+        Some(folder) => Arc::new(FileSecrets::new(folder.join(ROUTES_FILE))),
+        None => Arc::new(store()),
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub(crate) fn routes(_: Option<&Path>) -> Arc<dyn Secrets> {
+    Arc::new(store())
 }
 
 impl Secrets for KeychainSecrets {

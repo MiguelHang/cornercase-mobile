@@ -123,6 +123,35 @@ mod store {
     }
 }
 
+#[cfg(not(target_os = "ios"))]
+mod routes {
+    use cornercase_bridge::test_util::TempDir;
+
+    use super::*;
+
+    #[cfg(not(target_os = "android"))]
+    #[test]
+    fn have_no_store_on_a_platform_without_one() {
+        let dir = TempDir::new();
+        assert_eq!(routes(Some(dir.path())).set(KEY, SECRET), Err(Error::Secrets(NO_STORE.to_owned())));
+    }
+
+    #[cfg(target_os = "android")]
+    #[test]
+    fn are_kept_in_a_file_in_the_data_folder() {
+        let dir = TempDir::new();
+        routes(Some(dir.path())).set(KEY, SECRET).expect("the file takes the secret");
+        assert!(dir.path().join(ROUTES_FILE).is_file());
+        assert_eq!(routes(Some(dir.path())).get(KEY), Ok(Some(SECRET.to_vec())));
+    }
+
+    #[cfg(target_os = "android")]
+    #[test]
+    fn have_no_store_without_a_data_folder() {
+        assert_eq!(routes(None).get(KEY), Err(Error::Secrets(NO_STORE.to_owned())));
+    }
+}
+
 mod identity {
     use super::*;
 

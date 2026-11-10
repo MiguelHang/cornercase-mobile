@@ -22,6 +22,8 @@ export const commands = {
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
 	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
+	questionOpen: (tab: number, pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("question_open", { tab, pane })),
+	questionClose: (tab: number, pane: number) => __TAURI_INVOKE<void>("question_close", { tab, pane }),
 	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
@@ -46,6 +48,7 @@ export const events = {
 	changesChanged: makeEvent<ChangesChanged_Serialize, ChangesChanged_Deserialize>("changes-changed"),
 	connectionChanged: makeEvent<ConnectionChanged_Serialize, ConnectionChanged_Deserialize>("connection-changed"),
 	paneStatusChanged: makeEvent<PaneStatusChanged_Serialize, PaneStatusChanged_Deserialize>("pane-status-changed"),
+	questionChanged: makeEvent<QuestionChanged_Serialize, QuestionChanged_Deserialize>("question-changed"),
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
@@ -183,6 +186,11 @@ export type ChangesChanged_Serialize = {
 	mode: Mode,
 	summary: Summary_Serialize | null,
 	closed: boolean,
+};
+
+export type Choice = {
+	number: number,
+	label: string,
 };
 
 export type Colour = ({ index: number }) & { rgb?: never } | ({ rgb: [number, number, number] }) & { index?: never };
@@ -656,6 +664,28 @@ export type ProbeView = { state: "answers"; route: string } | { state: "unauthor
 export type ProjectChoice = {
 	id: number,
 	name: string,
+};
+
+export type QuestionChanged = QuestionChanged_Serialize | QuestionChanged_Deserialize;
+
+export type QuestionChanged_Deserialize = {
+	machine: number,
+	tab: number,
+	pane: number,
+	colours: Colours_Deserialize,
+	rows: Run_Deserialize[][],
+	options: Choice[],
+	closed: boolean,
+};
+
+export type QuestionChanged_Serialize = {
+	machine: number,
+	tab: number,
+	pane: number,
+	colours: Colours_Serialize,
+	rows: Run_Serialize[][],
+	options: Choice[],
+	closed: boolean,
 };
 
 export type Read = Read_Serialize | Read_Deserialize;

@@ -1,12 +1,13 @@
-use std::fs::{self, File};
-use std::io::{self, ErrorKind, Write};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::io::{self, ErrorKind};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use serde_json::error::Category;
 
 use super::{Machine, MachineId};
 use crate::error::Error;
+use crate::files::write_atomically;
 
 const VERSION: u32 = 1;
 
@@ -52,11 +53,6 @@ impl JsonFileStore {
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }
-
-    fn temporary(&self) -> PathBuf {
-        let name = self.path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default();
-        self.path.with_file_name(format!(".{name}.tmp"))
-    }
 }
 
 impl MachineStore for JsonFileStore {
@@ -72,14 +68,7 @@ impl MachineStore for JsonFileStore {
         let written =
             Written { version: VERSION, next_id: saved.next_id, machines: &saved.machines, active: saved.active };
         let text = serde_json::to_vec_pretty(&written).map_err(|error| unreadable(&error))?;
-        if let Some(folder) = self.path.parent() {
-            fs::create_dir_all(folder).map_err(|error| io_error("cannot create the folder", &error))?;
-        }
-        let temporary = self.temporary();
-        or_remove(write(&temporary, &text), &temporary)
-            .map_err(|error| io_error("cannot write the temporary file", &error))?;
-        or_remove(fs::rename(&temporary, &self.path), &temporary)
-            .map_err(|error| io_error("cannot replace the file", &error))
+        write_atomically(&self.path, &text).map_err(|error| Error::Store(error.to_string()))
     }
 }
 
@@ -90,19 +79,6 @@ fn parsed(text: &[u8]) -> Result<Saved, Error> {
     }
     let Read { next_id, machines, active } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
     Ok(Saved { next_id, machines, active })
-}
-
-fn write(path: &Path, text: &[u8]) -> io::Result<()> {
-    let mut file = File::create(path)?;
-    file.write_all(text)?;
-    file.sync_all()
-}
-
-fn or_remove<T>(result: io::Result<T>, temporary: &Path) -> io::Result<T> {
-    if result.is_err() {
-        fs::remove_file(temporary).ok();
-    }
-    result
 }
 
 fn io_error(what: &str, error: &io::Error) -> Error {

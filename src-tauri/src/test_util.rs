@@ -26,7 +26,8 @@ use crate::bindings;
 use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::CommandError;
 use crate::events::{
-    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, TerminalChanged, Toast,
+    AgentsChanged, ChangesChanged, ConnectionChanged, Emit, Emitted, PaneStatusChanged, QuestionChanged,
+    TerminalChanged, Toast,
 };
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
@@ -83,6 +84,13 @@ impl Recorder {
         self.all()
             .into_iter()
             .filter_map(|event| if let Emitted::Terminal(it) = event { Some(it) } else { None })
+            .collect()
+    }
+
+    pub(crate) fn questions(&self) -> Vec<QuestionChanged> {
+        self.all()
+            .into_iter()
+            .filter_map(|event| if let Emitted::Question(it) = event { Some(it) } else { None })
             .collect()
     }
 
@@ -157,13 +165,13 @@ impl Studio {
     pub(crate) fn new() -> Self {
         let dir = TempDir::new();
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
-        let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), Arc::clone(&secrets));
+        let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets.as_ref(), Arc::clone(&secrets));
         let added = state.machines(|machines| machines.add("studio", &code()).map_err(CommandError::from));
         Self { id: added.expect("the studio is added"), dir, secrets, state }
     }
 
     pub(crate) fn reloaded(&self) -> AppState {
-        AppState::load(Ok::<_, &str>(self.dir.path().to_path_buf()), Arc::clone(&self.secrets))
+        AppState::load(Ok::<_, &str>(self.dir.path().to_path_buf()), self.secrets.as_ref(), Arc::clone(&self.secrets))
     }
 }
 

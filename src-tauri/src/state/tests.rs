@@ -8,13 +8,14 @@ use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
 use cornercase_core::network::Kind;
+use cornercase_core::secrets::file::FileSecrets;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::secrets::{KeychainSecrets, mock_store, on_mock};
-use crate::test_util::{code, released, route};
+use crate::test_util::{TOKEN, code, released, route};
 
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
@@ -27,8 +28,16 @@ fn locked_keychain() -> Arc<dyn Secrets> {
     Arc::new(KeychainSecrets::new(Err(Error::Secrets("locked".to_owned())), HashMap::new()))
 }
 
-fn loaded(dir: &TempDir, secrets: Arc<dyn Secrets>) -> AppState {
-    AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets)
+fn loaded(dir: &TempDir, routes: Arc<dyn Secrets>) -> AppState {
+    loaded_with(dir, keychain().as_ref(), routes)
+}
+
+fn loaded_with(dir: &TempDir, identity: &dyn Secrets, routes: Arc<dyn Secrets>) -> AppState {
+    AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), identity, routes)
+}
+
+fn folderless() -> AppState {
+    AppState::load(NO_FOLDER, keychain().as_ref(), keychain())
 }
 
 fn add_studio(state: &AppState) -> Result<MachineId, CommandError> {
@@ -92,8 +101,7 @@ mod loading_the_machines {
 
     #[test]
     fn says_there_is_no_data_folder() {
-        let state = AppState::load(NO_FOLDER, keychain());
-        let error = add_studio(&state).expect_err("there is no folder for the machines");
+        let error = add_studio(&folderless()).expect_err("there is no folder for the machines");
         assert_eq!(error, CommandError::no_data_dir("no home folder"));
     }
 }
@@ -125,8 +133,8 @@ mod the_identity {
 
     #[test]
     fn is_read_from_the_keychain_once() {
-        let counted = Arc::new(Counted { inner: on_mock(mock_store()), identity_reads: AtomicUsize::new(0) });
-        let state = AppState::load(NO_FOLDER, counted.clone());
+        let counted = Counted { inner: on_mock(mock_store()), identity_reads: AtomicUsize::new(0) };
+        let state = AppState::load(NO_FOLDER, &counted, keychain());
         let first = state.identity().map(Identity::fingerprint);
         let second = state.identity().map(Identity::fingerprint);
         assert!(first.is_ok(), "{first:?}");
@@ -136,11 +144,49 @@ mod the_identity {
 
     #[test]
     fn says_why_there_is_none() {
-        let state = AppState::load(NO_FOLDER, locked_keychain());
+        let state = AppState::load(NO_FOLDER, locked_keychain().as_ref(), keychain());
         assert_eq!(
             state.identity().map(Identity::fingerprint),
             Err(CommandError::no_identity(&Error::Secrets("locked".to_owned())))
         );
+    }
+}
+
+mod separate_stores {
+    use super::*;
+
+    fn tokens(state: &AppState) -> Result<Vec<bool>, CommandError> {
+        state.machines(|machines| {
+            Ok(machines.machines().iter().flat_map(|machine| machine.routes.iter().map(Route::has_token)).collect())
+        })
+    }
+
+    #[test]
+    fn add_and_reload_machines_while_the_identity_store_is_broken() {
+        let dir = TempDir::new();
+        let routes = keychain();
+        let state = loaded_with(&dir, locked_keychain().as_ref(), Arc::clone(&routes));
+        assert!(state.identity().is_err());
+        add_studio(&state).expect("the machine is added");
+        assert_eq!(tokens(&loaded_with(&dir, locked_keychain().as_ref(), routes)), Ok(vec![true]));
+    }
+
+    #[test]
+    fn keep_the_identity_while_the_routes_store_is_broken() {
+        let dir = TempDir::new();
+        add_studio(&loaded(&dir, keychain())).expect("the machine is added");
+        let state = loaded_with(&dir, keychain().as_ref(), locked_keychain());
+        assert!(state.identity().is_ok());
+        assert!(tokens(&state).is_err());
+    }
+
+    #[test]
+    fn bring_a_machine_back_with_its_token_from_a_secrets_file() {
+        let dir = TempDir::new();
+        let file = || -> Arc<dyn Secrets> { Arc::new(FileSecrets::new(dir.path().join("route-secrets.json"))) };
+        add_studio(&loaded(&dir, file())).expect("the machine is added");
+        assert_eq!(tokens(&loaded(&dir, file())), Ok(vec![true]));
+        assert!(!saved_file(&dir).contains(TOKEN), "{}", saved_file(&dir));
     }
 }
 
@@ -154,13 +200,13 @@ mod the_network {
 
     #[test]
     fn is_unknown_until_the_first_one_is_applied() {
-        let state = AppState::load(NO_FOLDER, keychain());
+        let state = folderless();
         assert_eq!(state.replace_network(WIFI), None);
     }
 
     #[test]
     fn gives_back_the_one_it_replaces() {
-        let state = AppState::load(NO_FOLDER, keychain());
+        let state = folderless();
         state.replace_network(NONE);
         assert_eq!(state.replace_network(WIFI), Some(NONE));
         assert_eq!(state.replace_network(WIFI), Some(WIFI));
@@ -171,7 +217,7 @@ mod the_network {
     #[case::none(Some(NONE), true)]
     #[case::wifi(Some(WIFI), false)]
     fn is_down_only_once_none_is_applied(#[case] applied: Option<Network>, #[case] down: bool) {
-        let state = AppState::load(NO_FOLDER, keychain());
+        let state = folderless();
         if let Some(network) = applied {
             state.replace_network(network);
         }
@@ -230,7 +276,7 @@ mod an_active_store {
 
     #[tokio::test(start_paused = true)]
     async fn gives_way_to_the_next_one() {
-        let state = AppState::load(NO_FOLDER, keychain());
+        let state = folderless();
         let first = running(1, idle);
         *state.active() = Some(first.active);
         let second = running(2, idle);
@@ -253,23 +299,25 @@ mod an_active_store {
         Arc::strong_count(marker) > 1
     }
 
-    struct Both {
+    struct Held {
         active: Active,
         changes: Arc<()>,
         terminal: Arc<()>,
+        question: Arc<()>,
     }
 
-    fn both() -> Both {
+    fn held() -> Held {
         let Running { mut active, .. } = running(1, idle);
-        let (changes, terminal) = (Arc::new(()), Arc::new(()));
+        let (changes, terminal, question) = (Arc::new(()), Arc::new(()), Arc::new(()));
         active.follow(2, task(&changes));
         active.show(3, task(&terminal));
-        Both { active, changes, terminal }
+        active.ask(3, 5, task(&question));
+        Held { active, changes, terminal, question }
     }
 
     #[tokio::test(start_paused = true)]
     async fn keeps_following_changes_while_a_terminal_comes_and_goes() {
-        let Both { mut active, changes, terminal } = both();
+        let Held { mut active, changes, terminal, .. } = held();
         active.hide(3);
         released(&terminal).await;
         assert!(holds(&changes));
@@ -277,7 +325,7 @@ mod an_active_store {
 
     #[tokio::test(start_paused = true)]
     async fn keeps_the_terminal_while_changes_are_followed_again_and_dropped() {
-        let Both { mut active, changes, terminal } = both();
+        let Held { mut active, changes, terminal, .. } = held();
         let next = Arc::new(());
         active.follow(4, task(&next));
         released(&changes).await;
@@ -287,27 +335,61 @@ mod an_active_store {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn keeps_both_when_another_workspace_is_unfollowed_or_another_tab_hidden() {
-        let Both { mut active, changes, terminal } = both();
-        active.unfollow(3);
-        active.hide(2);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        assert!(holds(&changes) && holds(&terminal));
+    async fn keeps_the_question_of_a_tab_while_its_terminal_is_hidden() {
+        let Held { mut active, terminal, question, .. } = held();
+        active.hide(3);
+        released(&terminal).await;
+        assert!(holds(&question));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn stops_the_search_before_a_new_one_and_keeps_both() {
-        let Both { mut active, changes, terminal } = both();
+    async fn keeps_the_terminal_of_a_tab_while_its_question_is_dropped() {
+        let Held { mut active, terminal, question, .. } = held();
+        active.unask(3, 5);
+        released(&question).await;
+        assert!(holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_the_question_of_a_pane_when_another_pane_of_its_tab_is_unasked() {
+        let Held { mut active, question, .. } = held();
+        active.unask(3, 6);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&question));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ends_the_previous_question_when_another_is_asked() {
+        let Held { mut active, terminal, question, .. } = held();
+        let next = Arc::new(());
+        active.ask(4, 5, task(&next));
+        released(&question).await;
+        assert!(holds(&next) && holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_all_three_when_another_workspace_is_unfollowed_or_another_tab_hidden_or_unasked() {
+        let Held { mut active, changes, terminal, question } = held();
+        active.unfollow(3);
+        active.hide(2);
+        active.unask(2, 5);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&changes) && holds(&terminal) && holds(&question));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_the_search_before_a_new_one_and_keeps_the_others() {
+        let Held { mut active, changes, terminal, question } = held();
         let (before, next) = (Arc::new(()), Arc::new(()));
         active.search(2, task(&before));
         active.search(2, task(&next));
         released(&before).await;
-        assert!(holds(&next) && holds(&changes) && holds(&terminal));
+        assert!(holds(&next) && holds(&changes) && holds(&terminal) && holds(&question));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn stops_the_search_of_its_workspace_only_and_keeps_both() {
-        let Both { mut active, changes, terminal } = both();
+    async fn stops_the_search_of_its_workspace_only_and_keeps_the_others() {
+        let Held { mut active, changes, terminal, question } = held();
         let search = Arc::new(());
         active.search(2, task(&search));
         active.unsearch(3);
@@ -315,14 +397,15 @@ mod an_active_store {
         assert!(holds(&search));
         active.unsearch(2);
         released(&search).await;
-        assert!(holds(&changes) && holds(&terminal));
+        assert!(holds(&changes) && holds(&terminal) && holds(&question));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn stops_both_when_dropped() {
-        let Both { active, changes, terminal } = both();
+    async fn stops_all_three_when_dropped() {
+        let Held { active, changes, terminal, question } = held();
         drop(active);
         released(&changes).await;
         released(&terminal).await;
+        released(&question).await;
     }
 }

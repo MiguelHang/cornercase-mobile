@@ -1,11 +1,25 @@
 use tauri::{Runtime, Wry};
-use tauri_specta::{Builder, collect_commands, collect_events};
+use tauri_specta::{Builder, Commands, collect_commands, collect_events};
 
 use crate::commands::{changes, chat, connection, files, identity, machines, probe, routes, start, terminal};
-use crate::events::{AgentsChanged, ChangesChanged, ConnectionChanged, PaneStatusChanged, TerminalChanged, Toast};
+use crate::events::{
+    AgentsChanged, ChangesChanged, ConnectionChanged, PaneStatusChanged, QuestionChanged, TerminalChanged, Toast,
+};
 
 pub(crate) fn specta<R: Runtime>() -> Builder<R> {
-    with_events(Builder::<R>::new().commands(collect_commands![
+    Builder::<R>::new().commands(commands()).events(collect_events![
+        ConnectionChanged,
+        AgentsChanged,
+        PaneStatusChanged,
+        TerminalChanged,
+        QuestionChanged,
+        ChangesChanged,
+        Toast
+    ])
+}
+
+fn commands<R: Runtime>() -> Commands<R> {
+    collect_commands![
         machines::machines_list,
         machines::machine_add,
         machines::machine_remove::<Wry>,
@@ -23,6 +37,8 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
         chat::send,
         chat::keys,
         chat::attach::attach::<Wry>,
+        chat::question::question_open::<Wry>,
+        chat::question::question_close,
         terminal::terminal_open::<Wry>,
         terminal::terminal_close,
         terminal::input::terminal_input,
@@ -39,18 +55,7 @@ pub(crate) fn specta<R: Runtime>() -> Builder<R> {
         files::files_read,
         files::files_search,
         files::files_search_stop,
-    ]))
-}
-
-fn with_events<R: Runtime>(builder: Builder<R>) -> Builder<R> {
-    builder.events(collect_events![
-        ConnectionChanged,
-        AgentsChanged,
-        PaneStatusChanged,
-        TerminalChanged,
-        ChangesChanged,
-        Toast
-    ])
+    ]
 }
 
 #[cfg(test)]

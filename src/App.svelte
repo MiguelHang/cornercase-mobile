@@ -18,6 +18,7 @@
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
+  import type { Asker } from './lib/question.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import { prefersReducedMotion } from './lib/ui/motion'
@@ -45,6 +46,11 @@
   let shift = $state<Shift>(RESTING)
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
+  const asker: Asker = {
+    open: commands.questionOpen,
+    close: commands.questionClose,
+    listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)),
+  }
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
@@ -54,7 +60,17 @@
   const chat = $derived(
     pane === null
       ? null
-      : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers),
+      : new Chat(
+          owner,
+          pane,
+          commands.lastMessage,
+          commands.send,
+          commands.keys,
+          commands.attach,
+          haptics,
+          timers,
+          asker,
+        ),
   )
   const seen = $derived(chat?.row != null)
   const viewed = $derived(openedTerminal(route, current))

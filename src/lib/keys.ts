@@ -20,3 +20,5 @@ export const ROW: readonly KeyButton[] = [
 const DIGITS: readonly Digit[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
 
 export const DIGIT_ROW: readonly KeyButton[] = DIGITS.map((digit) => ({ label: digit, name: digit, key: digit }))
+
+export const digitOf = (number: number): Digit | null => DIGITS.find((digit) => digit === String(number)) ?? null
