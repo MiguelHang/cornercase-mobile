@@ -4,6 +4,7 @@ import comments from '../../../crates/core/tests/fixtures/control/issue-read/v1/
 import type {
   AgentChoice_Serialize,
   ConnectionView_Serialize,
+  Place,
   ReadIssue_Serialize as ReadIssue,
 } from '../../lib/bindings'
 import type { StartingIssue } from '../../lib/router.svelte'
@@ -188,7 +189,7 @@ describe('Start, its agent form', () => {
     expect(submit(body)?.[1]).toContain('aria-busy="true"')
     expect(submit(body)?.[2]).toContain('class="spinner')
     expect(label(submit(body))).toBe('Starting…')
-    expect(body.match(/<(?:input|textarea|select)[^>]*disabled=""/g)).toHaveLength(4)
+    expect(body.match(/<(?:input|textarea|select)[^>]*disabled=""/g)).toHaveLength(5)
   })
 
   it('shows what the server says and keeps what was typed', async () => {
@@ -198,6 +199,56 @@ describe('Start, its agent form', () => {
     expect(body).toMatch(/<p class="problem[^"]*" role="alert">the branch exists<\/p>/)
     expect(body).toContain('>fix the login</textarea>')
     expect(label(submit(body))).toBe('Start')
+  })
+})
+
+describe('Start, where its agent works', () => {
+  const WORKTREE: Place = { kind: 'worktree', project: 2, branch: 'fix-login' }
+
+  const note = (body: string) => flat(body).match(/<p class="note[^"]*">([^<]*)<\/p>/)?.[1]
+
+  it('starts in a new tab in the workspace with the Own worktree switch off', async () => {
+    const body = agentForm(await formOf())
+    expect(body).toMatch(/">Own worktree<\/span> <input class="toggle[^"]*" type="checkbox" role="switch"\/>/)
+    expect(labels(body)).toEqual(['Workspace', 'Agent', 'Model', 'Prompt'])
+    expect(note(body)).toBe('The agent starts in a new tab in this workspace.')
+  })
+
+  it('asks for a branch once the switch is on, and says where the agent works', async () => {
+    const form = await formOf()
+    form.ownWorktree = true
+    form.branch = 'fix-login'
+    const body = agentForm(form)
+    expect(body).toMatch(/role="switch" checked=""\/>/)
+    expect(labels(body)).toEqual(['Workspace', 'Branch', 'Agent', 'Model', 'Prompt'])
+    expect(body).toContain('value="fix-login"')
+    expect(note(body)).toBe("The agent works in its own worktree on this branch, made from the workspace's project.")
+  })
+
+  it('tells a missing branch under it', async () => {
+    const form = await filled()
+    form.ownWorktree = true
+    await form.start()
+    expect(errorOf(agentForm(form), 'Branch')).toBe('Name the branch')
+  })
+
+  it.each<[string, boolean, string, Place]>([
+    ['the workspace with the switch off', false, '', { kind: 'workspace', workspace: 9 }],
+    ["a worktree of the workspace's project with it on", true, 'fix-login', WORKTREE],
+  ])('sends %s', async (_, own, branch, place) => {
+    const startAgent = vi.fn(never)
+    const form = await filled({ startAgent })
+    form.ownWorktree = own
+    form.branch = branch
+    void form.start()
+    expect(startAgent.mock.calls).toEqual([[{ place, agent: 'claude', model: '', prompt: 'fix the login' }]])
+  })
+
+  it('says no workspace is open and holds Start without any', async () => {
+    const projects = [{ id: 1, name: 'web', workspaces: [] }]
+    const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects }) }))
+    expect(body).toContain('No workspace is open on this Mac.')
+    expect(submit(body)?.[1]).toContain('disabled=""')
   })
 })
 

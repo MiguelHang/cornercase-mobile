@@ -239,6 +239,17 @@ describe('StartForm choosing a workspace', () => {
     expect(form.workspaceChoices).toEqual({ kind: 'failed', reason: 'offline' })
   })
 
+  it.each<[string, StartCalls['startProjects'], boolean]>([
+    ['projects without workspaces', () => ok(choices([project(1), project(2)])), true],
+    ['some workspace', () => ok(choices(SESSION)), false],
+    ['projects that could not be read', () => failed('offline'), false],
+  ])('has no workspaces with %s', async (_, startProjects, none) => {
+    const { form } = made({ startProjects })
+    expect(form.noWorkspaces).toBe(false)
+    await form.load()
+    expect(form.noWorkspaces).toBe(none)
+  })
+
   it.each<[string, ProjectChoice[], number | null, number | null, number | null]>([
     ['the one of whoever opened it, before the last used', SESSION, 22, 21, 21],
     ['the last used while it is still in the session', SESSION, 22, null, 22],

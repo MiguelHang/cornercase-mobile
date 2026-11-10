@@ -126,6 +126,11 @@ export class StartForm {
     return this.agents.kind === 'ready' && this.agents.items.length === 0
   }
 
+  get noWorkspaces() {
+    const choices = this.workspaceChoices
+    return choices.kind === 'ready' && choices.items.length === 0
+  }
+
   forIssue(issue: StartingIssue) {
     this.issue = issue
     this.project = issue.project
