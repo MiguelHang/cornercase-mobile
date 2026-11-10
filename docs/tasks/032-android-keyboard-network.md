@@ -1,6 +1,6 @@
 # 032 — Android: teclado del WebView y cambio de red ⚠
 
-- Estado: pendiente
+- Estado: hecha, salvo la prueba en un Android real (CA5: queda para el usuario, no había uno a mano)
 - Depende de: 030, 021, 028
 - Riesgo: **alto** — IME de Android (GBoard) en un `textarea` oculto, `ConnectivityManager`.
 - Rama: `feat/032-android-input-network` · PR: `feat: type in the terminal and follow network changes on android`
@@ -9,12 +9,46 @@
 Que la terminal y el chat funcionen con los teclados de Android y que el cambio de red se detecte como en iOS.
 
 ## Criterios de aceptación
-- [ ] CA1 — `interactive-widget=resizes-content` en el viewport; la última fila de la terminal queda encima del teclado.
-- [ ] CA2 — GBoard y SwiftKey: escribir, borrar (los IME de Android mandan `beforeinput`/composición en vez de
-  `keydown`: se traducen bien a `input`), predicción desactivada en la terminal.
-- [ ] CA3 — Botón atrás de Android: cierra sheets y vuelve de pantalla con el mismo `router.back()` que la barra de navegación de la 037 (en Android, `←` sin título anterior y sin gesto de borde propio, que es del sistema); en la terminal no se manda a la PTY.
-- [ ] CA4 — El plugin de red de 028 gana parte Android (`ConnectivityManager.NetworkCallback`) con el mismo evento.
-- [ ] CA5 — Probado en un dispositivo real: criterios de éxito 2, 3 y 6 en Android.
+- [x] CA1 — `interactive-widget=resizes-content` en el viewport; la última fila de la terminal queda encima del teclado.
+  Con solo el viewport la WebView no encogía (edge-to-edge con `targetSdk` 37): `MainActivity.kt` aplica los insets
+  del IME (`design/architecture/android.md`). `keyboard.svelte.ts` mide el teclado contra la mayor altura vista al
+  mismo ancho, porque en Android encogen la página y el visual viewport a la vez (`design/terminal.md` › Typing).
+- [x] CA2 — GBoard y SwiftKey: escribir, borrar (los IME de Android mandan `beforeinput`/composición en vez de
+  `keydown`: se traducen bien a `input`), predicción desactivada en la terminal. GBoard comprobado en el emulador:
+  letra a letra, sin componer; un `keydown` 229 pasa sin contar como tecla. La barra de sugerencias sale aunque la
+  WebView pide `NO_SUGGESTIONS`, pero GBoard no autocorrige. SwiftKey y las composiciones (deslizar, voz, acentos),
+  solo en los tests: van a la lista del dispositivo.
+- [x] CA3 — Botón atrás de Android: cierra sheets y vuelve de pantalla con el mismo `router.back()` que la barra de
+  navegación de la 037 (en Android, `←` sin título anterior y sin gesto de borde propio, que es del sistema); en la
+  terminal no se manda a la PTY. `goBack` con una ruta debajo, cancela el escáner, y en la base es del sistema
+  (`design/look/navigation.md` › Android's back). Comprobado en el emulador en cada pantalla.
+- [x] CA4 — El plugin de red de 028 gana parte Android (`ConnectivityManager.NetworkCallback`) con el mismo evento.
+  Solo manda si cambia la red por defecto, `kind`, `expensive` o la VPN (`design/connection/network.md` › The
+  Android plugin). Comprobado en el emulador con wifi, datos y modo avión.
+- [ ] CA5 — Probado en un dispositivo real: criterios de éxito 2, 3 y 6 en Android. Pendiente del usuario (lista de
+  abajo).
+
+## Para el Android real (CA5)
+Con el puente en el Mac y el teléfono por Tailscale (`pnpm tauri android dev "<dispositivo>"`, depuración USB activa):
+
+- **Criterio de éxito 2** (contestar a un agente que espera): desde el chat, con GBoard y con SwiftKey, una respuesta
+  con texto y una tecla de la fila; el agente sigue trabajando. La imagen no: el plugin `photos` solo tiene iOS y en
+  Android `Attach` dice que no hay selector de fotos (ninguna tarea de Android lo trae; tarea aparte si se quiere).
+- **Criterio de éxito 3** (terminal en vivo): abrir la terminal de un agente, escribir y desplazar sin que cambie el
+  tamaño de la ventana del Mac; con "Fit to this phone", leer al ancho del teléfono.
+  - GBoard real: letra a letra, borrar, Enter una vez, la barra de sugerencias; escribir deslizando, por voz y con
+    acentos (composiciones: si se portan mal, plan B).
+  - SwiftKey: lo mismo (no está en la imagen del emulador).
+  - Un teclado físico por Bluetooth o USB: flechas, Esc, Tab, Ctrl-C.
+  - El teclado abriendo y cerrando sin reabrir el `surface`, la fila encima del teclado, Paste y su menú.
+  - Atrás: con el teclado abierto (el primero lo cierra), en cada pantalla, el gesto además del botón.
+- **Criterio de éxito 6** (todo se reconecta solo), midiendo desde la línea `network` de `logcat`
+  (`RustStdoutStderr`) hasta `connected`, con el tablero y con la terminal abiertos:
+  - wifi → datos con Tailscale, y datos → wifi;
+  - entrar y salir de Tailscale (la VPN como red por defecto);
+  - de una wifi a otra;
+  - sin red: "No network", y la vuelta;
+  - salir de la app y volver.
 
 ## Plan B
 El campo "componer" del plan B de 021 como modo por defecto en Android si el IME no se deja domar.
@@ -24,7 +58,9 @@ El campo "componer" del plan B de 021 como modo por defecto en Android si el IME
 - Orca: `mobile/modules/orca-mobile-web-shell/android/`.
 
 ## design/ que actualiza
-- `design/terminal.md` (Android), `design/connection.md` (red en Android).
+- `design/terminal.md` (teclados de Android, la altura con el teclado), `design/connection/network.md` (el plugin
+  en Android), `design/look/navigation.md` (el atrás de Android), `design/architecture/android.md` (`MainActivity.kt`),
+  `design/architecture.md` (los plugins), `DESIGN.md`.
 
 ## Verificación
 Notas de la prueba en dispositivo en la PR.
