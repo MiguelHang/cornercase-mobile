@@ -2,7 +2,7 @@ use rstest::rstest;
 use serde_json::json;
 
 use super::*;
-use crate::cli::issues::fixtures::{CONNECTED, NONE_CONNECTED, PARTIAL_LIST, WITH_COMMENTS};
+use crate::cli::issues::fixtures::{CONNECTED, NONE_CONNECTED, PARTIAL_LIST, PLACES, WITH_COMMENTS};
 use crate::error::Error;
 use crate::transport::fake::FakeTransport;
 use crate::transport::partial_json;
@@ -21,6 +21,10 @@ fn read_issue(text: &str) -> ReadIssue {
 
 fn states(read: &Sources) -> Vec<(&str, SourceState)> {
     read.sources.iter().map(|source| (source.source.as_str(), source.state)).collect()
+}
+
+fn place(project: u64, workspace: Option<u64>, label: &str, worktree: bool) -> PlaceInfo {
+    PlaceInfo { project, workspace, label: label.to_owned(), worktree }
 }
 
 fn filter(source: Option<&str>, closed: bool, mine: bool, cached: bool) -> ListFilter {
@@ -72,6 +76,27 @@ mod the_sources {
     }
 }
 
+mod the_places {
+    use super::*;
+
+    #[test]
+    fn read_a_repository_s_root_as_a_new_worktree_and_a_folder_s_workspaces_by_their_labels() {
+        let expected = [
+            place(4, None, "shop", true),
+            place(8, Some(7), "notes › journal", false),
+            place(8, Some(11), "notes › drafts", false),
+        ];
+        assert_eq!(sources(PLACES).places, expected);
+    }
+
+    #[test]
+    fn are_every_project_s_whichever_project_was_asked() {
+        let read = sources(PLACES);
+        assert_eq!(read.project, 4);
+        assert!(read.places.iter().any(|place| place.project != read.project), "{read:?}");
+    }
+}
+
 mod a_list {
     use super::*;
 
@@ -81,6 +106,7 @@ mod a_list {
             source: "github".to_owned(),
             key: "#41".to_owned(),
             title: "Checkout forgets the coupon after a refresh".to_owned(),
+            url: "https://github.com/acme/shop/issues/41".to_owned(),
             state: "open".to_owned(),
             closed: false,
             labels: vec!["bug".to_owned(), "checkout".to_owned()],
@@ -159,11 +185,26 @@ mod leniency {
     #[test]
     fn ignores_the_fields_it_does_not_use() {
         let line = json!({
-            "boot": "4242-1700000000", "project": 3, "closed": true, "places": [{ "project": 3 }],
+            "boot": "4242-1700000000", "project": 3, "closed": true,
             "sources": [{ "source": "plane", "tab": true, "env": "PLANE_API_KEY", "people": ["me", "anyone"] }]
         });
         let expected = SourceInfo { source: "plane".to_owned(), ..SourceInfo::default() };
         assert_eq!(sources(&line.to_string()).sources, [expected]);
+    }
+
+    #[test]
+    fn ignores_whether_a_place_is_the_shown_one() {
+        let line = json!({ "places": [{ "project": 3, "workspace": 5, "label": "api › fix", "here": true }] });
+        assert_eq!(sources(&line.to_string()).places, [place(3, Some(5), "api › fix", false)]);
+    }
+
+    #[test]
+    fn reads_an_older_answer_without_places_or_urls() {
+        let older = json!({ "project": 3, "sources": [{ "source": "github", "state": "connected" }] });
+        assert_eq!(sources(&older.to_string()).places, []);
+        let listed = json!({ "project": 3, "issues": [{ "source": "github", "key": "#4", "title": "Fix it" }] });
+        let issue = &lists(&listed.to_string()).issues[0];
+        assert_eq!((issue.key.as_str(), issue.url.as_str()), ("#4", ""));
     }
 
     #[test]

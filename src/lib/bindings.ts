@@ -33,7 +33,6 @@ export const commands = {
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
 	startIssue: (form: StartIssue) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_issue", { form })),
-	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
 	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
 	changesFollow: (workspace: number, mode: Mode) => typedError<null, CommandError>(__TAURI_INVOKE("changes_follow", { workspace, mode })),
@@ -439,6 +438,7 @@ export type IssueInfo_Deserialize = {
 	source?: string,
 	key?: string,
 	title?: string,
+	url?: string,
 	state?: string,
 	closed?: boolean,
 	labels?: string[],
@@ -451,6 +451,7 @@ export type IssueInfo_Serialize = {
 	source: string,
 	key: string,
 	title: string,
+	url: string,
 	state: string,
 	closed: boolean,
 	labels: string[],
@@ -704,12 +705,6 @@ export type Name_Serialize = {
 	indices: number[],
 };
 
-export type NewWorkspace = {
-	project: number,
-	name: string,
-	worktree: boolean,
-};
-
 export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;
 
 export type PaneStatusChanged_Deserialize = {
@@ -750,11 +745,30 @@ export type Patch_Serialize = {
 	hunks: Hunk_Serialize[],
 } & ChangedFile_Serialize;
 
+export type Place = { kind: "workspace"; workspace: number } | { kind: "worktree"; project: number; branch: string };
+
+export type PlaceInfo = PlaceInfo_Serialize | PlaceInfo_Deserialize;
+
+export type PlaceInfo_Deserialize = {
+	project?: number,
+	workspace?: number | null,
+	label?: string,
+	worktree?: boolean,
+};
+
+export type PlaceInfo_Serialize = {
+	project: number,
+	workspace: number | null,
+	label: string,
+	worktree: boolean,
+};
+
 export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
 	id: number,
 	name: string,
+	workspaces: WorkspaceChoice[],
 };
 
 export type QuestionChanged = QuestionChanged_Serialize | QuestionChanged_Deserialize;
@@ -915,11 +929,13 @@ export type Sources = Sources_Serialize | Sources_Deserialize;
 export type Sources_Deserialize = {
 	project?: number,
 	sources?: SourceInfo_Deserialize[],
+	places?: PlaceInfo_Deserialize[],
 };
 
 export type Sources_Serialize = {
 	project: number,
 	sources: SourceInfo_Serialize[],
+	places: PlaceInfo_Serialize[],
 };
 
 export type Staged = Staged_Serialize | Staged_Deserialize;
@@ -929,11 +945,10 @@ export type Staged_Deserialize = "no" | "partly" | "yes" | string;
 export type Staged_Serialize = "no" | "partly" | "yes" | "other";
 
 export type StartAgent = {
-	project: number,
+	place: Place,
 	agent: string,
 	model: string,
 	prompt: string,
-	worktree: string,
 };
 
 export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;
@@ -949,12 +964,11 @@ export type StartChoices_Serialize = {
 };
 
 export type StartIssue = {
-	project: number,
+	place: Place,
 	agent: string,
 	model: string,
 	key: string,
 	source: string,
-	branch: string,
 	issue_branch: string,
 };
 
@@ -1105,6 +1119,11 @@ export type ViewedFile_Serialize = {
 	viewed: boolean,
 	digest: string | null,
 	mode: Mode,
+};
+
+export type WorkspaceChoice = {
+	id: number,
+	name: string,
 };
 
 /* Tauri Specta runtime */

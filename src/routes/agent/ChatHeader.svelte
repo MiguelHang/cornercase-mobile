@@ -11,19 +11,23 @@
     backTo,
     agents,
     below = 0,
+    sendable,
     onback,
     onterminal,
     onchanges,
     onfiles,
+    onstart,
   }: {
     row: AgentRow
     backTo: string | null
     agents: AgentRow[]
     below?: number
+    sendable: boolean
     onback: () => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
     onfiles: (workspace: number, title: string) => void
+    onstart: (workspace: number) => void
   } = $props()
 
   let scrolled = $state(0)
@@ -51,6 +55,7 @@
     <ToolButton label="Terminal" icon="square-terminal" onclick={() => onterminal(row)} />
     <ToolButton label="Changes" icon="git-compare" onclick={() => onchanges(row.workspace, row.workspace_name)} />
     <ToolButton label="Files" icon="folder" onclick={() => onfiles(row.workspace, row.workspace_name)} />
+    <ToolButton label="New agent" icon="plus" disabled={!sendable} onclick={() => onstart(row.workspace)} />
   {/snippet}
 </NavBar>
 <header class="head" bind:clientHeight={tall}>
