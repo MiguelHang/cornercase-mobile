@@ -3,6 +3,7 @@ import type { AttachImage, Discard, Images, PasteAttached } from './attach.svelt
 import type {
   AgentRow_Serialize as AgentRow,
   CommandError,
+  HistoryEntry_Serialize as HistoryEntry,
   LastMessage_Serialize as LastMessage,
   QuestionChanged_Serialize as QuestionChanged,
   Style_Serialize as Style,
@@ -17,6 +18,7 @@ import {
   type SendText,
 } from './chat.svelte'
 import type { HapticsApi } from './haptics'
+import type { History } from './history'
 import type { Asker } from './question.svelte'
 
 export const MACHINE = 1
@@ -56,6 +58,17 @@ export const gate = <T>() => {
   let open: (value: T) => void = () => {}
   const promise = new Promise<T>((resolve) => (open = resolve))
   return { promise, open }
+}
+
+export const fakeHistory = (stored: HistoryEntry[] = [], loaded: Promise<void> = Promise.resolve()) => {
+  const kept: HistoryEntry[][] = []
+  const history: History = {
+    open: vi.fn<History['open']>(() => loaded.then(() => kept.at(-1) ?? stored)),
+    keep: vi.fn<History['keep']>((entries) => {
+      kept.push(entries)
+    }),
+  }
+  return { history, kept }
 }
 
 export const noRead: ReadLast = () => Promise.resolve(ok(message('')))

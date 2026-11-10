@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { HistoryEntry_Serialize as Entry, LastMessage_Serialize as LastMessage } from './bindings'
-import { edited, heard, nextId, restated, sent } from './history'
+import { gate, settle } from './chatFakes'
+import { edited, heard, type HistoryCalls, LocalHistory, nextId, restated, sent } from './history'
 
 const SEEN = 1_000
 
@@ -189,5 +190,91 @@ describe('heard', () => {
     const delivered = restated(asked.entries, asked.id, 'sent', null)
     const answer = heard(delivered, reading('Fixed the login.'), SEEN + 2, true)
     expect(kinds(answer)).toEqual(['gap', 'agent', 'you', 'agent'])
+  })
+})
+
+describe('LocalHistory', () => {
+  const STUDIO = 3
+  const BOOT = 'b1'
+  const stored = [gap(0), agent(1, 'Done.')]
+
+  const fakeCalls = (load: HistoryCalls['historyLoad'] = () => Promise.resolve(stored)) => ({
+    historyLoad: vi.fn(load),
+    historySave: vi.fn<HistoryCalls['historySave']>(() => Promise.resolve()),
+  })
+
+  const saved = (calls: ReturnType<typeof fakeCalls>) => calls.historySave.mock.calls
+
+  it('loads the pane it opens', async () => {
+    const calls = fakeCalls()
+    expect(await new LocalHistory(calls).open(STUDIO, BOOT, 7)).toEqual(stored)
+    expect(calls.historyLoad).toHaveBeenCalledWith(STUDIO, BOOT, 7)
+  })
+
+  it('opens an empty history when the load fails', async () => {
+    const calls = fakeCalls(() => Promise.reject(new Error('the app is gone')))
+    expect(await new LocalHistory(calls).open(STUDIO, BOOT, 7)).toEqual([])
+  })
+
+  it('keeps nothing before a pane is open', async () => {
+    const calls = fakeCalls()
+    new LocalHistory(calls).keep(stored)
+    await settle()
+    expect(saved(calls)).toEqual([])
+  })
+
+  it('keeps the entries in the pane it opened last', async () => {
+    const calls = fakeCalls()
+    const history = new LocalHistory(calls)
+    await history.open(STUDIO, BOOT, 7)
+    await history.open(STUDIO, 'b2', 8)
+    history.keep(stored)
+    await settle()
+    expect(saved(calls)).toEqual([[STUDIO, 'b2', 8, stored]])
+  })
+
+  it('writes in order, even when the earlier write is slow', async () => {
+    const calls = fakeCalls()
+    const slow = gate<null>()
+    calls.historySave.mockImplementationOnce(() => slow.promise.then(() => undefined))
+    const history = new LocalHistory(calls)
+    await history.open(STUDIO, BOOT, 7)
+    const later = [...stored, you(2, 'and the tests')]
+    history.keep(stored)
+    history.keep(later)
+    await settle()
+    expect(saved(calls)).toEqual([[STUDIO, BOOT, 7, stored]])
+    slow.open(null)
+    await settle()
+    expect(saved(calls)).toEqual([
+      [STUDIO, BOOT, 7, stored],
+      [STUDIO, BOOT, 7, later],
+    ])
+  })
+
+  it('swallows a failed write and still makes the next one', async () => {
+    const calls = fakeCalls()
+    calls.historySave.mockImplementationOnce(() => Promise.reject(new Error('the app is gone')))
+    const history = new LocalHistory(calls)
+    await history.open(STUDIO, BOOT, 7)
+    history.keep(stored)
+    history.keep([gap(0)])
+    await settle()
+    expect(saved(calls).map(([, , , entries]) => entries)).toEqual([stored, [gap(0)]])
+  })
+
+  it('loads again only once the writes before it are done', async () => {
+    const calls = fakeCalls()
+    const slow = gate<null>()
+    calls.historySave.mockImplementationOnce(() => slow.promise.then(() => undefined))
+    const history = new LocalHistory(calls)
+    await history.open(STUDIO, BOOT, 7)
+    history.keep(stored)
+    const reopened = history.open(STUDIO, BOOT, 7)
+    await settle()
+    expect(calls.historyLoad).toHaveBeenCalledTimes(1)
+    slow.open(null)
+    await reopened
+    expect(calls.historyLoad).toHaveBeenCalledTimes(2)
   })
 })

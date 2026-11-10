@@ -1,4 +1,9 @@
-import type { HistoryEntry_Serialize as Entry, LastMessage_Serialize as LastMessage, SendState } from './bindings'
+import type {
+  commands,
+  HistoryEntry_Serialize as Entry,
+  LastMessage_Serialize as LastMessage,
+  SendState,
+} from './bindings'
 import type { Reading } from './chat.svelte'
 
 type Heard = Reading | { kind: 'lost'; reason: string }
@@ -67,4 +72,40 @@ export const heard = (entries: Entry[], reading: Heard, seen: number, continuous
   const before = opened(entries, seen, continuous)
   const { text, written, turn_over } = message
   return [...before, { kind: 'agent' as const, id: nextId(before), text, written, turn_over, seen }]
+}
+
+export type HistoryCalls = Pick<typeof commands, 'historyLoad' | 'historySave'>
+
+export type History = {
+  open: (machine: number, boot: string, pane: number) => Promise<Entry[]>
+  keep: (entries: Entry[]) => void
+}
+
+type Place = { machine: number; boot: string; pane: number }
+
+export class LocalHistory implements History {
+  #calls: HistoryCalls
+  #place: Place | null = null
+  #writing: Promise<void> = Promise.resolve()
+
+  constructor(calls: HistoryCalls) {
+    this.#calls = calls
+  }
+
+  async open(machine: number, boot: string, pane: number) {
+    this.#place = { machine, boot, pane }
+    await this.#writing
+    return this.#calls.historyLoad(machine, boot, pane).catch((): Entry[] => [])
+  }
+
+  keep(entries: Entry[]) {
+    const place = this.#place
+    if (place === null) {
+      return
+    }
+    const { machine, boot, pane } = place
+    this.#writing = this.#writing
+      .then(() => this.#calls.historySave(machine, boot, pane, entries))
+      .catch(() => undefined)
+  }
 }
