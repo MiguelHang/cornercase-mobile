@@ -29,6 +29,8 @@ const TITLES: Titles = {
   change: (route) => nameOf(route.path),
   files: (route) => route.title,
   file: (route) => nameOf(route.path),
+  issues: () => 'Issues',
+  issue: (route) => route.key,
 }
 
 export const titleOf = (route: Route | null, lookups: Lookups): string | null => {

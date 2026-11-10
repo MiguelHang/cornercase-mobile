@@ -1,0 +1,31 @@
+{
+  "body": "Steps:\n\n1. Add `SPRING10`\n2. Refresh the page\n\nThe total goes back to the full price.\n",
+  "comments": [
+    {
+      "author": "ada",
+      "body": "It happens on Safari too.",
+      "created_at": "2026-11-08T10:00:00Z"
+    },
+    {
+      "author": "grace",
+      "body": "The coupon lives only in memory; it should go in the session.",
+      "created_at": "2026-11-09T09:20:24Z"
+    }
+  ],
+  "info": ["open", "bug", "checkout", "opened by @grace"],
+  "issue": {
+    "assignees": ["ada"],
+    "author": "grace",
+    "branch": "issue-41-checkout-forgets-the-coupon",
+    "closed": false,
+    "key": "#41",
+    "labels": ["bug", "checkout"],
+    "number": 41,
+    "source": "github",
+    "state": "open",
+    "title": "Checkout forgets the coupon after a refresh",
+    "updated_at": "2026-11-09T09:20:24Z",
+    "url": "https://github.com/acme/shop/issues/41"
+  },
+  "prompt": "https://github.com/acme/shop/issues/41"
+}

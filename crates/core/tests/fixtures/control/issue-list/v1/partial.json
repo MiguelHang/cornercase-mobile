@@ -1,0 +1,37 @@
+{
+  "issues": [
+    {
+      "assignees": ["ada"],
+      "author": "grace",
+      "branch": "issue-41-checkout-forgets-the-coupon",
+      "closed": false,
+      "key": "#41",
+      "labels": ["bug", "checkout"],
+      "number": 41,
+      "source": "github",
+      "state": "open",
+      "title": "Checkout forgets the coupon after a refresh",
+      "updated_at": "2026-11-09T09:20:24Z",
+      "url": "https://github.com/acme/shop/issues/41"
+    },
+    {
+      "assignees": [],
+      "author": "linus",
+      "branch": "issue-38-add-a-dark-theme",
+      "closed": true,
+      "key": "#38",
+      "labels": [],
+      "number": 38,
+      "source": "github",
+      "state": "closed",
+      "title": "Add a dark theme",
+      "updated_at": "2026-11-02T18:04:11Z",
+      "url": "https://github.com/acme/shop/issues/38"
+    }
+  ],
+  "project": 7,
+  "sources": [
+    { "cached": false, "count": 2, "source": "github" },
+    { "account": "@ada in acme", "cached": false, "count": 0, "error": "Shortcut rejected the token", "source": "shortcut" }
+  ]
+}

@@ -1,6 +1,7 @@
 use cornercase_core::cli::files::{self, Found, Listing, Read};
 use cornercase_core::error::Error;
 use cornercase_core::protocol::LINE_TOO_LONG;
+use cornercase_core::transport::partial_json;
 use serde::Serialize;
 use tauri::State;
 use tauri::async_runtime::{self, JoinHandle};
@@ -53,7 +54,7 @@ pub(crate) async fn files_list(
 ) -> Result<Listing, CommandError> {
     let transport = connected(&state)?;
     let argv = files::list_args(workspace, &paths);
-    files::partial_json(transport.as_ref(), argv).await.map_err(|error| CommandError::reason(&error))
+    partial_json(transport.as_ref(), argv).await.map_err(|error| CommandError::reason(&error))
 }
 
 #[tauri::command(async)]
@@ -65,7 +66,7 @@ pub(crate) async fn files_read(
 ) -> Result<FileShown, CommandError> {
     let transport = connected(&state)?;
     let argv = files::read_args(workspace, &path);
-    let read = files::partial_json(transport.as_ref(), argv).await.map_err(|error| unread(&error))?;
+    let read = partial_json(transport.as_ref(), argv).await.map_err(|error| unread(&error))?;
     Ok(FileShown::of(read))
 }
 
@@ -110,7 +111,7 @@ fn started(
     let transport = active.store().transport().ok_or_else(CommandError::not_connected)?;
     let (sender, found) = oneshot::channel();
     let searching = async move {
-        sender.send(files::partial_json(transport.as_ref(), argv).await).ok();
+        sender.send(partial_json(transport.as_ref(), argv).await).ok();
     };
     active.search(workspace, spawn(Box::pin(searching)));
     Ok(found)

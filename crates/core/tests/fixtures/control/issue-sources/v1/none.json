@@ -1,0 +1,40 @@
+{
+  "closed": false,
+  "places": [],
+  "project": 12,
+  "sources": [
+    {
+      "fields": ["assignee", "author"],
+      "from": "gh",
+      "missing": ["repository"],
+      "name": "GitHub",
+      "people": ["anyone", "anyone"],
+      "repository": true,
+      "source": "github",
+      "state": "missing",
+      "tab": true
+    },
+    {
+      "fields": ["assignee", "creator"],
+      "from": "saved",
+      "missing": [],
+      "name": "Linear",
+      "people": ["anyone", "anyone"],
+      "reason": "Linear rejected the token: it may have expired",
+      "repository": false,
+      "source": "linear",
+      "state": "failing",
+      "tab": true
+    },
+    {
+      "fields": ["assignee", "reporter"],
+      "missing": ["site", "email", "token"],
+      "name": "Jira",
+      "people": ["anyone", "anyone"],
+      "repository": false,
+      "source": "jira",
+      "state": "missing",
+      "tab": false
+    }
+  ]
+}
