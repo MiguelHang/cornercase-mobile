@@ -4,6 +4,7 @@ pub(crate) mod connection;
 pub(crate) mod error;
 pub(crate) mod files;
 pub(crate) mod identity;
+pub(crate) mod issues;
 pub(crate) mod machines;
 pub(crate) mod probe;
 pub(crate) mod reach;
