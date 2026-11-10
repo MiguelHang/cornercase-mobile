@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { AgentRow_Serialize as Agent } from '../../lib/bindings'
   import { elapsed, label, place, type Row } from '../../lib/board'
+  import Hidden from '../../lib/ui/Hidden.svelte'
+  import Icon from '../../lib/ui/Icon.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
   let {
@@ -31,23 +33,18 @@
     {#if time !== ''}
       <span class="time">{time}</span>
     {/if}
-    {#if item.attention !== null}
-      <StatusDot status={item.attention} size={10} />
-    {/if}
-    {#if item.hidden > 0}
-      <span class="hidden">+{item.hidden}</span>
-    {/if}
+    <Hidden hidden={item.hidden} attention={item.attention} />
   </button>
   {#if item.hasChildren}
     <button
       class="fold"
       type="button"
-      aria-label="Subagents"
+      aria-label="Subagents of {label(row, agents)}"
       aria-expanded={!item.folded}
       onclick={() => onfold(row.pane)}
       ontouchstart={() => {}}
     >
-      {item.folded ? '▸' : '▾'}
+      <Icon name={item.folded ? 'chevron-right' : 'chevron-down'} size={18} />
     </button>
   {/if}
 </div>
@@ -86,9 +83,13 @@
   }
 
   .fold {
+    display: flex;
     flex: none;
+    align-items: center;
+    justify-content: center;
     min-width: 44px;
-    color: var(--muted);
+    padding: 0;
+    color: var(--soft);
   }
 
   .lines {
@@ -118,12 +119,5 @@
     font-size: 13px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-  }
-
-  .hidden {
-    flex: none;
-    color: var(--muted);
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
   }
 </style>

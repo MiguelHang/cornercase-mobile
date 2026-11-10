@@ -328,6 +328,17 @@ describe('subagents', () => {
   })
 })
 
+describe('hiddenName', () => {
+  it.each<[string, number, string | null, string]>([
+    ['the count alone when nothing hidden needs attention', 3, null, '3 subagents hidden'],
+    ['one hidden by its status', 1, 'waiting', '1 subagent hidden, waiting'],
+    ['the loudest status of several as one of them at least', 3, 'failed', '3 subagents hidden, at least one failed'],
+    ['pending by its name', 2, 'pending', '2 subagents hidden, at least one pending'],
+  ])('says %s', (_, hidden, attention, name) => {
+    expect(board.hiddenName(hidden, attention)).toBe(name)
+  })
+})
+
 describe('statusName', () => {
   it.each<[string | null | undefined, string]>([
     ['working', 'Working'],

@@ -79,7 +79,7 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} {below} {onback} {onterminal} {onchanges} />
+    <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}

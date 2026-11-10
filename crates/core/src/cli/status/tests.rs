@@ -17,7 +17,6 @@ fn agent(id: u64, title: Option<String>, parent: Option<u64>, active: bool) -> P
         path: Some("/home/me/web-shop".into()),
         parent,
         role: None,
-        collapsed: false,
         active,
         dialog: false,
         at_prompt: None,
@@ -151,12 +150,7 @@ mod writing {
 
     #[test]
     fn writes_every_field_of_a_pane_with_the_names_of_the_contract() {
-        let pane = Pane {
-            role: Some("coder".into()),
-            collapsed: true,
-            at_prompt: Some(true),
-            ..agent(5, None, Some(4), false)
-        };
+        let pane = Pane { role: Some("coder".into()), at_prompt: Some(true), ..agent(5, None, Some(4), false) };
         let expected = json!({
             "id": 5,
             "agent": "claude",
@@ -166,7 +160,6 @@ mod writing {
             "path": "/home/me/web-shop",
             "parent": 4,
             "role": "coder",
-            "collapsed": true,
             "active": false,
             "dialog": false,
             "at_prompt": true,
@@ -228,24 +221,24 @@ mod the_real_server {
 mod a_tree_of_agents {
     use super::*;
 
-    fn agents(snapshot: &Snapshot) -> Vec<(u64, Option<u64>, Option<&str>, bool)> {
+    fn agents(snapshot: &Snapshot) -> Vec<(u64, Option<u64>, Option<&str>)> {
         panes(snapshot)
             .filter(|pane| pane.agent.is_some())
-            .map(|pane| (pane.id, pane.parent, pane.role.as_deref(), pane.collapsed))
+            .map(|pane| (pane.id, pane.parent, pane.role.as_deref()))
             .collect()
     }
 
     #[test]
-    fn reads_who_started_each_agent_its_role_and_its_fold() {
+    fn reads_who_started_each_agent_and_its_role() {
         let snapshot = parsed(STATUS_TREE);
         let expected = vec![
-            (5, None, None, true),
-            (7, Some(5), None, false),
-            (9, Some(7), None, false),
-            (12, Some(5), None, false),
-            (16, None, Some("orchestrator"), false),
-            (17, Some(16), Some("coder"), false),
-            (18, Some(16), Some("reviewer"), false),
+            (5, None, None),
+            (7, Some(5), None),
+            (9, Some(7), None),
+            (12, Some(5), None),
+            (16, None, Some("orchestrator")),
+            (17, Some(16), Some("coder")),
+            (18, Some(16), Some("reviewer")),
         ];
         assert_eq!(snapshot.version, "0.13.19");
         assert_eq!(agents(&snapshot), expected);
@@ -260,9 +253,9 @@ mod a_tree_of_agents {
     }
 
     #[test]
-    fn reads_a_pane_without_a_role_or_a_fold_as_neither() {
+    fn reads_a_pane_without_a_role_as_none() {
         let snapshot = parsed(STATUS_TREE);
         let shell = &snapshot.projects[0].workspaces[0].tabs[0].panes[0];
-        assert_eq!((shell.id, shell.role.as_deref(), shell.collapsed), (1, None, false));
+        assert_eq!((shell.id, shell.role.as_deref()), (1, None));
     }
 }

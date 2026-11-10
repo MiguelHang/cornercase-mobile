@@ -1,14 +1,12 @@
 <script lang="ts">
   import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
-  import { label, place, subagents } from '../../lib/board'
-  import StatusDot from '../../lib/ui/StatusDot.svelte'
+  import { subagents } from '../../lib/board'
+  import Icon from '../../lib/ui/Icon.svelte'
+  import Children from './Children.svelte'
 
-  let {
-    row,
-    agents,
-    onopen,
-    open = $bindable(false),
-  }: { row: AgentRow; agents: AgentRow[]; onopen: (pane: number) => void; open?: boolean } = $props()
+  let { row, agents, onopen }: { row: AgentRow; agents: AgentRow[]; onopen: (pane: number) => void } = $props()
+
+  let open = $state(false)
 
   const summary = $derived(subagents(agents, row.pane))
 </script>
@@ -23,56 +21,33 @@
       ontouchstart={() => {}}
     >
       <span class="count">{summary.line}</span>
-      <span class="arrow">{open ? '▾' : '▸'}</span>
+      <span class="arrow"><Icon name={open ? 'chevron-down' : 'chevron-right'} size={18} /></span>
     </button>
     {#if open}
-      <ul class="children" aria-label="Subagents">
-        {#each summary.children as child (child.key)}
-          <li>
-            <button class="child" type="button" onclick={() => onopen(child.row.pane)} ontouchstart={() => {}}>
-              <StatusDot status={child.row.status} />
-              <span class="names">
-                <span class="name">{label(child.row, agents)}</span>
-                <span class="where">{place(child.row, agents)}</span>
-              </span>
-              {#if child.attention !== null}
-                <StatusDot status={child.attention} size={10} />
-              {/if}
-              {#if child.hidden > 0}
-                <span class="hidden">+{child.hidden}</span>
-              {/if}
-            </button>
-          </li>
-        {/each}
-      </ul>
+      <Children children={summary.children} {agents} {onopen} />
     {/if}
   </div>
 {/if}
 
 <style>
-  .line,
-  .child {
+  .line {
     box-sizing: border-box;
     display: flex;
     align-items: center;
+    gap: var(--gap);
     width: 100%;
     min-height: 44px;
+    padding: 0;
     border: none;
     border-radius: var(--radius-control);
     background: none;
+    color: var(--muted);
     font: inherit;
     text-align: left;
   }
 
-  .line:active,
-  .child:active {
+  .line:active {
     background: var(--hover);
-  }
-
-  .line {
-    gap: var(--gap);
-    padding: 0;
-    color: var(--muted);
   }
 
   .count {
@@ -84,45 +59,11 @@
   }
 
   .arrow {
-    flex: none;
-    min-width: 44px;
-    text-align: center;
-  }
-
-  .children {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .child {
-    gap: var(--inset);
-    padding: var(--gap) var(--inset);
-    color: var(--text);
-  }
-
-  .names {
     display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .name,
-  .where {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .where,
-  .hidden {
-    color: var(--muted);
-    font-size: 13px;
-  }
-
-  .hidden {
     flex: none;
-    font-variant-numeric: tabular-nums;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    color: var(--soft);
   }
 </style>

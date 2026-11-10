@@ -2,18 +2,20 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import type { AttachImage } from '../../lib/attach.svelte'
+import { subagents } from '../../lib/board'
 import { Chat, timers, type Clock, type Outgoing, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
 import { fakeClock, message, ok } from '../../lib/chatFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import chatHeaderSource from './ChatHeader.svelte?raw'
 import AgentLine from './AgentLine.svelte'
+import Children from './Children.svelte'
+import childrenSource from './Children.svelte?raw'
 import agentLineSource from './AgentLine.svelte?raw'
 import KeyRow from './KeyRow.svelte'
 import keyRowSource from './KeyRow.svelte?raw'
 import Sent from './Sent.svelte'
 import sentSource from './Sent.svelte?raw'
-import Subagents from './Subagents.svelte'
 import subagentsSource from './Subagents.svelte?raw'
 import Thread from './Thread.svelte'
 import threadSource from './Thread.svelte?raw'
@@ -120,6 +122,16 @@ describe('Agent, its header', () => {
   it('sits below the connection bar', () => {
     expect(draw(chatWith(ROW), 52)).toContain('style="--below: 52px;"')
   })
+
+  it("names a flow's member by its role, as on the board, and keeps its place", () => {
+    const coder = { ...ROW, parent: 11, depth: 1, role: 'coder', title: 'Write the form', status: 'working' }
+    const team = [{ ...ROW, pane: 11, role: 'orchestrator' }, coder]
+    const body = draw(chatWith(coder), 0, CONNECTED, null, team)
+    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">coder<\/h1>/)
+    expect(body).toMatch(/<span class="called svelte-[\w-]+">coder<\/span>/)
+    expect(body).toMatch(/<span class="status svelte-[\w-]+">Working<\/span> · web › login › agent<\/p>/)
+    expect(draw(chatWith(coder))).toMatch(/<h1 class="title svelte-[\w-]+">Write the form<\/h1>/)
+  })
 })
 
 const LEAD: AgentRow = { ...ROW, status: 'working', role: 'orchestrator', rank_status: 'waiting' }
@@ -135,7 +147,9 @@ const TEAM = [LEAD, CODER, DIG, REVIEWER]
 const COUNT = /<span class="count svelte-[\w-]+">([^<]*)<\/span>/
 
 const unfolded = (agents: AgentRow[]) =>
-  render(Subagents, { props: { row: LEAD, agents, onopen: () => {}, open: true } }).body
+  render(Children, { props: { children: subagents(agents, LEAD.pane)?.children ?? [], agents, onopen: () => {} } }).body
+
+const CHEVRON_RIGHT = /<span class="arrow svelte-[\w-]+"><svg [^>]*width="18" height="18"[^]*?<path d="m9 18 6-6-6-6"><\/path>/
 
 const names = (body: string) => [...body.matchAll(/<span class="name svelte-[\w-]+">([^<]*)<\/span>/g)].map(([, name]) => name)
 
@@ -145,7 +159,7 @@ describe('Agent, its subagents', () => {
     expect(body.match(COUNT)?.[1]).toBe('3 subagents · 1 waiting, 2 working')
     expect(body).toMatch(/<\/header>(?:<!--[^>]*-->|\s)*<div class="subagents[^]*?<div class="thread/)
     expect(body).toContain('aria-expanded="false"')
-    expect(body).toContain('▸')
+    expect(body).toMatch(CHEVRON_RIGHT)
     expect(body).not.toContain('class="children')
   })
 
@@ -160,20 +174,25 @@ describe('Agent, its subagents', () => {
 
   it('unfolds into its direct children, named by their role, with the attention and count below each', () => {
     const body = unfolded(TEAM)
-    expect(body).toContain('aria-expanded="true"')
-    expect(body).toContain('▾')
+    expect(body).toMatch(/<ul class="children svelte-[\w-]+" aria-label="Subagents">/)
     expect(names(body)).toEqual(['coder', 'reviewer'])
     expect(body).toMatch(/<span class="where svelte-[\w-]+">Write the form<\/span>/)
-    expect(body).toMatch(/aria-label="Waiting" width="10"[^]*?<span class="hidden svelte-[\w-]+">\+1<\/span>/)
+    expect(body).toMatch(
+      /role="img" aria-label="1 subagent hidden, waiting"><span class="marks svelte-[\w-]+" aria-hidden="true">[^]*?aria-label="Waiting" width="10"[^]*?<span class="hidden svelte-[\w-]+">\+1<\/span>/,
+    )
     expect(body).not.toContain('>Dig<')
   })
 
   it("opens a child's chat from its row and folds the list from the line", () => {
-    expect(flat(subagentsSource)).toContain(
+    expect(flat(childrenSource)).toContain(
       '<button class="child" type="button" onclick={() => onopen(child.row.pane)} ontouchstart={() => {}}>',
     )
+    expect(flat(childrenSource)).toContain('min-height: 44px;')
+    expect(flat(subagentsSource)).toContain('let open = $state(false)')
     expect(flat(subagentsSource)).toContain('aria-expanded={open} onclick={() => (open = !open)}')
-    expect(flat(subagentsSource)).toContain('min-height: 44px;')
+    expect(flat(subagentsSource)).toContain("<Icon name={open ? 'chevron-down' : 'chevron-right'} size={18} />")
+    expect(flat(subagentsSource)).toContain('{#if open} <Children children={summary.children} {agents} {onopen} /> {/if}')
+    expect(flat(subagentsSource)).toContain('.arrow { display: flex; flex: none; align-items: center; justify-content: center; min-width: 44px;')
   })
 
   it('starts folded again for each agent opened, and opens its children like the board', () => {
@@ -402,7 +421,7 @@ describe('Agent, without its row', () => {
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} {below} {onback} {onterminal} {onchanges} /> {#key row.pane}')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {below} {onback} {onterminal} {onchanges} /> {#key row.pane}')
     const source = flat(chatHeaderSource)
     expect(source).toContain('aria-label="Terminal" onclick={() => onterminal(row)}')
     expect(source).toContain('aria-label="Changes" onclick={() => onchanges(row.workspace, row.workspace_name)}')

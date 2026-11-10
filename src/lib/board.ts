@@ -111,6 +111,8 @@ const closed = (made: Tree, agent: AgentRow) => {
   return row(agent, hidden.length > 0, hidden.length > 0, hidden)
 }
 
+const counted = (count: number) => `${count} ${count === 1 ? 'subagent' : 'subagents'}`
+
 const tally = (agents: AgentRow[]) =>
   COUNTED.flatMap((status) => {
     const count = agents.filter((agent) => statusName(agent.status).toLowerCase() === status).length
@@ -124,8 +126,16 @@ export const subagents = (rows: AgentRow[], pane: number): Subagents | null => {
     return null
   }
   const all = children.flatMap((child) => [child, ...descendants(made, child)])
-  const noun = all.length === 1 ? 'subagent' : 'subagents'
-  return { children: children.map((child) => closed(made, child)), line: `${all.length} ${noun} · ${tally(all)}` }
+  return { children: children.map((child) => closed(made, child)), line: `${counted(all.length)} · ${tally(all)}` }
+}
+
+export const hiddenName = (hidden: number, attention: string | null) => {
+  const what = `${counted(hidden)} hidden`
+  if (attention === null) {
+    return what
+  }
+  const status = statusName(attention).toLowerCase()
+  return hidden === 1 ? `${what}, ${status}` : `${what}, at least one ${status}`
 }
 
 export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES): Item[] => {
