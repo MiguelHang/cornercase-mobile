@@ -1,6 +1,6 @@
 # 047 — Arrancar una issue con un flow
 
-- Estado: en curso (falta comprobarlo en el simulador)
+- Estado: hecha
 - Depende de: 024, 045
 - Rama: `feat/047-issue-flow` · PR: `feat: start an issue with one of the project's flows`
 
@@ -16,7 +16,7 @@ cornercase tiene flows (equipos de agentes con roles: orquestador, coder, review
 - [x] CA2 — Al arrancar, la app lleva al tablero con el orquestador del flow como agente "arrancando" (023) y su equipo
   plegado debajo (038); los fallos se dicen como en Start (motivo de cornercase, `Unanswered`).
 - [x] CA3 — Sin flows en el proyecto, la opción no aparece; `contract` exige lo que haga falta (`REQUIRED` o un aviso).
-- [ ] CA4 — Comprobado en el simulador con un flow real; tests (argv, lectura de la lista, formulario); `hx check full` verde.
+- [x] CA4 — Comprobado en el simulador con un flow real; tests (argv, lectura de la lista, formulario); `hx check full` verde.
 
 ## Decisiones
 Tomadas el 2026-11-10 con los valores por defecto propuestos, sin respuesta del usuario (`design/starting-work.md` ›
@@ -34,13 +34,22 @@ From an issue › With a flow):
 - `flow-list` y `flow-run` en `contract::REQUIRED` (ya están en 0.13.19).
 
 ## design/ que actualiza
-- `design/starting-work.md`: From an issue › With a flow, las comprobaciones de The screen y Left out.
+- `design/starting-work.md`: From an issue › With a flow, las comprobaciones de The screen, Checked live y Left out.
 - `DESIGN.md` (los ficheros nuevos en la línea de Starting work), `design/connection.md` (`REQUIRED`),
   `design/architecture.md` (`issue_flows`, `start_flow`) y `design/look.md` (`Segmented`, `FlowPicker`).
 
 ## Verificación
-Pendiente: el simulador iPhone 17 contra el puente y cornercase 0.13.31 en un servidor aislado, con un built-in real y
-agentes de mentira (`design/starting-work.md` › Checked live).
+2026-11-10, simulador iPhone 17 (iOS 27.2) con la app y el puente de la rama, cornercase 0.13.31 en un servidor aislado
+(`HOME` falso, `gh` y agentes de mentira) y los toques por XCUITest (`design/starting-work.md` › Checked live):
+- `Flow` en el formulario de la issue, `Where` solo con la nueva worktree, la lista en el menú de iOS (opciones largas
+  en varias líneas, la que tiene problemas deshabilitada), el equipo bajo el selector y el último flow recordado.
+- Arrancar `Quick` (built-in): worktree, workspace y una pestaña por rol; `Starting claude…`, la pantalla del
+  orquestador y `Back` al tablero con el `coder` plegado debajo.
+- Con un proyecto que no es raíz de un repo, `Flow` no aparece.
+- El orquestador arranca el último (`launch_run` de upstream): el coder salió como agente ~1,1 s antes, así que el
+  tablero lo pondría como raíz ese rato. No es un hueco de upstream (`status` ya da el `role` del panel del
+  orquestador), así que `design/upstream-gaps.md` no cambia.
+- `hx check full` verde.
 
 ## Referencias
 - cornercase-terminal (`origin/main`): `design/commands-for-scripts-and-agents.md` (flow run, caps), los flows y sus
