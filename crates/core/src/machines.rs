@@ -30,6 +30,23 @@ pub struct Machine {
     pub last_route: Option<Address>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Reach {
+    Lan,
+    Tailscale,
+    Other,
+}
+
+pub(crate) fn reach(address: &Address) -> Reach {
+    if tailscale(address) {
+        return Reach::Tailscale;
+    }
+    match address.host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) if ip.is_private() => Reach::Lan,
+        _ => Reach::Other,
+    }
+}
+
 pub(crate) fn tailscale(address: &Address) -> bool {
     match address.host.parse::<IpAddr>() {
         Ok(IpAddr::V4(ip)) => {
