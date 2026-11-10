@@ -54,3 +54,25 @@ DevTools remoto (`adb forward tcp:… localabstract:webview_devtools_remote_<pid
   answering". Es el fallo que cubre CA2.
 - GBoard en la terminal (campo oculto) enseña la fila de herramientas, no la barra de sugerencias, y las minúsculas
   (sin mayúscula inicial); en el chat, mayúscula inicial. Sin escribir nada: es de T5.
+
+### T3 — altura y desplazamiento con el teclado (2026-11-10)
+Mismo emulador y APK con T2, en un AVD propio (`cornercase_api37_032`), contra el puente por la IP del Mac, en la
+terminal y el chat de un agente parado (Claude Code sin trabajar), sin escribir nada.
+
+- **Terminal**: con GBoard abierto `innerHeight` 578 y `visualViewport.height` 577,905, la pantalla con la clase
+  `keyboard`, `top` 0 y `height` 577,905: la fila de teclas pegada encima del teclado y la última fila de la rejilla
+  encima de la fila. Al cerrarlo (atrás) vuelve a 914, sin `keyboard` ni `top`/`height`, sin otro toque. `scrollY` 0
+  siempre. Cuatro aperturas y cierres: ningún `runs surface` nuevo en el log del puente.
+- **Con "Fit to this phone"**: al encenderlo un `runs view` y un `runs surface` (el ajuste); dos aperturas y cierres
+  del teclado después, nada más; la rejilla ajustada queda desplazada a su última fila encima de la fila de teclas.
+  Al apagarlo, un `runs surface` (vuelta al modo pasivo).
+- **Chat**: el campo y su fila de teclas pegados encima del teclado (campo en 518–562 de 578); al cerrarlo vuelve
+  abajo (830–874 de 914) con `scrollY` 0.
+- **Abrir la terminal con el teclado del chat abierto**: el teclado se cierra al perder el foco y la terminal sale a
+  toda la altura, con un solo `runs surface`.
+- **Girar con el teclado abierto**: a 914 de ancho con el teclado, `innerHeight` 150 y la pantalla sigue tratándolo
+  como abierto; un `runs surface` por el giro (el tamaño cambia) y ninguno al cerrar el teclado después; otro al
+  volver a vertical.
+- **Sin cambios de código**: el `top`/`height` de `Terminal.svelte` ya vale en Android (`offsetTop` 0 y la altura del
+  visual viewport, la misma que la del layout), y la página no se queda desplazada al cerrar el teclado, así que no
+  se añade la vuelta del scroll a 0: lo visto en la 030 era sin los insets del IME de `MainActivity.kt` (T1).
