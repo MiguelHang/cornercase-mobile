@@ -248,10 +248,9 @@ describe('Agent, its sticky header', () => {
 describe('Agent, its message', () => {
   it('draws the message as markdown, with the time it was written', () => {
     const chat = chatWith(ROW)
-    chat.reading = {
-      kind: 'message',
-      message: { pane: ROW.pane, agent: 'claude', text: 'Tests **pass**.', written: minutesAgo(5), turn_over: true },
-    }
+    chat.conversation = [
+      { kind: 'agent', id: 0, text: 'Tests **pass**.', written: minutesAgo(5), turn_over: true, seen: 0 },
+    ]
     const body = draw(chat)
     expect(body).toContain('<strong')
     expect(body).toContain('pass')
@@ -260,10 +259,7 @@ describe('Agent, its message', () => {
 
   it('leaves out the time when the message has none', () => {
     const chat = chatWith(ROW)
-    chat.reading = {
-      kind: 'message',
-      message: { pane: ROW.pane, agent: 'claude', text: 'Ready.', written: null, turn_over: null },
-    }
+    chat.conversation = [{ kind: 'agent', id: 0, text: 'Ready.', written: null, turn_over: null, seen: 0 }]
     expect(draw(chat)).not.toContain('class="written')
   })
 
@@ -576,7 +572,7 @@ describe('Agent, its keys', () => {
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
     expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
-    expect(flat(threadSource)).toContain('{/each} <AgentLine {chat} {now} /> </div>')
+    expect(flat(threadSource)).toContain('{#if note !== null} <p class="reason">{note}</p> {/if} <AgentLine {chat} {now} /> </div>')
   })
 
   it('tells the time by the chat clock', () => {

@@ -19,7 +19,6 @@ import {
   type Calls,
   fresh,
   seen,
-  ready,
   settle,
   PASTED,
   attached,
@@ -45,23 +44,16 @@ const failedWith = async (sendText: SendText, draft = 'fix thread.ts', calls: Ca
 }
 
 describe('Chat, what you sent', () => {
-  it('shows what you sent, sending, under the message it answers, with the field empty at once', async () => {
+  it('shows what you sent, sending, with the field empty at once', async () => {
     const answer = gate<Sent>()
     const chat = await opened(() => answer.promise)
     chat.draft = 'fix thread.ts'
     const sent = chat.send()
     expect(chat.draft).toBe('')
-    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sending', reason: null, answered: SHOWN })
+    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sending', reason: null })
     answer.open(ok(null))
     await sent
-    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sent', reason: null, answered: SHOWN })
-  })
-
-  it('answers no message while it is not read yet', async () => {
-    const chat = ready()
-    chat.draft = 'go on'
-    await chat.send()
-    expect(chat.outgoing?.answered).toBeNull()
+    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sent', reason: null })
   })
 
   it('names the images that went with it', async () => {
@@ -83,7 +75,7 @@ describe('Chat, what you sent', () => {
     ['a rejected call', () => Promise.reject(new Error('IPC is gone')), 'IPC is gone'],
   ])('is not sent after %s, with its reason', async (_, sendText, reason) => {
     const chat = await failedWith(sendText)
-    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'failed', reason, answered: SHOWN })
+    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'failed', reason })
     expect(chat.draft).toBe('')
   })
 
@@ -307,7 +299,7 @@ describe('Chat, left', () => {
 })
 
 describe('Chat, Retry', () => {
-  it('sends the same text again, under the message shown now', async () => {
+  it('sends the same text again', async () => {
     const sendText = sentOnce(refused('nothing was sent', 'not_sent'))
     const chat = await failedWith(sendText)
     expect(chat.canRetry).toBe(true)
@@ -316,7 +308,7 @@ describe('Chat, Retry', () => {
       [PANE, 'fix thread.ts', false],
       [PANE, 'fix thread.ts', false],
     ])
-    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sent', reason: null, answered: SHOWN })
+    expect(chat.outgoing).toEqual({ text: 'fix thread.ts', chips: [], state: 'sent', reason: null })
   })
 
   it('forces the text past the images still in the input, and drops them once sent', async () => {

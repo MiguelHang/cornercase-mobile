@@ -55,7 +55,7 @@ const grown = (entries: Entry[], last: AgentEntry, message: LastMessage) =>
     entry === last ? { ...last, text: message.text, written: message.written, turn_over: message.turn_over } : entry,
   )
 
-const lastAgent = (entries: Entry[]) => entries.findLast((entry): entry is AgentEntry => entry.kind === 'agent')
+export const lastAgent = (entries: Entry[]) => entries.findLast((entry): entry is AgentEntry => entry.kind === 'agent')
 
 export const heard = (entries: Entry[], reading: Heard, seen: number, continuous: boolean) => {
   if (reading.kind !== 'message') {

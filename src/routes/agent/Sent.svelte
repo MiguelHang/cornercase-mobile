@@ -1,35 +1,45 @@
 <script lang="ts">
-  import type { Chat, Outgoing } from '../../lib/chat.svelte'
+  import type { HistoryEntry_Serialize as Entry } from '../../lib/bindings'
+  import type { Chat } from '../../lib/chat.svelte'
+  import { sendNews, shownState } from '../../lib/thread'
   import Button from '../../lib/ui/Button.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
 
-  const NAMES: Record<Outgoing['state'], string> = { sending: 'sending', sent: 'sent', failed: 'not sent' }
+  type You = Extract<Entry, { kind: 'you' }>
 
-  let { chat }: { chat: Chat } = $props()
+  const NAMES: Record<ReturnType<typeof shownState>, string> = {
+    sending: 'sending',
+    sent: 'sent',
+    failed: 'not sent',
+    unconfirmed: 'not confirmed',
+  }
+
+  let { entry, chat }: { entry: You; chat: Chat | null } = $props()
+
+  const shown = $derived(shownState(entry.state, chat !== null))
 </script>
 
-{#if chat.outgoing !== null}
-  {@const outgoing = chat.outgoing}
-  <article class="sent" aria-label="Your message, {NAMES[outgoing.state]}">
-    <div class="bubble">
-      {#if outgoing.text !== ''}
-        <p class="text">{outgoing.text}</p>
-      {/if}
-      {#if outgoing.chips.length > 0}
-        <ul class="chips">
-          {#each outgoing.chips as chip (chip)}
-            <li class="chip">{chip.name}</li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-    {#if outgoing.state === 'sending'}
-      <p class="state"><Spinner />Sending…</p>
-    {:else if outgoing.state === 'sent'}
-      <p class="state"><Icon name="check" size={14} />Sent</p>
-    {:else}
-      <p class="state failed"><Icon name="circle-alert" size={14} />Not sent: {outgoing.reason}</p>
+<article class="sent" aria-label="Your message, {NAMES[shown]}">
+  <div class="bubble">
+    {#if entry.text !== ''}
+      <p class="text">{entry.text}</p>
+    {/if}
+    {#if entry.chips.length > 0}
+      <ul class="chips">
+        {#each entry.chips as chip, index (index)}
+          <li class="chip">{chip}</li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+  {#if shown === 'sending'}
+    <p class="state"><Spinner />Sending…</p>
+  {:else if shown === 'sent'}
+    <p class="state"><Icon name="check" size={14} />Sent</p>
+  {:else if shown === 'failed'}
+    <p class="state failed"><Icon name="circle-alert" size={14} />{sendNews(entry)}</p>
+    {#if chat !== null}
       <div class="actions">
         <Button tone="plain" resting={!chat.canRetry} onclick={() => void chat.retry()}>
           <Icon name="rotate-ccw" size={16} />Retry
@@ -37,8 +47,10 @@
         <Button tone="plain" onclick={() => chat.edit()}><Icon name="pencil" size={16} />Edit</Button>
       </div>
     {/if}
-  </article>
-{/if}
+  {:else}
+    <p class="state"><Icon name="circle-alert" size={14} />Not confirmed: the app closed before an answer came back</p>
+  {/if}
+</article>
 
 <style>
   .sent {

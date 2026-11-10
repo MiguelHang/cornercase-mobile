@@ -48,7 +48,6 @@ export type Outgoing = {
   chips: Chip[]
   state: 'sending' | 'sent' | 'failed'
   reason: string | null
-  answered: LastMessage | null
 }
 
 type Answer = Reading | { kind: 'lost'; reason: string }
@@ -457,9 +456,8 @@ export class Chat {
 
   async #deliver(text: string, again = false) {
     const chips = this.attachments.take()
-    const shown = this.reading.kind === 'message' ? { ...this.reading.message } : null
     const broken = this.#broken
-    const bubble: Outgoing = { text, chips, state: 'sending', reason: null, answered: shown }
+    const bubble: Outgoing = { text, chips, state: 'sending', reason: null }
     this.outgoing = bubble
     this.#expecting = true
     this.#recordSent(text, chips, again)

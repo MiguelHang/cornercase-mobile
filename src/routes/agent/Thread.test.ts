@@ -1,8 +1,9 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
+import type { HistoryEntry_Serialize as Entry } from '../../lib/bindings'
 import { Chat, timers, type Outgoing } from '../../lib/chat.svelte'
 import { message, ok } from '../../lib/chatFakes'
-import { CHIPS, LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unkept, unmarked, unpressed, unread, unsent } from './agentFakes'
+import { LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unkept, unmarked, unpressed, unread, unsent } from './agentFakes'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import Sent from './Sent.svelte'
@@ -10,18 +11,32 @@ import sentSource from './Sent.svelte?raw'
 import Thread from './Thread.svelte'
 import threadSource from './Thread.svelte?raw'
 
+type You = Extract<Entry, { kind: 'you' }>
+
 const outgoing = (state: Outgoing['state'], fields: Partial<Outgoing> = {}): Outgoing => ({
   text: 'what is wrong here?',
   chips: [],
   state,
   reason: state === 'failed' ? 'nothing was sent' : null,
-  answered: null,
   ...fields,
 })
 
-const bubble = (shown: Outgoing | null, chat = chatWith({ ...ROW, status: 'done' })) => {
-  chat.outgoing = shown
-  return render(Sent, { props: { chat } }).body
+const yours = (id: number, state: You['state'], fields: Partial<You> = {}): You => ({
+  kind: 'you',
+  id,
+  text: 'what is wrong here?',
+  chips: [],
+  state,
+  reason: state === 'failed' ? 'nothing was sent' : null,
+  seen: SINCE,
+  ...fields,
+})
+
+const bubble = (entry: You, chat: Chat | null = chatWith({ ...ROW, status: 'done' })) => {
+  if (chat !== null) {
+    chat.outgoing = outgoing(entry.state, { text: entry.text, reason: entry.reason })
+  }
+  return render(Sent, { props: { entry, chat } }).body
 }
 
 const action = (body: string, name: string) =>
@@ -29,7 +44,7 @@ const action = (body: string, name: string) =>
 
 describe('Sent', () => {
   it('shows the text in a bubble while it is sending, named as your message, with no actions', () => {
-    const body = bubble(outgoing('sending'))
+    const body = bubble(yours(1, 'sending'))
     expect(body).toMatch(/<article class="sent svelte-[\w-]+" aria-label="Your message, sending">/)
     expect(body).toMatch(/<p class="text svelte-[\w-]+">what is wrong here\?<\/p>/)
     expect(body).toMatch(/<p class="state svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Sending…<\/p>/)
@@ -39,7 +54,7 @@ describe('Sent', () => {
   })
 
   it('says it was sent with a check, and offers nothing', () => {
-    const body = bubble(outgoing('sent'))
+    const body = bubble(yours(1, 'sent'))
     expect(body).toContain('aria-label="Your message, sent"')
     expect(body).toMatch(/<p class="state svelte-[\w-]+"><svg[^]*?<path d="M20 6 9 17l-5-5"><\/path>[^]*?<\/svg>(?:<!---->)?Sent<\/p>/)
     expect(body).not.toContain('class="spinner')
@@ -47,7 +62,7 @@ describe('Sent', () => {
   })
 
   it('says why it was not sent and offers Retry and Edit, of 44 px, with their icons', () => {
-    const body = bubble(outgoing('failed', { reason: 'it may have been sent, but no answer came back' }))
+    const body = bubble(yours(1, 'failed', { reason: 'it may have been sent, but no answer came back' }))
     expect(body).toContain('aria-label="Your message, not sent"')
     expect(body).toMatch(
       /<p class="state failed svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not sent: it may have been sent, but no answer came back<\/p>/,
@@ -62,29 +77,49 @@ describe('Sent', () => {
   })
 
   it('rests Retry while it cannot go, and leaves Edit', () => {
-    const body = bubble(outgoing('failed'), chatWith(ROW))
+    const body = bubble(yours(1, 'failed'), chatWith(ROW))
     expect(action(body, 'Retry')?.[1]).toMatch(/^button plain svelte-[\w-]+ resting$/)
     expect(action(body, 'Retry')?.[2]).toBe(' disabled="" aria-disabled="true"')
     expect(action(body, 'Edit')?.[2]).toBe('')
   })
 
-  it('shows the names of the images that went with it, without their sizes', () => {
-    const body = bubble(outgoing('sent', { chips: CHIPS }))
+  it('shows the names of the images that went with it, even the same name twice', () => {
+    const body = bubble(yours(1, 'sent', { chips: ['IMG_0042.jpg', 'pasted.png', 'pasted.png'] }))
     const names = [...body.matchAll(/<li class="chip svelte-[\w-]+">([^<]*)<\/li>/g)].map((found) => found[1])
-    expect(names).toEqual(['IMG_0042.jpg', 'pasted.png'])
-    expect(body).not.toContain('KiB')
+    expect(names).toEqual(['IMG_0042.jpg', 'pasted.png', 'pasted.png'])
     expect(body.indexOf('what is wrong here?')).toBeLessThan(body.indexOf('IMG_0042.jpg'))
   })
 
   it('shows only the chips when only an image went', () => {
-    const body = bubble(outgoing('sending', { text: '', chips: CHIPS.slice(0, 1) }))
+    const body = bubble(yours(1, 'sending', { text: '', chips: ['IMG_0042.jpg'] }))
     expect(body).not.toContain('class="text')
     expect(body).toMatch(/<div class="bubble svelte-[\w-]+">(?:<!--[^>]*-->|\s)*<ul class="chips svelte-[\w-]+">/)
     expect(body).toContain('IMG_0042.jpg')
   })
 
-  it('draws nothing while nothing was sent', () => {
-    expect(bubble(null)).not.toContain('<article')
+  it('says why an earlier message was not sent, with nothing to do about it', () => {
+    const body = bubble(yours(1, 'failed', { reason: 'pane 12 is waiting' }), null)
+    expect(body).toContain('aria-label="Your message, not sent"')
+    expect(body).toMatch(/<p class="state failed svelte-[\w-]+"><svg[^]*?<\/svg>(?:<!---->)?Not sent: pane 12 is waiting<\/p>/)
+    expect(body).not.toContain('<button')
+  })
+
+  it('says a message not sent for no known reason is not sent', () => {
+    expect(bubble(yours(1, 'failed', { reason: null }), null)).toMatch(/(?:<!---->)?Not sent<\/p>/)
+  })
+
+  it('says a message the app closed on while sending was not confirmed, with no spinner and nothing to do', () => {
+    const body = bubble(yours(1, 'sending'), null)
+    expect(body).toContain('aria-label="Your message, not confirmed"')
+    expect(body).toMatch(
+      /<p class="state svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not confirmed: the app closed before an answer came back<\/p>/,
+    )
+    expect(body).not.toContain('class="spinner')
+    expect(body).not.toContain('<button')
+  })
+
+  it('shows an earlier message that went as sent', () => {
+    expect(bubble(yours(1, 'sent'), null)).toContain('aria-label="Your message, sent"')
   })
 
   it('retries and edits through the chat, keeping the text as it was written', () => {
@@ -181,12 +216,27 @@ describe('AgentLine', () => {
   })
 })
 
-const BEFORE = message('Shall I run the migration?')
+const agentSaid = (id: number, text: string, fields: Partial<AgentEntry> = {}): AgentEntry => ({
+  kind: 'agent',
+  id,
+  text,
+  written: null,
+  turn_over: true,
+  seen: SINCE,
+  ...fields,
+})
 
-const threadChat = (shown: Chat['reading'], sent: Outgoing | null = outgoing('sent', { answered: BEFORE })) => {
+type AgentEntry = Extract<Entry, { kind: 'agent' }>
+
+const GAP: Entry = { kind: 'gap', id: 0, seen: SINCE }
+
+const ASKED = agentSaid(1, 'Shall I run the migration?', { written: '2026-11-09T11:30:00.000Z' })
+
+const threadChat = (conversation: Entry[], sent: Outgoing | null = null, reading: Chat['reading'] = { kind: 'message', message: message('Migrated.') }) => {
   const chat = lineChat('working')
-  chat.reading = shown
+  chat.conversation = conversation
   chat.outgoing = sent
+  chat.reading = reading
   return chat
 }
 
@@ -197,61 +247,81 @@ const at = (body: string, mark: string) => {
   return body.indexOf(mark)
 }
 
-const order = (body: string) => [
-  at(body, '<article class="message'),
-  at(body, '<article class="sent'),
-  at(body, '<p class="said'),
-]
-
 const count = (body: string, mark: string) => body.split(mark).length - 1
 
 describe('Thread', () => {
-  it('shows the message you answered, then your bubble, then the line, before the answer comes', () => {
-    const body = thread(threadChat({ kind: 'message', message: BEFORE }))
-    const [agent, you, line] = order(body)
-    expect(agent).toBeLessThan(you)
-    expect(you).toBeLessThan(line)
-    expect(body).toContain('Shall I run the migration?')
-  })
-
-  it.each([
-    ['its text', { ...BEFORE, text: 'Migrated.' }],
-    ['the time it was written', { ...BEFORE, written: '2026-11-09T11:43:00.000Z' }],
-  ])('shows your bubble, then the answer, then the line, once %s changes', (_, answer) => {
-    const body = thread(threadChat({ kind: 'message', message: answer }))
-    const [agent, you, line] = order(body)
-    expect(you).toBeLessThan(agent)
-    expect(agent).toBeLessThan(line)
-  })
-
-  it('keeps a single message of the agent and a single bubble', () => {
-    const body = thread(threadChat({ kind: 'message', message: message('Migrated.') }))
-    expect(count(body, '<article class="message')).toBe(1)
+  it('shows the conversation in the order the phone saw it, then the line', () => {
+    const conversation = [GAP, ASKED, yours(2, 'sent', { text: 'yes, run it' }), agentSaid(3, 'Migrated.')]
+    const body = thread(threadChat(conversation))
+    const marks = [
+      'Earlier messages are on the Mac',
+      'Shall I run the migration?',
+      'yes, run it',
+      'Migrated.',
+      '<p class="said',
+    ]
+    const places = marks.map((mark) => at(body, mark))
+    expect(places).toEqual([...places].sort((one, other) => one - other))
+    expect(count(body, '<article class="message')).toBe(2)
     expect(count(body, '<article class="sent')).toBe(1)
-    expect(body).not.toContain('Shall I run the migration?')
   })
 
-  it('shows only the message and the line while nothing was sent', () => {
-    const body = thread(threadChat({ kind: 'message', message: BEFORE }, null))
-    expect(body).not.toContain('<article class="sent')
-    expect(at(body, '<article class="message')).toBeLessThan(at(body, '<p class="said'))
+  it('draws the gap as a muted line of its own', () => {
+    const body = thread(threadChat([GAP, ASKED]))
+    expect(body).toMatch(/<p class="gap svelte-[\w-]+">Earlier messages are on the Mac<\/p>/)
+    expect(flat(threadSource)).toContain('.gap { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }')
   })
 
-  it('keeps your bubble below the reading until a message comes', () => {
-    const body = thread(threadChat({ kind: 'loading' }))
-    expect(at(body, 'Reading its last message…')).toBeLessThan(at(body, '<article class="sent'))
+  it('draws each message of the agent as markdown, each with the time it was written', () => {
+    const conversation = [GAP, ASKED, agentSaid(2, 'Tests **pass**.', { written: '2026-11-09T11:38:00.000Z' })]
+    const body = thread(threadChat(conversation))
+    expect([...body.matchAll(/<p class="written svelte-[\w-]+">([^<]*)<\/p>/g)].map((found) => found[1])).toEqual([
+      '13 min',
+      '5 min',
+    ])
+    expect(body).toContain('<strong')
   })
 
-  it('marks a message whose turn is not over, faintly, after its text', () => {
-    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: false } }, null))
+  it('marks only the last message of the agent whose turn is not over, faintly, after its text', () => {
+    const conversation = [GAP, { ...ASKED, turn_over: false }, agentSaid(2, 'Writing it', { turn_over: false })]
+    const body = thread(threadChat(conversation))
+    expect(count(body, 'More to come…')).toBe(1)
     expect(body).toMatch(/<p class="going svelte-[\w-]+">More to come…<\/p>/)
-    expect(at(body, 'Shall I run the migration?')).toBeLessThan(at(body, 'More to come…'))
+    expect(at(body, 'Writing it')).toBeLessThan(at(body, 'More to come…'))
     expect(flat(threadSource)).toContain('.written, .going { color: var(--faint); font-size: 13px; }')
   })
 
-  it.each([true, null])('leaves the mark out when the turn is %o', (turnOver) => {
-    const body = thread(threadChat({ kind: 'message', message: { ...BEFORE, turn_over: turnOver } }, null))
+  it.each([true, null])('leaves the mark out when the last turn is %o', (turnOver) => {
+    const body = thread(threadChat([GAP, { ...ASKED, turn_over: false }, agentSaid(2, 'Done.', { turn_over: turnOver })]))
     expect(body).not.toContain('More to come')
+  })
+
+  it('offers Retry and Edit only on your last message, while the chat sent it', () => {
+    const conversation = [GAP, yours(1, 'failed'), ASKED, yours(3, 'failed')]
+    expect(count(thread(threadChat(conversation, outgoing('failed'))), 'Retry')).toBe(1)
+    expect(thread(threadChat(conversation))).not.toContain('Retry')
+  })
+
+  it('shows a send the app closed on as not confirmed', () => {
+    expect(thread(threadChat([GAP, ASKED, yours(2, 'sending')]))).toContain('Not confirmed: the app closed')
+  })
+
+  it('shows your message sending while the chat sends it', () => {
+    expect(thread(threadChat([GAP, ASKED, yours(2, 'sending')], outgoing('sending')))).toContain('Sending…')
+  })
+
+  it.each<[string, Chat['reading'], string]>([
+    ['that it is reading', { kind: 'loading' }, 'Reading its last message…'],
+    ['why it cannot read', { kind: 'unreadable', reason: 'no message yet' }, 'no message yet'],
+  ])('says %s after the conversation, muted, above the line', (_, reading, text) => {
+    const body = thread(threadChat([GAP, ASKED, yours(2, 'sent', { text: 'yes, run it' })], null, reading))
+    expect(body).toMatch(new RegExp(`<p class="reason svelte-[\\w-]+">${text}</p>`))
+    expect(at(body, 'yes, run it')).toBeLessThan(at(body, text))
+    expect(at(body, text)).toBeLessThan(at(body, '<p class="said'))
+  })
+
+  it('says nothing of the reading once a message is read', () => {
+    expect(thread(threadChat([GAP, ASKED]))).not.toContain('class="reason')
   })
 
   it('replaces a growing message in its place, without reading it again from the start', async () => {
@@ -263,14 +333,19 @@ describe('Thread', () => {
     await chat.refresh()
     const body = thread(chat)
     expect(body).toContain('Reading thread.ts and chat.svelte.ts')
+    expect(count(body, '<article class="message')).toBe(1)
     expect(body).not.toContain('Reading its last message…')
     expect(threadSource).not.toContain('{#key')
   })
 
-  it('goes down to the end after a reading only when the page was there before it', () => {
+  it('keys each entry by its id, so a growing message keeps its place', () => {
+    expect(flat(threadSource)).toContain('{#each bubbles as { entry, live, going } (entry.id)}')
+  })
+
+  it('goes to the end once the conversation shows, and after that only when the page was at its end', () => {
     const source = flat(threadSource)
     expect(source).toContain(
-      "$effect.pre(() => { const was = read read = chat.reading.kind === 'message' void chat.outgoing if (was && untrack(ending)) { void tick().then(toEnd) } })",
+      '$effect.pre(() => { void chat.reading void chat.outgoing const was = drawn drawn = chat.conversation.length > 0 if (drawn && (!was || untrack(ending))) { void tick().then(toEnd) } })',
     )
     expect(source).toContain('const toEnd = () => { const scrolled = scroller() scrolled.scrollTo({ top: scrolled.scrollHeight }) }')
     expect(source).toContain(
