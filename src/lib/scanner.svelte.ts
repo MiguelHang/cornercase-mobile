@@ -22,15 +22,31 @@ type Permission = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
 const granted = (state: Permission) => state === 'granted'
 
+export class Shown {
+  scanner = $state<Scanner | null>(null)
+
+  get scanning() {
+    return this.scanner?.state === 'scanning'
+  }
+
+  async stop() {
+    await this.scanner?.stop()
+  }
+}
+
+export const shown = new Shown()
+
 export class Scanner {
   state = $state<ScanState>('idle')
   error = $state<string | null>(null)
   #api: ScannerApi
   #root: Classes
+  #shown: Shown
 
-  constructor(api: ScannerApi, root: Classes) {
+  constructor(api: ScannerApi, root: Classes, on: Shown = shown) {
     this.#api = api
     this.#root = root
+    this.#shown = on
   }
 
   async scan(): Promise<string | null> {
@@ -39,6 +55,7 @@ export class Scanner {
     }
     this.state = 'scanning'
     this.error = null
+    this.#shown.scanner = this
     try {
       return await this.#read()
     } catch (error) {

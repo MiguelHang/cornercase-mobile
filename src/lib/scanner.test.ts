@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Format, type Scanned } from '@tauri-apps/plugin-barcode-scanner'
-import { pageClasses, Scanner, type ScannerApi } from './scanner.svelte'
+import { pageClasses, Scanner, Shown, shown, type ScannerApi } from './scanner.svelte'
 
 type PermissionState = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
@@ -14,7 +14,7 @@ const fakeRoot = () => {
   return { classes, root }
 }
 
-const plugin = (overrides: Partial<ScannerApi> = {}) => {
+const plugin = (overrides: Partial<ScannerApi> = {}, on = new Shown()) => {
   const allowed = () => Promise.resolve<PermissionState>('granted')
   const api = {
     checkPermissions: vi.fn(overrides.checkPermissions ?? allowed),
@@ -24,7 +24,7 @@ const plugin = (overrides: Partial<ScannerApi> = {}) => {
     openAppSettings: vi.fn(overrides.openAppSettings ?? (() => Promise.resolve())),
   }
   const { classes, root } = fakeRoot()
-  return { api, classes, scanner: new Scanner(api, root) }
+  return { api, classes, on, scanner: new Scanner(api, root, on) }
 }
 
 const pendingScan = () => {
@@ -197,6 +197,52 @@ describe('Scanner', () => {
     await scanned
     expect(api.cancel).toHaveBeenCalled()
     expect(classes.has('scanning')).toBe(false)
+  })
+})
+
+describe('Shown', () => {
+  it('shows no scanner before one scans, and stopping it does nothing', async () => {
+    const on = new Shown()
+    await on.stop()
+    expect([on.scanner, on.scanning]).toEqual([null, false])
+  })
+
+  it('shows the scanner that scans, so that it can be cancelled from outside', async () => {
+    const { scan, cancel } = pendingScan()
+    const { on, scanner } = plugin({ scan, cancel })
+    const scanned = scanner.scan()
+    await settled()
+    expect([on.scanner === scanner, on.scanning]).toEqual([true, true])
+    await on.stop()
+    expect(await scanned).toBeNull()
+    expect([scanner.state, scanner.error, on.scanning]).toEqual(['idle', null, false])
+  })
+
+  it.each<[string, Partial<ScannerApi>]>([
+    ['reads a code', {}],
+    ['is refused', refusing],
+  ])('stops showing a scanner as scanning once it %s', async (_, overrides) => {
+    const { on, scanner } = plugin(overrides)
+    await scanner.scan()
+    expect([on.scanner === scanner, on.scanning]).toEqual([true, false])
+  })
+
+  it('shows the last scanner that scanned', async () => {
+    const on = new Shown()
+    const first = plugin({ scan: () => new Promise(() => {}) }, on)
+    const second = plugin({ scan: () => new Promise(() => {}) }, on)
+    void first.scanner.scan()
+    void second.scanner.scan()
+    await settled()
+    await on.stop()
+    expect([first.scanner.state, second.scanner.state]).toEqual(['scanning', 'idle'])
+  })
+
+  it('shows the scanners of the page by default', async () => {
+    const { api } = plugin()
+    const scanner = new Scanner(api, fakeRoot().root)
+    await scanner.scan()
+    expect(shown.scanner).toBe(scanner)
   })
 })
 
