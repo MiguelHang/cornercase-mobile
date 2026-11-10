@@ -94,3 +94,36 @@ mod an_app_event {
         assert!(!without_waiting(|| connecting(&recorder) == 2).await, "{:?}", recorder.connections());
     }
 }
+
+mod a_page_loading {
+    use tauri::webview::PageLoadEvent;
+
+    use super::*;
+
+    fn holding_an_image() -> (Ipc, u64) {
+        let ipc = Ipc::new(Studio::new().reloaded());
+        let id = ipc.app.state::<AppState>().attached().store(3, "IMG_0042.jpg".into(), vec![1, 2, 3]).expect("kept");
+        (ipc, id)
+    }
+
+    #[test]
+    fn that_starts_forgets_the_images_kept_for_a_page_gone() {
+        let (ipc, id) = holding_an_image();
+        page_loading(ipc.app.handle(), PageLoadEvent::Started);
+        assert_eq!(ipc.app.state::<AppState>().attached().get(3, id), None);
+    }
+
+    #[test]
+    fn that_finishes_keeps_them() {
+        let (ipc, id) = holding_an_image();
+        page_loading(ipc.app.handle(), PageLoadEvent::Finished);
+        assert!(ipc.app.state::<AppState>().attached().get(3, id).is_some());
+    }
+
+    #[test]
+    fn before_the_app_has_its_state_does_nothing() {
+        let app = tauri::test::mock_app();
+        page_loading(app.handle(), PageLoadEvent::Started);
+        assert!(app.try_state::<AppState>().is_none());
+    }
+}

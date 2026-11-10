@@ -28,6 +28,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_barcode_scanner::init()).plugin(tauri_plugin_haptics::init());
     builder
         .invoke_handler(specta.invoke_handler())
+        .on_page_load(lifecycle::on_page_load)
         .setup(move |app| {
             specta.mount_events(app);
             let data_dir = app.path().app_data_dir();

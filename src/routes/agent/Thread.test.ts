@@ -2,18 +2,13 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import { Chat, timers, type Outgoing } from '../../lib/chat.svelte'
 import { message, ok } from '../../lib/chatFakes'
-import { LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unmarked, unpressed, unread, unsent } from './agentFakes'
+import { CHIPS, LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unmarked, unpressed, unread, unsent } from './agentFakes'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import Sent from './Sent.svelte'
 import sentSource from './Sent.svelte?raw'
 import Thread from './Thread.svelte'
 import threadSource from './Thread.svelte?raw'
-
-const CHIPS = [
-  { name: 'IMG_0042.jpg', size: '47 KiB' },
-  { name: 'pasted.png', size: '900 B' },
-]
 
 const outgoing = (state: Outgoing['state'], fields: Partial<Outgoing> = {}): Outgoing => ({
   text: 'what is wrong here?',
@@ -273,10 +268,36 @@ describe('Thread', () => {
   })
 
   it('goes down to the end after a reading only when the page was there before it', () => {
-    expect(flat(threadSource)).toContain(
-      '$effect.pre(() => { const was = read read = chat.reading.kind === \'message\' void chat.outgoing if (was && atEnd(window.scrollY, window.innerHeight, document.documentElement.scrollHeight)) { void tick().then(toEnd) } })',
+    const source = flat(threadSource)
+    expect(source).toContain(
+      "$effect.pre(() => { const was = read read = chat.reading.kind === 'message' void chat.outgoing if (was && untrack(ending)) { void tick().then(toEnd) } })",
     )
-    expect(flat(threadSource)).toContain('const toEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight })')
+    expect(source).toContain('const toEnd = () => { const scrolled = scroller() scrolled.scrollTo({ top: scrolled.scrollHeight }) }')
+    expect(source).toContain(
+      'const ending = () => { const { scrollTop, clientHeight, scrollHeight } = scroller() return atEnd(scrollTop, clientHeight, scrollHeight) }',
+    )
+  })
+
+  it('scrolls the page while the keyboard is closed, and itself while it is open', () => {
+    expect(flat(threadSource)).toContain(
+      'const scroller = () => (boxed && box !== undefined ? box : document.documentElement)',
+    )
+    expect(flat(threadSource)).toContain('.boxed { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }')
+    expect(thread(chatWith(ROW))).toMatch(/<div class="thread svelte-[\w-]+">/)
+    expect(render(Thread, { props: { chat: chatWith(ROW), now: LATER, boxed: true } }).body).toMatch(
+      /<div class="thread svelte-[\w-]+ boxed">/,
+    )
+  })
+
+  it('goes to its end as the keyboard opens or closes, and as its box changes height while open only if it was at its end', () => {
+    const source = flat(threadSource)
+    expect(source).toContain('let wasBoxed = untrack(() => boxed) let pinned = true')
+    expect(source).toContain(
+      '$effect(() => { void tall if (boxed !== wasBoxed || (boxed && pinned)) { wasBoxed = boxed toEnd() } })',
+    )
+    expect(source).toContain(
+      '<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={() => (pinned = ending())}>',
+    )
   })
 
   it('stacks your bubble on the right of the column', () => {

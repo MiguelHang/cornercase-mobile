@@ -15,6 +15,9 @@ use tauri::async_runtime::JoinHandle;
 
 use crate::commands::error::CommandError;
 use crate::identity;
+use crate::state::attached::AttachedImages;
+
+pub(crate) mod attached;
 
 const MACHINES_FILE: &str = "machines.json";
 
@@ -24,6 +27,7 @@ pub(crate) struct AppState {
     active: Mutex<Option<Active>>,
     network: Mutex<Option<Network>>,
     boots: Mutex<HashMap<MachineId, String>>,
+    attached: AttachedImages,
 }
 
 #[derive(Clone)]
@@ -61,6 +65,7 @@ impl AppState {
             active: Mutex::new(None),
             network: Mutex::new(None),
             boots: Mutex::new(HashMap::new()),
+            attached: AttachedImages::default(),
         }
     }
 
@@ -100,6 +105,10 @@ impl AppState {
         let active = self.active().as_ref().and_then(|active| Some((active.machine(), active.store().boot()?)));
         boots.extend(active);
         boots
+    }
+
+    pub(crate) fn attached(&self) -> &AttachedImages {
+        &self.attached
     }
 }
 

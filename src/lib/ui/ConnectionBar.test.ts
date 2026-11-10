@@ -52,6 +52,14 @@ describe('ConnectionBar', () => {
     expect(bar({ state: 'connecting' })).not.toContain('detail')
   })
 
+  it('stays on top of what the phone keyboard leaves visible, as iOS lifts the page over it', () => {
+    const source = flat(barSource)
+    expect(source).toContain('const keyboard = new Keyboard(globalThis)')
+    expect(source).toContain('$effect(() => keyboard.watch())')
+    expect(source).toContain('<div class="connection" role="status" style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}>')
+    expect(bar({ state: 'connecting' })).not.toContain('style=')
+  })
+
   it('announces itself as a status', () => {
     expect(bar({ state: 'connecting' })).toMatch(/^<!--\[--><div class="connection svelte-[\w-]+" role="status">/)
   })

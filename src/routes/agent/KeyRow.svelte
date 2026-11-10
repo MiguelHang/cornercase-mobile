@@ -42,7 +42,7 @@
       <Button
         tone={armed ? 'danger' : 'plain'}
         compact
-        resting={!chat.canPressKey(button.key)}
+        resting={!chat.canPress}
         label={armed ? ARMED : button.name}
         onclick={() => void press(button.key)}
       >

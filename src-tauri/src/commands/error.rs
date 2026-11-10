@@ -65,6 +65,8 @@ pub(crate) enum ErrorCode {
     NotSent,
     NoDigest,
     TooLargeHere,
+    AttachedFull,
+    AttachedGone,
 }
 
 impl CommandError {
@@ -98,6 +100,18 @@ impl CommandError {
 
     pub(crate) fn too_large_here() -> Self {
         Self::new(ErrorCode::TooLargeHere, "Too large to show on the phone")
+    }
+
+    pub(crate) fn too_many_attached(most: usize) -> Self {
+        Self::new(ErrorCode::AttachedFull, format!("at most {most} images can wait to be sent"))
+    }
+
+    pub(crate) fn attached_too_large() -> Self {
+        Self::new(ErrorCode::AttachedFull, "the images waiting to be sent take too much memory")
+    }
+
+    pub(crate) fn attached_gone() -> Self {
+        Self::new(ErrorCode::AttachedGone, "the image is no longer waiting to be sent")
     }
 
     pub(crate) fn maybe_sent() -> Self {
