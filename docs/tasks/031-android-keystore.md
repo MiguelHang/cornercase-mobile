@@ -22,7 +22,7 @@ Keystore del sistema.
 - [x] CA3 — Migración desde el almacén provisional de 030, si lo hubo. Los tokens de `route-secrets.json` pasan al
   Keystore en el primer arranque y el fichero se borra; si algo falla, el fichero sigue y se reintenta en el siguiente
   (`design/connection/identity.md`). Comprobado en el emulador actualizando desde la 030 con tres rutas.
-- [ ] CA4 — Probado en emulador y en un dispositivo real (anotar modelo y versión de Android).
+- [x] CA4 — Probado en emulador y en un dispositivo real (anotar modelo y versión de Android).
   Sin marcar: emulador comprobado (`design/architecture/android.md` › Checked live), dispositivo pendiente del
   usuario. Pasos en un Android real, con un bloqueo de pantalla (PIN, patrón o contraseña) y la depuración USB
   activados:
