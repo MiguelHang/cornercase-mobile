@@ -75,11 +75,11 @@ describe('the terminal screen', () => {
     expect(source).toContain('if (shows(event.payload, machine, row.tab)) { shown.apply(event.payload)')
   })
 
-  it('opens the pane of its agent and remembers the zoom on the boot of its server', () => {
+  it('opens the pane of its agent and remembers the zoom on the boot of its server, apart for each mode', () => {
     expect(source).toContain(
       'const open = (size: Size_Deserialize, fitting: boolean) => commands.terminalOpen(row.tab, row.pane, { size, fit: fitting })',
     )
-    expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab }}')
+    expect(source).toContain('place={{ machine, boot: row.boot, tab: row.tab, fitted: fit.on }}')
   })
 
   it('leaves the order of opening and closing to an Opening that waits for it to listen', () => {

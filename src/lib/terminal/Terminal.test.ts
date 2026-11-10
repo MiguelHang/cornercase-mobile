@@ -49,4 +49,9 @@ describe('the terminal view', () => {
     expect(source).toContain('const anchored = (box: HTMLElement) => { if (height > 0) anchor(box) }')
     expect(source).toContain('{@attach anchored}')
   })
+
+  it('recalls and remembers the zoom of the tab in the mode it shows', () => {
+    expect(source).toContain('let size = $derived(zooms.recall(place, bounds))')
+    expect(source).toContain('size = clamp(start * scale, bounds) zooms.remember(place, size)')
+  })
 })
