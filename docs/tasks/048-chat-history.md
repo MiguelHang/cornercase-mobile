@@ -1,6 +1,6 @@
 # 048 — El chat como conversación: historial en el móvil, y el de cornercase cuando exista
 
-- Estado: en curso (falta la comprobación en el simulador y `hx check full`, CA5)
+- Estado: hecha (en el iPhone del usuario, pendiente)
 - Depende de: 036, 041
 - Rama: `feat/048-chat-history` · PR: `feat: keep the chat's conversation on the phone`
 
@@ -27,5 +27,8 @@ pantalla.
   Desviación: solo la interfaz y la implementación local. El lector de `read --messages` no se hace: el comando no
   existe upstream y su formato es un borrador nuestro, así que se probaría contra un fixture inventado. Cómo entraría,
   en `design/chat.md` › Kept on the phone › Behind `History`.
-- [ ] CA5 — Comprobado en el simulador con un agente real (varios turnos, salir y volver, reiniciar la app); tests;
+- [x] CA5 — Comprobado en el simulador con un agente real (varios turnos, salir y volver, reiniciar la app); tests;
   `hx check full` verde.
+  - En el iPhone Air del simulador con Claude Code en Haiku: once turnos en orden, salir al tablero y volver, un turno
+    desde el Mac con el chat cerrado (sale el hueco) y matar y relanzar la app (la conversación sigue). 200 entradas
+    se pintan tan pronto como 26, así que no hace falta "Show earlier" (`design/chat.md` › Checked live).
