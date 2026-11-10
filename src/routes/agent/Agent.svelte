@@ -10,6 +10,7 @@
   import TextArea from '../../lib/ui/TextArea.svelte'
   import ChatHeader from './ChatHeader.svelte'
   import KeyRow from './KeyRow.svelte'
+  import Question from './Question.svelte'
   import Subagents from './Subagents.svelte'
   import Thread from './Thread.svelte'
 
@@ -54,10 +55,22 @@
     return untrack(() => whileShown(document, () => followed.follow()))
   })
 
+  $effect(() => {
+    const asked = chat
+    return untrack(() => whileShown(document, () => asked.watchQuestion()))
+  })
+
   const row = $derived(chat.row)
 
   const attach = async () => {
     const failed = await chat.attach()
+    if (failed !== null) {
+      onfailed(failed)
+    }
+  }
+
+  const choose = async (number: number) => {
+    const failed = await chat.pressOption(number)
     if (failed !== null) {
       onfailed(failed)
     }
@@ -84,7 +97,9 @@
     {/key}
     <Thread {chat} {now} />
     <div class="composer">
-      {#if chat.asking}
+      {#if chat.question !== null}
+        <Question question={chat.question} agent={row.agent} onoption={(number) => void choose(number)} />
+      {:else if chat.asking}
         <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
       {/if}
       <KeyRow {chat} {onfailed} />
@@ -118,6 +133,7 @@
     gap: var(--inset-wide);
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
+    --over-composer: 132px;
   }
 
   .note {
@@ -128,9 +144,13 @@
   .composer {
     position: sticky;
     bottom: 0;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--gap);
+    max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom));
     padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));
     background: var(--glass);

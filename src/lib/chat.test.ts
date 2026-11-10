@@ -9,7 +9,6 @@ import {
   timers,
   touches,
   whileShown,
-  type Page,
   type PressKey,
   type ReadLast,
   type SendText,
@@ -35,6 +34,7 @@ import {
   settle,
   PASTED,
   attached,
+  FakePage,
 } from './chatFakes'
 import type { KeyName } from './keys'
 
@@ -789,32 +789,6 @@ describe('Chat, while it is followed', () => {
     expect(chat.reading).toEqual({ kind: 'message', message: message('Half, and the rest') })
   })
 })
-
-class FakePage implements Page {
-  visibilityState: DocumentVisibilityState
-  #listeners = new Set<() => void>()
-
-  constructor(visibilityState: DocumentVisibilityState) {
-    this.visibilityState = visibilityState
-  }
-
-  addEventListener(name: string, listener: () => void) {
-    if (name === 'visibilitychange') this.#listeners.add(listener)
-  }
-
-  removeEventListener(name: string, listener: () => void) {
-    if (name === 'visibilitychange') this.#listeners.delete(listener)
-  }
-
-  turn(visibilityState: DocumentVisibilityState) {
-    this.visibilityState = visibilityState
-    for (const listener of this.#listeners) listener()
-  }
-
-  get listening() {
-    return this.#listeners.size
-  }
-}
 
 const watched = (visibilityState: DocumentVisibilityState) => {
   const page = new FakePage(visibilityState)

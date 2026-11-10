@@ -8,6 +8,7 @@ use crate::commands::reach::{ask, connected};
 use crate::state::AppState;
 
 pub(crate) mod attach;
+pub(crate) mod question;
 
 const ENTER: &str = "enter";
 

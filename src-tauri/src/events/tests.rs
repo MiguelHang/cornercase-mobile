@@ -10,6 +10,7 @@ use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
 use cornercase_core::protocol::USAGE_EXIT;
+use cornercase_core::terminal::question::Choice;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
@@ -162,6 +163,25 @@ fn closed_terminal_json() -> Value {
         "kitty_keyboard": 0 });
     json!({ "machine": 7, "tab": 3, "pane": null, "size": size, "cursor": null, "colours": colours,
         "modes": modes, "replaced": false, "rows": {}, "closed": true, "unfitted": false })
+}
+
+fn asked() -> Emitted {
+    let options = vec![Choice { number: 1, label: "Yes".to_owned() }, Choice { number: 2, label: "No".to_owned() }];
+    Emitted::Question(QuestionChanged {
+        machine: 7,
+        tab: 3,
+        pane: 4,
+        colours: Colours::default(),
+        rows: Vec::new(),
+        options,
+        closed: false,
+    })
+}
+
+fn asked_json() -> Value {
+    let colours = json!({ "fg": null, "bg": null, "cursor": null, "palette": {} });
+    let options = json!([{ "number": 1, "label": "Yes" }, { "number": 2, "label": "No" }]);
+    json!({ "machine": 7, "tab": 3, "pane": 4, "colours": colours, "rows": [], "options": options, "closed": false })
 }
 
 fn closed_changes() -> Emitted {
@@ -460,6 +480,7 @@ mod an_event {
         json!({ "machine": 7, "pane": null })
     )]
     #[case::terminal_changed(closed_terminal(), closed_terminal_json())]
+    #[case::question_changed(asked(), asked_json())]
     #[case::changes_changed_once_the_workspace_closed(closed_changes(), closed_changes_json())]
     #[case::error_toast(
         Emitted::Toast(Toast::error("it failed")),
@@ -475,6 +496,7 @@ mod an_event {
             Emitted::Agents(changed) => serde_json::to_value(changed),
             Emitted::PaneStatus(changed) => serde_json::to_value(changed),
             Emitted::Terminal(changed) => serde_json::to_value(changed),
+            Emitted::Question(changed) => serde_json::to_value(changed),
             Emitted::Changes(changed) => serde_json::to_value(changed),
             Emitted::Toast(toast) => serde_json::to_value(toast),
         };
@@ -488,6 +510,7 @@ mod an_event {
             AgentsChanged::NAME,
             PaneStatusChanged::NAME,
             TerminalChanged::NAME,
+            QuestionChanged::NAME,
             ChangesChanged::NAME,
             Toast::NAME,
         ];
@@ -496,6 +519,7 @@ mod an_event {
             "agents-changed",
             "pane-status-changed",
             "terminal-changed",
+            "question-changed",
             "changes-changed",
             "toast",
         ];
@@ -523,6 +547,7 @@ mod the_app {
         json!({ "machine": 7, "pane": 4 })
     )]
     #[case::terminal_changed(closed_terminal(), "terminal-changed", closed_terminal_json())]
+    #[case::question_changed(asked(), "question-changed", asked_json())]
     #[case::changes_changed(closed_changes(), "changes-changed", closed_changes_json())]
     #[case::toast(Emitted::Toast(Toast::error("it failed")), "toast", json!({ "level": "error", "message": "it failed" }))]
     fn emits_each_event_under_its_name(#[case] event: Emitted, #[case] name: &str, #[case] expected: Value) {

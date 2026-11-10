@@ -207,13 +207,8 @@ impl Opened for Showing {
     type Said = Screen;
 
     async fn next(&mut self) -> follow::Step<Option<Screen>> {
-        match self.live.next().await {
-            Step::Changed(changes) => {
-                follow::Step::Changed(self.shown.update(self.live.grid(), &changes).map(Screen::Update))
-            }
-            Step::Warned(error) => follow::Step::Warned(error),
-            Step::Ended(ended) => follow::Step::Ended(ended),
-        }
+        let step = self.live.next().await;
+        step.map(|changes| self.shown.update(self.live.grid(), &changes).map(Screen::Update))
     }
 }
 
@@ -229,7 +224,7 @@ async fn left(store: &Store, tab: u64) {
     let _ = time::timeout(LEAVING, gone).await;
 }
 
-fn holds(session: &Snapshot, tab: u64) -> bool {
+pub(crate) fn holds(session: &Snapshot, tab: u64) -> bool {
     let workspaces = session.projects.iter().flat_map(|project| &project.workspaces);
     workspaces.flat_map(|workspace| &workspace.tabs).any(|open| open.id == tab)
 }

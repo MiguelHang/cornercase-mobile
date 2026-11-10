@@ -6,7 +6,8 @@ import type {
 } from './bindings'
 import { Attachments, type AttachImage, type Chip } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
-import type { KeyName } from './keys'
+import { digitOf, type KeyName } from './keys'
+import { Questions, type Asker } from './question.svelte'
 import { deliver, messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
@@ -104,6 +105,7 @@ export class Chat {
   gone = $state(false)
   interrupting = $state(false)
   readonly attachments: Attachments
+  readonly #questions: Questions
   #readLast: ReadLast
   #sendText: SendText
   #pressKey: PressKey
@@ -112,6 +114,7 @@ export class Chat {
   #cancelExpiry: () => void = () => {}
   #cancelFollow: (() => void) | null = null
   #following = false
+  #questioning = false
   #asked = 0
   #busy = false
   #again = false
@@ -127,6 +130,7 @@ export class Chat {
     attachImage: AttachImage,
     haptics: HapticsApi,
     clock: Clock,
+    asker: Asker,
   ) {
     this.machine = machine
     this.pane = pane
@@ -134,6 +138,7 @@ export class Chat {
     this.#sendText = sendText
     this.#pressKey = pressKey
     this.attachments = new Attachments(pane, attachImage)
+    this.#questions = new Questions(machine, pane, asker)
     this.#haptics = haptics
     this.#clock = clock
     this.lastNews = clock.now()
@@ -149,6 +154,10 @@ export class Chat {
 
   get asking() {
     return this.row?.status === 'waiting'
+  }
+
+  get question() {
+    return this.#questions.question
   }
 
   get canSend() {
@@ -186,6 +195,7 @@ export class Chat {
     this.#hear(row)
     this.row = row
     this.#pace()
+    this.#ask()
   }
 
   #hear(row: AgentRow | null) {
@@ -235,6 +245,20 @@ export class Chat {
         this.#pace()
       })
     }
+  }
+
+  watchQuestion() {
+    this.#questioning = true
+    this.#ask()
+    return () => {
+      this.#questioning = false
+      this.#ask()
+    }
+  }
+
+  #ask() {
+    const row = this.row
+    this.#questions.want(this.#questioning && row?.status === 'waiting' ? row.tab : null)
   }
 
   #show(next: Reading) {
@@ -312,6 +336,11 @@ export class Chat {
     return failed
   }
 
+  async pressOption(number: number): Promise<string | null> {
+    const digit = digitOf(number)
+    return digit === null ? null : this.press(digit)
+  }
+
   #arm() {
     this.interrupting = true
     this.#cancelExpiry = this.#clock.after(INTERRUPT_WINDOW_MS, () => (this.interrupting = false))
@@ -331,5 +360,6 @@ export class Chat {
     this.#asked += 1
     this.#again = false
     this.#pace()
+    this.#ask()
   }
 }
