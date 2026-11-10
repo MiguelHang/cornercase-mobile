@@ -24,6 +24,10 @@ describe('the screens of src/routes', () => {
     expect(leftovers(text)).toEqual([])
   })
 
+  it.each(withBar)('%s leaves the safe area on top to the body, which pads it already', (path) => {
+    expect(screens[path]).not.toMatch(/padding(-top)?: calc\(env\(safe-area-inset-top\)/)
+  })
+
   it('go back through the NavBar on every screen with a way back', () => {
     expect(withBar.sort()).toEqual([
       '/src/routes/Machine.svelte',

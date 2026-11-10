@@ -85,7 +85,7 @@ describe('Diff', () => {
 
   it("goes back to the list from a bar titled with the file's path, a rename with both", () => {
     const body = draw(stateWith(reading()))
-    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed"[^]*?aria-label="Back to login"/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to login"/)
     expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->| )*<h1 class="path svelte-[\w-]+"><span dir="ltr">src\/a.rs<\/span>/)
     expect(body.match(/<h1/g)).toHaveLength(1)
     expect(body).not.toContain('class="top')

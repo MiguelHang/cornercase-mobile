@@ -57,7 +57,7 @@ describe('NavBar', () => {
 
   it('shows the arrow without the title below on Android', () => {
     const body = bar({ backTo: 'Agents', variant: 'android' })
-    expect(body).toMatch(/<div class="bar android svelte-[\w-]+ fixed"/)
+    expect(body).toMatch(/<div class="bar android svelte-[\w-]+ fixed topmost"/)
     expect(body).toContain('aria-label="Back to Agents"')
     expect(body).not.toContain('<path d="m15 18-6-6 6-6">')
     expect(body).not.toContain('class="label')
@@ -86,9 +86,9 @@ describe('NavBar', () => {
   })
 
   it.each<[string, Props, RegExp]>([
-    ['sticks by default', {}, /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 0px;">/],
+    ['sticks to the top by default', {}, /<div class="bar ios svelte-[\w-]+ fixed topmost" style="--below: 0px;">/],
     ['stays in place when not fixed', { fixed: false }, /<div class="bar ios svelte-[\w-]+" style="--below: 0px;">/],
-    ['draws its edge', { edge: true }, /<div class="bar ios svelte-[\w-]+ fixed edge" style="--below: 0px;">/],
+    ['draws its edge', { edge: true }, /<div class="bar ios svelte-[\w-]+ fixed topmost edge" style="--below: 0px;">/],
     ['sits below a bar', { below: 32 }, /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 32px;">/],
   ])('%s', (_, props, root) => {
     expect(bar({ ...props, variant: 'ios' })).toMatch(root)
@@ -98,6 +98,7 @@ describe('NavBar', () => {
     'grid-template-columns: 1fr auto 1fr;',
     'background: var(--veil);',
     'position: sticky; top: calc(env(safe-area-inset-top) + var(--below));',
+    '.fixed.topmost { top: 0; margin-top: calc(-1 * var(--gap) - env(safe-area-inset-top)); padding-top: calc(var(--gap) + env(safe-area-inset-top)); }',
     '.edge { border-bottom-color: var(--border); }',
     'min-width: 44px; min-height: 44px;',
     'color: var(--accent);',

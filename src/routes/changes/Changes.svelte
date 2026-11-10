@@ -87,11 +87,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--inset-wide);
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
   .totals {
     margin: 0;
+    padding-right: var(--inset);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }

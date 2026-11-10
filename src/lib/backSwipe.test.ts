@@ -112,7 +112,10 @@ describe('BackSwipe', () => {
 
     it.each([
       ['a touch that has not moved', false, []],
-      ['a waiting finger that moved more right than up or down', true, [[X + 1, Y]]],
+      ['a waiting finger that moved right', true, [[X + 1, Y]]],
+      ['a waiting finger that moved more than twice as far right as down', true, [[X + 3, Y + 1]]],
+      ['a waiting finger that moved twice as far right as up', false, [[X + 2, Y - 1]]],
+      ['a waiting finger that moved more right than down, but not twice as far', false, [[X + 3, Y + 2]]],
       ['a waiting finger that moved down', false, [[X, Y + 1]]],
       ['a waiting finger that moved as much down as right', false, [[X + 1, Y + 1]]],
       ['a waiting finger that moved left', false, [[X - 1, Y]]],
@@ -461,6 +464,16 @@ describe('watchBackSwipe', () => {
       touch('touchstart', X, 4010, 2)
       expect(edge.state).toBe('idle')
     })
+
+    it.each(['touchmove', 'touchend', 'touchcancel', 'pointercancel'])(
+      'never brings the screen back on a %s while it leaves',
+      (name) => {
+        const { touch, seen } = lifted(FAR)
+        touch(name, X + 10, 4010, 2)
+        vi.runAllTimers()
+        expect([seen, edge.state]).toEqual([[LEFT, RESTING, 'back'], 'idle'])
+      },
+    )
 
     it('takes touches again once it went back', () => {
       const { touch } = lifted(FAR)

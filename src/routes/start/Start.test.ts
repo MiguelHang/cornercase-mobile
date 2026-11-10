@@ -68,7 +68,7 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 describe('Start', () => {
   it('goes back to the agents from a bar with its title, and starts on Agent', async () => {
     const body = screen(await formOf())
-    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed"[^]*?aria-label="Back to Agents"/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
     expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Start<\/h1>/)
     expect(body).not.toContain('class="top')
     expect(body).toMatch(/aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button>/)

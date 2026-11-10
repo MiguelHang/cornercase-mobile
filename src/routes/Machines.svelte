@@ -122,7 +122,7 @@
     gap: var(--inset-wide);
     max-width: 520px;
     margin: 0 auto;
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
   .list {

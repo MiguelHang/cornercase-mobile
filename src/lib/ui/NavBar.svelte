@@ -35,7 +35,7 @@
   const fits = $derived(fitsLabel(labelWidth, room - TAP))
 </script>
 
-<div class="bar {variant}" class:fixed class:edge style:--below="{below}px">
+<div class="bar {variant}" class:fixed class:topmost={fixed && below === 0} class:edge style:--below="{below}px">
   <div class="start" bind:clientWidth={room}>
     <button class="back" type="button" aria-label={backLabel(backTo)} onclick={onback} ontouchstart={() => {}}>
       <Icon name={ios ? 'chevron-left' : 'arrow-left'} />
@@ -76,6 +76,12 @@
     z-index: 4;
     margin: calc(-1 * var(--gap)) calc(-1 * var(--inset-wide));
     padding: var(--gap) calc(var(--inset-wide) - var(--inset));
+  }
+
+  .fixed.topmost {
+    top: 0;
+    margin-top: calc(-1 * var(--gap) - env(safe-area-inset-top));
+    padding-top: calc(var(--gap) + env(safe-area-inset-top));
   }
 
   .edge {

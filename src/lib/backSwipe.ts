@@ -14,6 +14,8 @@ export const FLING = 0.5
 
 export const HOLD = 300
 
+export const LEAN = 2
+
 export type EdgeState = 'pending' | 'claimed' | 'cancelled'
 
 export type Step = { state: EdgeState; shift: number }
@@ -23,6 +25,8 @@ export type Ending = 'back' | 'settle' | 'tap' | 'none'
 type Sample = { x: number; at: number }
 
 const claimed = ([dx, dy]: Point): EdgeState => (dx > Math.abs(dy) ? 'claimed' : 'cancelled')
+
+const leans = ([dx, dy]: Point) => dx > LEAN * Math.abs(dy)
 
 export class BackSwipe {
   #fingers = new Set<number>()
@@ -68,7 +72,7 @@ export class BackSwipe {
   }
 
   get holds() {
-    return this.#state === 'claimed' || (this.#state === 'pending' && claimed(this.#moved) === 'claimed')
+    return this.#state === 'claimed' || (this.#state === 'pending' && leans(this.#moved))
   }
 
   cancel() {
@@ -158,12 +162,14 @@ class Watch {
   }
 
   #follow({ state, shift }: Step) {
+    if (this.#leaving !== undefined) return
     edge.state = EDGES[state]
     if (state === 'cancelled') this.#show(0, true)
     else if (!this.#watching.reduced()) this.#show(shift, false)
   }
 
   #end(ending: Ending) {
+    if (this.#leaving !== undefined) return
     edge.state = 'idle'
     if (ending !== 'back') return this.#show(0, true)
     if (this.#watching.reduced()) return this.#back()

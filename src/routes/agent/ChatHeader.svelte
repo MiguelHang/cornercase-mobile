@@ -88,7 +88,8 @@
   .short {
     display: inline-flex;
     align-items: center;
-    max-width: 100%;
+    max-width: 0;
+    overflow: hidden;
     vertical-align: middle;
     gap: 6px;
     min-width: 0;
@@ -97,12 +98,15 @@
     opacity: 0;
     transition:
       opacity 150ms ease-out,
-      visibility 150ms;
+      visibility 150ms,
+      max-width 0s 150ms;
   }
 
   .short.compact {
+    max-width: 100%;
     visibility: visible;
     opacity: 1;
+    transition-delay: 0s;
   }
 
   .called {

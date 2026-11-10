@@ -84,7 +84,7 @@ const withRejected = async () => {
 describe('Machines', () => {
   it('goes back to the agents from a bar with its title', async () => {
     const body = await screen()
-    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed"[^]*?aria-label="Back to Agents"/)
+    expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
     expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Machines<\/h1>/)
     expect(body).not.toContain('class="top')
   })

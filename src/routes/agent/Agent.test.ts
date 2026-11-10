@@ -98,7 +98,7 @@ describe('Agent, its header', () => {
   })
 })
 
-const BAR = /<div class="bar ios svelte-[\w-]+ fixed" style="--below: 0px;">(.*?)<\/div><!----> <header class="head svelte-[\w-]+">/
+const BAR = /<div class="bar ios svelte-[\w-]+ fixed topmost" style="--below: 0px;">(.*?)<\/div><!----> <header class="head svelte-[\w-]+">/
 
 const SHORT = /<div class="short svelte-[\w-]+" aria-hidden="true">(.*?)<\/div>/
 
@@ -149,7 +149,7 @@ describe('Agent, its sticky header', () => {
   it('shows the compact line only while compact, as tall as its 44 px buttons', () => {
     const source = flat(chatHeaderSource)
     expect(source).toContain('min-width: 0; min-height: 44px; visibility: hidden; opacity: 0;')
-    expect(source).toContain('.short.compact { visibility: visible; opacity: 1; }')
+    expect(source).toContain('.short.compact { max-width: 100%; visibility: visible; opacity: 1; transition-delay: 0s; }')
     expect(bar(ROW)).not.toMatch(/class="short[^"]* compact"/)
   })
 
@@ -158,8 +158,14 @@ describe('Agent, its sticky header', () => {
     expect(source.match(/<button class="tool" type="button" aria-label="\w+" onclick=\{.*?\} ontouchstart=\{\(\) => \{\}\}/g)).toHaveLength(2)
     expect(source).toContain('{#snippet right()} <button class="tool" type="button" aria-label="Terminal"')
     expect(source).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
-    expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 100%; vertical-align: middle;')
+    expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 0; overflow: hidden; vertical-align: middle;')
     expect(source).not.toContain('<Button')
+  })
+
+  it('leaves the back button the whole room while the compact line is hidden, taking it back once faded out', () => {
+    const source = flat(chatHeaderSource)
+    expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 0;')
+    expect(source).toContain('transition: opacity 150ms ease-out, visibility 150ms, max-width 0s 150ms; }')
   })
 
   it('changes without animation under Reduce Motion', () => {
