@@ -31,7 +31,7 @@ que crece hacia arriba con el texto) y "poder eliminar una imagen cuando la sube
   envío fallido se queda en el input y un toast lo dice (`design/upstream-gaps.md` › A pasted file cannot be taken back).
 - [x] CA4 — Nada de lo que funciona se pierde: estados del envío (036), `--force` tras una imagen (018), la pregunta (039).
 - [ ] CA5 — Comprobado en el simulador y en el iPhone del usuario; tests; `hx check full` verde.
-  Simulador hecho (Verificación); faltan el iPhone del usuario y el `hx check full` del tester.
+  Simulador hecho (Verificación) y `hx check full` verde (tester); falta el iPhone del usuario.
 
 ## Verificación
 En el iPhone, la barra es una cápsula como la de Claude o WhatsApp, las teclas salen solo cuando hacen falta y una

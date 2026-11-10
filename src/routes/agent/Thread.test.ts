@@ -289,11 +289,15 @@ describe('Thread', () => {
     )
   })
 
-  it('goes to its end as the keyboard opens or closes, and whenever its box changes height while open', () => {
+  it('goes to its end as the keyboard opens or closes, and as its box changes height while open only if it was at its end', () => {
     const source = flat(threadSource)
-    expect(source).toContain('let wasBoxed = untrack(() => boxed)')
-    expect(source).toContain('$effect(() => { void tall if (boxed || boxed !== wasBoxed) { wasBoxed = boxed toEnd() } })')
-    expect(source).toContain('<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall}>')
+    expect(source).toContain('let wasBoxed = untrack(() => boxed) let pinned = true')
+    expect(source).toContain(
+      '$effect(() => { void tall if (boxed !== wasBoxed || (boxed && pinned)) { wasBoxed = boxed toEnd() } })',
+    )
+    expect(source).toContain(
+      '<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={() => (pinned = ending())}>',
+    )
   })
 
   it('stacks your bubble on the right of the column', () => {

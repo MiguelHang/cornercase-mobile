@@ -28,6 +28,7 @@
 
   let read = false
   let wasBoxed = untrack(() => boxed)
+  let pinned = true
 
   $effect.pre(() => {
     const was = read
@@ -40,14 +41,14 @@
 
   $effect(() => {
     void tall
-    if (boxed || boxed !== wasBoxed) {
+    if (boxed !== wasBoxed || (boxed && pinned)) {
       wasBoxed = boxed
       toEnd()
     }
   })
 </script>
 
-<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall}>
+<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={() => (pinned = ending())}>
   {#each parts as part (part)}
     {#if part === 'you'}
       <Sent {chat} />
