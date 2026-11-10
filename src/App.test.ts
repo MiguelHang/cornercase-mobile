@@ -151,7 +151,7 @@ describe('App wiring', () => {
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers, asker, ), )',
+      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, commands.attach, haptics, timers, asker, ), )',
     )
     expect(source).toContain(
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
@@ -167,6 +167,13 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const seen = $derived(chat?.row != null)')
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
+  })
+
+  it('watches the chat for done only while its agent or its terminal is on top and the page shows', () => {
+    expect(source).toContain('const inView = $derived(chatOf(route) === null ? null : chat)')
+    expect(source).toContain(
+      '$effect(() => { const watched = inView if (watched !== null) { return untrack(() => whileShown(document, () => watched.watchDone())) } })',
+    )
   })
 
   it("names the route below for the back button, from the saved machines and the active machine's rows", () => {

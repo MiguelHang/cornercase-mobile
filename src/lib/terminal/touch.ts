@@ -1,6 +1,7 @@
 import type { Edge } from '../edge.svelte'
 import type { InputEvent } from './keys'
 import type { Room, Scroll } from './swipe'
+import type { Limits } from './zoom'
 
 export type Box = Pick<HTMLElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>
 
@@ -10,6 +11,14 @@ export const roomIn = ({ scrollTop, scrollHeight, clientHeight }: Box): Room => 
   up: scrollTop,
   down: Math.max(0, scrollHeight - clientHeight - scrollTop),
 })
+
+const NONE: Room = { up: 0, down: 0 }
+
+const NEAR_BASE = 0.5
+
+export const pinned = (fitted: boolean, size: number, { min }: Limits) => fitted && size - min < NEAR_BASE
+
+export const roomAt = (box: Box, held: boolean): Room => (held ? NONE : roomIn(box))
 
 export const slide = (box: Box, { pan, send, rowsUp }: Scroll, moves: Moves) => {
   box.scrollTop += pan

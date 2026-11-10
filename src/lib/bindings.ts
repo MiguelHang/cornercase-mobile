@@ -21,6 +21,7 @@ export const commands = {
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
 	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
+	markReviewed: (pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("mark_reviewed", { pane })),
 	attach: (pane: number) => typedError<Pasted_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
 	questionOpen: (tab: number, pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("question_open", { tab, pane })),
 	questionClose: (tab: number, pane: number) => __TAURI_INVOKE<void>("question_close", { tab, pane }),

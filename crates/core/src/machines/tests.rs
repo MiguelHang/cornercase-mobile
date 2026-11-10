@@ -75,3 +75,36 @@ mod tailscale {
         assert_eq!(crate::machines::tailscale(&Address { host: host.to_owned(), port: 8765 }), expected);
     }
 }
+
+mod reach {
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    #[case::the_first_of_ten("10.0.0.1", Reach::Lan)]
+    #[case::the_last_of_ten("10.255.255.255", Reach::Lan)]
+    #[case::the_first_of_172("172.16.0.1", Reach::Lan)]
+    #[case::the_last_of_172("172.31.255.255", Reach::Lan)]
+    #[case::below_172("172.15.255.255", Reach::Other)]
+    #[case::above_172("172.32.0.1", Reach::Other)]
+    #[case::the_first_of_192("192.168.0.1", Reach::Lan)]
+    #[case::the_last_of_192("192.168.255.255", Reach::Lan)]
+    #[case::below_192("192.167.255.255", Reach::Other)]
+    #[case::the_first_tailscale_v4("100.64.0.1", Reach::Tailscale)]
+    #[case::the_last_tailscale_v4("100.127.255.254", Reach::Tailscale)]
+    #[case::above_the_tailscale_v4("100.128.0.1", Reach::Other)]
+    #[case::the_tailscale_v6("fd7a:115c:a1e0::1", Reach::Tailscale)]
+    #[case::another_v6("fd00::1", Reach::Other)]
+    #[case::the_loopback("127.0.0.1", Reach::Other)]
+    #[case::a_name("studio.local", Reach::Other)]
+    fn sorts_an_address_by_how_it_is_reached(#[case] host: &str, #[case] expected: Reach) {
+        assert_eq!(crate::machines::reach(&Address { host: host.to_owned(), port: 8765 }), expected);
+    }
+
+    #[test]
+    fn puts_the_lan_before_tailscale_and_tailscale_before_the_rest() {
+        assert!(Reach::Lan < Reach::Tailscale);
+        assert!(Reach::Tailscale < Reach::Other);
+    }
+}

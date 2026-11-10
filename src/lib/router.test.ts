@@ -299,7 +299,7 @@ describe('chatOf', () => {
     expect(chatOf({ ...TERMINAL, machine: 2, row: { ...ROW, pane: 9 } })).toEqual({ machine: 2, pane: 9 })
   })
 
-  it.each([HOME, NO_MACHINES, MACHINES, MACHINE])('is none elsewhere', (route) => {
+  it.each([HOME, NO_MACHINES, MACHINES, MACHINE, START, CHANGES, CHANGE, FILES, FILE, ISSUES, ISSUE])('is none elsewhere', (route) => {
     expect(chatOf(route)).toBeNull()
   })
 

@@ -6,7 +6,7 @@ export type Asked = Pick<Opening, 'open' | 'pause'>
 export type Page = Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & Pick<Document, 'visibilityState'>
 
 export class Fit {
-  #on = $state(false)
+  #on = $state(true)
   #visible = $state(true)
 
   get on() {

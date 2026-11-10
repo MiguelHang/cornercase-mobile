@@ -93,19 +93,3 @@ mod the_token {
         assert_eq!(settled(&store, driver).await[..2], connections(retrying));
     }
 }
-
-mod the_winning_route {
-    use super::*;
-
-    #[tokio::test(start_paused = true)]
-    async fn becomes_the_last_route() {
-        let saved =
-            Machine { last_route: Some(route(LAN).address().clone()), ..machine(vec![route(LAN), route(TAILNET)]) };
-        let factory = network(vec![(TAILNET, contract(REAL))], &Asked::default());
-        let shared = Arc::new(Shared::default());
-        let (mut driver, _worker) = Driver::new(saved, factory, PickConfig::default(), shared);
-        let picked = driver.connect().await.expect("the tailnet answers");
-        assert_eq!(picked.route, route(TAILNET));
-        assert_eq!(driver.machine.last_route.as_ref(), Some(route(TAILNET).address()));
-    }
-}

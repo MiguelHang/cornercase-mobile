@@ -115,7 +115,7 @@
   <div class="view">
     <TerminalView
       pane={shown.current}
-      place={{ machine, boot: row.boot, tab: row.tab }}
+      place={{ machine, boot: row.boot, tab: row.tab, fitted: fit.on }}
       onfit={fitted}
       ontap={() => typist?.focus()}
       onsend={send}
