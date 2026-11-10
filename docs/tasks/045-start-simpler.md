@@ -1,6 +1,6 @@
 # 045 — Arrancar: sin workspaces nuevos y las issues sin un filtro de proyecto que no filtra
 
-- Estado: en curso
+- Estado: hecha
 - Depende de: 023, 024
 - Rama: `feat/045-start-simpler` · PR: `feat: start agents in existing workspaces and list every tracker's issues`
 
@@ -24,4 +24,4 @@ rama.
   arrancar se elige al arrancar (`Where`, con los sitios de `issue sources`). Rechazado: un filtro real solo para
   GitHub y GitLab, y dejar el selector con una nota. Decisión en `design/starting-work.md`; el hueco de upstream (no hay
   `issue list` de todos los proyectos) en `design/upstream-gaps.md`.
-- [ ] CA3 — Comprobado en el simulador; tests; `hx check full` verde.
+- [x] CA3 — Comprobado en el simulador; tests; `hx check full` verde.
