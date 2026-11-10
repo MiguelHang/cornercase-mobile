@@ -1,6 +1,14 @@
 import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
 import type { AttachImage } from '../../lib/attach.svelte'
-import { Chat, timers, type Clock, type PressKey, type ReadLast, type SendText } from '../../lib/chat.svelte'
+import {
+  Chat,
+  timers,
+  type Clock,
+  type MarkReviewed,
+  type PressKey,
+  type ReadLast,
+  type SendText,
+} from '../../lib/chat.svelte'
 import { fakeAsker, fakeClock } from '../../lib/chatFakes'
 
 export const ROW: AgentRow = {
@@ -29,6 +37,8 @@ export const unsent: SendText = () => new Promise(() => {})
 
 export const unpressed: PressKey = () => new Promise(() => {})
 
+export const unmarked: MarkReviewed = () => new Promise(() => {})
+
 export const unattached: AttachImage = () => new Promise(() => {})
 
 export const unasked = fakeAsker().asker
@@ -38,7 +48,7 @@ export const still = { impactFeedback: () => Promise.resolve({ status: 'ok' as c
 export const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 export const chatWith = (row: AgentRow | null, draft = '') => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, timers, unasked)
   if (row !== null) {
     chat.see(1, [row])
   }
@@ -57,7 +67,7 @@ export const clockAt = (millis: number) => {
 }
 
 export const lineChat = (status: string | null, since: string | null = ROW.since, clock: Clock = clockAt(LATER).clock) => {
-  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, clock, unasked)
+  const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, clock, unasked)
   chat.see(1, [{ ...ROW, status, since }])
   return chat
 }

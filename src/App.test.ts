@@ -151,7 +151,7 @@ describe('App wiring', () => {
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers, asker, ), )',
+      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.reviewed, commands.attach, haptics, timers, asker, ), )',
     )
     expect(source).toContain(
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
