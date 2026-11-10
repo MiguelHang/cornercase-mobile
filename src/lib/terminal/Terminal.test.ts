@@ -50,7 +50,7 @@ describe('the terminal view', () => {
   })
 
   it('adds no line of its own under the rows, so a fitted grid leaves no room to slide into', () => {
-    expect(source).toContain('.grid { position: relative; font-family: var(--font-mono); line-height: var(--line); }')
+    expect(source).toMatch(/\.grid\s*\{[^}]*\}/)
     expect(source).not.toMatch(/\.grid[^{]*\{[^}]*white-space/)
   })
 

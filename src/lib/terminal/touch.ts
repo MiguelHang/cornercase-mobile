@@ -14,7 +14,9 @@ export const roomIn = ({ scrollTop, scrollHeight, clientHeight }: Box): Room => 
 
 const NONE: Room = { up: 0, down: 0 }
 
-export const pinned = (fitted: boolean, size: number, { min }: Limits) => fitted && size <= min
+const NEAR_BASE = 0.5
+
+export const pinned = (fitted: boolean, size: number, { min }: Limits) => fitted && size - min < NEAR_BASE
 
 export const roomAt = (box: Box, held: boolean): Room => (held ? NONE : roomIn(box))
 

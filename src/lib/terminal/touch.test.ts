@@ -25,7 +25,9 @@ describe('pinned', () => {
 
   it.each([
     ['holds a fitted grid at the base', true, BASE, FITS, true],
+    ['holds a fitted grid pinched back to just over the base', true, BASE + 0.2, FITS, true],
     ['frees a fitted grid zoomed in', true, BASE + 1, FITS, false],
+    ['frees a fitted grid zoomed in by half a pixel', true, BASE + 0.5, FITS, false],
     ['frees a passive grid at the base', false, BASE, FITS, false],
     ['frees a passive grid fitted to the width', false, 2 * BASE, { min: 2 * BASE, max: 2 * BASE }, false],
   ])('%s', (_, fitted, size, limits, held) => {
