@@ -21,6 +21,8 @@ export type Subagents = { children: Row[]; line: string }
 
 type Tree = { roots: AgentRow[]; children: Map<number, AgentRow[]>; expanded: ReadonlySet<number> }
 
+type Walk = (made: Tree, agent: AgentRow) => Item[]
+
 const SECTION_OF: Record<string, Section> = {
   waiting: 'Waiting',
   failed: 'Waiting',
@@ -101,9 +103,20 @@ const branch = (made: Tree, agent: AgentRow): Item[] => {
   return [row(agent, children.length > 0, folded, folded ? descendants(made, agent) : []), ...shown]
 }
 
-const sectionItems = (made: Tree, section: Section): Item[] => {
+const found = (made: Tree, agent: AgentRow): Item[] => [
+  row(agent, false, false, []),
+  ...below(made, agent).flatMap((child) => found(made, child)),
+]
+
+const sectionItems = (made: Tree, section: Section, walk: Walk): Item[] => {
   const inside = made.roots.filter((agent) => sectionOf(agent.rank_status) === section)
-  return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => branch(made, agent))]
+  return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => walk(made, agent))]
+}
+
+const pruned = (rows: AgentRow[], wanted: string[]) => {
+  const made = tree(rows, NO_PANES)
+  const hit = (agent: AgentRow) => [agent, ...descendants(made, agent)].some((one) => matches(one, wanted))
+  return rows.filter(hit)
 }
 
 const closed = (made: Tree, agent: AgentRow) => {
@@ -138,9 +151,11 @@ export const hiddenName = (hidden: number, attention: string | null) => {
   return hidden === 1 ? `${what}, ${status}` : `${what}, at least one ${status}`
 }
 
-export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES): Item[] => {
-  const made = tree(rows, expanded)
-  return SECTIONS.flatMap((section) => sectionItems(made, section))
+export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES, query = ''): Item[] => {
+  const wanted = terms(query)
+  const made = tree(wanted.length === 0 ? rows : pruned(rows, wanted), expanded)
+  const walk = wanted.length === 0 ? branch : found
+  return SECTIONS.flatMap((section) => sectionItems(made, section, walk))
 }
 
 export const span = (millis: number) => {

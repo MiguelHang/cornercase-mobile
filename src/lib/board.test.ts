@@ -33,8 +33,8 @@ const agent = (pane: number, status: string | null, more: Partial<AgentRow> = {}
 
 const ago = (millis: number) => new Date(NOW - millis).toISOString()
 
-const keys = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
-  board.items(rows, expanded).map((item) => item.key)
+const keys = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
+  board.items(rows, expanded, query).map((item) => item.key)
 
 const under = (pane: number, status: string | null, parent: number, depth: number) =>
   agent(pane, status, { parent, depth })
@@ -68,9 +68,9 @@ const named = (pane: number, listed: AgentRow[] = FLOW) => {
 const children = (rows: AgentRow[], pane: number) =>
   board.subagents(rows, pane)?.children.map((item) => [item.row.pane, item.hasChildren, item.hidden, item.attention])
 
-const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>) =>
+const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
   board
-    .items(rows, expanded)
+    .items(rows, expanded, query)
     .flatMap((item) =>
       item.kind === 'row'
         ? [[item.row.pane, item.depth, item.hasChildren, item.folded, item.hidden, item.attention]]
@@ -219,6 +219,55 @@ describe('items of a tree', () => {
 
   it('lists an agent whose parent is not listed as a root', () => {
     expect(keys([under(3, 'working', 99, 1)])).toEqual(['section:Working', 'pane:3'])
+  })
+})
+
+describe('items while searching', () => {
+  it('shows a child that matches under its folded parents, unfolded and without counts', () => {
+    expect(shown(TEAM, undefined, 'agent 9')).toEqual([
+      [5, 0, false, false, 0, null],
+      [7, 1, false, false, 0, null],
+      [9, 2, false, false, 0, null],
+    ])
+  })
+
+  it('hides the siblings and the children that do not match', () => {
+    expect(keys(TEAM, new Set([5, 7, 16]), 'agent 16')).toEqual(['section:Working', 'pane:16'])
+  })
+
+  it('keeps the order of the core and the section of the root', () => {
+    expect(keys(TEAM, undefined, 'agent 1')).toEqual([
+      'section:Waiting',
+      'pane:5',
+      'pane:12',
+      'section:Working',
+      'pane:16',
+      'pane:17',
+      'pane:18',
+    ])
+  })
+
+  it('shows every branch unfolded when every agent matches', () => {
+    expect(keys(TEAM, undefined, 'AGENT')).toEqual(keys(TEAM, new Set([5, 7, 16])))
+  })
+
+  it('leaves out the sections without a match', () => {
+    expect(keys(TEAM, undefined, 'agent 20')).toEqual(['section:Idle', 'pane:20'])
+  })
+
+  it('lists nothing when nothing matches', () => {
+    expect(board.items(TEAM, new Set([5]), 'billing')).toEqual([])
+  })
+
+  it('leaves the unfolded agents as they were', () => {
+    const expanded = new Set([5])
+    board.items(TEAM, expanded, 'agent 18')
+    expect([...expanded]).toEqual([5])
+  })
+
+  it.each(['', '  '])('lists the board as before the search for %o', (query) => {
+    const expanded = new Set([5])
+    expect(board.items(TEAM, expanded, query)).toEqual(board.items(TEAM, expanded))
   })
 })
 
