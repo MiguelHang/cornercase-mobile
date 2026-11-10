@@ -33,6 +33,18 @@ fn crops(cols: u16, rows: &[String]) -> Vec<String> {
     texts(cropped(&pane(cols, &rows)))
 }
 
+fn pairs(lines: &[Line]) -> Vec<(u8, String)> {
+    options(lines).into_iter().map(|choice| (choice.number, choice.label)).collect()
+}
+
+fn listed(rows: &[&str]) -> Vec<(u8, String)> {
+    pairs(&rows.iter().map(|row| line(row)).collect::<Vec<Line>>())
+}
+
+fn owned(expected: &[(u8, &str)]) -> Vec<(u8, String)> {
+    expected.iter().map(|(number, label)| (*number, (*label).to_owned())).collect()
+}
+
 fn captured(json: &str) -> PaneGrid {
     let mut grid = Grid::default();
     grid.apply(serde_json::from_str::<Frame>(json).expect("a surface frame"));
@@ -81,6 +93,39 @@ mod window {
     }
 }
 
+mod options {
+    use super::*;
+
+    #[rstest]
+    #[case::numbered_from_one(&["Pick a fruit", "1. Pear", "2. Plum", "3. Fig"], &[(1, "Pear"), (2, "Plum"), (3, "Fig")])]
+    #[case::with_a_note_under_each(&["1. Pear", "   Sweet and soft", "2. Plum", "   Dark skin"], &[(1, "Pear"), (2, "Plum")])]
+    #[case::with_the_chosen_one_marked(&[" ❯ 1. Pear", "   2. Plum"], &[(1, "Pear"), (2, "Plum")])]
+    #[case::inside_a_box(&["│ › 1. Pear │", "│   2. Plum │"], &[(1, "Pear"), (2, "Plum")])]
+    #[case::with_every_mark(&["┃▶ 1. Pear", "|● 2. Plum", ">○ 3. Fig", "◯ 4. Lime"], &[(1, "Pear"), (2, "Plum"), (3, "Fig"), (4, "Lime")])]
+    #[case::with_spaces_around_the_label(&["1.   Pear  ", "2.Plum"], &[(1, "Pear"), (2, "Plum")])]
+    #[case::up_to_nine(&["1. a", "2. b", "3. c", "4. d", "5. e", "6. f", "7. g", "8. h", "9. i"], &[(1, "a"), (2, "b"), (3, "c"), (4, "d"), (5, "e"), (6, "f"), (7, "g"), (8, "h"), (9, "i")])]
+    #[case::without_the_first(&["2. Plum", "3. Fig"], &[(2, "Plum"), (3, "Fig")])]
+    #[case::keeping_the_lowest_row_of_a_number(&["1. Pear", "2. Old", "2. Plum"], &[(1, "Pear"), (2, "Plum")])]
+    #[case::stopping_at_the_first(&["1. Old", "2. Older", "1. Pear", "2. Plum"], &[(1, "Pear"), (2, "Plum")])]
+    fn are_read_from_the_bottom_up(#[case] rows: &[&str], #[case] expected: &[(u8, &str)]) {
+        assert_eq!(listed(rows), owned(expected));
+    }
+
+    #[rstest]
+    #[case::with_one_option(&["Pick a fruit", "1. Pear"])]
+    #[case::with_one_option_twice(&["1. Pear", "1. Pear"])]
+    #[case::with_ten_and_more(&["10. Pear", "11. Plum"])]
+    #[case::with_zero(&["0. Pear", "0. Plum"])]
+    #[case::with_empty_labels(&["1.", "2.  ", "3. Fig"])]
+    #[case::with_a_number_inside_the_text(&["Step 1. Pear", "and 2. Plum"])]
+    #[case::with_a_number_without_a_dot(&["1) Pear", "2 Plum"])]
+    #[case::with_letters(&["a. Pear", "b. Plum"])]
+    #[case::without_rows(&[])]
+    fn are_none_without_two_numbered_rows(#[case] rows: &[&str]) {
+        assert_eq!(listed(rows), Vec::new());
+    }
+}
+
 mod captures {
     use super::*;
 
@@ -94,6 +139,30 @@ mod captures {
         let rows = texts(cropped(&pane));
         let rule = "─".repeat(usize::from(pane.size.cols));
         assert_eq!((rows.len(), rows.first(), rows.last().map(String::as_str)), (count, Some(&rule), Some(last)));
+    }
+
+    #[rstest]
+    #[case::of_a_question(ASK_ONE)]
+    #[case::of_two_questions(ASK_TABS)]
+    fn list_the_answers_to_a_question(#[case] json: &str) {
+        let colours = [(1, "Red"), (2, "Green"), (3, "Blue"), (4, "Type something."), (5, "Chat about this")];
+        assert_eq!(pairs(cropped(&captured(json))), owned(&colours));
+    }
+
+    #[test]
+    fn list_the_answers_to_a_permission() {
+        let answers = [
+            (1, "Yes"),
+            (2, "Yes, and always allow access to"),
+            (3, "Yes, and switch to auto mode · auto mode handles these prompts for you"),
+            (4, "No"),
+        ];
+        assert_eq!(pairs(cropped(&captured(PERMISSION))), owned(&answers));
+    }
+
+    #[test]
+    fn list_no_answers_while_the_agent_works() {
+        assert_eq!(pairs(cropped(&captured(WORKING))), Vec::new());
     }
 
     #[test]

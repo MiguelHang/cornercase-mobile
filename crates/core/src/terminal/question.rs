@@ -1,8 +1,19 @@
+use serde::Serialize;
+
 use super::grid::{Line, PaneGrid};
 
 pub const QUESTION_ROWS: usize = 24;
 
+const MARKS: &str = "│┃|❯›>▶●○◯";
+
 const RULE: [char; 12] = ['─', '━', '═', '╌', '╭', '╮', '╰', '╯', '┌', '┐', '└', '┘'];
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct Choice {
+    pub number: u8,
+    pub label: String,
+}
 
 #[must_use]
 pub fn cropped(pane: &PaneGrid) -> &[Line] {
@@ -12,6 +23,36 @@ pub fn cropped(pane: &PaneGrid) -> &[Line] {
     let asked = window.get(ruled..).unwrap_or_default();
     let first = asked.iter().position(|line| !is_blank(line)).unwrap_or(asked.len());
     asked.get(first..).unwrap_or_default()
+}
+
+#[must_use]
+pub fn options(rows: &[Line]) -> Vec<Choice> {
+    let mut found: Vec<Choice> = Vec::new();
+    for choice in rows.iter().rev().filter_map(numbered) {
+        if found.iter().any(|seen| seen.number == choice.number) {
+            continue;
+        }
+        let first = choice.number == 1;
+        found.push(choice);
+        if first {
+            break;
+        }
+    }
+    if found.len() < 2 {
+        return Vec::new();
+    }
+    found.reverse();
+    found
+}
+
+fn numbered(line: &Line) -> Option<Choice> {
+    let text: String = chars(line).collect();
+    let text = text.trim_matches(|c: char| c.is_whitespace() || MARKS.contains(c));
+    let mut rest = text.chars();
+    let (Some(digit), Some('.')) = (rest.next(), rest.next()) else { return None };
+    let number = u8::try_from(digit.to_digit(10)?).ok().filter(|number| (1..=9).contains(number))?;
+    let label = rest.as_str().trim();
+    (!label.is_empty()).then(|| Choice { number, label: label.to_owned() })
 }
 
 fn chars(line: &Line) -> impl Iterator<Item = char> + '_ {
