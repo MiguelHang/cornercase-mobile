@@ -15,7 +15,7 @@ export type ReadLast = typeof commands.lastMessage
 
 export type SendText = typeof commands.send
 
-export type PressKey = typeof commands.keys
+export type PressKey = (pane: number, keys: KeyName[]) => ReturnType<typeof commands.keys>
 
 export type MarkReviewed = typeof commands.markReviewed
 
@@ -414,7 +414,7 @@ export class Chat {
       return null
     }
     this.#disarm()
-    return deliver(() => this.#pressKey(this.pane, key))
+    return deliver(() => this.#pressKey(this.pane, [key]))
   }
 
   async pressOption(number: number): Promise<string | null> {

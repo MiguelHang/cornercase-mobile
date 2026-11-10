@@ -57,9 +57,9 @@ async fn sending(answer: Option<Value>, text: &str, force: bool) -> (Result<(), 
     (sent, written(&lines))
 }
 
-async fn pressing(answer: Option<Value>, key: &str) -> (Result<(), Value>, Vec<Value>) {
+async fn pressing(answer: Option<Value>, names: &[&str]) -> (Result<(), Value>, Vec<Value>) {
     let (ipc, lines) = queueing(answer).await;
-    let pressed = press_key(&ipc.state(), 543, key).await.map_err(|error| json_of(&error));
+    let pressed = press_key(&ipc.state(), 543, names).await.map_err(|error| json_of(&error));
     (pressed, written(&lines))
 }
 
@@ -137,33 +137,47 @@ mod pressing_a_key {
     #[case::a_digit("1")]
     #[tokio::test(start_paused = true)]
     async fn queues_the_keys_command_without_stdin(#[case] key: &str) {
-        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), key).await;
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), &[key]).await;
         assert_eq!(pressed, Ok(()));
         assert_eq!(written, [json!({ "args": ["keys", "--pane", "543", key] })]);
+    }
+
+    #[rstest]
+    #[case::arrows_to_a_tab(&["right", "right"])]
+    #[case::arrows_then_an_option(&["right", "right", "2"])]
+    #[case::a_number_then_enter(&["3", "enter"])]
+    #[tokio::test(start_paused = true)]
+    async fn queues_several_keys_in_one_command_in_order(#[case] names: &[&str]) {
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), names).await;
+        assert_eq!(pressed, Ok(()));
+        let args: Vec<&str> = ["keys", "--pane", "543"].into_iter().chain(names.iter().copied()).collect();
+        assert_eq!(written, [json!({ "args": args })]);
     }
 
     #[tokio::test(start_paused = true)]
     async fn fails_with_the_reason_cornercase_gave() {
         let refusal = json!({ "status": 1, "error": format!("Error: {NOT_WAITING}\n") });
-        let (pressed, _) = pressing(Some(refusal), "enter").await;
+        let (pressed, _) = pressing(Some(refusal), &["enter"]).await;
         assert_eq!(pressed, Err(json!({ "code": "failed", "message": NOT_WAITING })));
     }
 
     #[tokio::test(start_paused = true)]
     async fn may_have_sent_it_when_the_answer_is_lost() {
-        let (pressed, written) = pressing(None, "enter").await;
+        let (pressed, written) = pressing(None, &["enter"]).await;
         assert_eq!(written.len(), 1);
         assert_eq!(pressed, Err(json_of(&CommandError::maybe_sent())));
     }
 
     #[rstest]
-    #[case::empty("")]
-    #[case::an_option("--force")]
-    #[case::two_keys("down enter")]
+    #[case::no_keys(&[], "")]
+    #[case::empty(&[""], "")]
+    #[case::an_option(&["--force"], "--force")]
+    #[case::two_keys_in_one_name(&["down enter"], "down enter")]
+    #[case::a_bad_one_after_good_ones(&["right", "right", "--force"], "--force")]
     #[tokio::test(start_paused = true)]
-    async fn refuses_a_name_the_app_never_sends_and_queues_nothing(#[case] key: &str) {
-        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), key).await;
-        assert_eq!(pressed, Err(json_of(&CommandError::from(Error::UnknownKey(key.to_owned())))));
+    async fn refuses_a_name_the_app_never_sends_and_queues_nothing(#[case] names: &[&str], #[case] bad: &str) {
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), names).await;
+        assert_eq!(pressed, Err(json_of(&CommandError::from(Error::UnknownKey(bad.to_owned())))));
         assert_eq!(written, Vec::<Value>::new());
     }
 }
@@ -209,7 +223,7 @@ mod without_a_connection {
     #[case::sending("send", json!({ "pane": 543, "text": "hello", "force": false }))]
     #[case::attaching("attach", json!({ "pane": 543 }))]
     #[case::pasting_an_attached_image("paste_attached", json!({ "pane": 543, "id": 1 }))]
-    #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
+    #[case::pressing_keys("keys", json!({ "pane": 543, "keys": ["right", "enter"] }))]
     #[case::reviewing("mark_reviewed", json!({ "pane": 543 }))]
     fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {
         let ipc = Ipc::new(Studio::new().reloaded());

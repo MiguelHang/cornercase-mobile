@@ -199,7 +199,7 @@ describe('Chat, its options', () => {
     const chat = fresh({ pressKey, haptics })
     chat.see(MACHINE, [row(PANE, 'waiting')])
     expect(await chat.pressOption(2)).toBeNull()
-    expect(pressKey.mock.calls).toEqual([[PANE, '2']])
+    expect(pressKey.mock.calls).toEqual([[PANE, ['2']]])
     expect(vi.mocked(haptics.impactFeedback).mock.calls).toEqual([['light']])
   })
 
