@@ -15,7 +15,7 @@ export type Choices<T> = { kind: 'loading' } | { kind: 'failed'; reason: string 
 
 export type Memory = { agent: string | null }
 
-type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
+export type Reply<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export const PROJECT_EMPTY = 'Choose a project'
 export const AGENT_EMPTY = 'Choose an agent'
