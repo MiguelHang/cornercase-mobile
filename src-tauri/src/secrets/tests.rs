@@ -123,12 +123,13 @@ mod store {
     }
 }
 
+#[cfg(not(target_os = "ios"))]
 mod routes {
     use cornercase_bridge::test_util::TempDir;
 
     use super::*;
 
-    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    #[cfg(not(target_os = "android"))]
     #[test]
     fn have_no_store_on_a_platform_without_one() {
         let dir = TempDir::new();
