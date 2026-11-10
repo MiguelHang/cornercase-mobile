@@ -1,3 +1,4 @@
+use cornercase_core::cli::start::Place;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
 use serde_json::{Value, json};
@@ -14,10 +15,6 @@ const ACCOUNTS: &str = include_str!(concat!(
 
 const STARTED: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/control/start/0.13.19.json"));
-const CREATED: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../crates/core/tests/fixtures/control/new-workspace/0.13.19.json"
-));
 const START: [&str; 8] =
     ["start", "claude", "--project", "5", "--worktree=fix-login", "--model=opus", "--prompt=Fix the login", "--placed"];
 
@@ -27,7 +24,10 @@ fn with_projects(projects: &Value) -> String {
 
 fn two_projects() -> String {
     with_projects(&json!([
-        { "id": 5, "name": "web", "custom_name": "Shop", "path": "/Users/me/web" },
+        { "id": 5, "name": "web", "custom_name": "Shop", "path": "/Users/me/web", "workspaces": [
+            { "id": 12, "name": "main", "custom_name": null, "worktree": false },
+            { "id": 9, "name": "fix-login", "custom_name": "Login", "worktree": true },
+        ] },
         { "id": 2, "name": "api", "custom_name": null },
     ]))
 }
@@ -50,12 +50,22 @@ fn choice(agent: &str, command: &str) -> AgentChoice {
 
 mod projects {
     use super::*;
+    use crate::view::WorkspaceChoice;
+
+    fn choice_of(id: u64, name: &str) -> WorkspaceChoice {
+        WorkspaceChoice { id, name: name.to_owned() }
+    }
 
     #[tokio::test(start_paused = true)]
-    async fn names_each_project_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot() {
+    async fn names_each_project_and_its_workspaces_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot()
+    {
         let studio = connected(serving(&[two_projects()])).await;
-        let expected =
-            [ProjectChoice { id: 5, name: "Shop".to_owned() }, ProjectChoice { id: 2, name: "api".to_owned() }];
+        let shop = ProjectChoice {
+            id: 5,
+            name: "Shop".to_owned(),
+            workspaces: vec![choice_of(12, "main"), choice_of(9, "Login")],
+        };
+        let expected = [shop, ProjectChoice { id: 2, name: "api".to_owned(), workspaces: Vec::new() }];
         let choices = StartChoices { boot: Some(BOOT.to_owned()), projects: expected.to_vec() };
         assert_eq!(projects(&studio.state), Ok(choices));
     }
@@ -128,11 +138,10 @@ fn start_argv() -> Vec<&'static str> {
 
 fn form() -> StartAgent {
     StartAgent {
-        project: 5,
+        place: Place::Worktree { project: 5, branch: "fix-login".to_owned() },
         agent: "claude".to_owned(),
         model: "opus".to_owned(),
         prompt: "  Fix the login\n".to_owned(),
-        worktree: "fix-login".to_owned(),
     }
 }
 
@@ -189,6 +198,15 @@ mod agent {
         assert_eq!(error.code, ErrorCode::Unanswered);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn sends_a_workspace_that_exists_as_where_the_tab_opens() {
+        let argv =
+            ["start", "claude", "--workspace", "12", "--model=opus", "--prompt=Fix the login", "--placed", "--json"];
+        let studio = connected(serving(&[two_projects()]).answer(&argv, &[STARTED], &[], 0)).await;
+        let form = StartAgent { place: Place::Workspace { workspace: 12 }, ..form() };
+        assert_eq!(run(&studio.state, form.argv()).await, Ok(ids(3, 12, 40, 57)));
+    }
+
     #[tokio::test]
     async fn refuses_without_a_connected_machine() {
         let error = run(&Studio::new().state, form().argv()).await.expect_err("no machine");
@@ -196,36 +214,27 @@ mod agent {
     }
 }
 
-mod workspace {
-    use super::*;
-
-    #[tokio::test(start_paused = true)]
-    async fn sends_the_form_as_cornercase_s_new_workspace_and_answers_its_ids() {
-        let argv = ["new-workspace", "--project", "2", "--worktree", "--json", "--", "fix-login"];
-        let studio = connected(serving(&[two_projects()]).answer(&argv, &[CREATED], &[], 0)).await;
-        let form = NewWorkspace { project: 2, name: " fix-login ".to_owned(), worktree: true };
-        assert_eq!(run(&studio.state, form.argv()).await, Ok(ids(7, 13, 41, 58)));
-    }
-}
-
 mod issue {
     use super::*;
 
-    fn form(branch: &str) -> StartIssue {
+    fn form(place: Place) -> StartIssue {
         StartIssue {
-            project: 5,
+            place,
             agent: "claude".to_owned(),
             model: String::new(),
             key: "#41".to_owned(),
             source: "github".to_owned(),
-            branch: branch.to_owned(),
             issue_branch: "issue-41-coupon".to_owned(),
         }
     }
 
-    async fn started_on(branch: &str, argv: &[&str]) -> Result<Started, CommandError> {
+    async fn started_in(place: Place, argv: &[&str]) -> Result<Started, CommandError> {
         let studio = connected(serving(&[two_projects()]).answer(argv, &[STARTED], &[], 0)).await;
-        run(&studio.state, form(branch).argv()).await
+        run(&studio.state, form(place).argv()).await
+    }
+
+    async fn started_on(branch: &str, argv: &[&str]) -> Result<Started, CommandError> {
+        started_in(Place::Worktree { project: 5, branch: branch.to_owned() }, argv).await
     }
 
     #[tokio::test(start_paused = true)]
@@ -248,6 +257,12 @@ mod issue {
             "--json",
         ];
         assert_eq!(started_on("fix", &argv).await, Ok(ids(3, 12, 40, 57)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sends_a_workspace_that_exists_without_a_branch() {
+        let argv = ["start", "claude", "--workspace", "12", "--issue=#41", "--source=github", "--placed", "--json"];
+        assert_eq!(started_in(Place::Workspace { workspace: 12 }, &argv).await, Ok(ids(3, 12, 40, 57)));
     }
 }
 
@@ -282,7 +297,10 @@ mod over_ipc {
     async fn answers_the_projects_of_the_active_machine() {
         let studio = connected(serving(&[two_projects()])).await;
         let ipc = Ipc::new(studio.state);
-        let projects = json!([{ "id": 5, "name": "Shop" }, { "id": 2, "name": "api" }]);
+        let projects = json!([
+            { "id": 5, "name": "Shop", "workspaces": [{ "id": 12, "name": "main" }, { "id": 9, "name": "Login" }] },
+            { "id": 2, "name": "api", "workspaces": [] },
+        ]);
         assert_eq!(ipc.invoke("start_projects", json!({})), Ok(json!({ "boot": BOOT, "projects": projects })));
     }
 
@@ -295,18 +313,16 @@ mod over_ipc {
     }
 
     #[test]
-    fn reads_the_three_forms_and_refuses_them_without_a_connected_machine() {
+    fn reads_both_forms_and_refuses_them_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        let agent = json!({ "project": 5, "agent": "claude", "model": "", "prompt": "Fix", "worktree": "" });
+        let agent = json!({ "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix" });
         let started = ipc.invoke("start_agent", json!({ "form": agent })).expect_err("no machine");
-        let workspace = json!({ "project": 5, "name": "fix", "worktree": false });
-        let created = ipc.invoke("new_workspace", json!({ "form": workspace })).expect_err("no machine");
         let issue = json!({
-            "project": 5, "agent": "claude", "model": "", "key": "#41", "source": "github",
-            "branch": "issue-41", "issue_branch": "issue-41"
+            "place": { "kind": "worktree", "project": 5, "branch": "issue-41" }, "agent": "claude", "model": "",
+            "key": "#41", "source": "github", "issue_branch": "issue-41"
         });
         let from_issue = ipc.invoke("start_issue", json!({ "form": issue })).expect_err("no machine");
-        let codes = [&started["code"], &created["code"], &from_issue["code"]];
-        assert_eq!(codes, [&json!("not_connected"); 3]);
+        let codes = [&started["code"], &from_issue["code"]];
+        assert_eq!(codes, [&json!("not_connected"); 2]);
     }
 }

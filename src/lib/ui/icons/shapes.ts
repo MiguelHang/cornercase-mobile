@@ -62,6 +62,10 @@ export const icons = {
     { kind: 'circle', cx: 9, cy: 9, r: 2 },
   ],
   check: [{ kind: 'path', d: 'M20 6 9 17l-5-5' }],
+  plus: [
+    { kind: 'path', d: 'M5 12h14' },
+    { kind: 'path', d: 'M12 5v14' },
+  ],
   'circle-alert': [
     { kind: 'circle', cx: 12, cy: 12, r: 10 },
     { kind: 'line', x1: 12, y1: 8, x2: 12, y2: 12 },

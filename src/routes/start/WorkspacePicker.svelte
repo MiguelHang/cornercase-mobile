@@ -6,13 +6,13 @@
 </script>
 
 <Picker
-  label="Project"
-  choices={form.projects}
-  bind:value={form.project}
-  of={(choice) => ({ value: choice.id, name: choice.name })}
-  error={form.projectError}
-  reading="Reading the projects…"
-  empty="No project is open on this Mac."
+  label="Workspace"
+  choices={form.workspaceChoices}
+  bind:value={form.workspace}
+  of={(choice) => ({ value: choice.id, name: choice.label })}
+  error={form.workspaceError}
+  reading="Reading the workspaces…"
+  empty="No workspace is open on this Mac."
   disabled={form.sending}
   onretry={() => void form.loadProjects()}
 />

@@ -1,15 +1,17 @@
 <script lang="ts">
-  import type { IssueInfo_Serialize as IssueInfo } from '../../lib/bindings'
   import { elapsed } from '../../lib/board'
+  import type { Found } from '../../lib/issueSweep'
 
   let {
     issue,
+    where,
     now,
     onopen,
   }: {
-    issue: IssueInfo
+    issue: Found
+    where: string
     now: number
-    onopen: (issue: IssueInfo) => void
+    onopen: (issue: Found) => void
   } = $props()
 
   const age = $derived(elapsed(issue.updated_at, now))
@@ -19,6 +21,7 @@
   <span class="head">
     <span class="state" class:closed={issue.closed}>{issue.state}</span>
     <span class="key">{issue.key}</span>
+    <span class="where">{where}</span>
   </span>
   <span class="title">{issue.title}</span>
   <span class="meta">
@@ -72,6 +75,10 @@
   .key {
     color: var(--muted);
     font-family: var(--font-mono);
+  }
+
+  .where {
+    color: var(--soft);
   }
 
   .title {

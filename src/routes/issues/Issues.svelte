@@ -1,9 +1,7 @@
 <script lang="ts">
-  import type {
-    IssueInfo_Serialize as IssueInfo,
-    SourceInfo_Serialize as SourceInfo,
-  } from '../../lib/bindings'
+  import type { SourceInfo_Serialize as SourceInfo } from '../../lib/bindings'
   import type { Failure, Filters, IssuesState } from '../../lib/issues.svelte'
+  import type { Found } from '../../lib/issueSweep'
   import Button from '../../lib/ui/Button.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import SearchField from '../../lib/ui/SearchField.svelte'
@@ -23,7 +21,7 @@
     issues: IssuesState
     backTo: string | null
     onback: () => void
-    onopen: (issue: IssueInfo) => void
+    onopen: (issue: Found) => void
     now?: number
   } = $props()
 
@@ -68,6 +66,11 @@
     return filters.closed ? 'No issues' : 'No open issues'
   })
 
+  const whereOf = (issue: Found) => {
+    const tracker = issues.nameOf(issue.source)
+    return issue.repository ? `${tracker} · ${issues.projectName(issue.project)}` : tracker
+  }
+
   const retry = () => void issues.retry()
 </script>
 
@@ -97,7 +100,7 @@
 <section class="screen">
   <NavBar {backTo} title="Issues" {onback} topmost>
     {#snippet right()}
-      {#if issues.loading && issues.lists !== null}
+      {#if issues.loading && issues.swept !== null}
         <span class="busy"><Spinner /></span>
       {/if}
     {/snippet}
@@ -125,11 +128,11 @@
     {/if}
     {#if shown.length > 0}
       <ul class="issues">
-        {#each shown as issue (`${issue.source}:${issue.key}`)}
-          <li><IssueRow {issue} {now} {onopen} /></li>
+        {#each shown as issue (`${issue.project}:${issue.source}:${issue.key}`)}
+          <li><IssueRow {issue} where={whereOf(issue)} {now} {onopen} /></li>
         {/each}
       </ul>
-    {:else if issues.lists === null}
+    {:else if issues.swept === null}
       {#if issues.loading}
         <p class="note"><Spinner />Reading the issues…</p>
       {/if}

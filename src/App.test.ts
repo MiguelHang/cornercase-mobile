@@ -157,7 +157,7 @@ describe('App wiring', () => {
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
     )
   })
 
@@ -189,29 +189,38 @@ describe('App wiring', () => {
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} {backTo} onback={goBack} onstarted={started} oncreated={created} onissues={listIssues} /> {:else if route.name === 'issues'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} workspace={route.workspace} {backTo} onback={goBack} onstarted={started} onissues={listIssues} /> {:else if route.name === 'issues'}",
     )
   })
 
-  it('lists the issues of the project Start chose on the machine of Start, opens a tapped one and starts on it', () => {
+  it("opens Start from an agent on the active machine, with the agent's workspace chosen", () => {
     expect(source).toContain(
-      "const listIssues = (project: number) => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine, project }) } }",
+      "const startIn = (workspace: number) => { if (current.machine !== null) { router.go({ name: 'start', machine: current.machine, workspace }) } }",
+    )
+  })
+
+  it('lists the issues on the machine of Start, opens a tapped one with its project and starts on it where it may, from the workspace Start was opened on', () => {
+    expect(source).toContain(
+      "const listIssues = () => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine }) } }",
     )
     expect(source).toContain(
-      "const openIssue = (row: IssueInfo) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: issues.project, key: row.key, source: row.source }) } }",
+      "const openIssue = (row: Found) => { if (issues !== null) { const { project, repository, key, source } = row router.go({ name: 'issue', machine: issues.machine, project, repository, key, source }) } }",
+    )
+    expect(source).toContain(
+      "const whereOf = (shown: Extract<Route, { name: 'issue' }>): Where => issues?.whereOf(shown, router.latest('start')?.workspace) ?? { project: null, places: [] }",
     )
     expect(source).toContain(
       "const startOn = (starting: StartingIssue) => { if (issue !== null) { router.go({ name: 'start', machine: issue.machine, issue: starting }) } }",
     )
     expect(source).toContain(
-      "{:else if route.name === 'issues'} {#if issues !== null} <Issues {issues} {backTo} onback={goBack} onopen={openIssue} /> {/if} {:else if route.name === 'issue'} {#if issue !== null} <Issue {issue} {backTo} onback={goBack} onstart={startOn} /> {/if} {:else if route.name === 'machines'}",
+      "{:else if route.name === 'issues'} {#if issues !== null} <Issues {issues} {backTo} onback={goBack} onopen={openIssue} /> {/if} {:else if route.name === 'issue'} {#if issue !== null} <Issue {issue} where={whereOf(route)} {backTo} onback={goBack} onstart={startOn} /> {/if} {:else if route.name === 'machines'}",
     )
   })
 
   it('keeps one state of the listed project and one of the read issue while they are in the stack, reading them on untracked and leaving them after', () => {
     expect(source).toContain("const listing = $derived(router.latest('issues'))")
     expect(source).toContain(
-      'const issues = $derived(listing === null ? null : new IssuesState(listing.machine, listing.project, commands))',
+      'const issues = $derived(listing === null ? null : new IssuesState(listing.machine, commands))',
     )
     expect(source).toContain("const shown = $derived(router.latest('issue'))")
     expect(source).toContain(
@@ -235,12 +244,6 @@ describe('App wiring', () => {
     )
     expect(source).toContain(
       "const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)",
-    )
-  })
-
-  it('tells the workspace it made and goes back to the board only from Start', () => {
-    expect(source).toContain(
-      "const created = (name: string) => { toasts.push({ level: 'info', message: `Workspace ${name} created` }) if (router.current.name === 'start') { router.back() } }",
     )
   })
 
@@ -365,7 +368,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

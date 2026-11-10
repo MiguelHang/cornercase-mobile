@@ -5,15 +5,20 @@ import type {
   ListedInfo_Serialize as ListedInfo,
   ListFilter_Deserialize as ListFilter,
   Lists_Serialize as Lists,
+  PlaceInfo_Serialize as PlaceInfo,
+  ProjectChoice,
   ReadIssue_Serialize as ReadIssue,
   SourceInfo_Serialize as SourceInfo,
   Sources_Serialize as Sources,
+  StartChoices_Serialize as StartChoices,
 } from './bindings'
 import { ANY_FILTERS, CAP, IssueState, IssuesState, type IssueCalls, type ReadCalls } from './issues.svelte'
+import type { Found } from './issueSweep'
 import { CHOICES_UNANSWERED } from './startForm.svelte'
 
 const MACHINE = 1
 const PROJECT = 7
+const NOTES = 8
 
 type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
@@ -25,7 +30,7 @@ const refusal = <T>(message: string, code: CommandError['code'] = 'failed'): Pro
 const tracker = (source: string, more: Partial<SourceInfo> = {}): SourceInfo => ({
   source,
   name: source.toUpperCase(),
-  repository: true,
+  repository: source === 'github' || source === 'gitlab',
   state: 'connected',
   missing: [],
   reason: null,
@@ -36,6 +41,7 @@ const issue = (key: string, title: string, labels: string[] = []): IssueInfo => 
   source: 'github',
   key,
   title,
+  url: `https://github.com/acme/shop/issues/${key.slice(1)}`,
   state: 'open',
   closed: false,
   labels,
@@ -55,13 +61,23 @@ const ACME_41 = issue('#41', 'Checkout forgets the coupon', ['bug', 'checkout'])
 const ACME_38 = issue('#38', 'Add a dark theme', ['design'])
 const ENG_42 = { ...issue('ENG-42', 'Speed up the search'), source: 'shortcut' }
 
+const found = (listedIssue: IssueInfo, project = PROJECT, repository = true): Found => ({
+  ...listedIssue,
+  project,
+  repository,
+})
+
 const lists = (issues: IssueInfo[], sources: ListedInfo[] = [listed('github', issues.length)]): Lists => ({
   project: PROJECT,
   issues,
   sources,
 })
 
-const sources = (...trackers: SourceInfo[]): Sources => ({ project: PROJECT, sources: trackers })
+const sources = (...trackers: SourceInfo[]): Sources => ({ project: PROJECT, sources: trackers, places: [] })
+
+const choice = (id: number, name: string): ProjectChoice => ({ id, name, workspaces: [] })
+
+const SHOP = choice(PROJECT, 'shop')
 
 type Lister = (project: number, filter: ListFilter) => Promise<Answer<Lists>>
 
@@ -70,13 +86,18 @@ const live =
   (_project, filter) =>
     answered(filter.cached === true ? kept : fresh)
 
-const fakes = (trackers: Sources = sources(tracker('github')), list: Lister = live(lists([ACME_41, ACME_38]))) => ({
-  issueSources: vi.fn<IssueCalls['issueSources']>(() => answered(trackers)),
+const fakes = (
+  trackers: Sources = sources(tracker('github')),
+  list: Lister = live(lists([ACME_41, ACME_38])),
+  projects: ProjectChoice[] = [SHOP],
+) => ({
+  startProjects: vi.fn<IssueCalls['startProjects']>(() => answered<StartChoices>({ boot: null, projects })),
+  issueSources: vi.fn<IssueCalls['issueSources']>((project) => answered({ ...trackers, project })),
   issueList: vi.fn<IssueCalls['issueList']>(list),
 })
 
 const opened = async (calls = fakes()) => {
-  const state = new IssuesState(MACHINE, PROJECT, calls)
+  const state = new IssuesState(MACHINE, calls)
   await state.load()
   return { state, calls }
 }
@@ -93,11 +114,12 @@ const held = <T>() => {
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('IssuesState trackers', () => {
-  it('reads the project trackers and lists the issues of the connected ones', async () => {
+  it('reads the projects, the trackers of each and lists the issues of the connected ones', async () => {
     const { state, calls } = await opened()
+    expect(calls.startProjects).toHaveBeenCalledOnce()
     expect(calls.issueSources).toHaveBeenCalledWith(PROJECT)
     expect(state.connected.map((source) => source.source)).toEqual(['github'])
-    expect(state.issues).toEqual([ACME_41, ACME_38])
+    expect(state.issues).toEqual([found(ACME_41), found(ACME_38)])
     expect(state.loading).toBe(false)
   })
 
@@ -110,8 +132,15 @@ describe('IssuesState trackers', () => {
     expect(state.trackers).toEqual({ kind: 'ready', sources: [missing, failing] })
   })
 
+  it('asks to connect a tracker when the Mac has no project open', async () => {
+    const { state, calls } = await opened(fakes(sources(tracker('github')), live(lists([])), []))
+    expect([state.connect, state.trackers]).toEqual([true, { kind: 'ready', sources: [] }])
+    expect(calls.issueSources).not.toHaveBeenCalled()
+    expect(calls.issueList).not.toHaveBeenCalled()
+  })
+
   it('is not asking to connect while the trackers are read', () => {
-    const state = new IssuesState(MACHINE, PROJECT, fakes())
+    const state = new IssuesState(MACHINE, fakes())
     expect(state.connect).toBe(false)
     expect(state.trackers).toEqual({ kind: 'loading' })
   })
@@ -128,13 +157,21 @@ describe('IssuesState trackers', () => {
     expect(calls.issueList).not.toHaveBeenCalled()
   })
 
+  it('says why when the projects cannot be read, and asks nothing more', async () => {
+    const calls = fakes()
+    calls.startProjects.mockImplementation(() => refusal('offline'))
+    const { state } = await opened(calls)
+    expect(state.trackers).toEqual({ kind: 'failed', reason: 'offline' })
+    expect([calls.issueSources.mock.calls.length, calls.issueList.mock.calls.length]).toEqual([0, 0])
+  })
+
   it('reads the trackers again on Try again after they failed', async () => {
     const calls = fakes()
     calls.issueSources.mockImplementationOnce(() => refusal('offline'))
     const { state } = await opened(calls)
     await state.retry()
     expect(calls.issueSources).toHaveBeenCalledTimes(2)
-    expect(state.issues).toEqual([ACME_41, ACME_38])
+    expect(state.issues).toEqual([found(ACME_41), found(ACME_38)])
   })
 
   it('offers to choose a tracker only with more than one connected', async () => {
@@ -144,29 +181,133 @@ describe('IssuesState trackers', () => {
   })
 })
 
-describe('IssuesState filters', () => {
-  it('lists open issues of every connected tracker at first', async () => {
-    const { calls } = await opened()
-    expect(filtersSent(calls)).toEqual([
-      { ...ANY_FILTERS, cached: true },
-      { ...ANY_FILTERS, cached: false },
+const NOTES_12 = {
+  ...issue('#12', 'Notes lose their colour'),
+  url: 'https://github.com/acme/notes/issues/12',
+  updated_at: '2026-11-10T08:00:00Z',
+}
+const STORY = { ...ENG_42, updated_at: '2026-11-09T12:00:00Z' }
+
+const everywhere = (): Lister => (project, filter) => {
+  const issues = filter.source === 'shortcut' ? [STORY] : project === NOTES ? [NOTES_12] : [ACME_41]
+  return answered({ project, issues, sources: [listed(filter.source ?? '', issues.length)] })
+}
+
+const both = () =>
+  fakes(sources(tracker('github'), tracker('shortcut')), everywhere(), [SHOP, choice(NOTES, 'notes')])
+
+const asked = (calls: ReturnType<typeof fakes>) =>
+  calls.issueList.mock.calls.map(([project, filter]) => `${filter.source}@${project}${filter.cached ? ' cached' : ''}`)
+
+describe('IssuesState across projects', () => {
+  it('reads the trackers of every project', async () => {
+    const { calls } = await opened(both())
+    expect(calls.issueSources.mock.calls).toEqual([[PROJECT], [NOTES]])
+  })
+
+  it('lists a tracker of the account once and GitHub in each project, the cache first', async () => {
+    const { calls } = await opened(both())
+    expect(asked(calls)).toEqual([
+      `github@${PROJECT} cached`,
+      `shortcut@${PROJECT} cached`,
+      `github@${NOTES} cached`,
+      `github@${PROJECT}`,
+      `shortcut@${PROJECT}`,
+      `github@${NOTES}`,
     ])
   })
 
-  it.each<[string, Partial<typeof ANY_FILTERS>]>([
-    ['closed ones too', { closed: true }],
-    ['mine', { mine: true }],
-    ['one tracker', { source: 'shortcut' }],
-    ['mine, closed ones too, in one tracker', { closed: true, mine: true, source: 'shortcut' }],
-  ])('lists %s again', async (_, change) => {
+  it('shows the issues of every project, the newest first, each with the project it was listed with', async () => {
+    const { state } = await opened(both())
+    expect(state.issues).toEqual([found(NOTES_12, NOTES), found(STORY, PROJECT, false), found(ACME_41)])
+  })
+
+  it('shows each list as it comes, while the rest are read', async () => {
+    const pending = held<Lists>()
+    const calls = both()
+    calls.issueList.mockImplementation(pending.call)
+    const state = new IssuesState(MACHINE, calls)
+    const loading = state.load()
+    await settled()
+    pending.answer(2, { ...lists([NOTES_12]), project: NOTES })
+    await settled()
+    expect([state.issues, state.loading]).toEqual([[found(NOTES_12, NOTES)], true])
+    pending.answer(0, lists([ACME_41]))
+    pending.answer(1, lists([STORY], [listed('shortcut', 1)]))
+    await settled()
+    ;[3, 4, 5].forEach((at) => pending.answer(at, { ...lists([]), project: at === 5 ? NOTES : PROJECT }))
+    await loading
+    expect([state.issues, state.loading]).toEqual([[], false])
+  })
+
+  it('keeps the lists that came and says why one failed', async () => {
+    const calls = both()
+    calls.issueList.mockImplementation((project, filter) =>
+      project === NOTES && filter.cached !== true ? refusal('gh failed') : everywhere()(project, filter),
+    )
+    const { state } = await opened(calls)
+    expect(state.issues).toEqual([found(NOTES_12, NOTES), found(STORY, PROJECT, false), found(ACME_41)])
+    expect([state.error, state.loading]).toEqual(['gh failed', false])
+  })
+
+  it('names each project, or gives its id when it does not know it', async () => {
+    const { state } = await opened(both())
+    expect([state.projectName(PROJECT), state.projectName(NOTES), state.projectName(99)]).toEqual([
+      'shop',
+      'notes',
+      '99',
+    ])
+  })
+
+  it('starts an issue of GitHub or GitLab only in its project, and one of a tracker of the account anywhere', async () => {
+    const place = (project: number, workspace: number | null, label: string): PlaceInfo => ({
+      project,
+      workspace,
+      label,
+      worktree: workspace === null,
+    })
+    const places = [place(PROJECT, null, 'shop · new worktree'), place(NOTES, 3, 'notes › main')]
+    const calls = both()
+    calls.issueSources.mockImplementation((project) =>
+      answered({ ...sources(tracker('github')), project, places }),
+    )
+    const { state } = await opened(calls)
+    expect([
+      state.whereOf({ project: NOTES, repository: false }, 3),
+      state.whereOf({ project: NOTES, repository: true }, 3),
+      state.whereOf({ project: 99, repository: true }),
+    ]).toEqual([
+      { project: null, places, workspace: 3 },
+      { project: NOTES, places: [places[1]], workspace: 3 },
+      { project: 99, places: [], workspace: undefined },
+    ])
+  })
+})
+
+describe('IssuesState filters', () => {
+  it('lists the open issues of each connected tracker at first', async () => {
+    const { calls } = await opened(fakes(sources(tracker('github'), tracker('shortcut'))))
+    expect(filtersSent(calls)).toEqual([
+      { ...ANY_FILTERS, source: 'github', cached: true },
+      { ...ANY_FILTERS, source: 'shortcut', cached: true },
+      { ...ANY_FILTERS, source: 'github', cached: false },
+      { ...ANY_FILTERS, source: 'shortcut', cached: false },
+    ])
+  })
+
+  it.each<[string, Partial<typeof ANY_FILTERS>, string[]]>([
+    ['closed ones too', { closed: true }, ['github', 'shortcut']],
+    ['mine', { mine: true }, ['github', 'shortcut']],
+    ['one tracker', { source: 'shortcut' }, ['shortcut']],
+    ['mine, closed ones too, in one tracker', { closed: true, mine: true, source: 'shortcut' }, ['shortcut']],
+  ])('lists %s again', async (_, change, trackers) => {
     const { state, calls } = await opened(fakes(sources(tracker('github'), tracker('shortcut'))))
     calls.issueList.mockClear()
     await state.filter(change)
     expect(state.filters).toEqual({ ...ANY_FILTERS, ...change })
-    expect(filtersSent(calls)).toEqual([
-      { ...ANY_FILTERS, ...change, cached: true },
-      { ...ANY_FILTERS, ...change, cached: false },
-    ])
+    expect(filtersSent(calls)).toEqual(
+      [true, false].flatMap((cached) => trackers.map((source) => ({ ...ANY_FILTERS, ...change, source, cached }))),
+    )
   })
 
   it('asks nothing when the filters stay the same', async () => {
@@ -182,7 +323,7 @@ describe('IssuesState filters', () => {
     const { state } = await opened(calls)
     calls.issueList.mockImplementation(pending.call)
     void state.filter({ mine: true })
-    expect(state.lists).toBeNull()
+    expect(state.swept).toBeNull()
     expect(state.loading).toBe(true)
   })
 
@@ -196,7 +337,7 @@ describe('IssuesState filters', () => {
     calls.issueList.mockClear()
     await state.refresh()
     expect(state.filters.source).toBeNull()
-    expect(filtersSent(calls).at(-1)).toEqual({ ...ANY_FILTERS, cached: false })
+    expect(filtersSent(calls).at(-1)).toEqual({ ...ANY_FILTERS, source: 'github', cached: false })
   })
 })
 
@@ -204,15 +345,15 @@ describe('IssuesState cached then live', () => {
   it('shows the cached issues until the live ones come', async () => {
     const pending = held<Lists>()
     const calls = fakes(sources(tracker('github')), pending.call)
-    const state = new IssuesState(MACHINE, PROJECT, calls)
+    const state = new IssuesState(MACHINE, calls)
     const loading = state.load()
     await settled()
     pending.answer(0, lists([ACME_38]))
     await settled()
-    expect([state.issues, state.loading]).toEqual([[ACME_38], true])
+    expect([state.issues, state.loading]).toEqual([[found(ACME_38)], true])
     pending.answer(1, lists([ACME_41, ACME_38]))
     await loading
-    expect([state.issues, state.loading]).toEqual([[ACME_41, ACME_38], false])
+    expect([state.issues, state.loading]).toEqual([[found(ACME_41), found(ACME_38)], false])
   })
 
   it('keeps what it shows when the cache is empty', async () => {
@@ -224,10 +365,10 @@ describe('IssuesState cached then live', () => {
     await settled()
     pending.answer(0, lists([]))
     await settled()
-    expect([state.issues, state.loading]).toEqual([[ACME_41, ACME_38], true])
+    expect([state.issues, state.loading]).toEqual([[found(ACME_41), found(ACME_38)], true])
     pending.answer(1, lists([ACME_41]))
     await reading
-    expect(state.issues).toEqual([ACME_41])
+    expect(state.issues).toEqual([found(ACME_41)])
   })
 
   it('takes an empty live list', async () => {
@@ -243,7 +384,7 @@ describe('IssuesState cached then live', () => {
       filter.cached === true ? refusal('no cache') : answered(lists([ACME_41])),
     )
     const { state } = await opened(calls)
-    expect([state.issues, state.error]).toEqual([[ACME_41], null])
+    expect([state.issues, state.error]).toEqual([[found(ACME_41)], null])
   })
 
   it('keeps what it shows and says why when the live list fails, and lists again on Try again', async () => {
@@ -253,10 +394,14 @@ describe('IssuesState cached then live', () => {
       filter.cached === true ? answered(lists([])) : refusal('gh failed'),
     )
     await state.refresh()
-    expect([state.issues, state.error, state.loading]).toEqual([[ACME_41, ACME_38], 'gh failed', false])
+    expect([state.issues, state.error, state.loading]).toEqual([
+      [found(ACME_41), found(ACME_38)],
+      'gh failed',
+      false,
+    ])
     calls.issueList.mockImplementation(live(lists([ACME_38])))
     await state.retry()
-    expect([state.issues, state.error]).toEqual([[ACME_38], null])
+    expect([state.issues, state.error]).toEqual([[found(ACME_38)], null])
   })
 })
 
@@ -273,7 +418,7 @@ describe('IssuesState search', () => {
     const { state, calls } = await opened(fakes(sources(tracker('github')), live(all)))
     calls.issueList.mockClear()
     state.query = query
-    expect(state.issues).toEqual(shown)
+    expect(state.issues).toEqual(shown.map((one) => found(one)))
     expect(calls.issueList).not.toHaveBeenCalled()
   })
 })
@@ -282,7 +427,7 @@ describe('IssuesState partial lists', () => {
   it('lists what came and one failure per tracker that failed, by its name', async () => {
     const partial = lists([ACME_41], [listed('github', 1), listed('shortcut', 0, 'Shortcut rejected the token')])
     const { state } = await opened(fakes(sources(tracker('github'), tracker('shortcut')), live(partial)))
-    expect(state.issues).toEqual([ACME_41])
+    expect(state.issues).toEqual([found(ACME_41)])
     expect(state.failures).toEqual([{ source: 'shortcut', name: 'SHORTCUT', error: 'Shortcut rejected the token' }])
   })
 
@@ -314,29 +459,43 @@ describe('IssuesState stale answers', () => {
     await settled()
     pending.answer(0, lists([ENG_42]))
     await first
-    expect(state.lists).toBeNull()
+    expect(state.swept).toBeNull()
     pending.answer(1, lists([ACME_38]))
     await settled()
     pending.answer(2, lists([ACME_41]))
     await second
-    expect(state.issues).toEqual([ACME_41])
+    expect(state.issues).toEqual([found(ACME_41)])
+  })
+
+  it('drops a list of a project that comes after the filters changed', async () => {
+    const pending = held<Lists>()
+    const calls = both()
+    const { state } = await opened(calls)
+    calls.issueList.mockImplementation(pending.call)
+    void state.filter({ mine: true })
+    await settled()
+    void state.filter({ mine: false })
+    await settled()
+    pending.answer(2, { ...lists([NOTES_12]), project: NOTES })
+    await settled()
+    expect([state.swept, pending.waiting.length]).toEqual([null, 6])
   })
 
   it('drops a list that comes for another project', async () => {
     const calls = fakes(sources(tracker('github')), live({ ...lists([ENG_42]), project: PROJECT + 1 }))
     const { state } = await opened(calls)
-    expect([state.lists, state.loading]).toEqual([null, false])
+    expect([state.swept, state.loading]).toEqual([null, false])
   })
 
   it('drops what comes once it is left', async () => {
     const pending = held<Lists>()
-    const state = new IssuesState(MACHINE, PROJECT, fakes(sources(tracker('github')), pending.call))
+    const state = new IssuesState(MACHINE, fakes(sources(tracker('github')), pending.call))
     const loading = state.load()
     await settled()
     state.stop()
     pending.answer(0, lists([ACME_41]))
     await loading
-    expect(state.lists).toBeNull()
+    expect(state.swept).toBeNull()
     expect(pending.waiting).toHaveLength(1)
     await state.filter({ mine: true })
     expect(pending.waiting).toHaveLength(1)
@@ -372,7 +531,7 @@ describe('IssuesState reading again', () => {
     void state.see(false)
     void state.see(true)
     await settled()
-    expect([state.issues, state.loading]).toEqual([[ACME_41, ACME_38], true])
+    expect([state.issues, state.loading]).toEqual([[found(ACME_41), found(ACME_38)], true])
   })
 
   it('shows a failed read again as a failure to list, keeping the issues', async () => {
@@ -381,7 +540,7 @@ describe('IssuesState reading again', () => {
     calls.issueSources.mockImplementation(() => refusal('offline'))
     await state.refresh()
     expect(state.trackers.kind).toBe('ready')
-    expect([state.issues, state.error]).toEqual([[ACME_41, ACME_38], 'offline'])
+    expect([state.issues, state.error]).toEqual([[found(ACME_41), found(ACME_38)], 'offline'])
   })
 
   it('reads the trackers again on Try again after reading them again failed', async () => {

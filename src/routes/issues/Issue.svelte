@@ -1,7 +1,7 @@
 <script lang="ts">
   import { elapsed } from '../../lib/board'
   import type { IssueState } from '../../lib/issues.svelte'
-  import type { StartingIssue } from '../../lib/router.svelte'
+  import type { StartingIssue, Where } from '../../lib/router.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Markdown from '../../lib/ui/Markdown.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
@@ -9,12 +9,14 @@
 
   let {
     issue,
+    where,
     backTo,
     onback,
     onstart,
     now = Date.now(),
   }: {
     issue: IssueState
+    where: Where
     backTo: string | null
     onback: () => void
     onstart: (starting: StartingIssue) => void
@@ -32,7 +34,7 @@
   const start = () => {
     if (read !== null) {
       const chosen = { ...read.issue, source: issue.source, key: issue.key }
-      onstart({ project: issue.project, issue: chosen, prompt: read.prompt })
+      onstart({ ...where, issue: chosen, prompt: read.prompt })
     }
   }
 </script>
