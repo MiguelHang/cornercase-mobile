@@ -68,7 +68,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 042 | [Chat: la pregunta del agente se lee sin scroll horizontal](tasks/042-chat-question-layout.md) | 039 | ~350 |
 | 043 | [Terminal: ajustada al móvil por defecto, y su scroll](tasks/043-terminal-fit-default.md) | 022 | ~250 |
 | 044 | [Abrir un agente done lo da por visto](tasks/044-done-seen.md) | 016 | ~250 |
-| 045 | [Arrancar: sin worktrees nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~250 |
+| 045 | [Arrancar: sin workspaces nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~1.500 |
 | 046 | [Elegir la LAN cuando la LAN y Tailscale contestan](tasks/046-prefer-lan.md) | 035 | ~150 |
 | 047 | [Arrancar una issue con un flow](tasks/047-start-issue-with-flow.md) | 024, 045 | ~350 |
 | 048 | [El chat como conversación: historial en el móvil, y el de cornercase cuando exista](tasks/048-chat-history.md) | 036, 041 | ~450 |
