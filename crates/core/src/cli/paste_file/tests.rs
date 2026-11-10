@@ -44,16 +44,42 @@ mod picking {
     fn reads_the_photo_the_picker_wrote() {
         let answer = json!({ "path": "/tmp/7F3A.jpg", "name": "IMG_0042.HEIC", "kind": "jpeg" });
         let picked = Picking::deserialize(answer).expect("an answer").picked();
-        let expected =
-            Picked { path: "/tmp/7F3A.jpg".to_owned(), name: Some("IMG_0042.HEIC".to_owned()), kind: Kind::Jpeg };
+        let expected = Picked {
+            path: "/tmp/7F3A.jpg".to_owned(),
+            name: Some("IMG_0042.HEIC".to_owned()),
+            kind: Kind::Jpeg,
+            thumbnail_path: None,
+        };
         assert_eq!(picked, Some(expected));
+    }
+
+    #[test]
+    fn reads_the_thumbnail_the_picker_wrote_beside_it() {
+        let answer = json!({ "path": "/tmp/7F3A.jpg", "kind": "jpeg", "thumbnailPath": "/tmp/7F3A-small.jpg" });
+        let picked = Picking::deserialize(answer).expect("an answer").picked().expect("a photo");
+        assert_eq!(picked.thumbnail_path.as_deref(), Some("/tmp/7F3A-small.jpg"));
+    }
+
+    #[test]
+    fn takes_a_photo_without_a_thumbnail() {
+        let answer = json!({ "path": "/tmp/7F3A.jpg", "name": "IMG_0042.HEIC", "kind": "jpeg" });
+        let picked = Picking::deserialize(answer).expect("an answer").picked().expect("a photo");
+        assert_eq!(picked.thumbnail_path, None);
+    }
+
+    #[test]
+    fn takes_a_null_thumbnail_as_none() {
+        let answer = json!({ "path": "/tmp/7F3A.jpg", "kind": "jpeg", "thumbnailPath": null });
+        let picked = Picking::deserialize(answer).expect("an answer").picked().expect("a photo");
+        assert_eq!(picked.thumbnail_path, None);
     }
 
     #[test]
     fn takes_a_photo_without_a_name() {
         let picked =
             Picking::deserialize(json!({ "path": "/tmp/7F3A.png", "kind": "png" })).expect("an answer").picked();
-        assert_eq!(picked, Some(Picked { path: "/tmp/7F3A.png".to_owned(), name: None, kind: Kind::Png }));
+        let expected = Picked { path: "/tmp/7F3A.png".to_owned(), name: None, kind: Kind::Png, thumbnail_path: None };
+        assert_eq!(picked, Some(expected));
     }
 
     #[test]
@@ -139,6 +165,25 @@ mod naming {
     #[test]
     fn refuses_a_kind_it_does_not_encode() {
         assert!(Kind::deserialize(json!("heic")).is_err());
+    }
+}
+
+mod thumbnails {
+    use super::*;
+
+    #[test]
+    fn makes_a_jpeg_data_url_of_the_bytes() {
+        assert_eq!(thumbnail_url(&[0xFF, 0xD8, 0xFF, 0xE0]), "data:image/jpeg;base64,/9j/4A==");
+    }
+
+    #[test]
+    fn uses_standard_base64_with_its_plus_and_slash() {
+        assert_eq!(thumbnail_url(&[0xFB, 0xFF]), "data:image/jpeg;base64,+/8=");
+    }
+
+    #[test]
+    fn makes_an_empty_data_url_of_no_bytes() {
+        assert_eq!(thumbnail_url(&[]), "data:image/jpeg;base64,");
     }
 }
 

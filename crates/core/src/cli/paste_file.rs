@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -34,6 +36,8 @@ pub struct Picked {
     #[serde(default)]
     pub name: Option<String>,
     pub kind: Kind,
+    #[serde(default, rename = "thumbnailPath")]
+    pub thumbnail_path: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -73,6 +77,10 @@ pub fn checked(bytes: Vec<u8>) -> Result<Vec<u8>, Error> {
         return Err(Error::ImageTooLarge);
     }
     Ok(bytes)
+}
+
+pub fn thumbnail_url(bytes: &[u8]) -> String {
+    format!("data:image/jpeg;base64,{}", STANDARD.encode(bytes))
 }
 
 pub fn output_name(original: Option<&str>, kind: Kind) -> String {

@@ -42,7 +42,12 @@ struct Attached {
 fn photo(dir: &TempDir, bytes: &[u8]) -> Picked {
     let path = dir.path().join("photo.jpg");
     fs::write(&path, bytes).expect("the photo is written");
-    Picked { path: path.display().to_string(), name: Some("IMG_0042.HEIC".to_owned()), kind: Kind::Jpeg }
+    Picked {
+        path: path.display().to_string(),
+        name: Some("IMG_0042.HEIC".to_owned()),
+        kind: Kind::Jpeg,
+        thumbnail_path: None,
+    }
 }
 
 fn answering(printed: Out, code: i32) -> impl FnOnce(FakeTransport, &Fed) -> FakeTransport {
@@ -151,7 +156,8 @@ mod picking_a_photo {
 
     #[tokio::test(start_paused = true)]
     async fn says_when_the_photo_it_wrote_cannot_be_read() {
-        let gone = Picked { path: "/nonexistent/photo.jpg".to_owned(), name: None, kind: Kind::Png };
+        let gone =
+            Picked { path: "/nonexistent/photo.jpg".to_owned(), name: None, kind: Kind::Png, thumbnail_path: None };
         let (answer, fed) = picking(Ok(Some(gone))).await;
         assert_eq!(answer.expect_err("nothing to read")["code"], "picker");
         assert_eq!(fed, Vec::<Vec<Stdin>>::new());
