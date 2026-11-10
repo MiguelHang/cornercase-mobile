@@ -11,6 +11,7 @@
     backTo,
     agents,
     below = 0,
+    boxed = false,
     onback,
     onterminal,
     onchanges,
@@ -20,6 +21,7 @@
     backTo: string | null
     agents: AgentRow[]
     below?: number
+    boxed?: boolean
     onback: () => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
@@ -29,7 +31,7 @@
   let scrolled = $state(0)
   let tall = $state(0)
 
-  const compact = $derived(compactHeader(scrolled, tall))
+  const compact = $derived(boxed || compactHeader(scrolled, tall))
 
   $effect(() => {
     const seen = () => (scrolled = window.scrollY)
@@ -53,7 +55,7 @@
     <ToolButton label="Files" icon="folder" onclick={() => onfiles(row.workspace, row.workspace_name)} />
   {/snippet}
 </NavBar>
-<header class="head" bind:clientHeight={tall}>
+<header class="head" class:spoken={boxed} bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
   <div class="lines">
     <h1 class="title">{label(row, agents)}</h1>

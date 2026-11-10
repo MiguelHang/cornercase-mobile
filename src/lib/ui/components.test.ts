@@ -418,7 +418,6 @@ describe('Icon', () => {
     ['chevron-down', 'm6 9 6 6 6-6', ''],
     ['chevron-right', 'm9 18 6-6-6-6', ''],
     ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
-    ['image-plus', 'M16 5h6', '<circle cx="9" cy="9" r="2"></circle>'],
     ['check', 'M20 6 9 17l-5-5', ''],
     ['pencil', 'm15 5 4 4', ''],
     ['rotate-ccw', 'M3 3v5h5', ''],

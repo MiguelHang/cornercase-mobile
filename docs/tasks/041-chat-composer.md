@@ -10,12 +10,13 @@ de Claude: una cápsula redondeada con `+` a la izquierda, el texto en medio y e
 que crece hacia arriba con el texto) y "poder eliminar una imagen cuando la subes".
 
 ## Criterios de aceptación
-- [ ] CA1 — El campo es una cápsula (`--radius-sheet` o pill) con el `+` de adjuntar dentro a la izquierda y un botón
+- [x] CA1 — El campo es una cápsula (`--radius-sheet` o pill) con el `+` de adjuntar dentro a la izquierda y un botón
   circular de enviar dentro a la derecha (flecha `arrow-up`, en `--brand` solo con algo que enviar); crece con el
   texto hacia arriba hasta su máximo; el teclado la empuja sin huecos.
-  Cápsula, `+`, `Send` redondo y el crecimiento, vistos en el simulador. Sin cerrar: con el teclado abierto queda un
-  hueco de 44 pt entre el pie del compositor y la barra ‹ › ✓ de WKWebView, el mismo que ya se vio el 2026-11-09
-  (`design/chat.md` › Checked live › The keyboard; el ajuste fino es de 021 y 032). Pendiente de decidir (Verificación).
+  Cápsula, `+`, `Send` redondo y el crecimiento, vistos en el simulador. Con el teclado abierto, la pantalla del chat
+  mide lo que el teclado deja a la vista (revisión 1, opción a): la barra de conexión, la cabecera compacta, el hilo y tu
+  burbuja quedan encima de la cápsula, y el campo queda a 26 pt de la barra ‹ › ✓ de WKWebView (16 son el relleno
+  inferior del compositor) en lugar de 44 (`design/chat.md` › The screen › With the keyboard open, Checked live).
 - [x] CA2 — Las teclas especiales (017) se esconden tras un icono dentro de la cápsula (p. ej. `keyboard` o `command`):
   cerradas por defecto, un toque las abre sobre la cápsula y otro las cierra; se abren solas mientras el agente está
   `waiting` (y la pregunta de 039 está a la vista) y se vuelven a cerrar cuando deja de estarlo. Pedido por el usuario
@@ -42,5 +43,5 @@ Mac; la `×` de la azul la quitó; un texto de dos líneas con la roja vació el
 abierto, y el puente corrió un solo `paste-file`: Claude recibió `[Image #1]` y contestó `One image, a solid red.`
 Pedirle una pregunta con `AskUserQuestion` lo puso en `waiting` y abrió las teclas sobre la cápsula con la pregunta y
 sus botones; `Option 1, Apple` contestó, el agente pasó a `done` y las teclas se cerraron solas. El icono `Keys` las
-abre y las cierra a mano. Sin resolver: el hueco de 44 pt sobre la barra del teclado (CA1). Sin ver aquí: quitar una
+abre y las cierra a mano. El hueco de 44 pt sobre la barra del teclado (CA1) se resolvió en la revisión 1: la pantalla mide el viewport visible. Sin ver aquí: quitar una
 imagen ya pegada tras un envío fallido, y su toast (cubierto por tests). El iPhone del usuario queda pendiente.

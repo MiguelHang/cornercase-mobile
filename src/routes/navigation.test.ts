@@ -14,7 +14,7 @@ const withBar = Object.entries(screens)
   .filter(([, text]) => text.includes('<NavBar'))
   .map(([path]) => path)
 
-const FIXED_SCREEN = '/src/routes/terminal/Terminal.svelte'
+const FIXED_SCREENS = ['/src/routes/terminal/Terminal.svelte', '/src/routes/agent/Agent.svelte']
 
 const SAFE_TOP = /(?:padding|margin)(?:-top)?:[^;]*safe-area-inset-top/
 
@@ -28,15 +28,15 @@ describe('the screens of src/routes', () => {
     expect(leftovers(text)).toEqual([])
   })
 
-  it.each(withBar.filter((path) => path !== FIXED_SCREEN))(
+  it.each(withBar.filter((path) => !FIXED_SCREENS.includes(path)))(
     '%s leaves the safe area on top to the body, which pads it already',
     (path) => {
       expect(screens[path]).not.toMatch(SAFE_TOP)
     },
   )
 
-  it('pads the safe area only on the fixed screen of the terminal, which the body does not reach', () => {
-    expect(screens[FIXED_SCREEN]).toMatch(SAFE_TOP)
+  it.each(FIXED_SCREENS)('%s pads the safe area itself, as a fixed screen the body does not reach', (path) => {
+    expect(screens[path]).toMatch(SAFE_TOP)
   })
 
   it('reach over the safe area only on the screens without the connection bar above', () => {

@@ -6,6 +6,7 @@ import type { Chat } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import { CHIPS, ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
+import ChatHeader from './ChatHeader.svelte'
 import chatHeaderSource from './ChatHeader.svelte?raw'
 import toolButtonSource from '../../lib/ui/ToolButton.svelte?raw'
 import Children from './Children.svelte'
@@ -152,7 +153,7 @@ describe('Agent, its subagents', () => {
   })
 
   it('starts folded again for each agent opened, and opens its children like the board', () => {
-    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} />')
+    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} boxed={seen !== null} />')
   })
 
   it('follows the rows as they change', () => {
@@ -201,9 +202,9 @@ describe('Agent, its sticky header', () => {
 
   it('turns compact past the large header, measured, following the page with a passive listener', () => {
     const source = flat(chatHeaderSource)
-    expect(source).toContain('const compact = $derived(compactHeader(scrolled, tall))')
+    expect(source).toContain('const compact = $derived(boxed || compactHeader(scrolled, tall))')
     expect(source).toContain('<NavBar {backTo} {onback} {below} edge={compact}> {#snippet center()} <div class="short" class:compact aria-hidden="true">')
-    expect(source).toContain('<header class="head" bind:clientHeight={tall}>')
+    expect(source).toContain('<header class="head" class:spoken={boxed} bind:clientHeight={tall}>')
     expect(source).toContain("const seen = () => (scrolled = window.scrollY) seen() window.addEventListener('scroll', seen, { passive: true })")
     expect(source).toContain("return () => window.removeEventListener('scroll', seen)")
   })
@@ -290,7 +291,7 @@ describe('Agent, its composer', () => {
     expect(body).toMatch(/<div class="composer svelte-[\w-]+" style="--below: 0px;">/)
     expect(body).toMatch(/<textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer" placeholder="Answer claude"/)
     expect(body).toContain('go on</textarea>')
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
   })
 
   it('offers no attaching without its agent, nor once it is gone', () => {
@@ -300,6 +301,37 @@ describe('Agent, its composer', () => {
     expect(draw(chatWith(null))).not.toContain('aria-label="Attach image"')
     expect(draw(gone)).not.toContain('aria-label="Attach image"')
     expect(draw(gone)).not.toContain('Attached images')
+  })
+})
+
+const header = (boxed: boolean) =>
+  render(ChatHeader, {
+    props: { row: ROW, agents: [], backTo: 'Agents', boxed, onback: () => {}, onterminal: () => {}, onchanges: () => {}, onfiles: () => {} },
+  }).body
+
+describe('Agent, with the phone keyboard open', () => {
+  it('takes the place and height of what the keyboard leaves visible, as the terminal does', () => {
+    const source = flat(agentSource)
+    expect(source).toContain('const keyboard = new Keyboard(globalThis) const seen = $derived(keyboard.covered ? keyboard.height : null)')
+    expect(source).toContain('$effect(() => keyboard.watch())')
+    expect(source).toContain(
+      'class:keyboard={seen !== null} style:--below="{below}px" style:top={seen === null ? undefined : `${keyboard.offset}px`} style:height={seen === null ? undefined : `${seen}px`} >',
+    )
+    expect(source).toContain(
+      '.keyboard { position: fixed; right: 0; left: 0; min-height: 0; padding-top: calc(env(safe-area-inset-top) + var(--below) + var(--inset));',
+    )
+  })
+
+  it('stays in the page while the keyboard is closed', () => {
+    expect(draw(chatWith(ROW))).toMatch(/<section class="agent svelte-[\w-]+" style="--below: 0px;">/)
+  })
+
+  it('turns the header compact at once, taking the large one only out of sight', () => {
+    expect(header(true)).toMatch(/<div class="short svelte-[\w-]+ compact" aria-hidden="true">/)
+    expect(header(true)).toMatch(/<header class="head svelte-[\w-]+ spoken">/)
+    expect(header(true)).toMatch(/<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>/)
+    expect(header(false)).toMatch(/<header class="head svelte-[\w-]+">/)
+    expect(header(false)).not.toMatch(/class="short[^"]* compact"/)
   })
 })
 
@@ -382,7 +414,7 @@ describe('Agent, without its row', () => {
 
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
-    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} {onfiles} /> {#key row.pane}')
+    expect(flat(agentSource)).toContain('{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} boxed={seen !== null} {onback} {onterminal} {onchanges} {onfiles} /> {#key row.pane}')
     const source = flat(chatHeaderSource)
     expect(source).toContain('label="Terminal" icon="square-terminal" onclick={() => onterminal(row)}')
     expect(source).toContain('label="Changes" icon="git-compare" onclick={() => onchanges(row.workspace, row.workspace_name)}')
@@ -508,7 +540,7 @@ describe('Agent, its keys', () => {
 
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
     expect(flat(threadSource)).toContain('{/each} <AgentLine {chat} {now} /> </div>')
   })
 

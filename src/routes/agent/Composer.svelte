@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Toast } from '../../lib/bindings'
   import type { Chat } from '../../lib/chat.svelte'
-  import { Keyboard } from '../../lib/terminal/keyboard.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
@@ -13,17 +12,18 @@
     chat,
     agent,
     below = 0,
+    seen = null,
     onfailed,
     ontoast,
   }: {
     chat: Chat
     agent: string
     below?: number
+    seen?: number | null
     onfailed: (reason: string) => void
     ontoast: (toast: Toast) => void
   } = $props()
 
-  const keyboard = new Keyboard(globalThis)
   const attaching = $derived(chat.attachments.attaching)
   const resting = $derived(!chat.canSend && !chat.sending)
 
@@ -41,8 +41,6 @@
     }
   }
 
-  $effect(() => keyboard.watch())
-
   const choose = async (number: number) => {
     const failed = await chat.pressOption(number)
     if (failed !== null) {
@@ -51,7 +49,12 @@
   }
 </script>
 
-<div class="composer" class:keyboard={keyboard.covered} style:--below="{below}px">
+<div
+  class="composer"
+  class:keyboard={seen !== null}
+  style:--below="{below}px"
+  style:--seen={seen === null ? undefined : `${seen}px`}
+>
   {#if chat.question !== null}
     <Question question={chat.question} {agent} onoption={(number) => void choose(number)} />
   {:else if chat.asking}
@@ -84,6 +87,7 @@
       type="button"
       aria-label="Keys"
       aria-expanded={chat.keysOpen}
+      onmousedown={(event) => event.preventDefault()}
       onclick={() => chat.toggleKeys()}
       ontouchstart={() => {}}
     >
@@ -123,7 +127,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap);
-    max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer));
+    max-height: calc(var(--seen, 100dvh) - env(safe-area-inset-top) - var(--below) - var(--over-composer));
     overflow-y: auto;
     overscroll-behavior: contain;
     margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom));

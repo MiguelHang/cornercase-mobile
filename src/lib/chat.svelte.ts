@@ -380,7 +380,14 @@ export class Chat {
   }
 
   async attach(): Promise<string | null> {
-    return this.canPress ? this.attachments.attach() : null
+    if (!this.canPress) {
+      return null
+    }
+    const failed = await this.attachments.attach()
+    if (this.gone) {
+      void this.attachments.release()
+    }
+    return failed
   }
 
   async remove(id: number): Promise<Toast | null> {

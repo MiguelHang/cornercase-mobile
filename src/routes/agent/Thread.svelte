@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import { elapsed } from '../../lib/board'
   import type { Chat } from '../../lib/chat.svelte'
   import { atEnd, threadOf } from '../../lib/thread'
@@ -7,25 +7,47 @@
   import AgentLine from './AgentLine.svelte'
   import Sent from './Sent.svelte'
 
-  let { chat, now }: { chat: Chat; now: number } = $props()
+  let { chat, now, boxed = false }: { chat: Chat; now: number; boxed?: boolean } = $props()
 
   const parts = $derived(threadOf(chat.reading, chat.outgoing))
 
-  const toEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight })
+  let box = $state<HTMLElement>()
+  let tall = $state(0)
+
+  const scroller = () => (boxed && box !== undefined ? box : document.documentElement)
+
+  const toEnd = () => {
+    const scrolled = scroller()
+    scrolled.scrollTo({ top: scrolled.scrollHeight })
+  }
+
+  const ending = () => {
+    const { scrollTop, clientHeight, scrollHeight } = scroller()
+    return atEnd(scrollTop, clientHeight, scrollHeight)
+  }
 
   let read = false
+  let wasBoxed = untrack(() => boxed)
 
   $effect.pre(() => {
     const was = read
     read = chat.reading.kind === 'message'
     void chat.outgoing
-    if (was && atEnd(window.scrollY, window.innerHeight, document.documentElement.scrollHeight)) {
+    if (was && untrack(ending)) {
       void tick().then(toEnd)
+    }
+  })
+
+  $effect(() => {
+    void tall
+    if (boxed || boxed !== wasBoxed) {
+      wasBoxed = boxed
+      toEnd()
     }
   })
 </script>
 
-<div class="thread">
+<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall}>
   {#each parts as part (part)}
     {#if part === 'you'}
       <Sent {chat} />
@@ -57,6 +79,12 @@
     flex-direction: column;
     gap: var(--inset-wide);
     min-width: 0;
+  }
+
+  .boxed {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .message {

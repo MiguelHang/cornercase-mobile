@@ -145,6 +145,12 @@ describe('Composer, its Send', () => {
     expect(sendSource).toContain('onclick={() => void chat.send()}')
   })
 
+  it('takes no focus from the field on a tap on Keys either, so the keyboard stays open for Ctrl-C in mid-message', () => {
+    const keysSource = flat(composerSource).match(/aria-label="Keys".*?<\/button>/)?.[0]
+    expect(keysSource).toContain('onmousedown={(event) => event.preventDefault()}')
+    expect(keysSource).toContain('onclick={() => chat.toggleKeys()}')
+  })
+
   it('leaves a failed send to its bubble, with no toast', () => {
     expect(flat(composerSource)).toContain('onclick={() => void chat.send()}')
     expect(flat(composerSource)).not.toContain('await chat.send()')
@@ -189,7 +195,7 @@ describe('Composer, its keys', () => {
     const body = draw(chat)
     expect(keysButton(body)?.[2]).toContain('aria-expanded="false"')
     expect(body).not.toMatch(KEY_ROW)
-    expect(flat(composerSource)).toContain('aria-expanded={chat.keysOpen} onclick={() => chat.toggleKeys()}')
+    expect(flat(composerSource)).toContain('aria-expanded={chat.keysOpen} onmousedown={(event) => event.preventDefault()} onclick={() => chat.toggleKeys()}')
   })
 
   it('open on their own when the agent starts waiting, below the note', () => {
@@ -210,7 +216,7 @@ describe('Composer, its attachments', () => {
     expect(found?.[3]).toContain(PLUS)
   })
 
-  it('offers it while the agent is asking, as it pastes into whatever is there', () => {
+  it('offers it while the agent is asking, as the image only waits on the phone until the next send', () => {
     expect(attachButton(draw(chatWith(ROW)))?.[2]).not.toContain('disabled')
   })
 
@@ -301,7 +307,7 @@ describe('Composer, its place', () => {
 
   it('never grows over the bar and the title, scrolling within itself instead', () => {
     expect(flat(composerSource)).toContain(
-      'max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
+      'max-height: calc(var(--seen, 100dvh) - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
     )
     expect(flat(composerSource)).toContain('--over-composer: 132px;')
     expect(render(Composer, { props: { chat: done(), agent: 'claude', below: 52, onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
@@ -318,11 +324,12 @@ describe('Composer, its place', () => {
     )
   })
 
-  it('sits right on the phone keyboard while it is open, with no gap for the safe area', () => {
+  it('sits right on the phone keyboard while it is open, with no gap for the safe area, within the height left', () => {
     const source = flat(composerSource)
-    expect(source).toContain('const keyboard = new Keyboard(globalThis)')
-    expect(source).toContain('$effect(() => keyboard.watch())')
-    expect(source).toContain('<div class="composer" class:keyboard={keyboard.covered} style:--below="{below}px">')
+    expect(source).not.toContain('new Keyboard(')
     expect(source).toContain('.keyboard { margin-bottom: calc(-1 * var(--inset-wide)); padding-bottom: var(--inset-wide); }')
+    expect(render(Composer, { props: { chat: done(), agent: 'claude', seen: 420, onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
+      /<div class="composer svelte-[\w-]+ keyboard" style="--below: 0px; --seen: 420px;">/,
+    )
   })
 })

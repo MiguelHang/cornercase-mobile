@@ -292,6 +292,18 @@ describe('Chat, left', () => {
     chat.leave()
     expect(discard).toHaveBeenCalledTimes(1)
   })
+
+  it('forgets an image the picker brings back after it was left, so it neither shows nor counts', async () => {
+    const picked = gate<Awaited<ReturnType<AttachImage>>>()
+    const discard = vi.fn(discardedOk)
+    const chat = await opened(sentOk, { attachImage: () => picked.promise, discard })
+    const attaching = chat.attach()
+    chat.leave()
+    picked.open(ok(image(1)))
+    await attaching
+    expect(chat.attachments.chips).toEqual([])
+    expect(discard.mock.calls).toEqual([[[1]]])
+  })
 })
 
 describe('Chat, Retry', () => {

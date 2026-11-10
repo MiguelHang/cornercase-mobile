@@ -2,6 +2,7 @@
   import type { ConnectionView_Serialize } from '../bindings'
   import { status } from '../connection'
   import { retryClock } from '../retryClock.svelte'
+  import { Keyboard } from '../terminal/keyboard.svelte'
   import Icon from './Icon.svelte'
   import ToneDot from './ToneDot.svelte'
 
@@ -17,13 +18,16 @@
     onmachines: () => void
   } = $props()
 
+  const keyboard = new Keyboard(globalThis)
   const clock = retryClock(() => connection)
 
   const shown = $derived(status(connection, machineName, clock.elapsed))
   const counting = $derived(connection.state === 'retrying')
+
+  $effect(() => keyboard.watch())
 </script>
 
-<div class="connection" role="status">
+<div class="connection" role="status" style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}>
   <div class="row" bind:clientHeight={height}>
     <ToneDot tone={shown.tone} pulsing={shown.pulsing} />
     <span class="lines">

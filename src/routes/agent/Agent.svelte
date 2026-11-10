@@ -2,6 +2,7 @@
   import { untrack } from 'svelte'
   import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize, Toast } from '../../lib/bindings'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
+  import { Keyboard } from '../../lib/terminal/keyboard.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
@@ -44,6 +45,11 @@
 
   let now = $state(untrack(() => chat.now()))
 
+  const keyboard = new Keyboard(globalThis)
+  const seen = $derived(keyboard.covered ? keyboard.height : null)
+
+  $effect(() => keyboard.watch())
+
   $effect(() => {
     const told = chat
     const timer = setInterval(() => (now = told.now()), TICK_MS)
@@ -63,7 +69,13 @@
   const row = $derived(chat.row)
 </script>
 
-<section class="agent" style:--below="{below}px">
+<section
+  class="agent"
+  class:keyboard={seen !== null}
+  style:--below="{below}px"
+  style:top={seen === null ? undefined : `${keyboard.offset}px`}
+  style:height={seen === null ? undefined : `${seen}px`}
+>
   {#if chat.gone}
     <NavBar {backTo} {onback} {below} />
     <p class="gone">This agent is no longer running.</p>
@@ -77,12 +89,22 @@
       </div>
     {/if}
   {:else}
-    <ChatHeader {row} agents={agents ?? []} {backTo} {below} {onback} {onterminal} {onchanges} {onfiles} />
+    <ChatHeader
+      {row}
+      agents={agents ?? []}
+      {backTo}
+      {below}
+      boxed={seen !== null}
+      {onback}
+      {onterminal}
+      {onchanges}
+      {onfiles}
+    />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
-    <Thread {chat} {now} />
-    <Composer {chat} agent={row.agent} {below} {onfailed} {ontoast} />
+    <Thread {chat} {now} boxed={seen !== null} />
+    <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />
   {/if}
 </section>
 
@@ -94,6 +116,16 @@
     gap: var(--inset-wide);
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
+  }
+
+  .keyboard {
+    position: fixed;
+    right: 0;
+    left: 0;
+    min-height: 0;
+    padding-top: calc(env(safe-area-inset-top) + var(--below) + var(--inset));
+    padding-right: calc(env(safe-area-inset-right) + var(--inset-wide));
+    padding-left: calc(env(safe-area-inset-left) + var(--inset-wide));
   }
 
   .waiting {
