@@ -48,7 +48,7 @@
       </div>
     {/if}
   {:else}
-    <p class="state"><Icon name="circle-alert" size={14} />Not confirmed: the app closed before an answer came back</p>
+    <p class="state"><Icon name="circle-alert" size={14} />Not confirmed: the chat closed before an answer came back</p>
   {/if}
 </article>
 

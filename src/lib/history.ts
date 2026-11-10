@@ -76,34 +76,33 @@ export const heard = (entries: Entry[], reading: Heard, seen: number, continuous
 
 export type HistoryCalls = Pick<typeof commands, 'historyLoad' | 'historySave'>
 
-export type History = {
-  open: (machine: number, boot: string, pane: number) => Promise<Entry[]>
+export type Kept = {
+  entries: Entry[]
   keep: (entries: Entry[]) => void
+}
+
+export type History = {
+  open: (machine: number, boot: string, pane: number) => Promise<Kept>
 }
 
 type Place = { machine: number; boot: string; pane: number }
 
 export class LocalHistory implements History {
   #calls: HistoryCalls
-  #place: Place | null = null
   #writing: Promise<void> = Promise.resolve()
 
   constructor(calls: HistoryCalls) {
     this.#calls = calls
   }
 
-  async open(machine: number, boot: string, pane: number) {
-    this.#place = { machine, boot, pane }
-    await this.#writing
-    return this.#calls.historyLoad(machine, boot, pane).catch((): Entry[] => [])
+  async open(machine: number, boot: string, pane: number): Promise<Kept> {
+    const place = { machine, boot, pane }
+    const loading = this.#writing.then(() => this.#calls.historyLoad(machine, boot, pane).catch((): Entry[] => []))
+    this.#writing = loading.then(() => undefined)
+    return { entries: await loading, keep: (entries) => this.#keep(place, entries) }
   }
 
-  keep(entries: Entry[]) {
-    const place = this.#place
-    if (place === null) {
-      return
-    }
-    const { machine, boot, pane } = place
+  #keep({ machine, boot, pane }: Place, entries: Entry[]) {
     this.#writing = this.#writing
       .then(() => this.#calls.historySave(machine, boot, pane, entries))
       .catch(() => undefined)

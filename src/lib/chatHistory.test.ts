@@ -298,6 +298,26 @@ describe('Chat, vouching for the conversation', () => {
     ])
   })
 
+  it('puts a gap before a message after a turn from the Mac that follows a send into a running turn', async () => {
+    const { chat } = await loaded(fakeHistory(stored), saying('Done.', 'Fixed.', 'Tests pass.'))
+    await chat.refresh()
+    told(chat, 'working')
+    await sendOn(chat, 'and the tests')
+    told(chat, 'working')
+    told(chat, 'done')
+    await chat.refresh()
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual([
+      'gap',
+      'agent: Done.',
+      'you: and the tests',
+      'agent: Fixed.',
+      'gap',
+      'agent: Tests pass.',
+    ])
+  })
+
   it('puts a gap before a message after a turn that a failed send did not start', async () => {
     const { chat } = await loaded(fakeHistory(stored), saying('Done.', 'Fixed.'), failingOnce())
     await chat.refresh()

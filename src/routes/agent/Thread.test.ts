@@ -112,7 +112,7 @@ describe('Sent', () => {
     const body = bubble(yours(1, 'sending'), null)
     expect(body).toContain('aria-label="Your message, not confirmed"')
     expect(body).toMatch(
-      /<p class="state svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not confirmed: the app closed before an answer came back<\/p>/,
+      /<p class="state svelte-[\w-]+"><svg[^]*?<circle cx="12" cy="12" r="10"><\/circle>[^]*?<\/svg>(?:<!---->)?Not confirmed: the chat closed before an answer came back<\/p>/,
     )
     expect(body).not.toContain('class="spinner')
     expect(body).not.toContain('<button')

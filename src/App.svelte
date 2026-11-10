@@ -60,6 +60,7 @@
     close: commands.questionClose,
     listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)),
   }
+  const history = new LocalHistory(commands)
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
@@ -80,7 +81,7 @@
           haptics,
           timers,
           asker,
-          new LocalHistory(commands),
+          history,
         ),
   )
   const seen = $derived(chat?.row != null)

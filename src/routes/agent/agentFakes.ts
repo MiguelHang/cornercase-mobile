@@ -48,7 +48,7 @@ export const unattached: Images = {
 
 export const unasked = fakeAsker().asker
 
-export const unkept: History = { open: () => Promise.resolve([]), keep: () => {} }
+export const unkept: History = { open: () => Promise.resolve({ entries: [], keep: () => {} }) }
 
 export const CHIPS: Chip[] = [
   { id: 1, name: 'IMG_0042.jpg', size: '47 KiB', thumbnail: null, pasted: false },

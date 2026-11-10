@@ -9,7 +9,7 @@ import type {
 } from './bindings'
 import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
-import { edited, heard, type History, restated, sent } from './history'
+import { edited, heard, type History, type Kept, restated, sent } from './history'
 import { digitOf, type KeyName } from './keys'
 import { Questions, type Asker } from './question.svelte'
 import { deliver, messageOf } from './toasts'
@@ -124,6 +124,7 @@ export class Chat {
   #haptics: HapticsApi
   #clock: Clock
   #history: History
+  #keep: Kept['keep'] = () => {}
   #recording: 'closed' | 'loading' | 'open' = 'closed'
   #unloaded: Change[] = []
   #sentId: number | null = null
@@ -229,19 +230,20 @@ export class Chat {
       return
     }
     this.#recording = 'loading'
-    void this.#history.open(this.machine, row.boot, this.pane).then((loaded) => this.#loaded(loaded))
+    void this.#history.open(this.machine, row.boot, this.pane).then((kept) => this.#loaded(kept))
   }
 
-  #loaded(loaded: HistoryEntry[]) {
+  #loaded({ entries: loaded, keep }: Kept) {
     if (this.gone) {
       return
     }
+    this.#keep = keep
     const entries = this.#unloaded.reduce((sofar, change) => change(sofar), loaded)
     this.#unloaded = []
     this.#recording = 'open'
     this.conversation = entries
     if (entries !== loaded) {
-      this.#history.keep(entries)
+      this.#keep(entries)
     }
   }
 
@@ -256,7 +258,7 @@ export class Chat {
     const entries = change(this.conversation)
     if (entries !== this.conversation) {
       this.conversation = entries
-      this.#history.keep(entries)
+      this.#keep(entries)
     }
   }
 
@@ -311,11 +313,12 @@ export class Chat {
   #vouch(row: AgentRow) {
     const another = row.agent !== this.#agent
     this.#agent = row.agent
-    const started = row.status !== this.#heard && (row.status === 'working' || row.status === 'shell')
+    const changed = row.status !== this.#heard
+    const started = changed && (row.status === 'working' || row.status === 'shell')
     if (another || (started && !this.#expecting && this.#heard !== 'waiting')) {
       this.lose()
     }
-    this.#expecting &&= !started
+    this.#expecting &&= !changed
   }
 
   #turnKeys(status: string | null) {

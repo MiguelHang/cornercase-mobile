@@ -62,11 +62,11 @@ export const gate = <T>() => {
 
 export const fakeHistory = (stored: HistoryEntry[] = [], loaded: Promise<void> = Promise.resolve()) => {
   const kept: HistoryEntry[][] = []
+  const keep = (entries: HistoryEntry[]) => {
+    kept.push(entries)
+  }
   const history: History = {
-    open: vi.fn<History['open']>(() => loaded.then(() => kept.at(-1) ?? stored)),
-    keep: vi.fn<History['keep']>((entries) => {
-      kept.push(entries)
-    }),
+    open: vi.fn<History['open']>(() => loaded.then(() => ({ entries: kept.at(-1) ?? stored, keep }))),
   }
   return { history, kept }
 }

@@ -207,41 +207,37 @@ describe('LocalHistory', () => {
 
   it('loads the pane it opens', async () => {
     const calls = fakeCalls()
-    expect(await new LocalHistory(calls).open(STUDIO, BOOT, 7)).toEqual(stored)
+    expect((await new LocalHistory(calls).open(STUDIO, BOOT, 7)).entries).toEqual(stored)
     expect(calls.historyLoad).toHaveBeenCalledWith(STUDIO, BOOT, 7)
   })
 
   it('opens an empty history when the load fails', async () => {
     const calls = fakeCalls(() => Promise.reject(new Error('the app is gone')))
-    expect(await new LocalHistory(calls).open(STUDIO, BOOT, 7)).toEqual([])
+    expect((await new LocalHistory(calls).open(STUDIO, BOOT, 7)).entries).toEqual([])
   })
 
-  it('keeps nothing before a pane is open', async () => {
-    const calls = fakeCalls()
-    new LocalHistory(calls).keep(stored)
-    await settle()
-    expect(saved(calls)).toEqual([])
-  })
-
-  it('keeps the entries in the pane it opened last', async () => {
+  it('keeps each opening in its own pane, even after another one opens', async () => {
     const calls = fakeCalls()
     const history = new LocalHistory(calls)
-    await history.open(STUDIO, BOOT, 7)
-    await history.open(STUDIO, 'b2', 8)
-    history.keep(stored)
+    const first = await history.open(STUDIO, BOOT, 7)
+    const second = await history.open(STUDIO, 'b2', 8)
+    first.keep(stored)
+    second.keep([gap(0)])
     await settle()
-    expect(saved(calls)).toEqual([[STUDIO, 'b2', 8, stored]])
+    expect(saved(calls)).toEqual([
+      [STUDIO, BOOT, 7, stored],
+      [STUDIO, 'b2', 8, [gap(0)]],
+    ])
   })
 
   it('writes in order, even when the earlier write is slow', async () => {
     const calls = fakeCalls()
     const slow = gate<null>()
     calls.historySave.mockImplementationOnce(() => slow.promise.then(() => undefined))
-    const history = new LocalHistory(calls)
-    await history.open(STUDIO, BOOT, 7)
+    const { keep } = await new LocalHistory(calls).open(STUDIO, BOOT, 7)
     const later = [...stored, you(2, 'and the tests')]
-    history.keep(stored)
-    history.keep(later)
+    keep(stored)
+    keep(later)
     await settle()
     expect(saved(calls)).toEqual([[STUDIO, BOOT, 7, stored]])
     slow.open(null)
@@ -255,26 +251,42 @@ describe('LocalHistory', () => {
   it('swallows a failed write and still makes the next one', async () => {
     const calls = fakeCalls()
     calls.historySave.mockImplementationOnce(() => Promise.reject(new Error('the app is gone')))
-    const history = new LocalHistory(calls)
-    await history.open(STUDIO, BOOT, 7)
-    history.keep(stored)
-    history.keep([gap(0)])
+    const { keep } = await new LocalHistory(calls).open(STUDIO, BOOT, 7)
+    keep(stored)
+    keep([gap(0)])
     await settle()
     expect(saved(calls).map(([, , , entries]) => entries)).toEqual([stored, [gap(0)]])
   })
 
-  it('loads again only once the writes before it are done', async () => {
+  it('a second open waits for the writes of the first', async () => {
     const calls = fakeCalls()
     const slow = gate<null>()
     calls.historySave.mockImplementationOnce(() => slow.promise.then(() => undefined))
     const history = new LocalHistory(calls)
-    await history.open(STUDIO, BOOT, 7)
-    history.keep(stored)
+    const first = await history.open(STUDIO, BOOT, 7)
+    first.keep(stored)
     const reopened = history.open(STUDIO, BOOT, 7)
     await settle()
     expect(calls.historyLoad).toHaveBeenCalledTimes(1)
     slow.open(null)
     await reopened
     expect(calls.historyLoad).toHaveBeenCalledTimes(2)
+  })
+
+  it('writes after a load only once that load is done', async () => {
+    const calls = fakeCalls()
+    const loading = gate<null>()
+    const history = new LocalHistory(calls)
+    const first = await history.open(STUDIO, BOOT, 7)
+    calls.historyLoad.mockImplementationOnce(() => loading.promise.then(() => stored))
+    const reopened = history.open(STUDIO, 'b2', 7)
+    await settle()
+    first.keep([gap(0)])
+    await settle()
+    expect(saved(calls)).toEqual([])
+    loading.open(null)
+    await reopened
+    await settle()
+    expect(saved(calls)).toEqual([[STUDIO, BOOT, 7, [gap(0)]]])
   })
 })
