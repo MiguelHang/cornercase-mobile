@@ -107,6 +107,7 @@ export class Chat {
   row = $state<AgentRow | null>(null)
   gone = $state(false)
   interrupting = $state(false)
+  keysOpen = $state(false)
   readonly attachments: Attachments
   readonly #questions: Questions
   #readLast: ReadLast
@@ -124,6 +125,7 @@ export class Chat {
   #starting = false
   #heard: string | null | undefined = undefined
   #leftOnTheMac = false
+  #keysByWaiting = false
 
   constructor(
     machine: number | null,
@@ -201,8 +203,32 @@ export class Chat {
   #hear(row: AgentRow | null) {
     if (row !== null && row.status !== this.#heard) {
       this.#heard = row.status
+      this.#turnKeys(row.status)
       this.lastNews = this.#clock.now()
     }
+  }
+
+  #turnKeys(status: string | null) {
+    if (status === 'waiting' && !this.keysOpen) {
+      this.keysOpen = true
+      this.#keysByWaiting = true
+    } else if (status !== 'waiting' && this.#keysByWaiting) {
+      this.#closeKeys()
+    }
+  }
+
+  toggleKeys() {
+    if (this.keysOpen) {
+      this.#closeKeys()
+    } else {
+      this.keysOpen = true
+    }
+  }
+
+  #closeKeys() {
+    this.keysOpen = false
+    this.#keysByWaiting = false
+    this.#disarm()
   }
 
   async refresh() {
