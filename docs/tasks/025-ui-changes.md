@@ -1,6 +1,6 @@
 # 025 — Pantalla 5: cambios del workspace y marcarlos como vistos
 
-- Estado: en curso
+- Estado: hecha
 - Depende de: 015
 - Riesgo: bajo
 - Rama: `feat/025-changes` · PR: `feat: review a workspace's changes and mark them viewed`
