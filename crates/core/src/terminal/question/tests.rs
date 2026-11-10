@@ -126,6 +126,42 @@ mod options {
     }
 }
 
+mod numbered_rows {
+    use super::*;
+
+    fn read(row: &str) -> Option<(usize, bool, u8, String)> {
+        numbered_at(&line(row)).map(|(column, selected, choice)| (column, selected, choice.number, choice.label))
+    }
+
+    #[rstest]
+    #[case::at_the_first_column("1. Pear", (0, false, 1, "Pear"))]
+    #[case::after_spaces("   2. Plum", (3, false, 2, "Plum"))]
+    #[case::chosen_with_a_chevron(" ❯ 1. Pear", (3, true, 1, "Pear"))]
+    #[case::chosen_with_a_guillemet("│ › 3. Fig │", (4, true, 3, "Fig"))]
+    #[case::chosen_with_a_triangle("▶ 4. Lime", (2, true, 4, "Lime"))]
+    #[case::chosen_with_a_greater_than_sign(">5. Kiwi", (1, true, 5, "Kiwi"))]
+    #[case::not_chosen_inside_a_box("│   2. Plum │", (4, false, 2, "Plum"))]
+    #[case::not_chosen_with_a_circle("○ 6. Date", (2, false, 6, "Date"))]
+    fn give_the_column_of_the_number_and_whether_it_is_chosen(
+        #[case] row: &str,
+        #[case] expected: (usize, bool, u8, &str),
+    ) {
+        let (column, selected, number, label) = expected;
+        assert_eq!(read(row), Some((column, selected, number, label.to_owned())));
+    }
+
+    #[rstest]
+    #[case::with_ten(" ❯ 10. Pear")]
+    #[case::with_zero("0. Pear")]
+    #[case::with_an_empty_label(" ❯ 1.  ")]
+    #[case::with_text_before_the_number("Step 1. Pear")]
+    #[case::with_only_marks(" ❯ │ ")]
+    #[case::empty("")]
+    fn are_none_without_an_option(#[case] row: &str) {
+        assert_eq!(read(row), None);
+    }
+}
+
 mod captures {
     use super::*;
 

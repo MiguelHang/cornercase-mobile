@@ -6,6 +6,8 @@ pub const QUESTION_ROWS: usize = 24;
 
 const MARKS: &str = "│┃|❯›>▶●○◯";
 
+const CHOSEN: &str = "❯›>▶";
+
 const RULE: [char; 12] = ['─', '━', '═', '╌', '╭', '╮', '╰', '╯', '┌', '┐', '└', '┘'];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -46,13 +48,27 @@ pub fn options(rows: &[Line]) -> Vec<Choice> {
 }
 
 fn numbered(line: &Line) -> Option<Choice> {
+    numbered_at(line).map(|(_, _, choice)| choice)
+}
+
+fn numbered_at(line: &Line) -> Option<(usize, bool, Choice)> {
     let text: String = chars(line).collect();
-    let text = text.trim_matches(|c: char| c.is_whitespace() || MARKS.contains(c));
+    let rest = text.trim_start_matches(is_padding);
+    let (lead, _) = text.split_at_checked(text.len() - rest.len())?;
+    let choice = choice(rest.trim_end_matches(is_padding))?;
+    Some((lead.chars().count(), lead.contains(|c: char| CHOSEN.contains(c)), choice))
+}
+
+fn choice(text: &str) -> Option<Choice> {
     let mut rest = text.chars();
     let (Some(digit), Some('.')) = (rest.next(), rest.next()) else { return None };
     let number = u8::try_from(digit.to_digit(10)?).ok().filter(|number| (1..=9).contains(number))?;
     let label = rest.as_str().trim();
     (!label.is_empty()).then(|| Choice { number, label: label.to_owned() })
+}
+
+fn is_padding(c: char) -> bool {
+    c.is_whitespace() || MARKS.contains(c)
 }
 
 fn chars(line: &Line) -> impl Iterator<Item = char> + '_ {
