@@ -188,8 +188,29 @@ describe('Chat, a mark that fails', () => {
     const { chat, marked } = watched('done', () => Promise.resolve(refused(NO_AGENT)))
     await settle()
     arrived(chat, '2026-11-10T10:00:00Z')
-    arrived(chat, '2026-11-10T10:00:00Z')
+    arrived(chat, '2026-11-10T10:05:00Z')
+    arrived(chat, '2026-11-10T10:05:00Z')
 
     expect(marked).toEqual([PANE, PANE])
+  })
+})
+
+describe('Chat, the time of an arrival at done', () => {
+  it('marks once when the time of the same arrival comes after its row', () => {
+    const { chat, marked } = watched('done')
+
+    arrived(chat, '2026-11-10T10:00:00Z')
+
+    expect(marked).toEqual([PANE])
+  })
+
+  it('marks once when the time of the arrival it marked is lost and comes back', () => {
+    const { chat, marked } = watched('working')
+    arrived(chat, '2026-11-10T10:00:00Z')
+
+    turned(chat, 'done')
+    arrived(chat, '2026-11-10T10:00:00Z')
+
+    expect(marked).toEqual([PANE])
   })
 })

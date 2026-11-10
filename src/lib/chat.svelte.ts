@@ -282,9 +282,13 @@ export class Chat {
     const row = this.row
     if (!this.#watchingDone || row?.status !== 'done') {
       this.#marked = undefined
-    } else if (this.#marked !== row.since) {
-      this.#marked = row.since
-      void deliver(() => this.#markReviewed(this.pane))
+    } else {
+      const again =
+        this.#marked === undefined || (this.#marked !== null && row.since !== null && row.since !== this.#marked)
+      this.#marked = row.since ?? this.#marked ?? null
+      if (again) {
+        void deliver(() => this.#markReviewed(this.pane))
+      }
     }
   }
 
