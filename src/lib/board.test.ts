@@ -68,6 +68,9 @@ const named = (pane: number, listed: AgentRow[] = FLOW) => {
 const children = (rows: AgentRow[], pane: number) =>
   board.subagents(rows, pane)?.children.map((item) => [item.row.pane, item.hasChildren, item.hidden, item.attention])
 
+const totals = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
+  board.items(rows, expanded, query).flatMap((item) => (item.kind === 'row' ? [[item.row.pane, item.total]] : []))
+
 const shown = (rows: AgentRow[], expanded?: ReadonlySet<number>, query?: string) =>
   board
     .items(rows, expanded, query)
@@ -141,6 +144,7 @@ describe('items', () => {
         hasChildren: false,
         folded: false,
         hidden: 0,
+        total: 0,
         attention: null,
       },
     ])
@@ -217,6 +221,18 @@ describe('items of a tree', () => {
     expect(shown(chain, new Set([1, 2, 3, 4])).map(([, depth]) => depth)).toEqual([0, 1, 2, 3, 3])
   })
 
+  it.each([
+    ['folded', undefined],
+    ['unfolded', new Set([5, 7, 16])],
+  ])('counts the subagents of every level %s', (_, expanded) => {
+    expect(totals(TEAM, expanded).filter(([pane]) => [5, 7, 16, 20].includes(pane))).toEqual([
+      [5, 3],
+      ...(expanded === undefined ? [] : [[7, 1]]),
+      [16, 2],
+      [20, 0],
+    ])
+  })
+
   it('lists an agent whose parent is not listed as a root', () => {
     expect(keys([under(3, 'working', 99, 1)])).toEqual(['section:Working', 'pane:3'])
   })
@@ -253,6 +269,14 @@ describe('items while searching', () => {
 
   it('leaves out the sections without a match', () => {
     expect(keys(TEAM, undefined, 'agent 20')).toEqual(['section:Idle', 'pane:20'])
+  })
+
+  it('counts no subagents while it searches', () => {
+    expect(totals(TEAM, undefined, 'agent 9')).toEqual([
+      [5, 0],
+      [7, 0],
+      [9, 0],
+    ])
   })
 
   it('lists nothing when nothing matches', () => {
@@ -385,6 +409,17 @@ describe('hiddenName', () => {
     ['pending by its name', 2, 'pending', '2 subagents hidden, at least one pending'],
   ])('says %s', (_, hidden, attention, name) => {
     expect(board.hiddenName(hidden, attention)).toBe(name)
+  })
+})
+
+describe('disclosureName', () => {
+  it.each<[number, boolean, string]>([
+    [3, true, 'Show 3 subagents'],
+    [1, true, 'Show 1 subagent'],
+    [3, false, 'Hide 3 subagents'],
+    [1, false, 'Hide 1 subagent'],
+  ])('names %i subagents folded %s as %s', (count, folded, name) => {
+    expect(board.disclosureName(count, folded)).toBe(name)
   })
 })
 

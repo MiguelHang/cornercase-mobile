@@ -12,6 +12,7 @@ export type Row = {
   hasChildren: boolean
   folded: boolean
   hidden: number
+  total: number
   attention: string | null
 }
 
@@ -85,26 +86,30 @@ const descendants = (made: Tree, agent: AgentRow): AgentRow[] =>
 const loudest = (agents: AgentRow[]) =>
   ATTENTION.find((status) => agents.some((agent) => agent.status === status)) ?? null
 
-const row = (agent: AgentRow, hasChildren: boolean, folded: boolean, hidden: AgentRow[]): Row => ({
-  kind: 'row',
-  key: `pane:${agent.pane}`,
-  row: agent,
-  depth: Math.min(agent.depth, MAX_DEPTH),
-  hasChildren,
-  folded,
-  hidden: hidden.length,
-  attention: loudest(hidden),
-})
+const row = (agent: AgentRow, all: AgentRow[], folded: boolean): Row => {
+  const hidden = folded ? all : []
+  return {
+    kind: 'row',
+    key: `pane:${agent.pane}`,
+    row: agent,
+    depth: Math.min(agent.depth, MAX_DEPTH),
+    hasChildren: all.length > 0,
+    folded,
+    hidden: hidden.length,
+    total: all.length,
+    attention: loudest(hidden),
+  }
+}
 
 const branch = (made: Tree, agent: AgentRow): Item[] => {
-  const children = below(made, agent)
-  const folded = children.length > 0 && !made.expanded.has(agent.pane)
-  const shown = folded ? [] : children.flatMap((child) => branch(made, child))
-  return [row(agent, children.length > 0, folded, folded ? descendants(made, agent) : []), ...shown]
+  const all = descendants(made, agent)
+  const folded = all.length > 0 && !made.expanded.has(agent.pane)
+  const shown = folded ? [] : below(made, agent).flatMap((child) => branch(made, child))
+  return [row(agent, all, folded), ...shown]
 }
 
 const found = (made: Tree, agent: AgentRow): Item[] => [
-  row(agent, false, false, []),
+  row(agent, [], false),
   ...below(made, agent).flatMap((child) => found(made, child)),
 ]
 
@@ -121,7 +126,7 @@ const pruned = (rows: AgentRow[], wanted: string[]) => {
 
 const closed = (made: Tree, agent: AgentRow) => {
   const hidden = descendants(made, agent)
-  return row(agent, hidden.length > 0, hidden.length > 0, hidden)
+  return row(agent, hidden, hidden.length > 0)
 }
 
 const counted = (count: number) => `${count} ${count === 1 ? 'subagent' : 'subagents'}`
@@ -150,6 +155,8 @@ export const hiddenName = (hidden: number, attention: string | null) => {
   const status = statusName(attention).toLowerCase()
   return hidden === 1 ? `${what}, ${status}` : `${what}, at least one ${status}`
 }
+
+export const disclosureName = (count: number, folded: boolean) => `${folded ? 'Show' : 'Hide'} ${counted(count)}`
 
 export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES, query = ''): Item[] => {
   const wanted = terms(query)
