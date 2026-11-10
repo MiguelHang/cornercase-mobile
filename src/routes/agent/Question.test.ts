@@ -1,5 +1,6 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
+import type { Card_Serialize as Card } from '../../lib/bindings'
 import type { Chat } from '../../lib/chat.svelte'
 import { MACHINE, PANE, asked, fakeAsker, fresh, row, settle } from '../../lib/chatFakes'
 import type { Question as Asked } from '../../lib/question.svelte'
@@ -8,6 +9,8 @@ import agentSource from './Agent.svelte?raw'
 import composerSource from './Composer.svelte?raw'
 import Question from './Question.svelte'
 import questionSource from './Question.svelte?raw'
+import cardSource from './QuestionCard.svelte?raw'
+import tabsSource from './QuestionTabs.svelte?raw'
 
 const MENU = ['Which colour?', '1. Red', '2. Green', '3. Blue']
 
@@ -19,7 +22,38 @@ const questionOf = (lines: string[]): Asked => {
 }
 
 const drawn = (question: Asked, agent = 'claude') =>
-  render(Question, { props: { question, agent, onoption: () => {} } }).body
+  render(Question, { props: { question, agent, onoption: () => {}, ontab: () => {} } }).body
+
+const PERMISSION: Card = {
+  tabs: [],
+  open: null,
+  blocks: [
+    { kind: 'text', text: 'Bash command' },
+    { kind: 'code', text: 'date > later.txt' },
+    { kind: 'text', text: 'Do you want to proceed?' },
+  ],
+  options: [
+    { number: 1, label: 'Yes', detail: null, selected: true },
+    { number: 2, label: 'Yes, and always allow access to', detail: '/Users/dev/web-shop from this project', selected: false },
+    { number: 3, label: 'No', detail: null, selected: false },
+  ],
+  help: ['Esc to cancel · Tab to amend'],
+}
+
+const tabbed = (open: number | null, labels = ['Colour', 'Size', 'Submit']): Card => ({
+  ...PERMISSION,
+  tabs: labels.map((label) => ({ label, answered: label === 'Submit' })),
+  open,
+})
+
+const carded = (card: Card) => drawn({ ...questionOf(MENU), card })
+
+const chips = (body: string) =>
+  [...body.matchAll(/<(button|span) class="chip[^"]*"([^>]*)>(.*?)(?=<(?:button|span) class="chip|<\/div>)/g)].map((found) => [
+    found[1],
+    found[2].includes('aria-current="true"'),
+    found[3].replace(/<[^>]*>/g, ''),
+  ])
 
 const asking = async (lines: string[] | null) => {
   const told = fakeAsker()
@@ -87,6 +121,15 @@ describe('Agent, its question', () => {
     )
     expect(flat(composerSource)).toContain('onoption={(number) => void choose(number)}')
     expect(flat(questionSource)).toContain('onclick={() => onoption(option.number)}')
+    expect(flat(cardSource)).toContain('onclick={() => onoption(option.number)}')
+  })
+
+  it('opens the tab tapped and hands the reason of a failure over, to be told', () => {
+    expect(flat(composerSource)).toContain(
+      'const openTab = async (index: number) => { const failed = await chat.openTab(index) if (failed !== null) { onfailed(failed) } }',
+    )
+    expect(flat(composerSource)).toContain('ontab={(index) => void openTab(index)}')
+    expect(flat(tabsSource)).toContain('onclick={() => ontab(index)}')
   })
 })
 
@@ -127,5 +170,86 @@ describe('Question', () => {
     expect(flat(questionSource)).toContain(
       '.label { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; }',
     )
+  })
+})
+
+describe('Question, as a card', () => {
+  it('lays the card out instead of the rows of the screen', () => {
+    const body = carded(PERMISSION)
+    expect(body).toContain('aria-label="claude asks"')
+    expect(body).not.toContain('class="rows')
+    expect(body).not.toContain('class="screen')
+  })
+
+  it('writes the text as paragraphs, the code as a block of its own and the help below the options', () => {
+    const body = carded(PERMISSION)
+    const blocks = [...body.matchAll(/<(p|pre) class="(text|code|help)[^"]*">([^<]*)<\/\1>/g)].map((found) => [found[2], found[3]])
+    expect(blocks).toEqual([
+      ['text', 'Bash command'],
+      ['code', 'date > later.txt'],
+      ['text', 'Do you want to proceed?'],
+      ['help', 'Esc to cancel · Tab to amend'],
+    ])
+    expect(body.indexOf('aria-label="Options"')).toBeLessThan(body.indexOf('class="help'))
+  })
+
+  it('puts every option on a button of its own, with its number, its label and its detail', () => {
+    const body = carded(PERMISSION)
+    const answers = [...body.matchAll(/aria-label="(Option [^"]+)"[^>]*>.*?<span class="label[^"]*">([^<]*)<\/span>(?:<!--[^>]*-->)*(?:<span class="detail[^"]*">([^<]*)<\/span>)?/g)]
+    expect(answers.map((found) => [found[1], found[2], found[3] ?? null])).toEqual([
+      ['Option 1, Yes', '1. Yes', null],
+      ['Option 2, Yes, and always allow access to, /Users/dev/web-shop from this project', '2. Yes, and always allow access to', '/Users/dev/web-shop from this project'],
+      ['Option 3, No', '3. No', null],
+    ])
+  })
+
+  it.each<[string, number]>([
+    ['the first', 0],
+    ['the last', 2],
+  ])('marks %s option chosen, for the eye and for VoiceOver', (_, chosen) => {
+    const card = { ...PERMISSION, options: PERMISSION.options.map((option, at) => ({ ...option, selected: at === chosen })) }
+    const buttons = [...carded(card).matchAll(/<button class="button plain[^"]*"[^>]*>(?:<!--[^>]*-->|\s)*<span class="mark[^"]*"[^>]*>([^<]*)<\/span>/g)]
+    expect(buttons.map((found) => [found[0].includes('aria-current="true"'), found[0].includes(' current'), found[1]])).toEqual(
+      PERMISSION.options.map((_, at) => (at === chosen ? [true, true, '❯'] : [false, false, ''])),
+    )
+  })
+
+  it('draws no tabs when the question has none', () => {
+    expect(carded(PERMISSION)).not.toContain('aria-label="Questions"')
+  })
+
+  it.each<[string, Card, (string | boolean)[][]]>([
+    ['makes every tab but the open one a button', tabbed(0), [['span', true, 'Colour'], ['button', false, 'Size'], ['button', false, '✔Submit']]],
+    ['follows the open tab', tabbed(1), [['button', false, 'Colour'], ['span', true, 'Size'], ['button', false, '✔Submit']]],
+    ['offers no tab to tap when none is seen open', tabbed(null), [['span', false, 'Colour'], ['span', false, 'Size'], ['span', false, '✔Submit']]],
+    ['shows a lone question as a heading, not a button', tabbed(0, ['Colour']), [['span', true, 'Colour']]],
+  ])('%s', (_, card, expected) => {
+    expect(chips(carded(card))).toEqual(expected)
+  })
+
+  it('names the answered tabs for VoiceOver', () => {
+    expect(carded(tabbed(0))).toContain('<span class="tick svelte-')
+    expect(carded(tabbed(0))).toMatch(/<span class="tick svelte-[\w-]+" role="img" aria-label="answered">✔<\/span>/)
+  })
+
+  it.each([
+    '.text { font-family: var(--font-ui); white-space: pre-line; }',
+    'font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap; }',
+    '.text, .code, .help { margin: 0; overflow-wrap: anywhere; }',
+    '.options { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); }',
+    'white-space: normal; overflow-wrap: anywhere; }',
+    '.detail, .help { color: var(--muted); }',
+  ])('wraps every line to the width of the phone: %s', (text) => {
+    expect(flat(cardSource)).toContain(text)
+  })
+
+  it('never keeps a line whole nor cuts it with an ellipsis', () => {
+    expect(flat(cardSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow|overflow-x/)
+    expect(flat(tabsSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow/)
+  })
+
+  it('wraps the tabs onto more lines rather than hiding any', () => {
+    expect(flat(tabsSource)).toContain('.tabs { display: flex; flex-wrap: wrap; gap: 6px; }')
+    expect(flat(tabsSource)).toContain('.open { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }')
   })
 })

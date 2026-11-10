@@ -8,6 +8,7 @@
     resting = false,
     busy = false,
     compact = false,
+    current = false,
     label,
     expanded,
     onclick,
@@ -18,6 +19,7 @@
     resting?: boolean
     busy?: boolean
     compact?: boolean
+    current?: boolean
     label?: string
     expanded?: boolean
     onclick?: (event: MouseEvent) => void
@@ -28,6 +30,7 @@
 <button
   class="button {tone}"
   class:compact
+  class:current
   class:resting
   class:busy
   {type}
@@ -36,6 +39,7 @@
   aria-busy={busy ? 'true' : undefined}
   aria-label={label}
   aria-expanded={expanded}
+  aria-current={current ? 'true' : undefined}
   {onclick}
   ontouchstart={() => {}}
 >
@@ -86,6 +90,12 @@
 
   .primary:not(.resting):active {
     background: var(--brand-hover);
+  }
+
+  .plain.current {
+    border-color: var(--edge);
+    background: var(--selected);
+    color: var(--text);
   }
 
   .plain:not(.resting):active {
