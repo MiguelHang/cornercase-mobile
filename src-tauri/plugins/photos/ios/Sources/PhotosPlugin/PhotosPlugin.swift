@@ -9,6 +9,7 @@ struct Picked: Encodable {
   let path: String
   let name: String?
   let kind: String
+  let thumbnailPath: String?
 }
 
 struct Cancelled: Encodable {
@@ -22,22 +23,40 @@ struct Failure: Error {
 enum Shrinking {
   static let maxSide = 2048
   static let jpegQuality = 0.85
+  static let thumbnailSide = 192
+  static let thumbnailQuality = 0.7
 
   static func shrink(_ url: URL, named name: String?) throws -> Picked {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
       throw Failure(message: "the photo cannot be read")
     }
     let png = CGImageSourceGetType(source).map { $0 as String == UTType.png.identifier } ?? false
-    let image = try thumbnail(of: source)
-    let target = URL(fileURLWithPath: NSTemporaryDirectory())
-      .appendingPathComponent("\(UUID().uuidString).\(png ? "png" : "jpg")")
-    try write(image, to: target, as: png ? UTType.png : UTType.jpeg)
-    return Picked(path: target.path, name: name, kind: png ? "png" : "jpeg")
+    let image = try thumbnail(of: source, side: maxSide)
+    let target = temporary(png ? "png" : "jpg")
+    try write(image, to: target, as: png ? UTType.png : UTType.jpeg, quality: jpegQuality)
+    return Picked(
+      path: target.path, name: name, kind: png ? "png" : "jpeg", thumbnailPath: small(of: source))
   }
 
-  static func thumbnail(of source: CGImageSource) throws -> CGImage {
+  static func small(of source: CGImageSource) -> String? {
+    let target = temporary("jpg")
+    do {
+      let image = try thumbnail(of: source, side: thumbnailSide)
+      try write(image, to: target, as: UTType.jpeg, quality: thumbnailQuality)
+      return target.path
+    } catch {
+      return nil
+    }
+  }
+
+  static func temporary(_ suffix: String) -> URL {
+    URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("\(UUID().uuidString).\(suffix)")
+  }
+
+  static func thumbnail(of source: CGImageSource, side: Int) throws -> CGImage {
     let options: [CFString: Any] = [
-      kCGImageSourceThumbnailMaxPixelSize: min(maxSide, longestSide(of: source)),
+      kCGImageSourceThumbnailMaxPixelSize: min(side, longestSide(of: source)),
       kCGImageSourceCreateThumbnailWithTransform: true,
       kCGImageSourceCreateThumbnailFromImageAlways: true,
     ]
@@ -54,7 +73,7 @@ enum Shrinking {
     return max(width, height)
   }
 
-  static func write(_ image: CGImage, to target: URL, as type: UTType) throws {
+  static func write(_ image: CGImage, to target: URL, as type: UTType, quality: Double) throws {
     guard
       let destination = CGImageDestinationCreateWithURL(
         target as CFURL, type.identifier as CFString, 1, nil)
@@ -62,7 +81,7 @@ enum Shrinking {
       throw Failure(message: "the photo cannot be written")
     }
     let properties: [CFString: Any] =
-      type == .png ? [:] : [kCGImageDestinationLossyCompressionQuality: jpegQuality]
+      type == .png ? [:] : [kCGImageDestinationLossyCompressionQuality: quality]
     CGImageDestinationAddImage(destination, image, properties as CFDictionary)
     guard CGImageDestinationFinalize(destination) else {
       try? FileManager.default.removeItem(at: target)
