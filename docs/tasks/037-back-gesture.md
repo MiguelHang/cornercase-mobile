@@ -1,6 +1,6 @@
 # 037 — Volver atrás con el gesto de iOS y un chevron en todas las pantallas
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 036
 - Riesgo: medio — el gesto de borde compite con el scroll horizontal de la terminal, el pellizco y el swipe de la 021.
 - Rama: `feat/037-back-gesture` · PR: `feat: go back with the edge swipe and a chevron on every screen`
@@ -11,7 +11,7 @@ vez de un botón `Back` con texto. Pedido por el usuario al probar en su iPhone 
 gestos para ir atrás? O por lo menos poner el chevron en vez de un botón Back".
 
 ## Criterios de aceptación
-- [ ] CA1 — Barra de navegación como en las apps de Apple (Mail, Ajustes, Notas), en todas las pantallas con pila
+- [x] CA1 — Barra de navegación como en las apps de Apple (Mail, Ajustes, Notas), en todas las pantallas con pila
   (agente/chat, terminal, Start, cambios, un diff, Machines, una máquina): una cabecera fija arriba, sobre `--veil` con
   el desenfoque del vidrio, con el botón de volver a la izquierda **dentro de esa cabecera**: `‹` (`chevron-left`) seguido
   del título de la pantalla anterior en `--brand` (`‹ Agents`, `‹ Machines`; solo `‹` si no cabe), zona táctil de 44 px,
@@ -20,23 +20,23 @@ gestos para ir atrás? O por lo menos poner el chevron en vez de un botón Back"
   el agente que ya no está usa la misma barra. Un componente compartido (p. ej. `NavBar`) que reemplace las cabeceras
   repetidas (`.top`, `.back`, `.title` de Machines, Machine, Changes, Diff, Start). Pedido por el usuario el 2026-11-09:
   "que el chevron de back vaya como en las apps de Apple, en la cabecera".
-- [ ] CA2 — Gesto de borde: deslizar desde el borde izquierdo (≤ 20–24 pt) hacia la derecha hace `router.back()`, con la
+- [x] CA2 — Gesto de borde: deslizar desde el borde izquierdo (≤ 20–24 pt) hacia la derecha hace `router.back()`, con la
   pantalla siguiendo al dedo y la de debajo asomando (o, como mínimo, un desplazamiento con umbral y la transición de
   `motion`); soltar antes del umbral la devuelve a su sitio. Respeta Reduce Motion.
-- [ ] CA3 — Sin pisar otros gestos: en la terminal, el pellizco, el scroll horizontal y el swipe de cursor de la 021 siguen
+- [x] CA3 — Sin pisar otros gestos: en la terminal, el pellizco, el scroll horizontal y el swipe de cursor de la 021 siguen
   funcionando; solo un toque que empieza en el borde es el gesto de volver. En el chat, el scroll y la selección de
   texto siguen igual. Investigar si WKWebView ofrece `allowsBackForwardNavigationGestures` y por qué no sirve (no hay
   historial de navegación: el router es estado), y anotarlo.
-- [ ] CA4 — Nada que hacer en la base: en el tablero y en `no-machines` el gesto no hace nada.
-- [ ] CA5 — Android, con la misma barra pero sus convenciones (la app sigue el look de cornercase-gpui, no Material, así
+- [x] CA4 — Nada que hacer en la base: en el tablero y en `no-machines` el gesto no hace nada.
+- [x] CA5 — Android, con la misma barra pero sus convenciones (la app sigue el look de cornercase-gpui, no Material, así
   que solo cambia lo que el usuario de Android espera del sistema): en Android la barra lleva `←` (`arrow-left`) sin el
   título de la pantalla anterior y el título a la izquierda; **no** hay gesto de borde propio, porque los dos bordes son
   el gesto atrás del sistema, y volver va por el atrás del sistema (botón o gesto, con predictive back si Tauri lo
   permite), que llama al mismo `router.back()` (032, CA3). La variante sale de la plataforma (p. ej. `platform()` del
   plugin `os` de Tauri o `navigator.userAgent`), en un solo sitio. Anotarlo en `design/look.md`.
-- [ ] CA6 — Comprobado en el simulador (gesto con XCUITest o simctl) y pendiente para el usuario en su iPhone; tests del
+- [x] CA6 — Comprobado en el simulador (gesto con XCUITest o simctl) y pendiente para el usuario en su iPhone; tests del
   reconocedor del gesto sin DOM (umbral, borde, cancelación).
-- [ ] CA7 — `hx check full` y mutation en verde.
+- [x] CA7 — `hx check full` y mutation en verde.
 
 ## design/ que actualiza
 - `design/look.md` › Navigation: la barra de navegación, el botón de volver con el título anterior, el gesto de borde y su convivencia con los demás gestos.
