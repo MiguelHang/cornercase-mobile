@@ -1,6 +1,6 @@
 # 029 — Verificación del MVP en un iPhone por Tailscale
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 015–028 y 030–032 (se hace al final, antes de la 033; decidido el 2026-11-09)
 - Riesgo: bajo (perfil de Apple gratuito: la app caduca a los 7 días)
 - Rama: `docs/029-mvp-check` · PR: `docs: record the mvp check on an iphone`
@@ -10,12 +10,12 @@ Comprobar los criterios de éxito 1–6 de `docs/IDEA.md` en un iPhone real por 
 dejar constancia; lo que falle se convierte en tareas nuevas.
 
 ## Criterios de aceptación
-- [ ] CA1 — `docs/mvp-check.md`: por cada criterio, pasos seguidos, resultado (sí/no/parcial), versión de cornercase,
+- [x] CA1 — `docs/mvp-check.md`: por cada criterio, pasos seguidos, resultado (sí/no/parcial), versión de cornercase,
   de iOS y de la app, y fecha.
-- [ ] CA2 — Cada fallo tiene su tarea nueva en `docs/tasks/` (numeración siguiente) enlazada desde el ROADMAP.
-- [ ] CA3 — `CLAUDE.md` › Commands con cómo instalar en un iPhone con perfil gratuito (y la caducidad de 7 días).
-- [ ] CA4 — Las notas "probado en vivo" de `design/*.md` actualizadas con lo visto.
-- [ ] CA5 — Si nadie lo hizo antes, el CA4 de la 028: wifi → datos (con Tailscale) y datos → wifi, con el tablero
+- [x] CA2 — Cada fallo tiene su tarea nueva en `docs/tasks/` (numeración siguiente) enlazada desde el ROADMAP.
+- [x] CA3 — `CLAUDE.md` › Commands con cómo instalar en un iPhone con perfil gratuito (y la caducidad de 7 días).
+- [x] CA4 — Las notas "probado en vivo" de `design/*.md` actualizadas con lo visto.
+- [x] CA5 — Si nadie lo hizo antes, el CA4 de la 028: wifi → datos (con Tailscale) y datos → wifi, con el tablero
   y la terminal abiertos; tiempo desde la línea `network` hasta `connected`, anotado en
   `design/connection/network.md` (lo que falta, en su apartado Checked live).
 
