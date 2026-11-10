@@ -393,6 +393,9 @@
       events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.paneStatusChanged.listen((event) => {
         if (chat !== null && touches(event.payload, chat.machine, chat.pane)) {
+          if (event.payload.pane === null) {
+            chat.lose()
+          }
           void chat.refresh()
         }
       }),

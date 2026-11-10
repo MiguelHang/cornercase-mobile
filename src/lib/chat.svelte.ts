@@ -128,6 +128,10 @@ export class Chat {
   #recording: 'closed' | 'loading' | 'open' = 'closed'
   #unloaded: Change[] = []
   #sentId: number | null = null
+  #vouched = false
+  #broken = 0
+  #expecting = false
+  #agent: string | null = null
   #cancelExpiry: () => void = () => {}
   #cancelFollow: (() => void) | null = null
   #following = false
@@ -279,17 +283,40 @@ export class Chat {
     this.#record((entries) => (this.#sentId === null ? entries : edited(entries, this.#sentId)))
   }
 
-  #recordHeard(answer: Answer) {
+  #recordHeard(answer: Answer, broken: number) {
     const seen = this.#clock.now()
-    this.#record((entries) => heard(entries, answer, seen, true))
+    const continuous = this.#vouched
+    if (answer.kind === 'message' && broken === this.#broken) {
+      this.#vouched = true
+    }
+    this.#record((entries) => heard(entries, answer, seen, continuous))
+  }
+
+  lose() {
+    this.#vouched = false
+    this.#broken += 1
   }
 
   #hear(row: AgentRow | null) {
-    if (row !== null && row.status !== this.#heard) {
+    if (row === null) {
+      return
+    }
+    this.#vouch(row)
+    if (row.status !== this.#heard) {
       this.#heard = row.status
       this.#turnKeys(row.status)
       this.lastNews = this.#clock.now()
     }
+  }
+
+  #vouch(row: AgentRow) {
+    const another = row.agent !== this.#agent
+    this.#agent = row.agent
+    const started = row.status !== this.#heard && (row.status === 'working' || row.status === 'shell')
+    if (another || (started && !this.#expecting && this.#heard !== 'waiting')) {
+      this.lose()
+    }
+    this.#expecting &&= !started
   }
 
   #turnKeys(status: string | null) {
@@ -327,16 +354,18 @@ export class Chat {
     while (this.#busy) {
       this.#again = false
       const number = ++this.#asked
+      const broken = this.#broken
       const answer = await read(this.#readLast, this.pane)
       if (number === this.#asked) {
         this.#show(kept(this.reading, answer))
-        this.#recordHeard(answer)
+        this.#recordHeard(answer, broken)
       }
       this.#busy = this.#again
     }
   }
 
   follow() {
+    this.lose()
     this.#following = true
     this.#pace()
     return () => {
@@ -429,8 +458,10 @@ export class Chat {
   async #deliver(text: string, again = false) {
     const chips = this.attachments.take()
     const shown = this.reading.kind === 'message' ? { ...this.reading.message } : null
+    const broken = this.#broken
     const bubble: Outgoing = { text, chips, state: 'sending', reason: null, answered: shown }
     this.outgoing = bubble
+    this.#expecting = true
     this.#recordSent(text, chips, again)
     const failed = await this.#handOver(text, chips)
     if (this.gone) {
@@ -439,11 +470,13 @@ export class Chat {
     }
     if (failed === null) {
       this.#leftOnTheMac = false
+      this.#vouched ||= broken === this.#broken
       this.lastNews = this.#clock.now()
       this.outgoing = { ...bubble, state: 'sent' }
       this.#restate('sent', null)
       return
     }
+    this.#expecting = false
     this.attachments.giveBack(chips)
     this.outgoing = { ...bubble, state: 'failed', reason: failed }
     this.#restate('failed', failed)

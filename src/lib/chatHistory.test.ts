@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { HistoryEntry_Serialize as Entry } from './bindings'
+import type { AgentRow_Serialize as AgentRow, HistoryEntry_Serialize as Entry } from './bindings'
 import type { ReadLast, SendText } from './chat.svelte'
 import { MACHINE, PANE, fakeHistory, fresh, gate, message, ok, refused, row, sentOk, settle } from './chatFakes'
 
@@ -131,7 +131,7 @@ describe('Chat, a reading or a send while the conversation loads', () => {
     expect(chat.conversation).toEqual([])
     load.open(undefined)
     await settle()
-    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'agent: Fixed.'])
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
     expect(kept).toEqual([chat.conversation])
   })
 
@@ -211,5 +211,132 @@ describe('Chat, once it is left', () => {
     await settle()
     expect(chat.conversation).toEqual([])
     expect(kept).toEqual([])
+  })
+})
+
+const told = (chat: ReturnType<typeof fresh>, status: string | null, agent = 'codex') => {
+  const shown: AgentRow = { ...row(PANE, status), agent }
+  chat.see(MACHINE, [shown])
+}
+
+const caughtUp = () => loaded(fakeHistory(stored), saying('Done.', 'Fixed.'))
+
+describe('Chat, vouching for the conversation', () => {
+  it('puts a gap before a first reading that is not the last message kept', async () => {
+    const { chat } = await loaded(fakeHistory(stored), saying('Fixed.'))
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
+  })
+
+  it('adds no gap for messages read one after the other', async () => {
+    const { chat } = await caughtUp()
+    await chat.refresh()
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'agent: Fixed.'])
+  })
+
+  it('adds no gap for a turn followed on screen, from the send to its answer', async () => {
+    const { chat } = await caughtUp()
+    const stop = chat.follow()
+    await chat.refresh()
+    await sendOn(chat, 'fix the login')
+    told(chat, 'working')
+    told(chat, 'working')
+    told(chat, 'done')
+    await chat.refresh()
+    stop()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'agent: Fixed.'])
+  })
+
+  it('adds no gap for the answer to a send made before any reading', async () => {
+    const { chat } = await loaded(fakeHistory(stored), saying('Fixed.'))
+    await sendOn(chat, 'fix the login')
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'agent: Fixed.'])
+  })
+
+  it('adds no gap once the agent goes on after answering a question', async () => {
+    const { chat } = await caughtUp()
+    await chat.refresh()
+    told(chat, 'waiting')
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'agent: Fixed.'])
+  })
+
+  it.each([
+    ['following starts again, back from the background', (chat: ReturnType<typeof fresh>) => chat.follow()],
+    ['the streams of the machine are lost', (chat: ReturnType<typeof fresh>) => chat.lose()],
+    ['the agent works on something sent from the Mac', (chat: ReturnType<typeof fresh>) => told(chat, 'working')],
+    ['the pane runs a command from the Mac', (chat: ReturnType<typeof fresh>) => told(chat, 'shell')],
+    ['another agent runs in the pane', (chat: ReturnType<typeof fresh>) => told(chat, 'done', 'claude')],
+  ])('puts a gap before the next message once %s', async (_, lost) => {
+    const { chat } = await caughtUp()
+    await chat.refresh()
+    lost(chat)
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
+  })
+
+  it('puts a gap before a message after a second turn it did not start', async () => {
+    const { chat } = await loaded(fakeHistory(stored), saying('Done.', 'Fixed.', 'Tests pass.'))
+    await chat.refresh()
+    await sendOn(chat, 'fix the login')
+    told(chat, 'working')
+    told(chat, 'done')
+    await chat.refresh()
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual([
+      'gap',
+      'agent: Done.',
+      'you: fix the login',
+      'agent: Fixed.',
+      'gap',
+      'agent: Tests pass.',
+    ])
+  })
+
+  it('puts a gap before a message after a turn that a failed send did not start', async () => {
+    const { chat } = await loaded(fakeHistory(stored), saying('Done.', 'Fixed.'), failingOnce())
+    await chat.refresh()
+    await sendOn(chat, 'fix the login')
+    chat.edit()
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
+  })
+
+  it('vouches for nothing after a send while the streams were lost', async () => {
+    const answer = gate<Awaited<ReturnType<SendText>>>()
+    const { chat } = await loaded(fakeHistory(stored), saying('Fixed.'), () => answer.promise)
+    const sending = sendOn(chat, 'fix the login')
+    chat.lose()
+    answer.open(ok(null))
+    await sending
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'gap', 'agent: Fixed.'])
+  })
+
+  it('vouches for nothing after a reading that failed', async () => {
+    const answers = [refused('no transcript'), ok(message('Fixed.'))]
+    const { chat } = await loaded(fakeHistory(stored), () => Promise.resolve(answers.shift() ?? refused('no more')))
+    await chat.refresh()
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
+  })
+
+  it('vouches for nothing after a reading that was on its way when the streams were lost', async () => {
+    const first = gate<Awaited<ReturnType<ReadLast>>>()
+    const later = saying('Fixed.')
+    let asked = 0
+    const { chat } = await loaded(fakeHistory(stored), () => (asked++ === 0 ? first.promise : later(PANE)))
+    const reading = chat.refresh()
+    chat.lose()
+    first.open(ok(message('Done.')))
+    await reading
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'gap', 'agent: Fixed.'])
   })
 })

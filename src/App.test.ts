@@ -254,9 +254,9 @@ describe('App wiring', () => {
     )
   })
 
-  it('reads again on a status change of its pane on its machine', () => {
+  it('reads again on a status change of its pane on its machine, vouching for nothing after one of the machine', () => {
     expect(source).toContain(
-      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, chat.machine, chat.pane)) { void chat.refresh() } }),',
+      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, chat.machine, chat.pane)) { if (event.payload.pane === null) { chat.lose() } void chat.refresh() } }),',
     )
   })
 
