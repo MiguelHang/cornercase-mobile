@@ -142,7 +142,7 @@ mod pick_route {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn is_not_held_up_by_a_route_that_fails_or_one_that_hangs() {
+    async fn is_held_up_only_for_the_window_by_a_better_route_that_hangs() {
         let network = Network::default()
             .with(LAN, FakeTransport::default().fail(CONTRACT, Error::Connect("refused".to_owned())))
             .with(TAILNET, hangs())
@@ -201,7 +201,9 @@ mod pick_route {
     async fn fails_a_route_without_a_token_before_reaching_it() {
         let network = Network::default().with(LAN, answers_after(0, "{}")).with(TAILNET, answers_after(0, "{}"));
         let routes = vec![bridge(LAN, 8765, None), route(TAILNET)];
+        let started = Instant::now();
         assert_eq!(network.pick(routes).await.map(|picked| picked.route), Ok(route(TAILNET)));
+        assert_eq!(started.elapsed(), Duration::ZERO);
         assert_eq!(network.calls(), [TAILNET]);
         let result = network.pick(vec![bridge(LAN, 8765, None)]).await.map(|picked| picked.route);
         assert_eq!(result, Err(PickError::AllFailed(vec![(address(LAN), Error::NoToken)])));

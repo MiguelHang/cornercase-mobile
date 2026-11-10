@@ -136,9 +136,13 @@ impl<'a> Race<'a> {
     }
 
     async fn prefer(&mut self, mut best: Picked, until: Instant) -> Picked {
-        while self.better_pending(reach(best.route.address())) {
+        let mut best_reach = reach(best.route.address());
+        while self.better_pending(best_reach) {
             match self.next(until).await {
-                Some((_, Ok(picked))) if reach(picked.route.address()) < reach(best.route.address()) => best = picked,
+                Some((_, Ok(picked))) if reach(picked.route.address()) < best_reach => {
+                    best_reach = reach(picked.route.address());
+                    best = picked;
+                }
                 Some(_) => {}
                 None => break,
             }
