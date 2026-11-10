@@ -32,7 +32,7 @@ const UNANSWERED: CommandError = { code: 'unanswered', message: 'the request was
 
 const agent = (name: string) => ({ agent: name, command: name, installed: true })
 
-const project = (id: number, name = `p${id}`): ProjectChoice => ({ id, name })
+const project = (id: number, name = `p${id}`): ProjectChoice => ({ id, name, workspaces: [] })
 
 const choices = (projects: ProjectChoice[], boot: string | null = 'boot-1'): StartChoices => ({ boot, projects })
 

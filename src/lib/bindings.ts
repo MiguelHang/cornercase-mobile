@@ -756,6 +756,7 @@ export type ProbeView = { state: "answers"; route: string } | { state: "unauthor
 export type ProjectChoice = {
 	id: number,
 	name: string,
+	workspaces: WorkspaceChoice[],
 };
 
 export type QuestionChanged = QuestionChanged_Serialize | QuestionChanged_Deserialize;
@@ -1104,6 +1105,11 @@ export type ViewedFile_Serialize = {
 	viewed: boolean,
 	digest: string | null,
 	mode: Mode,
+};
+
+export type WorkspaceChoice = {
+	id: number,
+	name: string,
 };
 
 /* Tauri Specta runtime */

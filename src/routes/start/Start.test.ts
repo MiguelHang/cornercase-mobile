@@ -30,7 +30,14 @@ const installed = (...names: string[]): AgentChoice_Serialize[] =>
   names.map((name) => ({ agent: name, command: name, installed: true }))
 
 const CALLS: StartCalls = {
-  startProjects: () => answer({ boot: 'boot-1', projects: [{ id: 1, name: 'web' }, { id: 2, name: 'api' }] }),
+  startProjects: () =>
+    answer({
+      boot: 'boot-1',
+      projects: [
+        { id: 1, name: 'web', workspaces: [] },
+        { id: 2, name: 'api', workspaces: [] },
+      ],
+    }),
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
   startIssue: never,
@@ -143,7 +150,8 @@ describe('Start, its agent form', () => {
   })
 
   it('chooses the only project', async () => {
-    const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects: [{ id: 5, name: 'web' }] }) }))
+    const projects = [{ id: 5, name: 'web', workspaces: [] }]
+    const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects }) }))
     expect(body).toMatch(/<select[^>]*>(?:<!--[^>]*-->)*<option value="5" selected="">web<\/option>/)
   })
 

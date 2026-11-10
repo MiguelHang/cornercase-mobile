@@ -28,7 +28,10 @@ fn with_projects(projects: &Value) -> String {
 
 fn two_projects() -> String {
     with_projects(&json!([
-        { "id": 5, "name": "web", "custom_name": "Shop", "path": "/Users/me/web" },
+        { "id": 5, "name": "web", "custom_name": "Shop", "path": "/Users/me/web", "workspaces": [
+            { "id": 12, "name": "main", "custom_name": null, "worktree": false },
+            { "id": 9, "name": "fix-login", "custom_name": "Login", "worktree": true },
+        ] },
         { "id": 2, "name": "api", "custom_name": null },
     ]))
 }
@@ -51,12 +54,22 @@ fn choice(agent: &str, command: &str) -> AgentChoice {
 
 mod projects {
     use super::*;
+    use crate::view::WorkspaceChoice;
+
+    fn choice_of(id: u64, name: &str) -> WorkspaceChoice {
+        WorkspaceChoice { id, name: name.to_owned() }
+    }
 
     #[tokio::test(start_paused = true)]
-    async fn names_each_project_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot() {
+    async fn names_each_project_and_its_workspaces_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot()
+    {
         let studio = connected(serving(&[two_projects()])).await;
-        let expected =
-            [ProjectChoice { id: 5, name: "Shop".to_owned() }, ProjectChoice { id: 2, name: "api".to_owned() }];
+        let shop = ProjectChoice {
+            id: 5,
+            name: "Shop".to_owned(),
+            workspaces: vec![choice_of(12, "main"), choice_of(9, "Login")],
+        };
+        let expected = [shop, ProjectChoice { id: 2, name: "api".to_owned(), workspaces: Vec::new() }];
         let choices = StartChoices { boot: Some(BOOT.to_owned()), projects: expected.to_vec() };
         assert_eq!(projects(&studio.state), Ok(choices));
     }
@@ -300,7 +313,10 @@ mod over_ipc {
     async fn answers_the_projects_of_the_active_machine() {
         let studio = connected(serving(&[two_projects()])).await;
         let ipc = Ipc::new(studio.state);
-        let projects = json!([{ "id": 5, "name": "Shop" }, { "id": 2, "name": "api" }]);
+        let projects = json!([
+            { "id": 5, "name": "Shop", "workspaces": [{ "id": 12, "name": "main" }, { "id": 9, "name": "Login" }] },
+            { "id": 2, "name": "api", "workspaces": [] },
+        ]);
         assert_eq!(ipc.invoke("start_projects", json!({})), Ok(json!({ "boot": BOOT, "projects": projects })));
     }
 
