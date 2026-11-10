@@ -1,10 +1,20 @@
 import { render } from 'svelte/server'
-import { describe, expect, it } from 'vitest'
-import type { AgentChoice_Serialize, ConnectionView_Serialize } from '../../lib/bindings'
+import { describe, expect, it, vi } from 'vitest'
+import comments from '../../../crates/core/tests/fixtures/control/issue-read/v1/comments.json'
+import type {
+  AgentChoice_Serialize,
+  ConnectionView_Serialize,
+  ReadIssue_Serialize as ReadIssue,
+} from '../../lib/bindings'
+import type { StartingIssue } from '../../lib/router.svelte'
 import { StartForm, type StartCalls } from '../../lib/startForm.svelte'
 import AgentForm from './AgentForm.svelte'
 import agentSource from './AgentForm.svelte?raw'
+import pickerSource from './AgentPicker.svelte?raw'
+import issueSource from './IssueForm.svelte?raw'
 import projectSource from './ProjectPicker.svelte?raw'
+import ShowIssues from './ShowIssues.svelte'
+import showSource from './ShowIssues.svelte?raw'
 import Start from './Start.svelte'
 import startSource from './Start.svelte?raw'
 import WorkspaceForm from './WorkspaceForm.svelte'
@@ -23,6 +33,7 @@ const CALLS: StartCalls = {
   startProjects: () => answer({ boot: 'boot-1', projects: [{ id: 1, name: 'web' }, { id: 2, name: 'api' }] }),
   installedAgents: () => answer(installed('claude', 'codex')),
   startAgent: never,
+  startIssue: never,
   newWorkspace: never,
 }
 
@@ -35,8 +46,29 @@ const formOf = async (calls: Partial<StartCalls> = {}) => {
 const refusing = (message: string) => () =>
   Promise.resolve({ status: 'error' as const, error: { code: 'failed' as const, message } })
 
-const screen = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED) =>
-  render(Start, { props: { connection, backTo: 'Agents', onback: () => {}, onstarted: () => {}, oncreated: () => {}, form } }).body
+const READ = comments as ReadIssue
+
+const COUPON: StartingIssue = { project: 2, issue: READ.issue, prompt: READ.prompt }
+
+const screen = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED, issue?: StartingIssue) =>
+  render(Start, {
+    props: {
+      connection,
+      issue,
+      backTo: 'Agents',
+      onback: () => {},
+      onstarted: () => {},
+      oncreated: () => {},
+      onissues: () => {},
+      form,
+    },
+  }).body
+
+const onIssue = (form: StartForm, connection: ConnectionView_Serialize = CONNECTED) =>
+  screen(form, connection, COUPON)
+
+const showIssues = (form: StartForm, sendable = true) =>
+  render(ShowIssues, { props: { form, sendable, onshow: () => {} } }).body
 
 const agentForm = (form: StartForm, sendable = true) => render(AgentForm, { props: { form, sendable } }).body
 
@@ -71,7 +103,9 @@ describe('Start', () => {
     expect(body).toMatch(/<div class="bar ios svelte-[\w-]+ fixed topmost"[^]*?aria-label="Back to Agents"/)
     expect(body).toMatch(/<div class="center svelte-[\w-]+">(<!--[^>]*-->)*<h1 class="title svelte-[\w-]+">Start<\/h1>/)
     expect(body).not.toContain('class="top')
-    expect(body).toMatch(/aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button>/)
+    expect(body).toMatch(
+      /aria-pressed="true">Agent<\/button><button[^>]*aria-pressed="false">Workspace<\/button><button[^>]*aria-pressed="false">Issue<\/button>/,
+    )
     expect(labels(body)).toEqual(['Project', 'Agent', 'Model', 'Prompt', 'Branch'])
   })
 
@@ -203,6 +237,98 @@ describe('Start, its workspace form', () => {
   })
 })
 
+describe('Start, its way to the issues', () => {
+  it('chooses the project and offers Show issues', async () => {
+    const body = showIssues(await formOf())
+    expect(labels(body)).toEqual(['Project'])
+    expect(body).toContain("Pick one of the project's issues to start an agent on it.")
+    expect(label(submit(body))).toBe('Showissues')
+    expect(submit(body)?.[1]).not.toContain('disabled')
+  })
+
+  it('says to choose a project instead of showing the issues of none', async () => {
+    const form = await formOf()
+    form.chooseProject()
+    expect(errorOf(showIssues(form), 'Project')).toBe('Choose a project')
+    expect(flat(showSource)).toContain(
+      'const show = () => { const project = form.chooseProject() if (project !== null) { onshow(project) } }',
+    )
+  })
+
+  it('holds Show issues while not connected', async () => {
+    expect(submit(showIssues(await formOf(), false))?.[1]).toContain('disabled=""')
+  })
+})
+
+describe('Start, on an issue', () => {
+  it('shows only the issue form, with no other action to switch to and no prompt to write', async () => {
+    const body = onIssue(await formOf())
+    expect(body).not.toContain('aria-label="What to start"')
+    expect(body).not.toContain('Show issues')
+    expect(labels(body)).toEqual(['Agent', 'Model', 'Branch'])
+    expect(body).not.toContain('<textarea')
+    expect(label(submit(body))).toBe('Start')
+  })
+
+  it("heads the form with the issue's key, its project and its title", async () => {
+    const body = onIssue(await formOf())
+    expect(body).toMatch(/<span class="key[^"]*">#41<\/span> (?:<!--[^>]*-->)*<span class="project[^"]*">api<\/span>/)
+    expect(body).toMatch(/<p class="name[^"]*">Checkout forgets the coupon after a refresh<\/p>/)
+  })
+
+  it("fills the branch with the issue's and says where the agent works", async () => {
+    const body = flat(onIssue(await formOf()))
+    expect(body).toMatch(/placeholder="issue-41-checkout-forgets-the-coupon"[^>]*value="issue-41-checkout-forgets-the-coupon"/)
+    expect(body.match(/>Branch<\/label>[^]*<p class="note[^"]*">([^<]*)<\/p>/)?.[1]).toBe(
+      "The agent works in its own worktree on this branch. If the project's folder is not the root of a git repository, it starts in a new tab there instead.",
+    )
+  })
+
+  it('folds the prompt cornercase will use, to read and not to change', async () => {
+    const body = onIssue(await formOf())
+    expect(body).toMatch(
+      /<details class="prompt[^"]*"><summary class="summary[^"]*">Prompt cornercase will use<\/summary> <p class="said[^"]*">https:\/\/github.com\/acme\/shop\/issues\/41<\/p><\/details>/,
+    )
+  })
+
+  it('turns the button into a spinner with Starting… and holds the fields while it sends', async () => {
+    const form = await formOf()
+    const body = () => screen(form)
+    onIssue(form)
+    void form.startIssue()
+    expect(submit(body())?.[1]).toContain('aria-busy="true"')
+    expect(label(submit(body()))).toBe('Starting…')
+    expect(body().match(/<(?:input|select)[^>]*disabled=""/g)).toHaveLength(3)
+  })
+
+  it('shows what the server says and keeps the branch typed', async () => {
+    const form = await formOf({ startIssue: refusing('no issue #41 in GitHub') })
+    onIssue(form)
+    form.branch = 'coupon-fix'
+    await form.startIssue()
+    const body = screen(form)
+    expect(body).toMatch(/<p class="problem[^"]*" role="alert">no issue #41 in GitHub<\/p>/)
+    expect(body).toContain('value="coupon-fix"')
+    expect(label(submit(body))).toBe('Start')
+  })
+
+  it('holds Start while not connected', async () => {
+    const body = onIssue(await formOf(), { state: 'connecting' })
+    expect(body).toContain('Not connected to the Mac.')
+    expect(submit(body)?.[1]).toContain('disabled=""')
+  })
+
+  it('hands over the agent it started on the issue', async () => {
+    const onstarted = vi.fn()
+    const started = { project: 2, workspace: 3, tab: 4, pane: 5, warning: null }
+    const form = new StartForm({ ...CALLS, startIssue: () => answer(started) }, onstarted, () => {}, { agent: null })
+    await form.load()
+    onIssue(form)
+    await form.startIssue()
+    expect(onstarted.mock.calls).toEqual([[started, 'claude']])
+  })
+})
+
 describe('Start wiring', () => {
   it('reads the choices on opening and again when the connection comes back', () => {
     const script = flat(startSource)
@@ -217,17 +343,26 @@ describe('Start wiring', () => {
     expect(script).toContain('(name) => oncreated(name),')
     expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
     expect(script).toContain('onclick={() => (action = name)}')
-    expect(script).toContain("{#if action === 'agent'} <AgentForm {form} {sendable} /> {:else}")
-    expect(script).toContain('{:else} <WorkspaceForm {form} {sendable} />')
+    expect(script).toContain("{:else if action === 'agent'} <AgentForm {form} {sendable} />")
+    expect(script).toContain("{:else if action === 'workspace'} <WorkspaceForm {form} {sendable} />")
+    expect(script).toContain('{:else} <ShowIssues {form} {sendable} onshow={onissues} />')
+  })
+
+  it('turns into the issue form when it opens on an issue', () => {
+    const script = flat(startSource)
+    expect(script).toContain('untrack(() => { if (issue !== undefined) { form.forIssue(issue) } })')
+    expect(script).toContain('{#if form.issue === null} <div class="actions"')
+    expect(script).toContain('{#if form.issue !== null} <IssueForm {form} {sendable} />')
   })
 
   it('sends each form with its own action', () => {
     expect(flat(agentSource)).toContain('void form.start()')
     expect(flat(workspaceSource)).toContain('void form.create()')
+    expect(flat(issueSource)).toContain('onsubmit={() => void form.startIssue()}')
   })
 
   it('reads again what failed on Try again', () => {
-    expect(flat(agentSource)).toContain('onretry={() => void form.loadAgents()}')
+    expect(flat(pickerSource)).toContain('onretry={() => void form.loadAgents()}')
     expect(flat(projectSource)).toContain('onretry={() => void form.loadProjects()}')
   })
 })

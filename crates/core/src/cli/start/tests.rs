@@ -14,6 +14,18 @@ fn agent(model: &str, worktree: &str) -> StartAgent {
     }
 }
 
+fn issue(model: &str, branch: &str) -> StartIssue {
+    StartIssue {
+        project: 3,
+        agent: "claude".to_owned(),
+        model: model.to_owned(),
+        key: "#41".to_owned(),
+        source: "github".to_owned(),
+        branch: branch.to_owned(),
+        issue_branch: "issue-41-checkout".to_owned(),
+    }
+}
+
 fn workspace(name: &str, worktree: bool) -> NewWorkspace {
     NewWorkspace { project: 7, name: name.to_owned(), worktree }
 }
@@ -73,6 +85,48 @@ mod start {
     #[test]
     fn never_moves_the_window_of_the_mac() {
         assert!(!agent("opus", "fix/login").argv().iter().any(|word| word == "--focus"));
+    }
+}
+
+mod start_issue {
+    use super::*;
+
+    const HEAD: [&str; 6] = ["start", "claude", "--project", "3", "--issue=#41", "--source=github"];
+
+    fn after_the_head(rest: &[&str]) -> Vec<String> {
+        HEAD.iter().chain(rest).map(|&word| word.to_owned()).collect()
+    }
+
+    #[rstest]
+    #[case::the_issue_s_branch(issue("", "issue-41-checkout"), &["--placed", "--json"])]
+    #[case::the_issue_s_branch_and_a_model(issue("opus", "issue-41-checkout"), &["--model=opus", "--placed", "--json"])]
+    #[case::another_branch(issue("", "fix/coupon"), &["--worktree=fix/coupon", "--placed", "--json"])]
+    #[case::another_branch_and_a_model(
+        issue("opus", "fix/coupon"),
+        &["--worktree=fix/coupon", "--model=opus", "--placed", "--json"]
+    )]
+    #[case::no_branch(issue("", ""), &["--placed", "--json"])]
+    #[case::the_issue_s_branch_with_spaces(issue(" \t", " issue-41-checkout\n"), &["--placed", "--json"])]
+    fn names_a_branch_only_when_it_is_not_the_issue_s(#[case] form: StartIssue, #[case] rest: &[&str]) {
+        assert_eq!(form.argv(), after_the_head(rest));
+    }
+
+    #[test]
+    fn leaves_out_a_blank_tracker() {
+        let form = StartIssue { source: " ".to_owned(), ..issue("", "") };
+        assert_eq!(form.argv(), ["start", "claude", "--project", "3", "--issue=#41", "--placed", "--json"]);
+    }
+
+    #[test]
+    fn glues_a_key_and_a_branch_that_start_with_a_dash_to_their_option() {
+        let form = StartIssue { key: " -48 ".to_owned(), source: "shortcut".to_owned(), ..issue("-m", "-b") };
+        assert_eq!(form.argv()[4..8], ["--issue=-48", "--source=shortcut", "--worktree=-b", "--model=-m"]);
+    }
+
+    #[test]
+    fn never_sends_a_prompt_nor_moves_the_window_of_the_mac() {
+        let argv = issue("opus", "fix/coupon").argv();
+        assert!(!argv.iter().any(|word| word.starts_with("--prompt") || word == "--focus"), "{argv:?}");
     }
 }
 

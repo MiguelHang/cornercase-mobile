@@ -208,6 +208,49 @@ mod workspace {
     }
 }
 
+mod issue {
+    use super::*;
+
+    fn form(branch: &str) -> StartIssue {
+        StartIssue {
+            project: 5,
+            agent: "claude".to_owned(),
+            model: String::new(),
+            key: "#41".to_owned(),
+            source: "github".to_owned(),
+            branch: branch.to_owned(),
+            issue_branch: "issue-41-coupon".to_owned(),
+        }
+    }
+
+    async fn started_on(branch: &str, argv: &[&str]) -> Result<Started, CommandError> {
+        let studio = connected(serving(&[two_projects()]).answer(argv, &[STARTED], &[], 0)).await;
+        run(&studio.state, form(branch).argv()).await
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sends_cornercase_s_start_on_the_issue_s_own_branch_and_answers_its_ids() {
+        let argv = ["start", "claude", "--project", "5", "--issue=#41", "--source=github", "--placed", "--json"];
+        assert_eq!(started_on("issue-41-coupon", &argv).await, Ok(ids(3, 12, 40, 57)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn sends_another_branch_as_the_worktree() {
+        let argv = [
+            "start",
+            "claude",
+            "--project",
+            "5",
+            "--issue=#41",
+            "--source=github",
+            "--worktree=fix",
+            "--placed",
+            "--json",
+        ];
+        assert_eq!(started_on("fix", &argv).await, Ok(ids(3, 12, 40, 57)));
+    }
+}
+
 mod answered {
     use super::*;
 
@@ -252,12 +295,18 @@ mod over_ipc {
     }
 
     #[test]
-    fn reads_both_forms_and_refuses_them_without_a_connected_machine() {
+    fn reads_the_three_forms_and_refuses_them_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
         let agent = json!({ "project": 5, "agent": "claude", "model": "", "prompt": "Fix", "worktree": "" });
         let started = ipc.invoke("start_agent", json!({ "form": agent })).expect_err("no machine");
         let workspace = json!({ "project": 5, "name": "fix", "worktree": false });
         let created = ipc.invoke("new_workspace", json!({ "form": workspace })).expect_err("no machine");
-        assert_eq!((&started["code"], &created["code"]), (&json!("not_connected"), &json!("not_connected")));
+        let issue = json!({
+            "project": 5, "agent": "claude", "model": "", "key": "#41", "source": "github",
+            "branch": "issue-41", "issue_branch": "issue-41"
+        });
+        let from_issue = ipc.invoke("start_issue", json!({ "form": issue })).expect_err("no machine");
+        let codes = [&started["code"], &created["code"], &from_issue["code"]];
+        assert_eq!(codes, [&json!("not_connected"); 3]);
     }
 }

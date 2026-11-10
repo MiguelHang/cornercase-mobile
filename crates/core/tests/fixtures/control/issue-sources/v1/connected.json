@@ -1,0 +1,45 @@
+{
+  "closed": false,
+  "places": [
+    { "here": true, "label": "shop", "project": 7, "workspace": null, "worktree": true },
+    { "here": false, "label": "notes › default", "project": 9, "workspace": 10, "worktree": false }
+  ],
+  "project": 7,
+  "sources": [
+    {
+      "fields": ["assignee", "author"],
+      "from": "gh",
+      "missing": [],
+      "name": "GitHub",
+      "people": ["anyone", "anyone"],
+      "repository": true,
+      "source": "github",
+      "state": "connected",
+      "tab": true
+    },
+    {
+      "account": "@ada in acme",
+      "fields": ["owner", "requester"],
+      "from": "env",
+      "env": "SHORTCUT_API_TOKEN",
+      "shadowed": true,
+      "missing": [],
+      "name": "Shortcut",
+      "people": ["me", { "person": { "handle": "grace", "id": null } }],
+      "repository": false,
+      "source": "shortcut",
+      "state": "connected",
+      "tab": true
+    },
+    {
+      "fields": ["assignee", "creator"],
+      "missing": ["token"],
+      "name": "Linear",
+      "people": ["anyone", "anyone"],
+      "repository": false,
+      "source": "linear",
+      "state": "missing",
+      "tab": false
+    }
+  ]
+}

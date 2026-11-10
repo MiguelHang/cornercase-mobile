@@ -31,6 +31,7 @@ export const commands = {
 	startProjects: () => typedError<StartChoices_Serialize, CommandError>(__TAURI_INVOKE("start_projects")),
 	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
+	startIssue: (form: StartIssue) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_issue", { form })),
 	newWorkspace: (form: NewWorkspace) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("new_workspace", { form })),
 	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
 	changesViewed: (file: ViewedFile_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("changes_viewed", { file })),
@@ -40,6 +41,9 @@ export const commands = {
 	filesRead: (workspace: number, path: string) => typedError<FileShown_Serialize, CommandError>(__TAURI_INVOKE("files_read", { workspace, path })),
 	filesSearch: (workspace: number, query: string) => typedError<Searched_Serialize, CommandError>(__TAURI_INVOKE("files_search", { workspace, query })),
 	filesSearchStop: (workspace: number) => __TAURI_INVOKE<void>("files_search_stop", { workspace }),
+	issueSources: (project: number) => typedError<Sources_Serialize, CommandError>(__TAURI_INVOKE("issue_sources", { project })),
+	issueList: (project: number, filter: ListFilter_Deserialize) => typedError<Lists_Serialize, CommandError>(__TAURI_INVOKE("issue_list", { project, filter })),
+	issueRead: (project: number, source: string, key: string) => typedError<ReadIssue_Serialize, CommandError>(__TAURI_INVOKE("issue_read", { project, source, key })),
 };
 
 /** Events */
@@ -214,6 +218,20 @@ export type Colours_Serialize = {
 export type CommandError = {
 	code: ErrorCode,
 	message: string,
+};
+
+export type CommentInfo = CommentInfo_Serialize | CommentInfo_Deserialize;
+
+export type CommentInfo_Deserialize = {
+	author?: string,
+	created_at?: string,
+	body?: string,
+};
+
+export type CommentInfo_Serialize = {
+	author: string,
+	created_at: string,
+	body: string,
 };
 
 export type ConnectionChanged = ConnectionChanged_Serialize | ConnectionChanged_Deserialize;
@@ -414,6 +432,32 @@ export type InputEvent_Deserialize = ({ key: Key_Deserialize }) & { mouse?: neve
 
 export type InputEvent_Serialize = ({ key: Key_Serialize }) & { mouse?: never; paste?: never; text?: never } | ({ text: string }) & { key?: never; mouse?: never; paste?: never } | ({ paste: string }) & { key?: never; mouse?: never; text?: never } | ({ mouse: Mouse_Serialize }) & { key?: never; paste?: never; text?: never };
 
+export type IssueInfo = IssueInfo_Serialize | IssueInfo_Deserialize;
+
+export type IssueInfo_Deserialize = {
+	source?: string,
+	key?: string,
+	title?: string,
+	state?: string,
+	closed?: boolean,
+	labels?: string[],
+	author?: string,
+	updated_at?: string,
+	branch?: string,
+};
+
+export type IssueInfo_Serialize = {
+	source: string,
+	key: string,
+	title: string,
+	state: string,
+	closed: boolean,
+	labels: string[],
+	author: string,
+	updated_at: string,
+	branch: string,
+};
+
 export type Key = Key_Serialize | Key_Deserialize;
 
 export type KeyKind = "press" | "repeat" | "release";
@@ -476,6 +520,38 @@ export type Line_Serialize = {
 	emphasis: ([number, number])[],
 };
 
+export type ListFilter = ListFilter_Serialize | ListFilter_Deserialize;
+
+export type ListFilter_Deserialize = {
+	source?: string | null,
+	closed?: boolean,
+	mine?: boolean,
+	cached?: boolean,
+};
+
+export type ListFilter_Serialize = {
+	source: string | null,
+	closed: boolean,
+	mine: boolean,
+	cached: boolean,
+};
+
+export type ListedInfo = ListedInfo_Serialize | ListedInfo_Deserialize;
+
+export type ListedInfo_Deserialize = {
+	source?: string,
+	count?: number,
+	cached?: boolean,
+	error?: string | null,
+};
+
+export type ListedInfo_Serialize = {
+	source: string,
+	count: number,
+	cached: boolean,
+	error: string | null,
+};
+
 export type Listing = Listing_Serialize | Listing_Deserialize;
 
 export type Listing_Deserialize = {
@@ -484,6 +560,20 @@ export type Listing_Deserialize = {
 
 export type Listing_Serialize = {
 	folders: Folder_Serialize[],
+};
+
+export type Lists = Lists_Serialize | Lists_Deserialize;
+
+export type Lists_Deserialize = {
+	project?: number,
+	issues?: IssueInfo_Deserialize[],
+	sources?: ListedInfo_Deserialize[],
+};
+
+export type Lists_Serialize = {
+	project: number,
+	issues: IssueInfo_Serialize[],
+	sources: ListedInfo_Serialize[],
 };
 
 export type MachineList = MachineList_Serialize | MachineList_Deserialize;
@@ -690,6 +780,22 @@ export type QuestionChanged_Serialize = {
 
 export type Read = Read_Serialize | Read_Deserialize;
 
+export type ReadIssue = ReadIssue_Serialize | ReadIssue_Deserialize;
+
+export type ReadIssue_Deserialize = {
+	issue?: IssueInfo_Deserialize,
+	body?: string,
+	comments?: CommentInfo_Deserialize[],
+	prompt?: string,
+};
+
+export type ReadIssue_Serialize = {
+	issue: IssueInfo_Serialize,
+	body: string,
+	comments: CommentInfo_Serialize[],
+	prompt: string,
+};
+
 export type ReadKind = ReadKind_Serialize | ReadKind_Deserialize;
 
 export type ReadKind_Deserialize = "text" | "image" | "binary" | "too-large" | "folder" | "missing" | string;
@@ -777,6 +883,44 @@ export type Size_Serialize = {
 	rows: number,
 };
 
+export type SourceInfo = SourceInfo_Serialize | SourceInfo_Deserialize;
+
+export type SourceInfo_Deserialize = {
+	source?: string,
+	name?: string,
+	repository?: boolean,
+	state?: SourceState_Deserialize,
+	missing?: string[],
+	reason?: string | null,
+};
+
+export type SourceInfo_Serialize = {
+	source: string,
+	name: string,
+	repository: boolean,
+	state: SourceState_Serialize,
+	missing: string[],
+	reason: string | null,
+};
+
+export type SourceState = SourceState_Serialize | SourceState_Deserialize;
+
+export type SourceState_Deserialize = "connected" | "missing" | "failing" | string;
+
+export type SourceState_Serialize = "connected" | "missing" | "failing" | "other";
+
+export type Sources = Sources_Serialize | Sources_Deserialize;
+
+export type Sources_Deserialize = {
+	project?: number,
+	sources?: SourceInfo_Deserialize[],
+};
+
+export type Sources_Serialize = {
+	project: number,
+	sources: SourceInfo_Serialize[],
+};
+
 export type Staged = Staged_Serialize | Staged_Deserialize;
 
 export type Staged_Deserialize = "no" | "partly" | "yes" | string;
@@ -801,6 +945,16 @@ export type StartChoices_Deserialize = {
 export type StartChoices_Serialize = {
 	boot: string | null,
 	projects: ProjectChoice[],
+};
+
+export type StartIssue = {
+	project: number,
+	agent: string,
+	model: string,
+	key: string,
+	source: string,
+	branch: string,
+	issue_branch: string,
 };
 
 export type Started = Started_Serialize | Started_Deserialize;

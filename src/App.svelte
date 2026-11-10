@@ -6,6 +6,7 @@
     commands,
     events,
     type AgentRow_Serialize as AgentRow,
+    type IssueInfo_Serialize as IssueInfo,
     type MachineView_Serialize,
     type Started_Serialize as Started,
   } from './lib/bindings'
@@ -15,10 +16,11 @@
   import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
+  import { IssuesState, IssueState } from './lib/issues.svelte'
   import { latestWins } from './lib/join'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
-  import { openedTerminal, Router, routeFor } from './lib/router.svelte'
+  import { openedTerminal, Router, routeFor, type StartingIssue } from './lib/router.svelte'
   import type { Asker } from './lib/question.svelte'
   import { openScanner } from './lib/scanner.svelte'
   import { Toasts } from './lib/toasts.svelte'
@@ -31,6 +33,8 @@
   import Diff from './routes/changes/Diff.svelte'
   import File from './routes/files/File.svelte'
   import Files from './routes/files/Files.svelte'
+  import Issue from './routes/issues/Issue.svelte'
+  import Issues from './routes/issues/Issues.svelte'
   import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
@@ -129,6 +133,11 @@
         ),
   )
 
+  const listing = $derived(router.latest('issues'))
+  const issues = $derived(listing === null ? null : new IssuesState(listing.machine, listing.project, commands))
+  const shown = $derived(router.latest('issue'))
+  const issue = $derived(shown === null ? null : new IssueState(shown.machine, shown, commands))
+
   $effect(() => {
     const { machine, agents } = current
     if (chat !== null) {
@@ -166,6 +175,24 @@
       void (top.name === 'file' ? state.open(top.path) : state.start())
     })
     return () => state.stop()
+  })
+
+  const kept = (state: IssuesState | IssueState | null) => {
+    if (state === null) {
+      return
+    }
+    untrack(() => void state.load())
+    return () => state.stop()
+  }
+
+  $effect(() => kept(issues))
+
+  $effect(() => kept(issue))
+
+  $effect(() => {
+    const connected = current.connection.state === 'connected'
+    const watched = [issues, issue]
+    untrack(() => watched.forEach((state) => void state?.see(connected)))
   })
 
   const show = (next: Screen) => {
@@ -257,12 +284,31 @@
     const at = router.current
     if (at.name === 'start') {
       launched = agent
-      router.replace({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true })
+      router.settle({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true })
     } else {
       toasts.push({ level: 'info', message: `${agent} started` })
     }
     if (placed.warning !== null) {
       toasts.push({ level: 'info', message: placed.warning })
+    }
+  }
+
+  const listIssues = (project: number) => {
+    const at = router.current
+    if (at.name === 'start') {
+      router.go({ name: 'issues', machine: at.machine, project })
+    }
+  }
+
+  const openIssue = (row: IssueInfo) => {
+    if (issues !== null) {
+      router.go({ name: 'issue', machine: issues.machine, project: issues.project, key: row.key, source: row.source })
+    }
+  }
+
+  const startOn = (starting: StartingIssue) => {
+    if (issue !== null) {
+      router.go({ name: 'start', machine: issue.machine, issue: starting })
     }
   }
 
@@ -402,11 +448,21 @@
       {:else if route.name === 'start'}
         <Start
           connection={current.connection}
+          issue={route.issue}
           {backTo}
           onback={goBack}
           onstarted={started}
           oncreated={created}
+          onissues={listIssues}
         />
+      {:else if route.name === 'issues'}
+        {#if issues !== null}
+          <Issues {issues} {backTo} onback={goBack} onopen={openIssue} />
+        {/if}
+      {:else if route.name === 'issue'}
+        {#if issue !== null}
+          <Issue {issue} {backTo} onback={goBack} onstart={startOn} />
+        {/if}
       {:else if route.name === 'machines'}
         <Machines
           {machines}
