@@ -1,5 +1,6 @@
-use std::fs::{self, File};
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
 pub(crate) fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -18,7 +19,7 @@ fn temporary(path: &Path) -> PathBuf {
 }
 
 fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let mut file = File::create(path)?;
+    let mut file = OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(path)?;
     file.write_all(bytes)?;
     file.sync_all()
 }

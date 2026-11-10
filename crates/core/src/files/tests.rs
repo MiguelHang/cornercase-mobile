@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::io::ErrorKind;
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 use cornercase_bridge::test_util::TempDir;
@@ -49,6 +50,14 @@ mod write_atomically {
         write_atomically(&folder.file(), b"second").expect("write the second");
         assert_eq!(fs::read(folder.file()).expect("read the file"), b"second");
         assert_eq!(folder.names(), ["data.json"]);
+    }
+
+    #[test]
+    fn leaves_the_file_readable_only_by_its_owner() {
+        let folder = Folder::new();
+        write_atomically(&folder.file(), b"secret").expect("write");
+        let mode = fs::metadata(folder.file()).expect("the file's metadata").permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "{mode:o}");
     }
 
     #[test]

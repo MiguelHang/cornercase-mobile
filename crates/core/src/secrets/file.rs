@@ -56,7 +56,7 @@ impl FileSecrets {
             return Ok(());
         }
         let text = serde_json::to_vec_pretty(&Written { version: VERSION, secrets: &entries })
-            .map_err(|error| shapeless(&error))?;
+            .map_err(|error| Error::Secrets(format!("cannot encode the secrets: {error}")))?;
         write_atomically(&self.path, &text).map_err(|error| Error::Secrets(error.to_string()))
     }
 }

@@ -12,11 +12,12 @@ La misma app corriendo en Android, sin funciones nuevas, con lo específico de i
 - [x] CA1 — `pnpm tauri android init`; `src-tauri/gen/android` versionado (D4); `applicationId`
   `dev.usecornercase.mobile`; `minSdk` elegido y justificado. `minSdk` 24, fijado en `tauri.conf.json`
   (`design/architecture/android.md`).
-- [x] CA2 — `pnpm tauri android dev` arranca en el emulador y en un dispositivo; conecta al puente y muestra el tablero.
-  Comprobado en el emulador (Android 17, API 37) el 2026-11-10: hot reload, la máquina añadida con el código del
-  puente, el tablero en vivo por Tailscale y la máquina que sigue tras cerrar la app. Pendiente del usuario: un
-  dispositivo real por Tailscale (`pnpm tauri android dev "<dispositivo>"` con la depuración USB activada) y
-  escanear un QR de verdad, porque la cámara del emulador no llega a abrirse.
+- [ ] CA2 — `pnpm tauri android dev` arranca en el emulador y en un dispositivo; conecta al puente y muestra el tablero.
+  Sin marcar: emulador comprobado, dispositivo pendiente del usuario. En el emulador (Android 17, API 37), el
+  2026-11-10: hot reload, la máquina añadida con el código del puente, el tablero en vivo por Tailscale y la máquina
+  que sigue tras cerrar la app. Pendiente del usuario: un dispositivo real por Tailscale
+  (`pnpm tauri android dev "<dispositivo>"` con la depuración USB activada) y escanear un QR de verdad, porque la
+  cámara del emulador no llega a abrirse.
 - [x] CA3 — Mientras no exista 031, `Secrets` en Android devuelve un error claro y la app sigue (la identidad no se usa
   en la fase 0; el token de las rutas necesita almacén: usar el plan provisional decidido en la tarea y anotarlo).
   La identidad da "no secret store on this platform yet"; los tokens van a `FileSecrets`, un JSON en la carpeta de
