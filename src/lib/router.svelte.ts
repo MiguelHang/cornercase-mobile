@@ -46,6 +46,13 @@ const overChat = (route: Route) => overMachines(route) || inWorkspace(route)
 
 export type WorkspaceOf = { machine: number; workspace: number }
 
+type Named<N extends Route['name']> = Extract<Route, { name: N }>
+
+const named =
+  <N extends Route['name']>(name: N) =>
+  (route: Route): route is Named<N> =>
+    route.name === name
+
 export class Router {
   #stack: Route[] = $state([])
 
@@ -72,6 +79,10 @@ export class Router {
 
   get browsed(): WorkspaceOf | null {
     return this.#workspaceOf('files', 'file')
+  }
+
+  latest<N extends Route['name']>(name: N): Named<N> | null {
+    return this.#stack.findLast(named(name)) ?? null
   }
 
   #workspaceOf(...names: InWorkspace['name'][]): WorkspaceOf | null {

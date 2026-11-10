@@ -373,6 +373,23 @@ describe('StartForm create', () => {
   })
 })
 
+describe('StartForm choosing a project for its issues', () => {
+  it('says to choose a project when none is chosen', async () => {
+    const { form, commands } = await loaded()
+    expect(form.chooseProject()).toBeNull()
+    expect(form.projectError).toBe(PROJECT_EMPTY)
+    expect(commands.startIssue).not.toHaveBeenCalled()
+  })
+
+  it('gives the chosen project and clears what it said before', async () => {
+    const { form } = await loaded()
+    form.chooseProject()
+    form.project = 2
+    expect(form.chooseProject()).toBe(2)
+    expect(form.projectError).toBeNull()
+  })
+})
+
 describe('StartForm from an issue', () => {
   const sent = (branch: string, agent = 'claude', model = '') => ({
     project: 9,

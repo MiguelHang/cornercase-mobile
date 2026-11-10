@@ -182,13 +182,49 @@ describe('App wiring', () => {
     )
     expect(source).not.toContain('boot')
     expect(source).toContain(
-      "{:else if route.name === 'start'} <Start connection={current.connection} {backTo} onback={goBack} onstarted={started} oncreated={created} /> {:else if route.name === 'machines'}",
+      "{:else if route.name === 'start'} <Start connection={current.connection} issue={route.issue} {backTo} onback={goBack} onstarted={started} oncreated={created} onissues={listIssues} /> {:else if route.name === 'issues'}",
     )
   })
 
-  it('puts the agent it started in place of Start on its machine, says it is starting and tells its warning', () => {
+  it('lists the issues of the project Start chose on the machine of Start, opens a tapped one and starts on it', () => {
     expect(source).toContain(
-      "const started = (placed: Started, agent: string) => { const at = router.current if (at.name === 'start') { launched = agent router.replace({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true }) } else { toasts.push({ level: 'info', message: `${agent} started` }) } if (placed.warning !== null) { toasts.push({ level: 'info', message: placed.warning }) } }",
+      "const listIssues = (project: number) => { const at = router.current if (at.name === 'start') { router.go({ name: 'issues', machine: at.machine, project }) } }",
+    )
+    expect(source).toContain(
+      "const openIssue = (row: IssueInfo) => { if (issues !== null) { router.go({ name: 'issue', machine: issues.machine, project: issues.project, key: row.key, source: row.source }) } }",
+    )
+    expect(source).toContain(
+      "const startOn = (starting: StartingIssue) => { if (issue !== null) { router.go({ name: 'start', machine: issue.machine, issue: starting }) } }",
+    )
+    expect(source).toContain(
+      "{:else if route.name === 'issues'} {#if issues !== null} <Issues {issues} {backTo} onback={goBack} onopen={openIssue} /> {/if} {:else if route.name === 'issue'} {#if issue !== null} <Issue {issue} {backTo} onback={goBack} onstart={startOn} /> {/if} {:else if route.name === 'machines'}",
+    )
+  })
+
+  it('keeps one state of the listed project and one of the read issue while they are in the stack, reading them on untracked and leaving them after', () => {
+    expect(source).toContain("const listing = $derived(router.latest('issues'))")
+    expect(source).toContain(
+      'const issues = $derived(listing === null ? null : new IssuesState(listing.machine, listing.project, commands))',
+    )
+    expect(source).toContain("const shown = $derived(router.latest('issue'))")
+    expect(source).toContain(
+      'const issue = $derived(shown === null ? null : new IssueState(shown.machine, shown, commands))',
+    )
+    expect(source).toContain(
+      'const kept = (state: IssuesState | IssueState | null) => { if (state === null) { return } untrack(() => void state.load()) return () => state.stop() }',
+    )
+    expect(source).toContain('$effect(() => kept(issues)) $effect(() => kept(issue))')
+  })
+
+  it('reads the issues again when the connection comes back, with no boot of its own', () => {
+    expect(source).toContain(
+      "$effect(() => { const connected = current.connection.state === 'connected' const watched = [issues, issue] untrack(() => watched.forEach((state) => void state?.see(connected, null))) })",
+    )
+  })
+
+  it('puts the agent it started on the board in place of Start and all under it, says it is starting and tells its warning', () => {
+    expect(source).toContain(
+      "const started = (placed: Started, agent: string) => { const at = router.current if (at.name === 'start') { launched = agent router.settle({ name: 'agent', machine: at.machine, pane: placed.pane, starting: true }) } else { toasts.push({ level: 'info', message: `${agent} started` }) } if (placed.warning !== null) { toasts.push({ level: 'info', message: placed.warning }) } }",
     )
     expect(source).toContain(
       "const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)",
@@ -239,7 +275,7 @@ describe('App wiring', () => {
     expect(source).toContain(
       "const goBack = () => { const top = router.current.name if (top === 'change') { changes?.closeDiff() }",
     )
-    expect(source.match(/onback=\{goBack\}/g)).toHaveLength(9)
+    expect(source.match(/onback=\{goBack\}/g)).toHaveLength(11)
     expect(source).not.toContain('onback={() =>')
     expect(source).not.toContain('leaveDiff')
   })

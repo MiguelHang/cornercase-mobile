@@ -109,6 +109,11 @@ export class StartForm {
     this.branch = issue.issue.branch
   }
 
+  chooseProject() {
+    this.projectError = errorIf(this.project === null, PROJECT_EMPTY)
+    return this.project
+  }
+
   async load() {
     await Promise.all([this.loadProjects(), this.loadAgents()])
   }

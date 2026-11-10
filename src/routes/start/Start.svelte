@@ -1,20 +1,25 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
   import { commands, type ConnectionView_Serialize, type Started_Serialize as Started } from '../../lib/bindings'
+  import type { StartingIssue } from '../../lib/router.svelte'
   import { StartForm } from '../../lib/startForm.svelte'
   import Glass from '../../lib/ui/Glass.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import AgentForm from './AgentForm.svelte'
+  import IssueForm from './IssueForm.svelte'
+  import ShowIssues from './ShowIssues.svelte'
   import WorkspaceForm from './WorkspaceForm.svelte'
 
-  type Action = 'agent' | 'workspace'
+  type Action = 'agent' | 'workspace' | 'issue'
 
   let {
     connection,
+    issue,
     backTo,
     onback,
     onstarted,
     oncreated,
+    onissues,
     form = new StartForm(
       commands,
       (started, agent) => onstarted(started, agent),
@@ -22,19 +27,28 @@
     ),
   }: {
     connection: ConnectionView_Serialize
+    issue?: StartingIssue
     backTo: string | null
     onback: () => void
     onstarted: (started: Started, agent: string) => void
     oncreated: (name: string) => void
+    onissues: (project: number) => void
     form?: StartForm
   } = $props()
 
   const ACTIONS: [Action, string][] = [
     ['agent', 'Agent'],
     ['workspace', 'Workspace'],
+    ['issue', 'Issue'],
   ]
 
   let action = $state<Action>('agent')
+
+  untrack(() => {
+    if (issue !== undefined) {
+      form.forIssue(issue)
+    }
+  })
 
   const sendable = $derived(connection.state === 'connected')
 
@@ -50,28 +64,34 @@
 
 <section class="screen">
   <NavBar {backTo} title="Start" {onback} topmost />
-  <div class="actions" role="group" aria-label="What to start">
-    {#each ACTIONS as [name, words] (name)}
-      <button
-        class="action"
-        type="button"
-        aria-pressed={action === name}
-        disabled={form.sending}
-        onclick={() => (action = name)}
-        ontouchstart={() => {}}
-      >
-        {words}
-      </button>
-    {/each}
-  </div>
+  {#if form.issue === null}
+    <div class="actions" role="group" aria-label="What to start">
+      {#each ACTIONS as [name, words] (name)}
+        <button
+          class="action"
+          type="button"
+          aria-pressed={action === name}
+          disabled={form.sending}
+          onclick={() => (action = name)}
+          ontouchstart={() => {}}
+        >
+          {words}
+        </button>
+      {/each}
+    </div>
+  {/if}
   {#if !sendable}
     <p class="offline">Not connected to the Mac. What you type stays here until it connects.</p>
   {/if}
   <Glass>
-    {#if action === 'agent'}
+    {#if form.issue !== null}
+      <IssueForm {form} {sendable} />
+    {:else if action === 'agent'}
       <AgentForm {form} {sendable} />
-    {:else}
+    {:else if action === 'workspace'}
       <WorkspaceForm {form} {sendable} />
+    {:else}
+      <ShowIssues {form} {sendable} onshow={onissues} />
     {/if}
   </Glass>
 </section>

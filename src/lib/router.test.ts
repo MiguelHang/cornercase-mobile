@@ -504,6 +504,19 @@ describe('Router, the issues of a project', () => {
     expect(chatOf(ISSUES)).toBeNull()
     expect(chatOf(ISSUE)).toBeNull()
   })
+
+  it('finds the list and the issue under the start form, the same routes each time, and nothing once they are gone', () => {
+    const router = routed(START, ISSUES, ISSUE, ON_ISSUE)
+    const list = router.latest('issues')
+    expect(list).toEqual(ISSUES)
+    expect(router.latest('issue')).toEqual(ISSUE)
+    expect(router.latest('start')).toEqual(ON_ISSUE)
+    router.back()
+    expect(router.latest('issues')).toBe(list)
+    router.settle(STARTING)
+    expect(router.latest('issues')).toBeNull()
+    expect(router.latest('issue')).toBeNull()
+  })
 })
 
 describe('Router.settle', () => {
