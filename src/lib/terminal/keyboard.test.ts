@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { GAP, Keyboard, seen, whileClosed, type Screen, type Viewport } from './keyboard.svelte'
 
+const WIDTH = 411
+
 const FULL = 900
 
 const KEYBOARD = 340
@@ -31,6 +33,7 @@ class FakeViewport extends Target implements Viewport {
 }
 
 class FakeScreen extends Target implements Screen {
+  innerWidth = WIDTH
   innerHeight = FULL
   visualViewport: FakeViewport | null
 
@@ -78,6 +81,7 @@ describe('Keyboard', () => {
 
   it('follows a turn of the screen', () => {
     const { screen, viewport, keyboard } = watched()
+    screen.innerWidth = FULL
     screen.innerHeight = 400
     viewport.height = 400
     screen.fire('resize')
@@ -106,6 +110,53 @@ describe('Keyboard', () => {
   })
 })
 
+describe('Keyboard where the page shrinks with it, as on Android', () => {
+  const shrunk = ({ screen, viewport }: ReturnType<typeof watched>, height: number, width = WIDTH) => {
+    screen.innerWidth = width
+    screen.innerHeight = height
+    viewport.height = height
+    screen.fire('resize')
+    viewport.fire('resize')
+  }
+
+  it('calls the keyboard open as the page shrinks above it', () => {
+    const watching = watched()
+    shrunk(watching, FULL - KEYBOARD)
+    expect(shown(watching.keyboard)).toEqual({ height: FULL - KEYBOARD, offset: 0, covered: true, open: true })
+  })
+
+  it('calls the keyboard closed as the page takes the full height again', () => {
+    const watching = watched()
+    shrunk(watching, FULL - KEYBOARD)
+    shrunk(watching, FULL)
+    expect(shown(watching.keyboard)).toEqual({ height: FULL, offset: 0, covered: false, open: false })
+  })
+
+  it('starts again from the height after a turn of the screen', () => {
+    const watching = watched()
+    shrunk(watching, 400, FULL)
+    expect(shown(watching.keyboard)).toEqual({ height: 400, offset: 0, covered: false, open: false })
+  })
+
+  it('calls the keyboard open after a turn of the screen', () => {
+    const watching = watched()
+    shrunk(watching, 400, FULL)
+    shrunk(watching, 400 - KEYBOARD / 2, FULL)
+    expect(watching.keyboard.open).toBe(true)
+  })
+
+  it('drops the size asked for while the keyboard is open', () => {
+    const watching = watched()
+    const then = vi.fn()
+    const fitted = whileClosed(watching.keyboard, then)
+    shrunk(watching, FULL - KEYBOARD)
+    fitted(31)
+    shrunk(watching, FULL)
+    fitted(50)
+    expect(then.mock.calls).toEqual([[50]])
+  })
+})
+
 describe('seen', () => {
   const screen = (height: number): Screen => {
     const viewport = new FakeViewport()
@@ -126,6 +177,26 @@ describe('seen', () => {
     ['uncovered at the full height', FULL, false],
   ])('calls the screen %s', (_, height, covered) => {
     expect(seen(screen(height)).covered).toBe(covered)
+  })
+
+  it('keeps the tallest page seen at the same width', () => {
+    const shrunk = screen(FULL - KEYBOARD)
+    shrunk.innerHeight = FULL - KEYBOARD
+    expect(seen(shrunk, { width: WIDTH, height: FULL })).toMatchObject({
+      open: true,
+      tallest: { width: WIDTH, height: FULL },
+    })
+  })
+
+  it('forgets the tallest page once the width changes', () => {
+    expect(seen(screen(FULL), { width: FULL, height: 2 * FULL })).toMatchObject({
+      open: false,
+      tallest: { width: WIDTH, height: FULL },
+    })
+  })
+
+  it('takes a taller page as the new tallest', () => {
+    expect(seen(screen(FULL), { width: WIDTH, height: FULL - KEYBOARD }).tallest).toEqual({ width: WIDTH, height: FULL })
   })
 })
 
