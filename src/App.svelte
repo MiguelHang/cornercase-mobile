@@ -14,6 +14,7 @@
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { latestWins } from './lib/join'
   import { openedTerminal, Router, routeFor } from './lib/router.svelte'
+  import type { Asker } from './lib/question.svelte'
   import { Toasts } from './lib/toasts.svelte'
   import ConnectionBar from './lib/ui/ConnectionBar.svelte'
   import ToastStack from './lib/ui/Toasts.svelte'
@@ -37,6 +38,11 @@
   let launched = $state('')
   const router = new Router(routeFor(idle, 0))
   const toasts = new Toasts()
+  const asker: Asker = {
+    open: commands.questionOpen,
+    close: commands.questionClose,
+    listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)),
+  }
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
@@ -46,7 +52,17 @@
   const chat = $derived(
     pane === null
       ? null
-      : new Chat(owner, pane, commands.lastMessage, commands.send, commands.keys, commands.attach, haptics, timers),
+      : new Chat(
+          owner,
+          pane,
+          commands.lastMessage,
+          commands.send,
+          commands.keys,
+          commands.attach,
+          haptics,
+          timers,
+          asker,
+        ),
   )
   const seen = $derived(chat?.row != null)
   const viewed = $derived(openedTerminal(route, current))
