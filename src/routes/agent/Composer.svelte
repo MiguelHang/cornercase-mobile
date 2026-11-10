@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Toast } from '../../lib/bindings'
   import type { Chat } from '../../lib/chat.svelte'
+  import { Keyboard } from '../../lib/terminal/keyboard.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
@@ -22,6 +23,7 @@
     ontoast: (toast: Toast) => void
   } = $props()
 
+  const keyboard = new Keyboard(globalThis)
   const attaching = $derived(chat.attachments.attaching)
   const resting = $derived(!chat.canSend && !chat.sending)
 
@@ -39,6 +41,8 @@
     }
   }
 
+  $effect(() => keyboard.watch())
+
   const choose = async (number: number) => {
     const failed = await chat.pressOption(number)
     if (failed !== null) {
@@ -47,7 +51,7 @@
   }
 </script>
 
-<div class="composer" style:--below="{below}px">
+<div class="composer" class:keyboard={keyboard.covered} style:--below="{below}px">
   {#if chat.question !== null}
     <Question question={chat.question} {agent} onoption={(number) => void choose(number)} />
   {:else if chat.asking}
@@ -125,6 +129,11 @@
     padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));
     background: var(--glass);
     --over-composer: 132px;
+  }
+
+  .keyboard {
+    margin-bottom: calc(-1 * var(--inset-wide));
+    padding-bottom: var(--inset-wide);
   }
 
   .note {

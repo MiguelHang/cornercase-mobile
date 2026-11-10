@@ -302,4 +302,21 @@ describe('Composer, its place', () => {
       /<div class="composer svelte-[\w-]+" style="--below: 52px;">/,
     )
   })
+
+  it('keeps clear of the bottom safe area while the phone keyboard is closed', () => {
+    expect(flat(composerSource)).toContain(
+      'margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom)); padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));',
+    )
+    expect(render(Composer, { props: { chat: done(), agent: 'claude', onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
+      /<div class="composer svelte-[\w-]+" style="--below: 0px;">/,
+    )
+  })
+
+  it('sits right on the phone keyboard while it is open, with no gap for the safe area', () => {
+    const source = flat(composerSource)
+    expect(source).toContain('const keyboard = new Keyboard(globalThis)')
+    expect(source).toContain('$effect(() => keyboard.watch())')
+    expect(source).toContain('<div class="composer" class:keyboard={keyboard.covered} style:--below="{below}px">')
+    expect(source).toContain('.keyboard { margin-bottom: calc(-1 * var(--inset-wide)); padding-bottom: var(--inset-wide); }')
+  })
 })
