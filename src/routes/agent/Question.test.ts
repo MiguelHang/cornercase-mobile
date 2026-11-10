@@ -105,13 +105,15 @@ describe('Question', () => {
     ])
   })
 
-  it('offers no buttons for a single option', () => {
-    const body = drawn(questionOf(['Go on?', '1. Yes']))
+  it('offers no buttons when the screen holds no options', () => {
+    const body = drawn(questionOf(['Go on? (y/n)']))
     expect([options(body), body.includes('aria-label="Options"')]).toEqual([[], false])
   })
 
   it('scrolls the screen within its own box, never the page sideways, and keeps its end in sight', () => {
-    expect(flat(questionSource)).toContain('.screen { position: relative; max-height: 40dvh; overflow: auto;')
+    expect(flat(questionSource)).toContain(
+      '.screen { position: relative; flex: 0 1 auto; min-height: calc(3 * var(--line)); max-height: 40dvh; overflow: auto;',
+    )
     expect(flat(questionSource)).toContain('.rows, .probe { font-family: var(--font-mono); white-space: pre; }')
     expect(flat(questionSource)).toContain('if (question.rows.length > 0) anchor(box)')
   })

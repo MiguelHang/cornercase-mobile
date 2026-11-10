@@ -125,20 +125,25 @@ mod opening {
 }
 
 mod closing {
+    use rstest::rstest;
+
     use super::*;
 
     #[tokio::test(start_paused = true)]
     async fn cuts_the_surface_of_its_tab() {
         let asked = Watched::in_tab(942).await;
-        close(&asked.studio.state, 942);
+        close(&asked.studio.state, 942, 941);
         settle().await;
         assert_eq!(asked.surfaces.running(), 0);
     }
 
+    #[rstest]
+    #[case::of_another_tab(4, 941)]
+    #[case::of_another_pane_of_the_same_tab(942, 950)]
     #[tokio::test(start_paused = true)]
-    async fn leaves_the_question_of_another_tab() {
+    async fn leaves_the_question(#[case] tab: u64, #[case] pane: u64) {
         let asked = Watched::in_tab(942).await;
-        close(&asked.studio.state, 4);
+        close(&asked.studio.state, tab, pane);
         settle().await;
         assert_eq!(asked.surfaces.running(), 1);
     }
@@ -166,7 +171,7 @@ mod over_ipc {
     async fn closes_the_surface_of_its_tab() {
         let asked = Watched::in_tab(942).await;
         let ipc = Ipc::new(asked.studio.state);
-        assert_eq!(ipc.invoke("question_close", json!({ "tab": 942 })), Ok(Value::Null));
+        assert_eq!(ipc.invoke("question_close", json!({ "tab": 942, "pane": 941 })), Ok(Value::Null));
         settle().await;
         assert_eq!(asked.surfaces.running(), 0);
     }
@@ -174,6 +179,6 @@ mod over_ipc {
     #[test]
     fn closes_nothing_without_a_question() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        assert_eq!(ipc.invoke("question_close", json!({ "tab": 942 })), Ok(Value::Null));
+        assert_eq!(ipc.invoke("question_close", json!({ "tab": 942, "pane": 941 })), Ok(Value::Null));
     }
 }

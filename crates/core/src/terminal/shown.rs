@@ -43,7 +43,7 @@ impl Shown {
         })
     }
 
-    pub(crate) fn chosen<'a>(&self, grid: &'a Grid) -> Option<&'a PaneGrid> {
+    fn chosen<'a>(&self, grid: &'a Grid) -> Option<&'a PaneGrid> {
         let asked = self.asked.and_then(|asked| grid.panes.iter().find(|pane| pane.pane == asked));
         asked.or_else(|| grid.panes.iter().find(|pane| pane.active)).or_else(|| grid.panes.first())
     }

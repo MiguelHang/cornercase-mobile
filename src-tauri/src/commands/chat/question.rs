@@ -29,8 +29,8 @@ pub(crate) fn question_open<R: Runtime>(
 #[tauri::command]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn question_close(state: State<'_, AppState>, tab: u64) {
-    close(&state, tab);
+pub(crate) fn question_close(state: State<'_, AppState>, tab: u64, pane: u64) {
+    close(&state, tab, pane);
 }
 
 pub(crate) fn open(
@@ -42,13 +42,13 @@ pub(crate) fn open(
     let mut active = state.active();
     let active = active.as_mut().ok_or_else(CommandError::not_connected)?;
     let asked = ask(active.machine(), asking, active.store().clone(), emit);
-    active.ask(asking.tab, spawn(Box::pin(asked)));
+    active.ask(asking.tab, asking.pane, spawn(Box::pin(asked)));
     Ok(())
 }
 
-pub(crate) fn close(state: &AppState, tab: u64) {
+pub(crate) fn close(state: &AppState, tab: u64, pane: u64) {
     if let Some(active) = state.active().as_mut() {
-        active.unask(tab);
+        active.unask(tab, pane);
     }
 }
 

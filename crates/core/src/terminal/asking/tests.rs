@@ -125,6 +125,13 @@ mod the_question {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn is_said_again_after_a_line_that_is_not_a_surface() {
+        let surface = vec![asked(), Said::After(1), Said::Line("not json".to_owned()), Said::After(1), asked()];
+        let mut read = Read::after_a_minute(reading(vec![surface])).await;
+        assert_eq!(read.seen(), [(0, RED.to_owned()), (1, "failed".to_owned()), (2, RED.to_owned())]);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn is_not_said_again_for_a_patch_above_it() {
         let above = patched(&[(2, "Opus 5.5 with low effort")]);
         let mut read = Read::after_a_minute(reading(vec![vec![asked(), Said::After(1), above]])).await;
@@ -134,6 +141,7 @@ mod the_question {
     #[rstest]
     #[case::of_the_agent(941, RED)]
     #[case::of_the_shell_beside_it(950, "950: $ ls (0)")]
+    #[case::of_no_other_pane_when_the_one_asked_is_not_there(960, "960:  (0)")]
     #[tokio::test(start_paused = true)]
     async fn is_read_from_the_pane_asked_in_a_split_tab(#[case] pane: u64, #[case] expected: &str) {
         let mut read = Read::of_pane(pane, reading(vec![vec![beside_a_shell()]])).await;

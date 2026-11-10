@@ -1,7 +1,6 @@
 use super::grid::{Grid, Line};
 use super::live::{Live, Source, holds};
 use super::question::{Choice, cropped, options};
-use super::shown::Shown;
 use crate::cli::surface::{Colours, Size};
 use crate::error::Error;
 use crate::follow::{self, Notice, Opened, Reached, Step};
@@ -16,10 +15,12 @@ pub struct Question {
 }
 
 impl Question {
-    fn of(shown: &Shown, grid: &Grid) -> Option<Self> {
-        let pane = shown.chosen(grid)?;
+    fn of(asked: u64, grid: &Grid) -> Self {
+        let Some(pane) = grid.panes.iter().find(|pane| pane.pane == asked) else {
+            return Self { pane: asked, colours: Colours::default(), rows: Vec::new(), options: Vec::new() };
+        };
         let rows = cropped(pane);
-        Some(Self { pane: pane.pane, colours: pane.colours.clone(), rows: rows.to_vec(), options: options(rows) })
+        Self { pane: pane.pane, colours: pane.colours.clone(), rows: rows.to_vec(), options: options(rows) }
     }
 }
 
@@ -51,7 +52,7 @@ impl Asking {
     pub async fn run(self, store: Store, sink: impl FnMut(Asked) + Send) {
         let reading = |reached: Reached| Reading {
             live: Live::open(reached.transport, reached.queue, Source::Tab { tab: self.tab, size: self.size }),
-            shown: Shown::new(Some(self.pane)),
+            pane: self.pane,
             last: None,
         };
         follow::reopen(&store, |session| holds(session, self.tab), reading, sink).await;
@@ -60,13 +61,13 @@ impl Asking {
 
 struct Reading {
     live: Live,
-    shown: Shown,
+    pane: u64,
     last: Option<Question>,
 }
 
 impl Reading {
     fn asked(&mut self) -> Option<Asked> {
-        let question = Question::of(&self.shown, self.live.grid())?;
+        let question = Question::of(self.pane, self.live.grid());
         if self.last.as_ref() == Some(&question) {
             return None;
         }
@@ -80,6 +81,9 @@ impl Opened for Reading {
 
     async fn next(&mut self) -> Step<Option<Asked>> {
         let step = self.live.next().await;
+        if matches!(step, Step::Warned(_)) {
+            self.last = None;
+        }
         step.map(|_| self.asked())
     }
 }

@@ -373,6 +373,12 @@ describe('Agent, its field', () => {
   it('stays at the bottom of the screen while the message scrolls', () => {
     expect(flat(agentSource)).toContain('.composer { position: sticky; bottom: 0;')
   })
+
+  it('never grows over the bar and the title, scrolling within itself instead', () => {
+    expect(flat(agentSource)).toContain(
+      'max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
+    )
+  })
 })
 
 describe('Agent, without its row', () => {

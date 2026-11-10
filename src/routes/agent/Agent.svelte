@@ -133,6 +133,7 @@
     gap: var(--inset-wide);
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
+    --over-composer: 132px;
   }
 
   .note {
@@ -143,9 +144,13 @@
   .composer {
     position: sticky;
     bottom: 0;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--gap);
+    max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom));
     padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));
     background: var(--glass);

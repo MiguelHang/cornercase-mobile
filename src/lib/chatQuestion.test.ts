@@ -105,7 +105,7 @@ describe('Chat, closing its question', () => {
     const { chat, asker, tell, listening } = await watching()
     tell(asked(MENU))
     await turned(chat, status)
-    expect([chat.question, asker.close.mock.calls, listening()]).toEqual([null, [[TAB]], 0])
+    expect([chat.question, asker.close.mock.calls, listening()]).toEqual([null, [[TAB, PANE]], 0])
   })
 
   it('closes the question once its agent is gone', async () => {
@@ -113,7 +113,7 @@ describe('Chat, closing its question', () => {
     tell(asked(MENU))
     chat.see(MACHINE, [row(3, 'working')])
     await settle()
-    expect([chat.gone, chat.question, asker.close.mock.calls]).toEqual([true, null, [[TAB]]])
+    expect([chat.gone, chat.question, asker.close.mock.calls]).toEqual([true, null, [[TAB, PANE]]])
   })
 
   it('closes the question once nobody watches it, and hears no more', async () => {
@@ -121,7 +121,7 @@ describe('Chat, closing its question', () => {
     stop()
     await settle()
     tell(asked(MENU))
-    expect([chat.question, asker.close.mock.calls]).toEqual([null, [[TAB]]])
+    expect([chat.question, asker.close.mock.calls]).toEqual([null, [[TAB, PANE]]])
   })
 
   it('opens the question again once its agent waits again', async () => {
@@ -132,7 +132,7 @@ describe('Chat, closing its question', () => {
       [TAB, PANE],
       [TAB, PANE],
     ])
-    expect(asker.close.mock.calls).toEqual([[TAB]])
+    expect(asker.close.mock.calls).toEqual([[TAB, PANE]])
   })
 
   it('closes and opens again in the order asked, even before an open has settled', async () => {
@@ -158,7 +158,7 @@ describe('Chat, closing its question', () => {
     await settle()
     page.turn('hidden')
     await settle()
-    expect(asker.close.mock.calls).toEqual([[TAB]])
+    expect(asker.close.mock.calls).toEqual([[TAB, PANE]])
     page.turn('visible')
     await settle()
     expect(asker.open.mock.calls).toEqual([
@@ -188,7 +188,7 @@ describe('Chat, a question it cannot open', () => {
     await settle()
     stop()
     await settle()
-    expect([told.asker.open.mock.calls.length, told.asker.close.mock.calls]).toEqual([0, [[TAB]]])
+    expect([told.asker.open.mock.calls.length, told.asker.close.mock.calls]).toEqual([0, [[TAB, PANE]]])
   })
 })
 

@@ -36,11 +36,11 @@ pub(crate) struct Active {
     forwarder: JoinHandle<()>,
     terminal: Slot,
     changes: Slot,
-    question: Slot,
+    question: Slot<(u64, u64)>,
 }
 
 #[derive(Default)]
-struct Slot(Option<(u64, JoinHandle<()>)>);
+struct Slot<K = u64>(Option<(K, JoinHandle<()>)>);
 
 impl AppState {
     pub(crate) fn load(data_dir: Result<PathBuf, impl Display>, secrets: Arc<dyn Secrets>) -> Self {
@@ -137,7 +137,7 @@ impl Active {
     }
 
     pub(crate) fn hide(&mut self, tab: u64) {
-        self.terminal.empty(tab);
+        self.terminal.empty(&tab);
     }
 
     pub(crate) fn follow(&mut self, workspace: u64, changes: JoinHandle<()>) {
@@ -145,15 +145,15 @@ impl Active {
     }
 
     pub(crate) fn unfollow(&mut self, workspace: u64) {
-        self.changes.empty(workspace);
+        self.changes.empty(&workspace);
     }
 
-    pub(crate) fn ask(&mut self, tab: u64, question: JoinHandle<()>) {
-        self.question.fill(tab, question);
+    pub(crate) fn ask(&mut self, tab: u64, pane: u64, question: JoinHandle<()>) {
+        self.question.fill((tab, pane), question);
     }
 
-    pub(crate) fn unask(&mut self, tab: u64) {
-        self.question.empty(tab);
+    pub(crate) fn unask(&mut self, tab: u64, pane: u64) {
+        self.question.empty(&(tab, pane));
     }
 }
 
@@ -164,18 +164,20 @@ impl Drop for Active {
     }
 }
 
-impl Slot {
-    fn fill(&mut self, key: u64, task: JoinHandle<()>) {
+impl<K: PartialEq> Slot<K> {
+    fn fill(&mut self, key: K, task: JoinHandle<()>) {
         self.stop();
         self.0 = Some((key, task));
     }
 
-    fn empty(&mut self, key: u64) {
-        if self.0.as_ref().is_some_and(|(held, _)| *held == key) {
+    fn empty(&mut self, key: &K) {
+        if self.0.as_ref().is_some_and(|(held, _)| held == key) {
             self.stop();
         }
     }
+}
 
+impl<K> Slot<K> {
     fn stop(&mut self) {
         if let Some((_, task)) = self.0.take() {
             task.abort();
@@ -183,7 +185,7 @@ impl Slot {
     }
 }
 
-impl Drop for Slot {
+impl<K> Drop for Slot<K> {
     fn drop(&mut self) {
         self.stop();
     }

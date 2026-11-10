@@ -57,7 +57,7 @@ export class Questions {
     this.#opened = null
     this.question = null
     opened.unlisten.then((stop) => stop()).catch(quietly)
-    this.#queue(() => this.#asker.close(opened.tab))
+    this.#queue(() => this.#asker.close(opened.tab, this.#pane))
   }
 
   #queue(call: () => Promise<unknown>) {

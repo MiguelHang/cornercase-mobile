@@ -23,7 +23,6 @@
 
   const cell = $derived(measured > 0 ? measured : ADVANCE)
   const ink = $derived(paneColours(question.colours))
-  const options = $derived(question.options.length < 2 ? [] : question.options)
   const cols = $derived(Math.max(0, ...question.rows.map((runs) => runs.reduce((sum, run) => sum + run.width, 0))))
 
   const measure = (probe: HTMLElement) => {
@@ -52,9 +51,9 @@
   </div>
   <span class="probe" aria-hidden="true"><span {@attach measure}>{PROBE}</span></span>
 </div>
-{#if options.length > 0}
+{#if question.options.length > 0}
   <div class="options" role="group" aria-label="Options">
-    {#each options as option (option.number)}
+    {#each question.options as option (option.number)}
       <Button tone="plain" label="Option {option.number}, {option.label}" onclick={() => onoption(option.number)}
         ><span class="label">{option.number}. {option.label}</span></Button
       >
@@ -65,6 +64,8 @@
 <style>
   .screen {
     position: relative;
+    flex: 0 1 auto;
+    min-height: calc(3 * var(--line));
     max-height: 40dvh;
     overflow: auto;
     padding: var(--gap);

@@ -265,7 +265,7 @@ mod an_active_store {
         let (changes, terminal, question) = (Arc::new(()), Arc::new(()), Arc::new(()));
         active.follow(2, task(&changes));
         active.show(3, task(&terminal));
-        active.ask(3, task(&question));
+        active.ask(3, 5, task(&question));
         Held { active, changes, terminal, question }
     }
 
@@ -299,16 +299,24 @@ mod an_active_store {
     #[tokio::test(start_paused = true)]
     async fn keeps_the_terminal_of_a_tab_while_its_question_is_dropped() {
         let Held { mut active, terminal, question, .. } = held();
-        active.unask(3);
+        active.unask(3, 5);
         released(&question).await;
         assert!(holds(&terminal));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_the_question_of_a_pane_when_another_pane_of_its_tab_is_unasked() {
+        let Held { mut active, question, .. } = held();
+        active.unask(3, 6);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&question));
     }
 
     #[tokio::test(start_paused = true)]
     async fn ends_the_previous_question_when_another_is_asked() {
         let Held { mut active, terminal, question, .. } = held();
         let next = Arc::new(());
-        active.ask(4, task(&next));
+        active.ask(4, 5, task(&next));
         released(&question).await;
         assert!(holds(&next) && holds(&terminal));
     }
@@ -318,7 +326,7 @@ mod an_active_store {
         let Held { mut active, changes, terminal, question } = held();
         active.unfollow(3);
         active.hide(2);
-        active.unask(2);
+        active.unask(2, 5);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         assert!(holds(&changes) && holds(&terminal) && holds(&question));
     }
