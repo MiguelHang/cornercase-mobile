@@ -42,8 +42,10 @@ const optionOf = (flow: FlowChoice): FlowOption => ({
   problem: flow.problems[0] ?? null,
 })
 
+const nameKey = (name: string) => name.trim().toLowerCase()
+
 const firstOfEachName = (flows: FlowChoice[]) =>
-  flows.filter((flow, at) => flows.findIndex((other) => other.name === flow.name) === at)
+  flows.filter((flow, at) => flows.findIndex((other) => nameKey(other.name) === nameKey(flow.name)) === at)
 
 const teamOf = (flow: FlowChoice) => {
   const leads = flow.roles.filter((role) => role.role === ORCHESTRATOR)
@@ -116,7 +118,7 @@ export class FlowStart {
   }
 
   async retry() {
-    if (this.#project !== null) {
+    if (this.#project !== null && this.#readable) {
       await this.#ask(this.#project)
     }
   }
@@ -148,7 +150,7 @@ export class FlowStart {
 
   async look() {
     const place = this.#flowPlace()
-    if (place !== undefined && this.#form.placesWhere(worktrees).kind === 'ready') {
+    if (place !== undefined && this.#readable) {
       await this.read(place.project, this.#form.boot)
     }
   }
@@ -171,6 +173,10 @@ export class FlowStart {
     if (await form.launch(() => this.#calls.startFlow(run), FLOW_UNANSWERED)) {
       this.remember(chosen.name)
     }
+  }
+
+  get #readable() {
+    return this.#form.placesWhere(worktrees).kind === 'ready'
   }
 
   #placeFor(mode: StartMode) {
