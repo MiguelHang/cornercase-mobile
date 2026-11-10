@@ -244,8 +244,19 @@ describe('Question, as a card', () => {
   })
 
   it('never keeps a line whole nor cuts it with an ellipsis', () => {
-    expect(flat(cardSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow|overflow-x/)
+    expect(flat(cardSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow|overflow-x: (auto|scroll|visible)/)
     expect(flat(tabsSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow/)
+  })
+
+  it('yields to the composer and scrolls only up and down inside itself', () => {
+    expect(flat(cardSource)).toContain(
+      '.card { display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--gap); min-width: 0; min-height: 0; max-height: 40dvh; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;',
+    )
+  })
+
+  it('follows the chosen option when it changes', () => {
+    expect(flat(cardSource)).toContain('{@attach follow(chosen)}')
+    expect(flat(cardSource)).toContain('box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())')
   })
 
   it('wraps the tabs onto more lines rather than hiding any', () => {

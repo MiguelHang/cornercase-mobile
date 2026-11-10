@@ -1,5 +1,7 @@
 <script lang="ts">
+  import type { Attachment } from 'svelte/attachments'
   import type { Card_Serialize as Card, CardOption_Serialize as CardOption } from '../../lib/bindings'
+  import { revealBy } from '../../lib/reveal'
   import Button from '../../lib/ui/Button.svelte'
   import QuestionTabs from './QuestionTabs.svelte'
 
@@ -17,9 +19,20 @@
 
   const named = (option: CardOption) =>
     [`Option ${option.number}`, option.label, ...(option.detail === null ? [] : [option.detail])].join(', ')
+
+  const chosen = $derived(card.options.find((option) => option.selected)?.number ?? null)
+
+  const follow =
+    (number: number | null): Attachment<HTMLElement> =>
+    (box) => {
+      const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
+      if (option !== null) {
+        box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())
+      }
+    }
 </script>
 
-<div class="card" role="group" aria-label="{agent} asks">
+<div class="card" role="group" aria-label="{agent} asks" {@attach follow(chosen)}>
   {#if card.tabs.length > 0}
     <QuestionTabs tabs={card.tabs} open={card.open} {ontab} />
   {/if}
@@ -49,9 +62,15 @@
 <style>
   .card {
     display: flex;
+    flex: 0 1 auto;
     flex-direction: column;
     gap: var(--gap);
     min-width: 0;
+    min-height: 0;
+    max-height: 40dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     color: var(--text);
   }
 
