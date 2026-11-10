@@ -41,7 +41,6 @@ export class BackSwipe {
     this.#from = point
     this.#moved = [0, 0]
     this.#pressed = at
-    this.#shift = 0
     this.#last = { x: point[0], at }
     return this.#state
   }
@@ -154,8 +153,6 @@ class Watch {
 
   stop() {
     clearTimeout(this.#leaving)
-    this.#leaving = undefined
-    this.#swipe.cancel()
     edge.state = 'idle'
     this.#show(0, false)
   }

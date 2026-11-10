@@ -148,6 +148,15 @@ describe('BackSwipe', () => {
       expect(moved(CLAIM, 0, HOLD).state).toBe('claimed')
     })
 
+    it.each([
+      ['claims at the end of a wait counted from the touch', HOLD, 'claimed'],
+      ['cancels after a wait counted from the touch', HOLD + 1, 'cancelled'],
+    ])('%s', (_, wait, state) => {
+      const swipe = new BackSwipe()
+      swipe.press(1, [X, Y], 1000)
+      expect(swipe.move(1, [X + CLAIM, Y], 1000 + wait).state).toBe(state)
+    })
+
     it('cancels after the wait', () => {
       expect(moved(CLAIM, 0, HOLD + 1)).toEqual(STILL)
     })
@@ -202,11 +211,14 @@ describe('BackSwipe', () => {
       expect(swipe.lift(1, 200 + CLAIM / FLING, WIDTH)).toBe('back')
     })
 
-    it('measures the first move from the touch', () => {
+    it.each([
+      ['goes back', 0, 'back'],
+      ['settles', 1, 'settle'],
+    ])('measures the first move from the touch, so it %s', (_, late, ending) => {
       const swipe = new BackSwipe()
-      swipe.press(1, [X, Y], 100)
-      swipe.move(1, [X + CLAIM, Y], 110)
-      expect(swipe.lift(1, 100 + CLAIM / FLING, WIDTH)).toBe('back')
+      swipe.press(1, [EDGE, Y], 100)
+      swipe.move(1, [EDGE + CLAIM, Y], 110)
+      expect(swipe.lift(1, 100 + CLAIM / FLING + late, WIDTH)).toBe(ending)
     })
 
     it('settles a fling to the left', () => {
@@ -449,6 +461,13 @@ describe('watchBackSwipe', () => {
       touch('touchstart', X, 4010, 2)
       expect(edge.state).toBe('idle')
     })
+
+    it('takes touches again once it went back', () => {
+      const { touch } = lifted(FAR)
+      vi.runAllTimers()
+      touch('touchstart', X, 5000, 2)
+      expect(edge.state).toBe('pending')
+    })
   })
 
   describe('with Reduce Motion', () => {
@@ -470,13 +489,15 @@ describe('watchBackSwipe', () => {
   })
 
   describe('cancelling', () => {
-    it.each(['touchcancel', 'pointercancel'])('settles back on a %s, going back never', (name) => {
+    it.each(['touchcancel', 'pointercancel'])('settles back at once on a %s, following and going back never', (name) => {
       const { touch, seen } = dragged(60)
       seen.length = 0
       touch(name, X + 60, 2010)
+      const settled = [[...seen], edge.state]
+      touch('touchmove', X + FAR, 2015)
       touch('touchend', X + FAR, 2020)
       vi.runAllTimers()
-      expect([seen, edge.state]).toEqual([[SETTLED], 'idle'])
+      expect([settled, seen, edge.state]).toEqual([[[SETTLED], 'idle'], [SETTLED], 'idle'])
     })
 
     it('settles back when a second finger comes', () => {
