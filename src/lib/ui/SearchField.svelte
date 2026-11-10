@@ -6,36 +6,81 @@
     label,
     value = $bindable(''),
     oninput,
+    oncancel,
   }: {
     label: string
     value?: string
     oninput?: FormEventHandler<HTMLInputElement>
+    oncancel?: () => void
   } = $props()
+
+  let field: HTMLInputElement | undefined = $state()
+
+  let focused = $state(false)
+
+  const cancelling = $derived(oncancel !== undefined && (focused || value !== ''))
+
+  const cancel = () => {
+    value = ''
+    field?.blur()
+    oncancel?.()
+  }
+
+  const submit = (event: KeyboardEvent) => {
+    if (oncancel !== undefined && event.key === 'Enter') {
+      field?.blur()
+    }
+  }
 </script>
 
-<label class="search">
-  <Icon name="search" size={18} />
-  <input
-    class="query"
-    type="search"
-    aria-label={label}
-    placeholder={label}
-    autocomplete="off"
-    autocapitalize="off"
-    autocorrect="off"
-    spellcheck="false"
-    enterkeyhint="search"
-    bind:value
-    {oninput}
-  />
-</label>
+<div class="bar">
+  <label class="search">
+    <Icon name="search" size={18} />
+    <input
+      class="query"
+      type="search"
+      aria-label={label}
+      placeholder={label}
+      autocomplete="off"
+      autocapitalize="off"
+      autocorrect="off"
+      spellcheck="false"
+      enterkeyhint="search"
+      bind:this={field}
+      bind:value
+      {oninput}
+      onfocus={() => (focused = true)}
+      onblur={() => (focused = false)}
+      onkeydown={submit}
+    />
+  </label>
+  {#if cancelling}
+    <button
+      class="cancel"
+      type="button"
+      onmousedown={(event) => event.preventDefault()}
+      onclick={cancel}
+      ontouchstart={() => {}}
+    >
+      Cancel
+    </button>
+  {/if}
+</div>
 
 <style>
-  .search {
-    box-sizing: border-box;
+  .bar {
     display: flex;
     align-items: center;
     gap: var(--gap);
+  }
+
+  .search {
+    box-sizing: border-box;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--gap);
+    min-width: 0;
     min-height: 44px;
     padding: 0 12px;
     border: 1px solid var(--edge);
@@ -66,5 +111,20 @@
 
   .query::placeholder {
     color: var(--faint);
+  }
+
+  .cancel {
+    flex: none;
+    min-height: 44px;
+    padding: 0 4px;
+    border: none;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 16px;
+  }
+
+  .cancel:active {
+    opacity: 0.5;
   }
 </style>

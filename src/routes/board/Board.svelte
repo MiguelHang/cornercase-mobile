@@ -2,9 +2,11 @@
   import { flip } from 'svelte/animate'
   import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
   import { items } from '../../lib/board'
+  import { boardSearch } from '../../lib/boardSearch.svelte'
   import { folds } from '../../lib/folds.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
+  import SearchField from '../../lib/ui/SearchField.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
   import AgentRow from './AgentRow.svelte'
 
@@ -43,6 +45,16 @@
     }
   }
 
+  const query = $derived(machine === null ? '' : boardSearch.query(machine))
+
+  const search = (text: string) => {
+    if (machine !== null) {
+      boardSearch.write(machine, text)
+    }
+  }
+
+  const shown = $derived(agents === null ? [] : items(agents, opened, query))
+
   const moving = { duration: prefersReducedMotion() ? 0 : ENTER_MS }
 </script>
 
@@ -58,17 +70,29 @@
   {:else if agents.length === 0}
     <p class="empty">No agents running.</p>
   {:else}
-    <ul class="items">
-      {#each items(agents, opened) as item (item.key)}
-        <li class="item" animate:flip={moving}>
-          {#if item.kind === 'header'}
-            <h2 class="section">{item.section}</h2>
-          {:else}
-            <AgentRow {item} {agents} {now} {onopen} onfold={fold} />
-          {/if}
-        </li>
-      {/each}
-    </ul>
+    <div class="find">
+      <SearchField
+        label="Search agents"
+        value={query}
+        oninput={(event) => search(event.currentTarget.value)}
+        oncancel={() => search('')}
+      />
+    </div>
+    {#if shown.length === 0}
+      <p class="empty">No agent matches the search</p>
+    {:else}
+      <ul class="items">
+        {#each shown as item (item.key)}
+          <li class="item" animate:flip={moving}>
+            {#if item.kind === 'header'}
+              <h2 class="section">{item.section}</h2>
+            {:else}
+              <AgentRow {item} {agents} {now} {onopen} onfold={fold} />
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
 </section>
 
@@ -80,6 +104,10 @@
   .actions {
     display: flex;
     justify-content: flex-end;
+    margin-bottom: var(--inset);
+  }
+
+  .find {
     margin-bottom: var(--inset);
   }
 

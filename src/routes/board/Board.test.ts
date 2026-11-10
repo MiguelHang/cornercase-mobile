@@ -1,11 +1,13 @@
 import { render } from 'svelte/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
+import { boardSearch } from '../../lib/boardSearch.svelte'
 import { folds } from '../../lib/folds.svelte'
 import hiddenSource from '../../lib/ui/Hidden.svelte?raw'
 import Board from './Board.svelte'
 import boardSource from './Board.svelte?raw'
 import rowSource from './AgentRow.svelte?raw'
+import searchSource from '../../lib/ui/SearchField.svelte?raw'
 
 const NOW = Date.parse('2026-11-09T12:00:00.000Z')
 
@@ -139,8 +141,9 @@ describe('Board', () => {
   it('keys every item by its section or pane and moves them with flip, still with reduced motion', () => {
     const source = flat(boardSource)
     expect(source).toContain(
-      '{#each items(agents, opened) as item (item.key)} <li class="item" animate:flip={moving}>',
+      '{#each shown as item (item.key)} <li class="item" animate:flip={moving}>',
     )
+    expect(source).toContain('const shown = $derived(agents === null ? [] : items(agents, opened, query))')
     expect(source).toContain('const moving = { duration: prefersReducedMotion() ? 0 : ENTER_MS }')
   })
 
@@ -284,6 +287,107 @@ describe('Board', () => {
   })
 
   it('keeps every branch folded without a machine', () => {
+    expect(titles(draw(BRANCH, CONNECTED, 0, null))).toEqual(['Lead'])
+  })
+})
+
+describe('Board search', () => {
+  const searching = (machine: number, query: string) => {
+    boardSearch.write(machine, query)
+    return machine
+  }
+
+  const field = (body: string) => body.match(/<input class="query svelte-[\w-]+" type="search"[^>]*>/)?.[0] ?? null
+
+  const CANCEL = /<button class="cancel svelte-[\w-]+" type="button">Cancel<\/button>/
+
+  afterEach(() => {
+    boardSearch.write(0, '')
+  })
+
+  it('draws a search field named Search agents between Start and the list, with the attributes of the other fields', () => {
+    const body = draw(BRANCH)
+    expect(field(body)).toMatch(
+      /^<input class="query svelte-[\w-]+" type="search" aria-label="Search agents" placeholder="Search agents" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" value=""\/>$/,
+    )
+    expect(body.indexOf('>Start<')).toBeLessThan(body.indexOf('type="search"'))
+    expect(body.indexOf('type="search"')).toBeLessThan(body.indexOf('<ul'))
+    expect(flat(boardSource)).toContain('.find { margin-bottom: var(--inset); }')
+    expect(boardSource).not.toContain('sticky')
+  })
+
+  it.each<[string, Agent[] | null]>([
+    ['no agent runs', []],
+    ['the list has not come', null],
+  ])('draws no search field while %s, and keeps the query', (_, agents) => {
+    const machine = searching(40, 'dig')
+    expect(field(draw(agents, CONNECTED, 0, machine))).toBeNull()
+    expect(boardSearch.query(machine)).toBe('dig')
+  })
+
+  it('shows what matches with its parents, unfolded and without a disclosure, and leaves the folds alone', () => {
+    const machine = searching(41, 'dig')
+    const body = draw(BRANCH, CONNECTED, 0, machine)
+    expect(titles(body)).toEqual(['Lead', 'Ask', 'Dig'])
+    expect(disclosures(body)).toEqual([])
+    expect(body).not.toContain('class="folded')
+    expect(field(body)).toContain('value="dig"')
+    expect(folds.expanded(machine, 'b1').size).toBe(0)
+  })
+
+  it('says so when nothing matches, and keeps the field to fix the query', () => {
+    const body = draw(BRANCH, CONNECTED, 0, searching(42, 'zebra'))
+    expect(body).toMatch(/<p class="empty svelte-[\w-]+">No agent matches the search<\/p>/)
+    expect(body).not.toContain('<ul')
+    expect(field(body)).toContain('value="zebra"')
+  })
+
+  it('offers Cancel beside a field with text, and not beside an empty one', () => {
+    expect(draw(BRANCH, CONNECTED, 0, searching(43, 'ask'))).toMatch(CANCEL)
+    expect(draw(BRANCH, CONNECTED, 0, searching(44, ''))).not.toContain('>Cancel<')
+  })
+
+  it('empties the query and leaves the field on Cancel, then shows the board folded as before', () => {
+    const search = flat(searchSource)
+    expect(search).toContain('const cancelling = $derived(oncancel !== undefined && (focused || value !== \'\'))')
+    expect(search).toContain("const cancel = () => { value = '' field?.blur() oncancel?.() }")
+    expect(search).toContain('onmousedown={(event) => event.preventDefault()} onclick={cancel}')
+    expect(search).toContain('onfocus={() => (focused = true)} onblur={() => (focused = false)}')
+    expect(flat(boardSource)).toContain("oncancel={() => search('')}")
+    const machine = unfolded(45, 2)
+    searching(machine, 'dig')
+    searching(machine, '')
+    const body = draw(BRANCH, CONNECTED, 0, machine)
+    expect(titles(body)).toEqual(['Lead'])
+    expect(disclosures(body).map(([label]) => label)).toEqual(['Show 2 subagents'])
+    expect(folds.expanded(machine, 'b1')).toEqual(new Set([2]))
+  })
+
+  it('leaves the field on Enter and keeps the query', () => {
+    expect(flat(searchSource)).toContain(
+      "const submit = (event: KeyboardEvent) => { if (oncancel !== undefined && event.key === 'Enter') { field?.blur() } }",
+    )
+    expect(flat(searchSource)).toContain('onkeydown={submit}')
+  })
+
+  it('writes each input as the query of its machine', () => {
+    expect(flat(boardSource)).toContain('oninput={(event) => search(event.currentTarget.value)}')
+    expect(flat(boardSource)).toContain(
+      'const search = (text: string) => { if (machine !== null) { boardSearch.write(machine, text) } }',
+    )
+  })
+
+  it('keeps the query when the board comes back on the same machine, and starts empty on another', () => {
+    const machine = searching(46, 'ask')
+    expect(titles(draw(BRANCH, CONNECTED, 0, machine))).toEqual(['Lead', 'Ask'])
+    expect(titles(draw(BRANCH, CONNECTED, 0, machine))).toEqual(['Lead', 'Ask'])
+    const other = draw(BRANCH, CONNECTED, 0, 47)
+    expect(titles(other)).toEqual(['Lead'])
+    expect(field(other)).toContain('value=""')
+  })
+
+  it('searches nothing without a machine', () => {
+    searching(48, 'dig')
     expect(titles(draw(BRANCH, CONNECTED, 0, null))).toEqual(['Lead'])
   })
 })

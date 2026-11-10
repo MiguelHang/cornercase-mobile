@@ -234,7 +234,16 @@ describe('SearchField', () => {
 
   it('binds its value and passes each input on', () => {
     expect(searchFieldSource).toContain("value = $bindable('')")
-    expect(flat(searchFieldSource)).toContain('bind:value {oninput} />')
+    expect(flat(searchFieldSource)).toContain('bind:this={field} bind:value {oninput}')
+  })
+
+  it('offers no Cancel without oncancel, even with text', () => {
+    expect(body).not.toContain('Cancel')
+  })
+
+  it('offers a text Cancel beside the field when it can be cancelled', () => {
+    const cancelled = render(SearchField, { props: { label: 'Search agents', value: 'pay', oncancel: () => {} } }).body
+    expect(cancelled).toMatch(/<\/label> (?:<!--[^>]*-->)*<button class="cancel svelte-[\w-]+" type="button">Cancel<\/button>/)
   })
 
   it.each([
@@ -243,6 +252,8 @@ describe('SearchField', () => {
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
     '.query::placeholder { color: var(--faint); }',
+    '.bar { display: flex; align-items: center; gap: var(--gap); }',
+    '.cancel { flex: none; min-height: 44px; padding: 0 4px; border: none; background: none; color: var(--accent);',
   ])('holds %s', (text) => {
     expect(flat(searchFieldSource)).toContain(text)
   })
