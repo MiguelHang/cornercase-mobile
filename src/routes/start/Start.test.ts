@@ -14,6 +14,8 @@ import agentSource from './AgentForm.svelte?raw'
 import pickerSource from './AgentPicker.svelte?raw'
 import issueSource from './IssueForm.svelte?raw'
 import Picker from './Picker.svelte'
+import Segmented from './Segmented.svelte'
+import segmentedSource from './Segmented.svelte?raw'
 import ShowIssues from './ShowIssues.svelte'
 import showSource from './ShowIssues.svelte?raw'
 import Start from './Start.svelte'
@@ -430,6 +432,21 @@ describe('Switch', () => {
   })
 })
 
+describe('Segmented', () => {
+  it('presses the chosen option of a labelled group and turns every option off while disabled', () => {
+    const options: ['agent' | 'flow', string][] = [
+      ['agent', 'Agent'],
+      ['flow', 'Flow'],
+    ]
+    const body = render(Segmented, { props: { label: 'Who works', options, value: 'flow', disabled: true } }).body
+    expect(body).toMatch(/<div class="actions[^"]*" role="group" aria-label="Who works">/)
+    const buttons = [...body.matchAll(/<button[^>]*aria-pressed="(\w+)"([^>]*)>(\w+)<\/button>/g)]
+    expect(buttons.map(([, pressed, rest, words]) => [words, pressed, rest.includes('disabled=""')])).toEqual([
+      ['Agent', 'false', true],
+      ['Flow', 'true', true],
+    ])
+  })
+})
 
 describe('Picker', () => {
   it('offers no Try again when nothing can be read again', () => {
@@ -452,7 +469,8 @@ describe('Start wiring', () => {
     const script = flat(startSource)
     expect(script).toContain('form = new StartForm(commands, (started, agent) => onstarted(started, agent)),')
     expect(script).toContain('<NavBar {backTo} title="Start" {onback} topmost />')
-    expect(script).toContain('onclick={() => (action = name)}')
+    expect(script).toContain('options={ACTIONS} bind:value={action} disabled={form.sending}')
+    expect(flat(segmentedSource)).toContain('onclick={() => (value = name)}')
     expect(script).toContain("{:else if action === 'agent'} <AgentForm {form} {sendable} />")
     expect(script).toContain('{:else} <ShowIssues {sendable} onshow={onissues} />')
   })
@@ -462,7 +480,7 @@ describe('Start wiring', () => {
     expect(script).toContain(
       'untrack(() => { if (issue !== undefined) { form.forIssue(issue) } if (workspace !== undefined) { form.prefer(workspace) } })',
     )
-    expect(script).toContain('{#if form.issue === null} <div class="actions"')
+    expect(script).toContain('{#if form.issue === null} <Segmented label="What to start"')
     expect(script).toContain('{#if form.issue !== null} <IssueForm {form} {sendable} />')
   })
 
