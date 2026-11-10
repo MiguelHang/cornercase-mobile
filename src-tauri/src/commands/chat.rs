@@ -1,5 +1,5 @@
-use cornercase_core::cli::keys;
 use cornercase_core::cli::last_message::{self, LastMessage};
+use cornercase_core::cli::{keys, mark};
 use cornercase_core::transport::{self, Stdin};
 use tauri::State;
 
@@ -30,6 +30,12 @@ pub(crate) async fn keys(state: State<'_, AppState>, pane: u64, key: String) -> 
     press_key(&state, pane, &key).await
 }
 
+#[tauri::command(async)]
+#[specta::specta]
+pub(crate) async fn reviewed(state: State<'_, AppState>, pane: u64) -> Result<(), CommandError> {
+    mark_reviewed(&state, pane).await
+}
+
 pub(crate) async fn read_last_message(state: &AppState, pane: u64) -> Result<LastMessage, CommandError> {
     let transport = connected(state)?;
     transport::json(transport.as_ref(), last_message::args(pane)).await.map_err(|error| CommandError::reason(&error))
@@ -46,6 +52,10 @@ pub(crate) async fn send_message(state: &AppState, pane: u64, text: String, forc
 pub(crate) async fn press_key(state: &AppState, pane: u64, key: &str) -> Result<(), CommandError> {
     let args = keys::args(pane, key).map_err(|error| CommandError::reason(&error))?;
     ask(state, args, None).await
+}
+
+pub(crate) async fn mark_reviewed(state: &AppState, pane: u64) -> Result<(), CommandError> {
+    ask(state, mark::reviewed_args(pane), None).await
 }
 
 #[cfg(test)]
