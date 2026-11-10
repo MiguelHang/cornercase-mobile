@@ -11,7 +11,7 @@ import type {
   Toast,
 } from './bindings'
 import { CLOSED } from './changes.svelte'
-import { childOf, FilesState, highlight, SEARCH_DELAY, type Calls, type Row } from './files.svelte'
+import { childOf, FilesState, highlight, iconOf, SEARCH_DELAY, type Calls, type Row } from './files.svelte'
 
 const MACHINE = 1
 const WORKSPACE = 3
@@ -129,6 +129,24 @@ describe('FilesState, its tree', () => {
 
   it('names a child by its folder, the root adding nothing', () => {
     expect([childOf('', 'src'), childOf('src', 'cli')]).toEqual(['src', 'src/cli'])
+  })
+
+  it.each([
+    ['folder', 'src', false, 'folder'],
+    ['folder', 'src', true, 'folder-open'],
+    ['folder', 'shots.png', false, 'folder'],
+    ['file', 'main.rs', false, 'file'],
+    ['file', 'logo.svg', false, 'file'],
+    ['file', 'photo.JPEG', false, 'image'],
+    ['file', 'a.jpg', false, 'image'],
+    ['file', 'b.gif', false, 'image'],
+    ['file', 'c.webp', false, 'image'],
+    ['file', 'd.bmp', false, 'image'],
+    ['file', 'png', false, 'file'],
+    ['other', 'socket.png', false, 'image'],
+    ['other', 'fifo', false, 'file'],
+  ] as const)('draws a %s named %s (open: %s) with the %s icon', (kind, name, open, icon) => {
+    expect(iconOf(kind, name, open)).toBe(icon)
   })
 
   it('opens a folder under its row, a level deeper, with a spinner while it lists', async () => {

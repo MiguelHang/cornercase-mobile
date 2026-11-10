@@ -10,6 +10,7 @@ import type {
 } from './bindings'
 import { CLOSED } from './changes.svelte'
 import { messageOf } from './toasts'
+import type { IconName } from './ui/icons/shapes'
 
 export type Calls = {
   list: typeof commands.filesList
@@ -48,6 +49,15 @@ export const highlight = (path: string, indices: readonly number[]): Piece[] =>
       ? [...pieces.slice(0, -1), { text: last.text + char, hit }]
       : [...pieces, { text: char, hit }]
   }, [])
+
+const PICTURES = /\.(png|jpe?g|gif|webp|bmp)$/i
+
+export const iconOf = (kind: Entry['kind'], name: string, open: boolean): IconName => {
+  if (kind === 'folder') {
+    return open ? 'folder-open' : 'folder'
+  }
+  return PICTURES.test(name) ? 'image' : 'file'
+}
 
 export const childOf = (folder: string, name: string) => (folder === ROOT ? name : `${folder}/${name}`)
 
