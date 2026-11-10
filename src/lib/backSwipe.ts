@@ -28,6 +28,7 @@ export class BackSwipe {
   #fingers = new Set<number>()
   #state: EdgeState = 'cancelled'
   #from: Point = [0, 0]
+  #moved: Point = [0, 0]
   #pressed = 0
   #shift = 0
   #before: Sample = { x: 0, at: 0 }
@@ -38,6 +39,7 @@ export class BackSwipe {
     if (this.#fingers.size > 1) return this.#drop()
     this.#state = point[0] <= EDGE ? 'pending' : 'cancelled'
     this.#from = point
+    this.#moved = [0, 0]
     this.#pressed = at
     this.#shift = 0
     this.#last = { x: point[0], at }
@@ -48,6 +50,7 @@ export class BackSwipe {
     if (!this.#fingers.has(id)) return this.#step()
     this.#expire(at)
     const moved: Point = [x - this.#from[0], y - this.#from[1]]
+    this.#moved = moved
     if (this.#state === 'pending' && Math.hypot(...moved) >= CLAIM) this.#state = claimed(moved)
     this.#before = this.#last
     this.#last = { x, at }
@@ -63,6 +66,10 @@ export class BackSwipe {
     if (state === 'pending') return 'tap'
     if (state !== 'claimed') return 'none'
     return shift >= width * SHARE || this.#speed(at) >= FLING ? 'back' : 'settle'
+  }
+
+  get holds() {
+    return this.#state === 'claimed' || (this.#state === 'pending' && claimed(this.#moved) === 'claimed')
   }
 
   cancel() {
@@ -132,7 +139,7 @@ class Watch {
   moved(event: Touches) {
     for (const { identifier, clientX, clientY } of touched(event))
       this.#follow(this.#swipe.move(identifier, [clientX, clientY], event.timeStamp))
-    if (edge.state === 'claimed') event.preventDefault()
+    if (this.#swipe.holds) event.preventDefault()
   }
 
   lifted(event: Touches) {

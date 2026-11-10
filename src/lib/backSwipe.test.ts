@@ -14,6 +14,7 @@ import {
 } from './backSwipe'
 import { edge } from './edge.svelte'
 import type { Route } from './router.svelte'
+import type { Point } from './terminal/pinch'
 import { LEAVE_MS } from './ui/motion'
 
 const WIDTH = 400
@@ -99,6 +100,46 @@ describe('BackSwipe', () => {
 
     it('is never negative', () => {
       expect(claimed().move(1, [0, Y], 40)).toEqual({ state: 'claimed', shift: 0 })
+    })
+  })
+
+  describe('holding the page', () => {
+    const after = (...moves: Point[]) => {
+      const swipe = pressed()
+      moves.forEach((point, at) => swipe.move(1, point, 10 * (at + 1)))
+      return swipe.holds
+    }
+
+    it.each([
+      ['a touch that has not moved', false, []],
+      ['a waiting finger that moved more right than up or down', true, [[X + 1, Y]]],
+      ['a waiting finger that moved down', false, [[X, Y + 1]]],
+      ['a waiting finger that moved as much down as right', false, [[X + 1, Y + 1]]],
+      ['a waiting finger that moved left', false, [[X - 1, Y]]],
+      ['a claimed finger that turns down', true, [[X + CLAIM, Y], [X, Y + 100]]],
+      ['a cancelled finger that turns right', false, [[X, Y + CLAIM], [X + 100, Y + CLAIM]]],
+    ] as [string, boolean, Point[]][])('for %s is %s', (_, holds, moves) => {
+      expect(after(...moves)).toBe(holds)
+    })
+
+    it('never holds for a touch away from the edge', () => {
+      const swipe = pressed(EDGE + 1)
+      swipe.move(1, [EDGE + 2, Y], 10)
+      expect(swipe.holds).toBe(false)
+    })
+
+    it('lets go once the finger lifts', () => {
+      const swipe = claimed()
+      swipe.lift(1, 40, WIDTH)
+      expect(swipe.holds).toBe(false)
+    })
+
+    it('starts again from the next touch', () => {
+      const swipe = pressed()
+      swipe.move(1, [X + 1, Y], 10)
+      swipe.lift(1, 20, WIDTH)
+      swipe.press(1, [X, Y], 30)
+      expect(swipe.holds).toBe(false)
     })
   })
 
@@ -264,9 +305,9 @@ const watched = (options: Partial<Watching> = {}) => {
     onback: () => seen.push('back'),
     ...options,
   })
-  const touch = (name: string, x: number, at: number, id = 1) =>
+  const touch = (name: string, x: number, at: number, id = 1, y = Y) =>
     target.fire(name, {
-      changedTouches: [{ identifier: id, clientX: x, clientY: Y }],
+      changedTouches: [{ identifier: id, clientX: x, clientY: y }],
       timeStamp: at,
       preventDefault: () => prevented++,
     })
@@ -350,13 +391,21 @@ describe('watchBackSwipe', () => {
   })
 
   describe('the page', () => {
-    it('stops scrolling only once the finger is claimed', () => {
+    it('stops scrolling from the first move right, before the claim', () => {
       const { touch, prevented } = watched()
       touch('touchstart', X, 0)
-      touch('touchmove', X + CLAIM - 1, 10)
+      touch('touchmove', X + 1, 10)
       const waiting = prevented()
       touch('touchmove', X + CLAIM, 20)
-      expect([waiting, prevented()]).toEqual([0, 1])
+      expect([waiting, prevented()]).toEqual([1, 2])
+    })
+
+    it('lets the page scroll for a finger at the edge that moves down', () => {
+      const { touch, prevented } = watched()
+      touch('touchstart', X, 0)
+      touch('touchmove', X, 10, 1, Y + 1)
+      touch('touchmove', X, 20, 1, Y + CLAIM)
+      expect([prevented(), edge.state]).toEqual([0, 'idle'])
     })
 
     it('never stops scrolling for a touch past the edge', () => {
