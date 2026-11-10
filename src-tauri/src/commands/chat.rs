@@ -54,7 +54,7 @@ pub(crate) async fn send_message(state: &AppState, pane: u64, text: String, forc
 }
 
 pub(crate) async fn press_key(state: &AppState, pane: u64, key: &str) -> Result<(), CommandError> {
-    let args = keys::args(pane, key).map_err(|error| CommandError::reason(&error))?;
+    let args = keys::args(pane, &[key]).map_err(|error| CommandError::reason(&error))?;
     ask(state, args, None).await
 }
 

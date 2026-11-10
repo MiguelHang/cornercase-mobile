@@ -29,13 +29,22 @@ mod argv {
     #[case::eight("8")]
     #[case::nine("9")]
     fn sends_one_named_key_to_one_pane(#[case] key: &str) {
-        assert_eq!(args(12, key), Ok(words(&["keys", "--pane", "12", key])));
+        assert_eq!(args(12, &[key]), Ok(words(&["keys", "--pane", "12", key])));
     }
 
     #[test]
     fn knows_every_key_the_app_sends_and_no_other() {
-        let accepted: Vec<&str> = NAMES.into_iter().filter(|key| args(1, key).is_ok()).collect();
+        let accepted: Vec<&str> = NAMES.into_iter().filter(|key| args(1, &[key]).is_ok()).collect();
         assert_eq!(accepted, NAMES);
+    }
+
+    #[rstest]
+    #[case::three_arrows(&["right", "right", "right"])]
+    #[case::arrows_then_a_number(&["left", "left", "2"])]
+    #[case::a_number_then_enter(&["3", "enter"])]
+    fn sends_several_keys_in_order_in_one_command(#[case] keys: &[&str]) {
+        let expected: Vec<String> = words(&["keys", "--pane", "12"]).into_iter().chain(words(keys)).collect();
+        assert_eq!(args(12, keys), Ok(expected));
     }
 }
 
@@ -54,6 +63,19 @@ mod refusing {
     #[case::a_space_around_it(" enter")]
     #[case::two_keys("down enter")]
     fn fails_on_a_name_outside_the_app_keys(#[case] key: &str) {
-        assert_eq!(args(12, key), Err(Error::UnknownKey(key.to_owned())));
+        assert_eq!(args(12, &[key]), Err(Error::UnknownKey(key.to_owned())));
+    }
+
+    #[rstest]
+    #[case::a_bad_one_in_the_middle(&["right", "shift+tab", "enter"], "shift+tab")]
+    #[case::a_bad_one_at_the_end(&["right", "right", "--force"], "--force")]
+    #[case::the_first_of_two_bad_ones(&["up", "ctrl+o", "Esc"], "ctrl+o")]
+    fn fails_on_the_first_bad_name_of_a_list(#[case] keys: &[&str], #[case] bad: &str) {
+        assert_eq!(args(12, keys), Err(Error::UnknownKey(bad.to_owned())));
+    }
+
+    #[test]
+    fn fails_on_an_empty_list() {
+        assert_eq!(args(12, &[]), Err(Error::UnknownKey(String::new())));
     }
 }
