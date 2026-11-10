@@ -1,4 +1,4 @@
-import type { AgentRow_Serialize as AgentRow } from './bindings'
+import type { AgentRow_Serialize as AgentRow, IssueInfo_Serialize as IssueInfo } from './bindings'
 import type { Screen } from './connection'
 
 export type Route =
@@ -8,11 +8,15 @@ export type Route =
   | { name: 'terminal'; machine: number; row: AgentRow }
   | { name: 'machines' }
   | { name: 'machine'; id: number; adding?: boolean }
-  | { name: 'start'; machine: number }
+  | { name: 'start'; machine: number; issue?: StartingIssue }
   | { name: 'changes'; machine: number; workspace: number; title: string }
   | { name: 'change'; machine: number; workspace: number; path: string }
   | { name: 'files'; machine: number; workspace: number; title: string }
   | { name: 'file'; machine: number; workspace: number; path: string }
+  | { name: 'issues'; machine: number; project: number }
+  | { name: 'issue'; machine: number; project: number; key: string; source: string }
+
+export type StartingIssue = { project: number; issue: IssueInfo; prompt: string }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
@@ -82,6 +86,10 @@ export class Router {
 
   replace(route: Route) {
     this.#stack = [...this.#stack.slice(0, Math.max(1, this.#stack.length - 1)), route]
+  }
+
+  settle(route: Route) {
+    this.#stack = [this.#stack[0], route]
   }
 
   setBase(base: Base) {

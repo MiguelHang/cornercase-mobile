@@ -36,6 +36,27 @@ const FILES = { name: 'files', machine: 1, workspace: 3, title: 'feature' } as c
 const FILE = { name: 'file', machine: 1, workspace: 3, path: 'src/main.rs' } as const
 const WHOLE = { name: 'file', machine: 1, workspace: 2, path: 'src/app.rs' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
+const ISSUES = { name: 'issues', machine: 1, project: 4 } as const
+const ISSUE = { name: 'issue', machine: 1, project: 4, key: '#41', source: 'github' } as const
+const ON_ISSUE: Route = {
+  name: 'start',
+  machine: 1,
+  issue: {
+    project: 4,
+    issue: {
+      source: 'github',
+      key: '#41',
+      title: 'Checkout forgets the coupon',
+      state: 'open',
+      closed: false,
+      labels: [],
+      author: 'grace',
+      updated_at: '2026-11-09T09:20:24Z',
+      branch: 'issue-41-checkout-forgets-the-coupon',
+    },
+    prompt: 'https://github.com/acme/shop/issues/41',
+  },
+}
 
 describe('Router', () => {
   it('starts on the route it is given', () => {
@@ -462,5 +483,56 @@ describe('Router, the files of a workspace', () => {
   it('is no chat of its own', () => {
     expect(chatOf(FILES)).toBeNull()
     expect(chatOf(FILE)).toBeNull()
+  })
+})
+
+describe('Router, the issues of a project', () => {
+  it('stacks an issue on its list and the start form on the issue, and goes back the same way', () => {
+    const router = routed(START, ISSUES, ISSUE, ON_ISSUE)
+    expect(router.current).toEqual(ON_ISSUE)
+    router.back()
+    expect(router.current).toEqual(ISSUE)
+    router.back()
+    expect(router.current).toEqual(ISSUES)
+  })
+
+  it('opens and reviews nothing under the issues, which are no chat of their own', () => {
+    const router = routed(START, ISSUES, ISSUE, ON_ISSUE)
+    expect(router.opened).toBeNull()
+    expect(router.reviewed).toBeNull()
+    expect(router.browsed).toBeNull()
+    expect(chatOf(ISSUES)).toBeNull()
+    expect(chatOf(ISSUE)).toBeNull()
+  })
+})
+
+describe('Router.settle', () => {
+  it('leaves only the started agent on the base, so going back reaches the board', () => {
+    const router = routed(START, ISSUES, ISSUE, ON_ISSUE)
+    router.settle(STARTING)
+    expect(router.current).toEqual(STARTING)
+    expect(router.below).toEqual(HOME)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('drops what sat between the base and the start form', () => {
+    const router = routed(MACHINES, START, ISSUES, ISSUE, ON_ISSUE)
+    router.settle(STARTING)
+    router.back()
+    expect(router.current).toEqual(HOME)
+  })
+
+  it('keeps the base it was on, and goes on top of it when nothing is above it', () => {
+    const router = new Router(NO_MACHINES)
+    router.settle(STARTING)
+    expect(router.below).toEqual(NO_MACHINES)
+    expect(router.current).toEqual(STARTING)
+  })
+
+  it("opens the started agent's chat", () => {
+    const router = routed(START, ISSUES, ISSUE, ON_ISSUE)
+    router.settle(STARTING)
+    expect(router.opened).toEqual({ machine: 1, pane: 7 })
   })
 })
