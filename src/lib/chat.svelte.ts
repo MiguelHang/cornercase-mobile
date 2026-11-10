@@ -17,6 +17,8 @@ export type SendText = typeof commands.send
 
 export type PressKey = typeof commands.keys
 
+export type MarkReviewed = typeof commands.markReviewed
+
 export type Clock = { after: (ms: number, then: () => void) => () => void; now: () => number }
 
 export const INTERRUPT_WINDOW_MS = 3000
@@ -113,12 +115,15 @@ export class Chat {
   #readLast: ReadLast
   #sendText: SendText
   #pressKey: PressKey
+  #markReviewed: MarkReviewed
   #haptics: HapticsApi
   #clock: Clock
   #cancelExpiry: () => void = () => {}
   #cancelFollow: (() => void) | null = null
   #following = false
   #questioning = false
+  #watchingDone = false
+  #marked: string | null | undefined = undefined
   #asked = 0
   #busy = false
   #again = false
@@ -133,6 +138,7 @@ export class Chat {
     readLast: ReadLast,
     sendText: SendText,
     pressKey: PressKey,
+    markReviewed: MarkReviewed,
     images: Images,
     haptics: HapticsApi,
     clock: Clock,
@@ -143,6 +149,7 @@ export class Chat {
     this.#readLast = readLast
     this.#sendText = sendText
     this.#pressKey = pressKey
+    this.#markReviewed = markReviewed
     this.attachments = new Attachments(pane, images)
     this.#questions = new Questions(machine, pane, asker)
     this.#haptics = haptics
@@ -198,6 +205,7 @@ export class Chat {
     this.row = row
     this.#pace()
     this.#ask()
+    this.#review()
   }
 
   #hear(row: AgentRow | null) {
@@ -285,6 +293,29 @@ export class Chat {
   #ask() {
     const row = this.row
     this.#questions.want(this.#questioning && row?.status === 'waiting' ? row.tab : null)
+  }
+
+  watchDone() {
+    this.#watchingDone = true
+    this.#review()
+    return () => {
+      this.#watchingDone = false
+      this.#review()
+    }
+  }
+
+  #review() {
+    const row = this.row
+    if (!this.#watchingDone || row?.status !== 'done') {
+      this.#marked = undefined
+    } else {
+      const again =
+        this.#marked === undefined || (this.#marked !== null && row.since !== null && row.since !== this.#marked)
+      this.#marked = row.since ?? this.#marked ?? null
+      if (again) {
+        void deliver(() => this.#markReviewed(this.pane))
+      }
+    }
   }
 
   #show(next: Reading) {

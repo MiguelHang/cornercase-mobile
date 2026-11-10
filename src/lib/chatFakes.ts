@@ -7,7 +7,15 @@ import type {
   QuestionChanged_Serialize as QuestionChanged,
   Style_Serialize as Style,
 } from './bindings'
-import { Chat, type Clock, type Page, type PressKey, type ReadLast, type SendText } from './chat.svelte'
+import {
+  Chat,
+  type Clock,
+  type MarkReviewed,
+  type Page,
+  type PressKey,
+  type ReadLast,
+  type SendText,
+} from './chat.svelte'
 import type { HapticsApi } from './haptics'
 import type { Asker } from './question.svelte'
 
@@ -55,6 +63,17 @@ export const noRead: ReadLast = () => Promise.resolve(ok(message('')))
 export const sentOk: SendText = () => Promise.resolve(ok(null))
 
 export const pressedOk: PressKey = () => Promise.resolve(ok(null))
+
+export const markedOk: MarkReviewed = () => Promise.resolve(ok(null))
+
+export const fakeMarker = (answer: () => ReturnType<MarkReviewed> = () => markedOk(PANE)) => {
+  const marked: number[] = []
+  const markReviewed: MarkReviewed = (pane) => {
+    marked.push(pane)
+    return answer()
+  }
+  return { markReviewed, marked }
+}
 
 export const PASTED_PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
 
@@ -137,6 +156,7 @@ export type Calls = {
   readLast?: ReadLast
   sendText?: SendText
   pressKey?: PressKey
+  markReviewed?: MarkReviewed
   attachImage?: AttachImage
   pasteAttached?: PasteAttached
   discard?: Discard
@@ -156,11 +176,12 @@ export const fresh = (calls: Calls = {}) => {
     readLast = noRead,
     sendText = sentOk,
     pressKey = pressedOk,
+    markReviewed = markedOk,
     haptics = still(),
     clock = fakeClock().clock,
     asker = fakeAsker().asker,
   } = calls
-  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, imagesOf(calls), haptics, clock, asker)
+  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, imagesOf(calls), haptics, clock, asker)
 }
 
 export const seen = (calls: Calls = {}, status: string | null = 'done') => {

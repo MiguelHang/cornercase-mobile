@@ -42,11 +42,25 @@ describe('the terminal view', () => {
 
   it('points the wheel at the cell under the finger at the zoom it shows', () => {
     expect(source).toContain('const { left, top } = (drawn ?? box).getBoundingClientRect()')
-    expect(source).toContain('cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room: roomIn(box)')
+    expect(source).toContain('cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room }')
+  })
+
+  it('holds a fitted grid at the base in place, so a swipe goes whole to the history', () => {
+    expect(source).toContain('const room = roomAt(box, pinned(place.fitted, size, bounds))')
+  })
+
+  it('adds no line of its own under the rows, so a fitted grid leaves no room to slide into', () => {
+    expect(source).toMatch(/\.grid\s*\{[^}]*\}/)
+    expect(source).not.toMatch(/\.grid[^{]*\{[^}]*white-space/)
   })
 
   it('keeps its last row in view as its height changes', () => {
     expect(source).toContain('const anchored = (box: HTMLElement) => { if (height > 0) anchor(box) }')
     expect(source).toContain('{@attach anchored}')
+  })
+
+  it('recalls and remembers the zoom of the tab in the mode it shows', () => {
+    expect(source).toContain('let size = $derived(zooms.recall(place, bounds))')
+    expect(source).toContain('size = clamp(start * scale, bounds) zooms.remember(place, size)')
   })
 })

@@ -13,7 +13,7 @@
   import Row from './Row.svelte'
   import { paneColours, rgb } from './style'
   import { Swipe, type Grid } from './swipe'
-  import { anchor, ended, followed, roomIn, slide, Tap } from './touch'
+  import { anchor, ended, followed, pinned, roomAt, slide, Tap } from './touch'
   import { BASE, clamp, fit, limits, LINE, type Place } from './zoom'
 
   const PROBE = 'M'.repeat(100)
@@ -94,7 +94,8 @@
   const gridIn = (box: HTMLElement): Grid => {
     const { left, top } = (drawn ?? box).getBoundingClientRect()
     const { modes, size: cells } = pane
-    return { modes, size: cells, cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room: roomIn(box) }
+    const room = roomAt(box, pinned(place.fitted, size, bounds))
+    return { modes, size: cells, cell: (cell * size) / BASE, line: size * LINE, origin: [left, top], room }
   }
 
   const pressed = (event: PointerEvent) => {
@@ -184,14 +185,9 @@
     touch-action: pan-x;
   }
 
-  .grid,
-  .probe {
-    font-family: var(--font-mono);
-    white-space: pre;
-  }
-
   .grid {
     position: relative;
+    font-family: var(--font-mono);
     line-height: var(--line);
   }
 
@@ -204,6 +200,8 @@
     overflow: hidden;
     visibility: hidden;
     pointer-events: none;
+    font-family: var(--font-mono);
+    white-space: pre;
   }
 
   .cursor {

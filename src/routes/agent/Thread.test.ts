@@ -2,7 +2,7 @@ import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
 import { Chat, timers, type Outgoing } from '../../lib/chat.svelte'
 import { message, ok } from '../../lib/chatFakes'
-import { CHIPS, LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unpressed, unread, unsent } from './agentFakes'
+import { CHIPS, LATER, ROW, SINCE, chatWith, clockAt, flat, lineChat, still, unasked, unattached, unmarked, unpressed, unread, unsent } from './agentFakes'
 import AgentLine from './AgentLine.svelte'
 import agentLineSource from './AgentLine.svelte?raw'
 import Sent from './Sent.svelte'
@@ -166,7 +166,7 @@ describe('AgentLine', () => {
   })
 
   it('keeps the region while the agent is not seen yet', () => {
-    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unattached, still, timers, unasked)
+    const chat = new Chat(1, ROW.pane, unread, unsent, unpressed, unmarked, unattached, still, timers, unasked)
     expect(region(line(chat))).toBe('<span class="spoken"></span> <!--[-1--><!--]-->')
   })
 
@@ -256,7 +256,7 @@ describe('Thread', () => {
 
   it('replaces a growing message in its place, without reading it again from the start', async () => {
     const said = ['Reading thread.ts', 'Reading thread.ts and chat.svelte.ts']
-    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unattached, still, timers, unasked)
+    const chat = new Chat(1, ROW.pane, () => Promise.resolve(ok({ ...message(said.shift() ?? ''), turn_over: false })), unsent, unpressed, unmarked, unattached, still, timers, unasked)
     chat.see(1, [{ ...ROW, status: 'working' }])
     await chat.refresh()
     expect(thread(chat)).toContain('Reading thread.ts')

@@ -24,6 +24,7 @@ pub const REQUIRED: Required = Required {
         "last-message",
         "send",
         "keys",
+        "mark",
         "paste-file",
         "view",
         "surface",

@@ -14,14 +14,14 @@
   import { backPressed, handled, watchBackButton } from './lib/backButton'
   import { backSwipes, RESTING, translated, watchBackSwipe, type Shift } from './lib/backSwipe'
   import { ChangesState } from './lib/changes.svelte'
-  import { Chat, timers, touches } from './lib/chat.svelte'
+  import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
   import { IssuesState, IssueState } from './lib/issues.svelte'
   import { latestWins } from './lib/join'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
-  import { openedTerminal, Router, routeFor, type StartingIssue } from './lib/router.svelte'
+  import { chatOf, openedTerminal, Router, routeFor, type StartingIssue } from './lib/router.svelte'
   import type { Asker } from './lib/question.svelte'
   import { openScanner } from './lib/scanner.svelte'
   import { Toasts } from './lib/toasts.svelte'
@@ -74,6 +74,7 @@
           commands.lastMessage,
           commands.send,
           commands.keys,
+          commands.markReviewed,
           images,
           haptics,
           timers,
@@ -81,6 +82,7 @@
         ),
   )
   const seen = $derived(chat?.row != null)
+  const inView = $derived(chatOf(route) === null ? null : chat)
   const viewed = $derived(openedTerminal(route, current))
   const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)
   const rescanning = $derived(route.name === 'machine' && route.adding === true)
@@ -157,6 +159,13 @@
   $effect(() => {
     const opened = chat
     return () => opened?.leave()
+  })
+
+  $effect(() => {
+    const watched = inView
+    if (watched !== null) {
+      return untrack(() => whileShown(document, () => watched.watchDone()))
+    }
   })
 
   $effect(() => {

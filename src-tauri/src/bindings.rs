@@ -37,6 +37,7 @@ macro_rules! app_commands {
             chat::last_message,
             chat::send,
             chat::keys,
+            chat::mark_reviewed,
             chat::attach::attach::<Wry>,
             chat::attach::paste_attached,
             chat::attach::discard,

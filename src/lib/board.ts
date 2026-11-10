@@ -12,6 +12,7 @@ export type Row = {
   hasChildren: boolean
   folded: boolean
   hidden: number
+  total: number
   attention: string | null
 }
 
@@ -20,6 +21,8 @@ export type Item = { kind: 'header'; key: string; section: Section } | Row
 export type Subagents = { children: Row[]; line: string }
 
 type Tree = { roots: AgentRow[]; children: Map<number, AgentRow[]>; expanded: ReadonlySet<number> }
+
+type Walk = (made: Tree, agent: AgentRow) => Item[]
 
 const SECTION_OF: Record<string, Section> = {
   waiting: 'Waiting',
@@ -83,32 +86,54 @@ const descendants = (made: Tree, agent: AgentRow): AgentRow[] =>
 const loudest = (agents: AgentRow[]) =>
   ATTENTION.find((status) => agents.some((agent) => agent.status === status)) ?? null
 
-const row = (agent: AgentRow, hasChildren: boolean, folded: boolean, hidden: AgentRow[]): Row => ({
-  kind: 'row',
-  key: `pane:${agent.pane}`,
-  row: agent,
-  depth: Math.min(agent.depth, MAX_DEPTH),
-  hasChildren,
-  folded,
-  hidden: hidden.length,
-  attention: loudest(hidden),
-})
-
-const branch = (made: Tree, agent: AgentRow): Item[] => {
-  const children = below(made, agent)
-  const folded = children.length > 0 && !made.expanded.has(agent.pane)
-  const shown = folded ? [] : children.flatMap((child) => branch(made, child))
-  return [row(agent, children.length > 0, folded, folded ? descendants(made, agent) : []), ...shown]
+const row = (agent: AgentRow, all: AgentRow[], folded: boolean): Row => {
+  const hidden = folded ? all : []
+  return {
+    kind: 'row',
+    key: `pane:${agent.pane}`,
+    row: agent,
+    depth: Math.min(agent.depth, MAX_DEPTH),
+    hasChildren: all.length > 0,
+    folded,
+    hidden: hidden.length,
+    total: all.length,
+    attention: loudest(hidden),
+  }
 }
 
-const sectionItems = (made: Tree, section: Section): Item[] => {
+const branch = (made: Tree, agent: AgentRow): Item[] => {
+  const all = descendants(made, agent)
+  const folded = all.length > 0 && !made.expanded.has(agent.pane)
+  const shown = folded ? [] : below(made, agent).flatMap((child) => branch(made, child))
+  return [row(agent, all, folded), ...shown]
+}
+
+const found = (made: Tree, agent: AgentRow): Item[] => [
+  row(agent, [], false),
+  ...below(made, agent).flatMap((child) => found(made, child)),
+]
+
+const sectionItems = (made: Tree, section: Section, walk: Walk): Item[] => {
   const inside = made.roots.filter((agent) => sectionOf(agent.rank_status) === section)
-  return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => branch(made, agent))]
+  return inside.length === 0 ? [] : [header(section), ...inside.flatMap((agent) => walk(made, agent))]
+}
+
+const pruned = (rows: AgentRow[], wanted: string[]) => {
+  const panes = new Map(rows.map((agent) => [agent.pane, agent]))
+  const kept = new Set<number>()
+  const keep = (agent: AgentRow | undefined) => {
+    if (agent !== undefined && !kept.has(agent.pane)) {
+      kept.add(agent.pane)
+      keep(agent.parent === null ? undefined : panes.get(agent.parent))
+    }
+  }
+  rows.filter((agent) => matches(agent, wanted)).forEach(keep)
+  return rows.filter((agent) => kept.has(agent.pane))
 }
 
 const closed = (made: Tree, agent: AgentRow) => {
   const hidden = descendants(made, agent)
-  return row(agent, hidden.length > 0, hidden.length > 0, hidden)
+  return row(agent, hidden, hidden.length > 0)
 }
 
 const counted = (count: number) => `${count} ${count === 1 ? 'subagent' : 'subagents'}`
@@ -138,9 +163,13 @@ export const hiddenName = (hidden: number, attention: string | null) => {
   return hidden === 1 ? `${what}, ${status}` : `${what}, at least one ${status}`
 }
 
-export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES): Item[] => {
-  const made = tree(rows, expanded)
-  return SECTIONS.flatMap((section) => sectionItems(made, section))
+export const disclosureName = (count: number, folded: boolean) => `${folded ? 'Show' : 'Hide'} ${counted(count)}`
+
+export const items = (rows: AgentRow[], expanded: ReadonlySet<number> = NO_PANES, query = ''): Item[] => {
+  const wanted = terms(query)
+  const made = tree(wanted.length === 0 ? rows : pruned(rows, wanted), expanded)
+  const walk = wanted.length === 0 ? branch : found
+  return SECTIONS.flatMap((section) => sectionItems(made, section, walk))
 }
 
 export const span = (millis: number) => {
@@ -177,3 +206,20 @@ export const place = (agent: AgentRow, listed: AgentRow[] = []) => {
 
 export const label = (agent: AgentRow, listed: AgentRow[] = []) =>
   (member(agent, listed) ? agent.role : null) ?? named(agent)
+
+const normalized = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+
+export const terms = (query: string) =>
+  normalized(query)
+    .split(/\s+/)
+    .filter((term) => term !== '')
+
+export const matches = (agent: AgentRow, wanted: string[]) => {
+  const fields = [agent.title, agent.agent, agent.project_name, agent.workspace_name, agent.role]
+  const words = fields.map((field) => normalized(field ?? ''))
+  return wanted.every((term) => words.some((word) => word.includes(term)))
+}

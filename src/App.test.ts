@@ -151,7 +151,7 @@ describe('App wiring', () => {
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, images, haptics, timers, asker, ), )',
+      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, images, haptics, timers, asker, ), )',
     )
     expect(source).toContain(
       'const images: Images = { attach: commands.attach, paste: commands.pasteAttached, discard: commands.discard }',
@@ -174,6 +174,13 @@ describe('App wiring', () => {
 
   it('lets the chat go once it is left, so that its images waiting on the phone are dropped', () => {
     expect(source).toContain('$effect(() => { const opened = chat return () => opened?.leave() })')
+  })
+
+  it('watches the chat for done only while its agent or its terminal is on top and the page shows', () => {
+    expect(source).toContain('const inView = $derived(chatOf(route) === null ? null : chat)')
+    expect(source).toContain(
+      '$effect(() => { const watched = inView if (watched !== null) { return untrack(() => whileShown(document, () => watched.watchDone())) } })',
+    )
   })
 
   it("names the route below for the back button, from the saved machines and the active machine's rows", () => {

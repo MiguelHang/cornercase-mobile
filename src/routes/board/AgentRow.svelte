@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { AgentRow_Serialize as Agent } from '../../lib/bindings'
-  import { elapsed, label, place, type Row } from '../../lib/board'
+  import { disclosureName, elapsed, label, place, type Row } from '../../lib/board'
   import Hidden from '../../lib/ui/Hidden.svelte'
   import Icon from '../../lib/ui/Icon.svelte'
+  import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
   let {
@@ -21,9 +22,30 @@
 
   const row = $derived(item.row)
   const time = $derived(elapsed(row.since, now))
+
+  const turn = prefersReducedMotion() ? 0 : ENTER_MS
 </script>
 
 <div class="agent" style:--depth={item.depth}>
+  <div class="lead">
+    {#if item.hasChildren}
+      <button
+        class="fold"
+        type="button"
+        aria-label={disclosureName(item.total, item.folded)}
+        aria-expanded={!item.folded}
+        onclick={() => onfold(row.pane)}
+        ontouchstart={() => {}}
+      >
+        <span class="chevron" class:open={!item.folded} style:--turn="{turn}ms">
+          <Icon name="chevron-right" size={18} />
+        </span>
+      </button>
+      <span class="count">
+        <Hidden hidden={item.hidden} attention={item.attention} gap="4px" />
+      </span>
+    {/if}
+  </div>
   <button class="row" type="button" onclick={() => onopen(row.pane)} ontouchstart={() => {}}>
     <StatusDot status={row.status} />
     <span class="lines">
@@ -33,22 +55,7 @@
     {#if time !== ''}
       <span class="time">{time}</span>
     {/if}
-    <Hidden hidden={item.hidden} attention={item.attention} />
   </button>
-  {#if item.hasChildren}
-    <button
-      class="fold"
-      type="button"
-      aria-label="Subagents of {label(row, agents)}"
-      aria-expanded={!item.folded}
-      onclick={() => onfold(row.pane)}
-      ontouchstart={() => {}}
-    >
-      <Icon name={item.folded ? 'chevron-right' : 'chevron-down'} size={18} />
-    </button>
-  {:else if item.depth > 0}
-    <span class="slot"></span>
-  {/if}
 </div>
 
 <style>
@@ -84,19 +91,35 @@
     text-align: left;
   }
 
-  .fold {
+  .lead {
+    position: relative;
     display: flex;
     flex: none;
     align-items: center;
-    justify-content: center;
-    min-width: 44px;
-    padding: 0;
+    width: 60px;
+  }
+
+  .fold {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    padding: 0 0 0 6px;
     color: var(--soft);
   }
 
-  .slot {
-    flex: none;
-    width: 44px;
+  .count {
+    position: absolute;
+    left: 24px;
+    pointer-events: none;
+  }
+
+  .chevron {
+    display: flex;
+    transition: transform var(--turn);
+  }
+
+  .chevron.open {
+    transform: rotate(90deg);
   }
 
   .lines {

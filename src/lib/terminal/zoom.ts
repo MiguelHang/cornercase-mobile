@@ -6,7 +6,7 @@ export const LINE = 1.3
 
 export type Limits = { min: number; max: number }
 
-export type Place = { machine: number; boot: string; tab: number }
+export type Place = { machine: number; boot: string; tab: number; fitted: boolean }
 
 export const limits = (paneCols: number, screenWidth: number, cellWidth: number, base = BASE): Limits => {
   const width = paneCols * cellWidth
@@ -21,7 +21,7 @@ export const fit = (width: number, height: number, cellWidth: number, base = BAS
 
 export const clamp = (size: number, { min, max }: Limits) => Math.min(max, Math.max(min, size))
 
-const keyOf = ({ machine, boot, tab }: Place) => `${machine}:${boot}:${tab}`
+const keyOf = ({ machine, boot, tab, fitted }: Place) => `${machine}:${boot}:${tab}:${fitted ? 'fitted' : 'passive'}`
 
 export class Zooms {
   #sizes = new Map<string, number>()
