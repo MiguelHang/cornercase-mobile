@@ -3,10 +3,12 @@
   import { label, place, statusName } from '../../lib/board'
   import { compactHeader } from '../../lib/thread'
   import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
   let {
     row,
+    backTo,
     agents,
     below = 0,
     onback,
@@ -14,6 +16,7 @@
     onchanges,
   }: {
     row: AgentRow
+    backTo: string | null
     agents: AgentRow[]
     below?: number
     onback: () => void
@@ -34,28 +37,29 @@
   })
 </script>
 
-<div class="bar" class:compact style:--below="{below}px">
-  <button class="tool" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-    <Icon name="chevron-left" />
-  </button>
-  <div class="short" aria-hidden="true">
-    <StatusDot status={row.status} />
-    <span class="called">{label(row, agents)}</span>
-    <span class="state">{statusName(row.status)}</span>
-  </div>
-  <button class="tool" type="button" aria-label="Terminal" onclick={() => onterminal(row)} ontouchstart={() => {}}>
-    <Icon name="square-terminal" />
-  </button>
-  <button
-    class="tool"
-    type="button"
-    aria-label="Changes"
-    onclick={() => onchanges(row.workspace, row.workspace_name)}
-    ontouchstart={() => {}}
-  >
-    <Icon name="git-compare" />
-  </button>
-</div>
+<NavBar {backTo} {onback} {below} edge={compact}>
+  {#snippet center()}
+    <div class="short" class:compact aria-hidden="true">
+      <StatusDot status={row.status} />
+      <span class="called">{label(row, agents)}</span>
+      <span class="state">{statusName(row.status)}</span>
+    </div>
+  {/snippet}
+  {#snippet right()}
+    <button class="tool" type="button" aria-label="Terminal" onclick={() => onterminal(row)} ontouchstart={() => {}}>
+      <Icon name="square-terminal" />
+    </button>
+    <button
+      class="tool"
+      type="button"
+      aria-label="Changes"
+      onclick={() => onchanges(row.workspace, row.workspace_name)}
+      ontouchstart={() => {}}
+    >
+      <Icon name="git-compare" />
+    </button>
+  {/snippet}
+</NavBar>
 <header class="head" bind:clientHeight={tall}>
   <StatusDot status={row.status} size={20} />
   <div class="lines">
@@ -65,21 +69,6 @@
 </header>
 
 <style>
-  .bar {
-    position: sticky;
-    top: calc(env(safe-area-inset-top) + var(--below));
-    z-index: 4;
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    margin: calc(-1 * var(--gap)) calc(-1 * var(--inset-wide));
-    padding: var(--gap) calc(var(--inset-wide) - var(--inset));
-    border-bottom: 1px solid transparent;
-    background: var(--veil);
-    -webkit-backdrop-filter: blur(24px);
-    backdrop-filter: blur(24px);
-  }
-
   .tool {
     display: flex;
     flex: none;
@@ -99,9 +88,11 @@
   }
 
   .short {
-    display: flex;
-    flex: 1;
+    display: inline-flex;
     align-items: center;
+    max-width: 0;
+    overflow: hidden;
+    vertical-align: middle;
     gap: 6px;
     min-width: 0;
     min-height: 44px;
@@ -109,16 +100,15 @@
     opacity: 0;
     transition:
       opacity 150ms ease-out,
-      visibility 150ms;
+      visibility 150ms,
+      max-width 0s 150ms;
   }
 
-  .compact {
-    border-bottom-color: var(--border);
-  }
-
-  .compact .short {
+  .short.compact {
+    max-width: 100%;
     visibility: visible;
     opacity: 1;
+    transition-delay: 0s;
   }
 
   .called {

@@ -33,6 +33,12 @@ de necesitar el puente.
 - [ ] CA4 — `design/bridge.md` y `design/upstream-gaps.md` enlazan la propuesta; el borrador de la issue queda en el
   fichero (no se abre la issue sin el visto bueno del usuario).
 
+## Notas
+- 035 (2026-11-09): el servidor real necesitaría algo como `--bridge-routes` del puente
+  (`design/bridge/machine-code.md`): responder, sin token, las direcciones en las que escucha, para que la app añada
+  las rutas que le falten a una máquina sin volver a escanear; y su QR, un código con todas sus direcciones, el token y
+  el nombre del Mac.
+
 ## Referencias
 - cornercase-terminal (`origin/main`): `src/web/mod.rs`, `src/web/http.rs`, `src/web/auth.rs`, `src/web/bridge.rs`,
   `src/cli/reach.rs`, `design/browser-access.md`, `design/remote-windows.md`,

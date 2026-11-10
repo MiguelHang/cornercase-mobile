@@ -19,12 +19,12 @@
   </div>
 {:else if scanner.state === 'denied'}
   <div class="notice" role="alert">
-    <p class="text">Camera access is off. Turn it on in Settings, or paste the URL below.</p>
+    <p class="text">Camera access is off. Turn it on in Settings, or paste the code below.</p>
     <Button tone="plain" onclick={() => void scanner.openSettings()}>Open Settings</Button>
   </div>
 {:else if scanner.state === 'failed'}
   <div class="notice" role="alert">
-    <p class="text">Could not scan the code. Paste the URL below.</p>
+    <p class="text">Could not scan the code. Paste the code below.</p>
     <p class="detail">{scanner.error}</p>
   </div>
 {/if}

@@ -6,13 +6,14 @@
 
 <script lang="ts">
   import type { Size_Deserialize } from '../bindings'
+  import { edge } from '../edge.svelte'
   import type { InputEvent } from './keys'
   import type { PaneState } from './pane.svelte'
   import { Pinch, type Point } from './pinch'
   import Row from './Row.svelte'
   import { paneColours, rgb } from './style'
   import { Swipe, type Grid } from './swipe'
-  import { anchor, roomIn, slide, Tap } from './touch'
+  import { anchor, ended, followed, roomIn, slide, Tap } from './touch'
   import { BASE, clamp, fit, limits, LINE, type Place } from './zoom'
 
   const PROBE = 'M'.repeat(100)
@@ -102,6 +103,7 @@
   }
 
   const moved = (box: HTMLElement, event: PointerEvent) => {
+    if (!followed(edge.state)) return
     const scale = pinch.move(event.pointerId, pointOf(event))
     if (scale !== null && !byGesture) zoom(scale)
     const scroll = swipe.move(event.pointerId, pointOf(event), () => gridIn(box))
@@ -110,7 +112,7 @@
 
   const lifted = (event: PointerEvent) => {
     pinch.lift(event.pointerId)
-    tap.lifted(swipe.lift(event.pointerId))
+    ended(tap, edge.state, swipe.lift(event.pointerId))
   }
 
   const cancelled = (event: PointerEvent) => {

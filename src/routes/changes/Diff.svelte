@@ -2,7 +2,7 @@
   import type { Fold_Serialize as Fold } from '../../lib/bindings'
   import { CLOSED, goneMessage, type ChangesState } from '../../lib/changes.svelte'
   import { rows, shownPath } from '../../lib/diff'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import DiffLine from './DiffLine.svelte'
   import Viewed from './Viewed.svelte'
@@ -15,10 +15,12 @@
   let {
     path,
     changes,
+    backTo,
     onback,
   }: {
     path: string
     changes: ChangesState
+    backTo: string | null
     onback: () => void
   } = $props()
 
@@ -32,15 +34,16 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
-    {#if open}
-      <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
-    {/if}
-  </header>
+  <NavBar {backTo} {onback} topmost>
+    {#snippet center()}
+      <h1 class="path"><span dir="ltr">{shownPath(patch ?? { path, old_path: null })}</span></h1>
+    {/snippet}
+    {#snippet right()}
+      {#if open}
+        <Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />
+      {/if}
+    {/snippet}
+  </NavBar>
   {#if changes.gone}
     <p class="note">{CLOSED}.</p>
   {:else if reading?.kind === 'gone'}
@@ -69,44 +72,16 @@
     display: flex;
     flex-direction: column;
     gap: var(--inset-wide);
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    min-width: 0;
-    margin: 0 calc(-1 * var(--inset));
-  }
-
-  .back {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .back:active {
-    background: var(--hover);
-  }
-
-  .title {
-    flex: 1;
-    min-width: 0;
+  .path {
     margin: 0;
     overflow: hidden;
     direction: rtl;
+    color: var(--text);
     font-size: 17px;
     font-weight: 600;
-    text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

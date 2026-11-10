@@ -1,6 +1,8 @@
 use std::fmt;
 use std::net::{IpAddr, SocketAddr};
 
+use cornercase_core::machines::code::MachineCode;
+use cornercase_core::machines::route::RouteError;
 use qrcode::{Color, EcLevel, QrCode};
 
 use crate::network::Target;
@@ -11,6 +13,8 @@ const LIGHT: u8 = 231;
 const HALF: &str = "▀";
 const RESET: &str = "\x1b[0m";
 const LOOPBACK: &str = "loopback";
+const DASH: &str = " — ";
+const GAP: &str = "  ";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Place<'a> {
@@ -27,14 +31,52 @@ impl fmt::Display for Place<'_> {
     }
 }
 
-pub fn url(ip: IpAddr, port: u16, token: &str) -> String {
-    format!("ws://{}/?token={token}", SocketAddr::new(ip, port))
+pub fn block(
+    name: Option<&str>,
+    places: &[(Place<'_>, IpAddr)],
+    port: u16,
+    token: &str,
+) -> Result<Vec<String>, RouteError> {
+    let Some(code) = machine_code(name, places, port, token)? else { return Ok(Vec::new()) };
+    let text = code.to_string();
+    let mut block = vec![heading(code.name(), places), text.clone()];
+    block.extend(lines(&text));
+    block.push(String::new());
+    block.extend(places.iter().map(|&(place, ip)| format!("{place}{GAP}{}", url(ip, port, token))));
+    Ok(block)
 }
 
-pub fn block(place: Place<'_>, url: &str) -> Vec<String> {
-    let mut block = vec![place.to_string(), url.to_owned()];
-    block.extend(lines(url));
-    block
+fn machine_code(
+    name: Option<&str>,
+    places: &[(Place<'_>, IpAddr)],
+    port: u16,
+    token: &str,
+) -> Result<Option<MachineCode>, RouteError> {
+    let Some((&(_, first), others)) = places.split_first() else { return Ok(None) };
+    let code = MachineCode::new(first, port, token)?;
+    let code = others.iter().fold(code, |code, &(_, ip)| code.with_also(ip));
+    Ok(Some(match name {
+        Some(name) => code.with_name(name),
+        None => code,
+    }))
+}
+
+fn heading(name: Option<&str>, places: &[(Place<'_>, IpAddr)]) -> String {
+    let mut labels: Vec<String> = Vec::with_capacity(places.len());
+    for label in places.iter().map(|(place, _)| place.to_string()) {
+        if !labels.contains(&label) {
+            labels.push(label);
+        }
+    }
+    let labels = labels.join(", ");
+    match name {
+        Some(name) => format!("{name}{DASH}{labels}"),
+        None => labels,
+    }
+}
+
+fn url(ip: IpAddr, port: u16, token: &str) -> String {
+    format!("ws://{}/?token={token}", SocketAddr::new(ip, port))
 }
 
 fn lines(url: &str) -> Vec<String> {

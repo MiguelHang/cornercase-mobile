@@ -46,6 +46,10 @@ export class Router {
     return this.#stack[this.#stack.length - 1]
   }
 
+  get below(): Route | null {
+    return this.#stack.at(-2) ?? null
+  }
+
   get opened(): ChatOf | null {
     const under = this.#stack.findLast((route) => !overChat(route))
     return under === undefined ? null : chatOf(under)

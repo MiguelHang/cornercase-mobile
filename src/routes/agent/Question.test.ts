@@ -37,6 +37,7 @@ const screen = (chat: Chat) =>
       connection: { state: 'connected', route: 'ws://mac:7000' },
       agents: null,
       onfailed: () => {},
+      backTo: 'Agents',
       onback: () => {},
       onopen: () => {},
       onchanges: () => {},

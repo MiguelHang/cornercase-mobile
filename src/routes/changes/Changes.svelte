@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Mode } from '../../lib/bindings'
   import { CLOSED, type ChangesState } from '../../lib/changes.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import FileRow from './FileRow.svelte'
 
@@ -14,11 +14,13 @@
   let {
     title,
     changes,
+    backTo,
     onback,
     onopen,
   }: {
     title: string
     changes: ChangesState
+    backTo: string | null
     onback: () => void
     onopen: (path: string) => void
   } = $props()
@@ -41,15 +43,13 @@
 </script>
 
 <section class="screen">
-  <header class="top">
-    <button class="back" type="button" aria-label="Back" onclick={onback} ontouchstart={() => {}}>
-      <Icon name="chevron-left" size={24} />
-    </button>
-    <h1 class="title">{title}</h1>
-    {#if listed !== null}
-      <p class="totals"><span class="plus">+{listed.added}</span> <span class="minus">−{listed.removed}</span></p>
-    {/if}
-  </header>
+  <NavBar {backTo} {title} {onback} topmost>
+    {#snippet right()}
+      {#if listed !== null}
+        <p class="totals"><span class="plus">+{listed.added}</span> <span class="minus">−{listed.removed}</span></p>
+      {/if}
+    {/snippet}
+  </NavBar>
   {#if changes.gone}
     <p class="note">{CLOSED}.</p>
   {:else}
@@ -87,50 +87,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--inset-wide);
-    padding: calc(env(safe-area-inset-top) + var(--gap)) var(--inset-wide) 40px;
-  }
-
-  .top {
-    display: flex;
-    align-items: center;
-    gap: var(--gap);
-    min-width: 0;
-    margin-left: calc(-1 * var(--inset));
-  }
-
-  .back {
-    display: flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--accent);
-  }
-
-  .back:active {
-    background: var(--hover);
-  }
-
-  .title {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    overflow: hidden;
-    font-size: 22px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    padding: var(--gap) var(--inset-wide) 40px;
   }
 
   .totals {
-    flex: none;
     margin: 0;
+    padding-right: var(--inset);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .plus {

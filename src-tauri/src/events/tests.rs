@@ -9,6 +9,7 @@ use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
+use cornercase_core::protocol::USAGE_EXIT;
 use cornercase_core::terminal::question::Choice;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
@@ -27,6 +28,10 @@ use crate::test_util::{
 const RESTARTED: &str = "5152-1770000100";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
 const HEARD: &str = "2026-10-16T09:30:00.123Z";
+const ROUTES: &[&str] = &[BRIDGE_ROUTES];
+const LAN_HOST: &str = "studio.lan";
+const TAILSCALE_HOST: &str = "100.101.102.103";
+const TAILSCALE: &str = "ws://100.101.102.103:9000/";
 
 type Row = (Option<String>, Option<String>);
 
@@ -99,6 +104,36 @@ fn forwarding(id: MachineId, store: &Store, changes: Changes, machines: SharedMa
 
 fn watching(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> (Store, Recorder) {
     let (store, driver) = store_of(id, fake);
+    let recorder = forwarding(id, &store, store.changes(), machines);
+    tokio::spawn(driver);
+    (store, recorder)
+}
+
+fn telling(fake: FakeTransport, hosts: &[&str]) -> FakeTransport {
+    let routes: Vec<Value> = hosts.iter().map(|host| json!({ "host": host, "port": 9000 })).collect();
+    fake.answer(ROUTES, &[&json!({ "routes": routes }).to_string()], &[], 0)
+}
+
+fn tailscale() -> Route {
+    Route::parse(&format!("{TAILSCALE}?token={TOKEN}")).expect("a tailscale url")
+}
+
+fn saved_routes(studio: &Studio) -> Vec<Route> {
+    let saved = studio.reloaded().machines(|machines| Ok(machines.machine(studio.id).cloned()));
+    saved.expect("the machines load").expect("the studio is saved").routes
+}
+
+fn lan_then_tailscale(id: MachineId, machines: SharedMachines) -> (Store, Recorder) {
+    let lan = telling(serving(&[snapshot(BOOT, 7, "first")]), &[LAN_HOST, TAILSCALE_HOST]);
+    let lan: Arc<dyn Transport> = Arc::new(by_call(lan, CONTRACT, vec![contracted(BOOT), FakeTransport::default()]));
+    let tailscale: Arc<dyn Transport> =
+        Arc::new(telling(serving(&[snapshot(BOOT, 8, "first")]), &[LAN_HOST, TAILSCALE_HOST]));
+    let machine = Machine { id, name: "studio".to_owned(), routes: vec![route()], last_route: None };
+    let transports = move |asked: &Route| match asked.address().to_string().as_str() {
+        TAILSCALE => Ok(Arc::clone(&tailscale)),
+        _ => Ok(Arc::clone(&lan)),
+    };
+    let (store, driver) = Store::new(machine, transports, PickConfig::default());
     let recorder = forwarding(id, &store, store.changes(), machines);
     tokio::spawn(driver);
     (store, recorder)
@@ -229,6 +264,73 @@ mod the_forwarder {
         settle().await;
         assert_eq!(recorder.connections(), [changed(id, ConnectionView::Connecting), changed(id, connected())]);
         assert_eq!(recorder.toasts(), [Toast::error("the app has no folder for its data: no home folder")]);
+    }
+}
+
+mod learning_the_routes {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn saves_the_address_the_machine_lacked_with_the_token_of_the_route_that_won() {
+        let studio = Studio::new();
+        let fake = telling(serving(&[snapshot(BOOT, 7, "first")]), &[LAN_HOST, TAILSCALE_HOST]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(saved_routes(&studio), [route(), tailscale()]);
+        assert_eq!(
+            recorder.connections(),
+            [changed(studio.id, ConnectionView::Connecting), changed(studio.id, connected())]
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lets_the_store_race_the_learned_address_once_the_network_changes() {
+        let studio = Studio::new();
+        let (store, recorder) = lan_then_tailscale(studio.id, studio.state.shared_machines());
+        settle().await;
+        store.network_changed();
+        settle().await;
+        let over_tailscale = ConnectionView::Connected { route: TAILSCALE.to_owned() };
+        assert_eq!(recorder.connections().last(), Some(&changed(studio.id, over_tailscale)));
+        assert_eq!(saved_routes(&studio), [route(), tailscale()]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn adds_an_address_once_however_often_the_bridge_tells_it() {
+        let studio = Studio::new();
+        let (store, _driver) = store_of(studio.id, serving(&[]));
+        let transport: Arc<dyn Transport> =
+            Arc::new(telling(FakeTransport::default(), &[TAILSCALE_HOST, TAILSCALE_HOST]));
+        for _ in 0..2 {
+            learn(studio.id, Arc::clone(&transport), route(), store.clone(), studio.state.shared_machines()).await;
+        }
+        assert_eq!(saved_routes(&studio), [route(), tailscale()]);
+    }
+
+    #[rstest]
+    #[case::refused(serving(&[snapshot(BOOT, 7, "first")]).answer(ROUTES, &[], &["not allowed: --bridge-routes"], USAGE_EXIT))]
+    #[case::not_json(serving(&[snapshot(BOOT, 7, "first")]).answer(ROUTES, &["usage"], &[], 0))]
+    #[case::unanswered(serving(&[snapshot(BOOT, 7, "first")]))]
+    #[tokio::test(start_paused = true)]
+    async fn stays_quiet_with_a_bridge_that_does_not_know_the_request(#[case] fake: FakeTransport) {
+        let studio = Studio::new();
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(recorder.all().len(), recorder.connections().len() + recorder.agents().len());
+        assert_eq!(
+            recorder.connections(),
+            [changed(studio.id, ConnectionView::Connecting), changed(studio.id, connected())]
+        );
+        assert_eq!(saved_routes(&studio), [route()]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_forwarding_while_the_bridge_has_not_told_them() {
+        let studio = Studio::new();
+        let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "waiting")]).open(ROUTES, &[]);
+        let recorder = watched(studio.id, fake, studio.state.shared_machines());
+        settle().await;
+        assert_eq!(rows(&recorder), [Some(claude("working", None)), Some(claude("waiting", None))]);
     }
 }
 
