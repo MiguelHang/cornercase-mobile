@@ -23,9 +23,9 @@ horizontal, podemos mejorar esa UI".
   toquen) o, como mínimo, se ven enteras.
   Tocables: un toque manda las flechas en una sola llamada a `keys`, que toma una lista. La abierta es el chip con un
   fondo propio; sin una así, los chips se ven pero no se tocan.
-- [ ] CA4 — Comprobado con `AskUserQuestion` real (una y varias preguntas, opciones largas) en el simulador; tests del
+- [x] CA4 — Comprobado con `AskUserQuestion` real (una y varias preguntas, opciones largas) en el simulador; tests del
   parser con los fixtures de 039; `hx check full` verde.
-  Simulador hecho (Verificación); falta `hx check full` (cierre) y el iPhone del usuario.
+  Simulador hecho (Verificación) y `hx check full` verde el 2026-11-10; falta probarlo en el iPhone del usuario.
 
 ## Verificación
 En el iPhone, la pregunta del agente se lee entera a lo ancho del teléfono, sin scroll lateral: el texto y las
