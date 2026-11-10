@@ -1,174 +1,143 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use cornercase_core::identity::Identity;
-use keyring_core::mock;
+use cornercase_bridge::test_util::TempDir;
+use cornercase_core::secrets::hex::encoded;
 use rstest::rstest;
 
+use super::keychain::Modifiers;
 use super::*;
 
 const KEY: &str = "a/key";
 const SECRET: &[u8] = &[0xff, 0xfe, 0x9d, 0x61, 0xb1];
-const SECRET_IN_DEBUG: &str = "255, 254, 157, 97, 177";
+const BROKEN: &str = "the store is broken";
 
-fn secrets() -> (Arc<CredentialStore>, KeychainSecrets) {
-    let store = mock_store();
-    (Arc::clone(&store), on_mock(store))
+fn given_store() -> Arc<dyn Secrets> {
+    Arc::new(on_mock(mock_store()))
 }
 
-fn fail_next_call(store: &Arc<CredentialStore>, key: &str, error: keyring_core::Error) -> Entry {
-    let entry = store.build(SERVICE, key, None).expect("a mock entry");
-    let credential: &mock::Cred = entry.as_any().downcast_ref().expect("a mock credential");
-    credential.set_error(error);
-    entry
+fn given_broken_store() -> Arc<dyn Secrets> {
+    Arc::new(KeychainSecrets::new(Err(Error::Secrets(BROKEN.to_owned())), Modifiers::new()))
 }
 
-mod get {
-    use super::*;
-
-    #[test]
-    fn is_none_for_a_key_that_was_never_set() {
-        let (_, secrets) = secrets();
-        assert_eq!(secrets.get(KEY), Ok(None));
-    }
-
-    #[rstest]
-    #[case::text(b"a token")]
-    #[case::bytes_that_are_not_utf8(SECRET)]
-    fn gives_back_the_bytes_that_were_set(#[case] value: &[u8]) {
-        let (_, secrets) = secrets();
-        secrets.set(KEY, value).expect("the mock takes the secret");
-        assert_eq!(secrets.get(KEY), Ok(Some(value.to_vec())));
-    }
+struct Folder {
+    dir: TempDir,
 }
 
-mod delete {
-    use super::*;
-
-    #[test]
-    fn is_ok_for_a_key_that_was_never_set() {
-        let (_, secrets) = secrets();
-        assert_eq!(secrets.delete(KEY), Ok(()));
+impl Folder {
+    fn new() -> Self {
+        Self { dir: TempDir::new() }
     }
 
-    #[test]
-    fn removes_the_secret() {
-        let (_, secrets) = secrets();
-        secrets.set(KEY, SECRET).expect("the mock takes the secret");
-        secrets.delete(KEY).expect("the mock deletes the secret");
-        assert_eq!(secrets.get(KEY), Ok(None));
+    fn holding_a_secret() -> Self {
+        let folder = Self::new();
+        folder.file().set(KEY, SECRET).expect("the file takes the secret");
+        folder
+    }
+
+    fn path(&self) -> PathBuf {
+        self.dir.path().join(ROUTES_FILE)
+    }
+
+    fn file(&self) -> FileSecrets {
+        FileSecrets::new(self.path())
     }
 }
 
-mod failure {
-    use super::*;
-
-    #[rstest]
-    #[case::get(|secrets: &KeychainSecrets| secrets.get(KEY).map(drop))]
-    #[case::set(|secrets: &KeychainSecrets| secrets.set(KEY, SECRET))]
-    #[case::delete(|secrets: &KeychainSecrets| secrets.delete(KEY))]
-    fn becomes_a_secrets_error(#[case] operation: fn(&KeychainSecrets) -> Result<(), Error>) {
-        let (store, secrets) = secrets();
-        fail_next_call(&store, KEY, keyring_core::Error::NoStorageAccess("locked".into()));
-        assert_eq!(operation(&secrets), Err(Error::Secrets("Couldn't access platform storage: locked".to_owned())));
-    }
-
-    #[rstest]
-    #[case::bad_encoding(|_: &CredentialStore| keyring_core::Error::BadEncoding(SECRET.to_vec()))]
-    #[case::bad_data_format(|_: &CredentialStore| keyring_core::Error::BadDataFormat(SECRET.to_vec(), "garbled".into()))]
-    #[case::ambiguous(ambiguous)]
-    fn keeps_the_secret_out_of_the_message(#[case] error: fn(&CredentialStore) -> keyring_core::Error) {
-        let (store, secrets) = secrets();
-        fail_next_call(&store, KEY, error(&*store));
-        let Err(Error::Secrets(message)) = secrets.get(KEY) else {
-            panic!("the mock's error should become a secrets error");
-        };
-        assert!(!message.contains(SECRET_IN_DEBUG), "{message}");
-    }
-
-    fn ambiguous(store: &CredentialStore) -> keyring_core::Error {
-        let other = store.build(SERVICE, "another/key", None).expect("a mock entry");
-        other.set_secret(SECRET).expect("the mock takes the secret");
-        keyring_core::Error::Ambiguous(vec![other])
-    }
-}
-
-mod modifiers {
-    use super::*;
-
-    #[test]
-    fn reach_the_store_with_each_entry() {
-        let secrets = KeychainSecrets::new(Ok(mock_store()), Modifiers::from([("access-policy", "a policy")]));
-        assert_eq!(
-            secrets.get(KEY),
-            Err(Error::Secrets("Unsupported: The mock store doesn't allow entry modifiers".to_owned()))
-        );
-    }
-}
-
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 mod store {
     use super::*;
 
-    #[cfg(not(target_os = "ios"))]
     #[test]
     fn fails_with_a_clear_message_on_a_platform_without_one() {
-        assert_eq!(store().get(KEY), Err(Error::Secrets(NO_STORE.to_owned())));
-    }
-
-    #[cfg(target_os = "ios")]
-    #[test]
-    fn keeps_items_on_this_device_once_it_was_unlocked() {
-        let store = store();
-        assert!(store.store.is_ok());
-        assert_eq!(store.modifiers, Modifiers::from([("access-policy", "AfterFirstUnlockThisDeviceOnly")]));
+        let app = tauri::test::mock_app();
+        assert_eq!(store(app.handle()).get(KEY), Err(Error::Secrets(NO_STORE.to_owned())));
     }
 }
 
-#[cfg(not(target_os = "ios"))]
 mod routes {
-    use cornercase_bridge::test_util::TempDir;
-
     use super::*;
 
-    #[cfg(not(target_os = "android"))]
     #[test]
-    fn have_no_store_on_a_platform_without_one() {
+    fn share_the_store_of_the_identity() {
         let dir = TempDir::new();
-        assert_eq!(routes(Some(dir.path())).set(KEY, SECRET), Err(Error::Secrets(NO_STORE.to_owned())));
+        let store = given_store();
+        assert!(Arc::ptr_eq(&routes(Some(dir.path()), Arc::clone(&store)), &store));
+    }
+
+    #[test]
+    fn share_the_store_of_the_identity_without_a_data_folder() {
+        let store = given_store();
+        assert!(Arc::ptr_eq(&routes(None, Arc::clone(&store)), &store));
     }
 
     #[cfg(target_os = "android")]
     #[test]
-    fn are_kept_in_a_file_in_the_data_folder() {
-        let dir = TempDir::new();
-        routes(Some(dir.path())).set(KEY, SECRET).expect("the file takes the secret");
-        assert!(dir.path().join(ROUTES_FILE).is_file());
-        assert_eq!(routes(Some(dir.path())).get(KEY), Ok(Some(SECRET.to_vec())));
-    }
-
-    #[cfg(target_os = "android")]
-    #[test]
-    fn have_no_store_without_a_data_folder() {
-        assert_eq!(routes(None).get(KEY), Err(Error::Secrets(NO_STORE.to_owned())));
+    fn take_the_secrets_of_the_old_file_into_the_store() {
+        let folder = Folder::holding_a_secret();
+        let store = given_store();
+        assert!(Arc::ptr_eq(&routes(Some(folder.dir.path()), Arc::clone(&store)), &store));
+        assert_eq!(store.get(KEY), Ok(Some(SECRET.to_vec())));
+        assert!(!folder.path().exists());
     }
 }
 
-mod identity {
+mod moved {
     use super::*;
 
     #[test]
-    fn keeps_its_fingerprint_from_one_start_to_the_next() {
-        let store = mock_store();
-        let first = Identity::load_or_create(&on_mock(Arc::clone(&store))).expect("a new identity");
-        let second = Identity::load_or_create(&on_mock(store)).expect("the saved identity");
-        assert_eq!(first.fingerprint(), second.fingerprint());
+    fn hands_over_the_store_when_there_is_no_file() {
+        let folder = Folder::new();
+        let store = given_store();
+        assert!(Arc::ptr_eq(&moved(folder.file(), Arc::clone(&store)), &store));
     }
 
     #[test]
-    fn is_not_created_when_the_store_cannot_be_read() {
-        let store = mock_store();
-        let entry = fail_next_call(&store, "identity/ed25519", keyring_core::Error::NoStorageAccess("locked".into()));
-        let error = Identity::load_or_create(&on_mock(Arc::clone(&store))).expect_err("an unreadable store");
-        assert_eq!(error, Error::Secrets("Couldn't access platform storage: locked".to_owned()));
-        assert!(entry.get_secret().is_err_and(|e| matches!(e, keyring_core::Error::NoEntry)));
+    fn copies_the_file_into_the_store_and_removes_it() {
+        let folder = Folder::holding_a_secret();
+        let store = given_store();
+        assert!(Arc::ptr_eq(&moved(folder.file(), Arc::clone(&store)), &store));
+        assert_eq!(store.get(KEY), Ok(Some(SECRET.to_vec())));
+        assert!(!folder.path().exists());
+    }
+
+    #[test]
+    fn keeps_using_the_file_when_the_store_fails() {
+        let folder = Folder::holding_a_secret();
+        let routes = moved(folder.file(), given_broken_store());
+        assert_eq!(routes.get(KEY), Ok(Some(SECRET.to_vec())));
+        assert!(folder.path().is_file());
+    }
+
+    #[test]
+    fn tries_again_on_the_next_start() {
+        let folder = Folder::holding_a_secret();
+        moved(folder.file(), given_broken_store());
+        let store = given_store();
+        assert!(Arc::ptr_eq(&moved(folder.file(), Arc::clone(&store)), &store));
+        assert_eq!(store.get(KEY), Ok(Some(SECRET.to_vec())));
+    }
+}
+
+mod line {
+    use super::*;
+
+    #[rstest]
+    #[case::nothing_without_a_file(Ok(Migration::NoFile), None)]
+    #[case::how_many_moved(Ok(Migration::Moved(2)), Some("cornercase-mobile: moved 2 route secrets into the store"))]
+    #[case::why_the_file_stays(
+        Err(Error::Secrets(BROKEN.to_owned())),
+        Some("cornercase-mobile: the route secrets stay in their file: the secret store failed: the store is broken")
+    )]
+    fn says(#[case] migration: Result<Migration, Error>, #[case] said: Option<&str>) {
+        assert_eq!(line(&migration).as_deref(), said);
+    }
+
+    #[test]
+    fn keeps_the_secret_out_of_a_failure() {
+        let folder = Folder::holding_a_secret();
+        let said = line(&migrate(&folder.file(), &*given_broken_store())).expect("a line about the failure");
+        assert!(said.starts_with("cornercase-mobile: the route secrets stay in their file: "));
+        assert!(!said.contains(&encoded(SECRET)));
     }
 }

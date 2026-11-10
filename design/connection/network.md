@@ -6,7 +6,7 @@ A topic of [Connection](../connection.md). The app notices when the phone change
 
 ## The iOS plugin
 
-- **A Tauri plugin of our own in Swift** (`src-tauri/plugins/network/`, a crate of the workspace). The decision to go native, and the alternative rejected, are in `design/architecture.md`.
+- **A Tauri plugin of our own in Swift** (`src-tauri/plugins/network/`, a crate of the workspace). The decision to go native, and the alternative rejected, are in `design/architecture/plugins.md`.
   - **What it sends**: `NetworkPlugin.swift` starts an `NWPathMonitor` on a queue of its own. Each path that differs from the last one sent goes out as `{kind, expensive}`, the first path the monitor gives included.
   - **`kind`**: `none` when the path is not `satisfied`; otherwise the first interface type the path uses, checked as `wifi`, then `cellular`, then `other` (wired, loopback or a VPN alone).
   - **`expensive`** is the path's `isExpensive`.
@@ -122,4 +122,4 @@ A topic of [Connection](../connection.md). The app notices when the phone change
 ## If the plugin breaks
 
 - **Plan B**, the task's, for a native plugin that does not work: keep the retries on the return to the foreground and on a stream that fails, and lower the transport's silence to 20 s. Not done as well as the plugin, since the plugin works.
-- **Plan C**: upstream's polling in Rust (`design/architecture.md`, Native code). It would replace the plugin if a later iOS or Tauri broke it, before falling back to plan B.
+- **Plan C**: upstream's polling in Rust (`design/architecture/plugins.md`). It would replace the plugin if a later iOS or Tauri broke it, before falling back to plan B.

@@ -60,7 +60,7 @@ El campo "componer" del plan B de 021 como modo por defecto en Android si el IME
 ## design/ que actualiza
 - `design/terminal.md` (teclados de Android, la altura con el teclado), `design/connection/network.md` (el plugin
   en Android), `design/look/navigation.md` (el atrás de Android), `design/architecture/android.md` (`MainActivity.kt`),
-  `design/architecture.md` (los plugins), `DESIGN.md`.
+  `design/architecture/plugins.md` (los plugins), `DESIGN.md`.
 
 ## Verificación
 Notas de la prueba en dispositivo en la PR.
