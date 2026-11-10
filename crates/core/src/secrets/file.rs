@@ -11,7 +11,7 @@ use serde_json::error::Category;
 use super::Secrets;
 use super::hex::{decoded, encoded};
 use crate::error::Error;
-use crate::files::write_atomically;
+use crate::files::{temporary, write_atomically};
 
 const VERSION: u32 = 1;
 
@@ -52,7 +52,14 @@ impl FileSecrets {
 
     pub(super) fn remove(&self) -> Result<(), Error> {
         let _writing = self.writes.lock().unwrap_or_else(PoisonError::into_inner);
-        fs::remove_file(&self.path).map_err(|error| Error::Secrets(format!("cannot remove the secrets file: {error}")))
+        fs::remove_file(&self.path)
+            .map_err(|error| Error::Secrets(format!("cannot remove the secrets file: {error}")))?;
+        self.discard_temporary();
+        Ok(())
+    }
+
+    pub(super) fn discard_temporary(&self) {
+        fs::remove_file(temporary(&self.path)).ok();
     }
 
     fn stored(&self) -> Result<Option<Entries>, Error> {
