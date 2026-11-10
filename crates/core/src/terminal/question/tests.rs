@@ -5,7 +5,7 @@ use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, WORKING};
 use crate::cli::surface::{Frame, Size, Style};
 use crate::terminal::grid::{Grid, Run};
 
-fn line(text: &str) -> Line {
+pub(super) fn line(text: &str) -> Line {
     text.chars().map(|c| Run { text: c.to_string(), width: 1, style: Style::default(), link: None }).collect()
 }
 
@@ -45,7 +45,7 @@ fn owned(expected: &[(u8, &str)]) -> Vec<(u8, String)> {
     expected.iter().map(|(number, label)| (*number, (*label).to_owned())).collect()
 }
 
-fn captured(json: &str) -> PaneGrid {
+pub(super) fn captured(json: &str) -> PaneGrid {
     let mut grid = Grid::default();
     grid.apply(serde_json::from_str::<Frame>(json).expect("a surface frame"));
     grid.panes.into_iter().next().expect("the agent's pane")

@@ -2,6 +2,10 @@ use serde::Serialize;
 
 use super::grid::{Line, PaneGrid};
 
+mod card;
+
+pub use card::{Block, Card, CardOption, Tab, card};
+
 pub const QUESTION_ROWS: usize = 24;
 
 const MARKS: &str = "│┃|❯›>▶●○◯";
@@ -29,13 +33,26 @@ pub fn cropped(pane: &PaneGrid) -> &[Line] {
 
 #[must_use]
 pub fn options(rows: &[Line]) -> Vec<Choice> {
-    let mut found: Vec<Choice> = Vec::new();
-    for choice in rows.iter().rev().filter_map(numbered) {
-        if found.iter().any(|seen| seen.number == choice.number) {
+    listed(rows).into_iter().map(|numbered| numbered.choice).collect()
+}
+
+struct Numbered {
+    row: usize,
+    column: usize,
+    selected: bool,
+    choice: Choice,
+}
+
+fn listed(rows: &[Line]) -> Vec<Numbered> {
+    let mut found: Vec<Numbered> = Vec::new();
+    for (row, (column, selected, choice)) in
+        rows.iter().enumerate().rev().filter_map(|(row, line)| Some((row, numbered_at(line)?)))
+    {
+        if found.iter().any(|seen| seen.choice.number == choice.number) {
             continue;
         }
         let first = choice.number == 1;
-        found.push(choice);
+        found.push(Numbered { row, column, selected, choice });
         if first {
             break;
         }
@@ -45,10 +62,6 @@ pub fn options(rows: &[Line]) -> Vec<Choice> {
     }
     found.reverse();
     found
-}
-
-fn numbered(line: &Line) -> Option<Choice> {
-    numbered_at(line).map(|(_, _, choice)| choice)
 }
 
 fn numbered_at(line: &Line) -> Option<(usize, bool, Choice)> {
