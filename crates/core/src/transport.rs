@@ -64,6 +64,17 @@ pub async fn json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<Stri
     serde_json::from_str(&stdout).map_err(|error| json_error(&error))
 }
 
+pub async fn partial_json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
+    let answer = output(transport, argv).await?;
+    if answer.code != STALE_BOOT
+        && let Ok(read) = serde_json::from_str(&answer.stdout)
+    {
+        return Ok(read);
+    }
+    let stdout = printed(answer)?;
+    serde_json::from_str(&stdout).map_err(|error| json_error(&error))
+}
+
 pub(crate) async fn fed(
     transport: &dyn Transport,
     argv: Vec<String>,

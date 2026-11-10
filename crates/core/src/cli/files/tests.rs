@@ -3,7 +3,9 @@ use serde_json::{Value, json};
 
 use super::*;
 use crate::cli::files::fixtures::{IMAGE, LISTING, SEARCH, TEXT};
+use crate::error::Error;
 use crate::transport::fake::FakeTransport;
+use crate::transport::partial_json;
 
 fn listing(text: &str) -> Listing {
     serde_json::from_str(text).expect("a files listing")

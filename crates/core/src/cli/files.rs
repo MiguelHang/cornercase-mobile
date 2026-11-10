@@ -1,9 +1,6 @@
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::cli::changes::Status;
-use crate::error::Error;
-use crate::transport::{self, STALE_BOOT, Transport, json_error};
 
 #[cfg(test)]
 pub(crate) mod fixtures;
@@ -157,17 +154,6 @@ pub fn search_args(workspace: u64, query: &str) -> Vec<String> {
     let mut argv = command("search", workspace, &["--names"]);
     argv.push(query.to_owned());
     argv
-}
-
-pub async fn partial_json<T: DeserializeOwned>(transport: &dyn Transport, argv: Vec<String>) -> Result<T, Error> {
-    let output = transport::output(transport, argv).await?;
-    if output.code != STALE_BOOT
-        && let Ok(read) = serde_json::from_str(&output.stdout)
-    {
-        return Ok(read);
-    }
-    let stdout = transport::printed(output)?;
-    serde_json::from_str(&stdout).map_err(|error| json_error(&error))
 }
 
 fn command(action: &str, workspace: u64, flags: &[&str]) -> Vec<String> {
