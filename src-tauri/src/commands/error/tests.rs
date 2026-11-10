@@ -114,6 +114,7 @@ mod of_the_app {
         "no_digest",
         "marking a file viewed needs the digest of the version shown"
     )]
+    #[case::too_large_here(CommandError::too_large_here(), "too_large_here", "Too large to show on the phone")]
     #[case::maybe_sent(CommandError::maybe_sent(), "unanswered", "it may have been sent, but no answer came back")]
     fn carries_its_code_and_its_message(#[case] error: CommandError, #[case] code: &str, #[case] message: &str) {
         assert_eq!(json_of(&error), json!({ "code": code, "message": message }));

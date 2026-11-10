@@ -64,6 +64,7 @@ pub(crate) enum ErrorCode {
     NotConnected,
     NotSent,
     NoDigest,
+    TooLargeHere,
 }
 
 impl CommandError {
@@ -93,6 +94,10 @@ impl CommandError {
 
     pub(crate) fn no_digest() -> Self {
         Self::new(ErrorCode::NoDigest, "marking a file viewed needs the digest of the version shown")
+    }
+
+    pub(crate) fn too_large_here() -> Self {
+        Self::new(ErrorCode::TooLargeHere, "Too large to show on the phone")
     }
 
     pub(crate) fn maybe_sent() -> Self {

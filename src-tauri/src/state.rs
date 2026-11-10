@@ -36,6 +36,7 @@ pub(crate) struct Active {
     forwarder: JoinHandle<()>,
     terminal: Slot,
     changes: Slot,
+    search: Slot,
     question: Slot<(u64, u64)>,
 }
 
@@ -124,6 +125,7 @@ impl Active {
             forwarder,
             terminal: Slot::default(),
             changes: Slot::default(),
+            search: Slot::default(),
             question: Slot::default(),
         }
     }
@@ -158,6 +160,14 @@ impl Active {
 
     pub(crate) fn unask(&mut self, tab: u64, pane: u64) {
         self.question.empty(&(tab, pane));
+    }
+
+    pub(crate) fn search(&mut self, workspace: u64, search: JoinHandle<()>) {
+        self.search.fill(workspace, search);
+    }
+
+    pub(crate) fn unsearch(&mut self, workspace: u64) {
+        self.search.empty(&workspace);
     }
 }
 

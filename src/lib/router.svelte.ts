@@ -11,6 +11,8 @@ export type Route =
   | { name: 'start'; machine: number }
   | { name: 'changes'; machine: number; workspace: number; title: string }
   | { name: 'change'; machine: number; workspace: number; path: string }
+  | { name: 'files'; machine: number; workspace: number; title: string }
+  | { name: 'file'; machine: number; workspace: number; path: string }
 
 type Base = Extract<Route, { name: 'no-machines' | 'home' }>
 
@@ -31,9 +33,14 @@ export const chatOf = (route: Route): ChatOf | null => {
 
 const overMachines = (route: Route) => route.name === 'machines' || route.name === 'machine'
 
-const overChat = (route: Route) => overMachines(route) || route.name === 'changes' || route.name === 'change'
+type InWorkspace = Extract<Route, { name: 'changes' | 'change' | 'files' | 'file' }>
 
-export type Reviewed = { machine: number; workspace: number }
+const inWorkspace = (route: Route): route is InWorkspace =>
+  route.name === 'changes' || route.name === 'change' || route.name === 'files' || route.name === 'file'
+
+const overChat = (route: Route) => overMachines(route) || inWorkspace(route)
+
+export type WorkspaceOf = { machine: number; workspace: number }
 
 export class Router {
   #stack: Route[] = $state([])
@@ -55,9 +62,18 @@ export class Router {
     return under === undefined ? null : chatOf(under)
   }
 
-  get reviewed(): Reviewed | null {
-    const top = this.current
-    return top.name === 'changes' || top.name === 'change' ? { machine: top.machine, workspace: top.workspace } : null
+  get reviewed(): WorkspaceOf | null {
+    return this.#workspaceOf('changes', 'change')
+  }
+
+  get browsed(): WorkspaceOf | null {
+    return this.#workspaceOf('files', 'file')
+  }
+
+  #workspaceOf(...names: InWorkspace['name'][]): WorkspaceOf | null {
+    const above = this.#stack.slice(this.#stack.findLastIndex((route) => !inWorkspace(route)) + 1)
+    const found = above.findLast((route): route is InWorkspace => inWorkspace(route) && names.includes(route.name))
+    return found === undefined ? null : { machine: found.machine, workspace: found.workspace }
   }
 
   go(route: Route) {

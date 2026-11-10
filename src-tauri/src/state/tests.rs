@@ -378,6 +378,29 @@ mod an_active_store {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn stops_the_search_before_a_new_one_and_keeps_the_others() {
+        let Held { mut active, changes, terminal, question } = held();
+        let (before, next) = (Arc::new(()), Arc::new(()));
+        active.search(2, task(&before));
+        active.search(2, task(&next));
+        released(&before).await;
+        assert!(holds(&next) && holds(&changes) && holds(&terminal) && holds(&question));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stops_the_search_of_its_workspace_only_and_keeps_the_others() {
+        let Held { mut active, changes, terminal, question } = held();
+        let search = Arc::new(());
+        active.search(2, task(&search));
+        active.unsearch(3);
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(holds(&search));
+        active.unsearch(2);
+        released(&search).await;
+        assert!(holds(&changes) && holds(&terminal) && holds(&question));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn stops_all_three_when_dropped() {
         let Held { active, changes, terminal, question } = held();
         drop(active);

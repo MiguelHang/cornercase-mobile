@@ -28,7 +28,8 @@ const stateWith = (shown: Reading | null, path = PATH) => {
   return state
 }
 
-const draw = (changes: ChangesState) => render(Diff, { props: { path: PATH, changes, backTo: 'login', onback: () => {} } }).body
+const draw = (changes: ChangesState) =>
+  render(Diff, { props: { path: PATH, changes, backTo: 'login', onback: () => {}, onfile: () => {} } }).body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -36,17 +37,17 @@ const bare = (html: string) => html.replace(/<!--[^]*?-->/g, '')
 
 const note = (body: string) => bare(body).match(/<p class="note svelte-[\w-]+">(.*?)<\/p>/)?.[1] ?? null
 
-const kinds = (body: string) => [...body.matchAll(/<div class="line (\w+) svelte-[\w-]+"/g)].map((m) => m[1])
+const kinds = (body: string) => [...body.matchAll(/<div class="code-line (\w+) svelte-[\w-]+"/g)].map((m) => m[1])
 
 const texts = (body: string) =>
-  [...bare(body).matchAll(/<span class="text svelte-[\w-]+">(.*?)<\/span><\/div>/g)].map((m) =>
-    m[1].replace(/<[^>]+>/g, ''),
-  )
+  [...bare(body).matchAll(/<span class="code-text">(.*?)<\/span><\/div>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''))
 
 const numbers = (body: string) =>
-  [...body.matchAll(/<span class="number svelte-[\w-]+">(\d*)<\/span><span class="number svelte-[\w-]+">(\d*)<\/span>/g)].map(
+  [...body.matchAll(/<span class="code-number">(\d*)<\/span><span class="code-number">(\d*)<\/span>/g)].map(
     (m) => [m[1], m[2]],
   )
+
+const WHOLE = /<button class="tool svelte-[\w-]+" type="button" aria-label="Whole file">(?:<!--[^>]*-->| )*<svg [^>]*>(?:(?!<\/svg>)[^])*?<path d="M6 22a2 2 0 0 1-2-2V4/
 
 const viewedButton = (body: string) => body.match(/aria-label="Viewed" aria-pressed="(\w+)"/)?.[1] ?? null
 
@@ -137,7 +138,32 @@ describe('Diff', () => {
 
   it('cuts a long path at its start and puts the viewed button at the right of the bar', () => {
     expect(flat(diffSource)).toContain('.path { margin: 0; overflow: hidden; direction: rtl;')
-    expect(draw(stateWith(reading()))).toMatch(/<div class="end svelte-[\w-]+">(<!--[^>]*-->)*<button class="check/)
+    expect(draw(stateWith(reading()))).toMatch(/<div class="end svelte-[\w-]+">(?:(?!<\/div>)[^])*<button class="check/)
+  })
+
+  it.each(['modified', 'added', 'renamed', 'untracked', 'other'] as const)(
+    'offers the whole file of a %s change before the viewed button',
+    (status) => {
+      const body = draw(stateWith(reading({ status })))
+      expect(body).toMatch(WHOLE)
+      expect(body.search(WHOLE)).toBeLessThan(body.indexOf('aria-label="Viewed"'))
+    },
+  )
+
+  it('offers no whole file for a deleted change, nor before the patch, once the change is gone or the workspace closed', () => {
+    const closed = stateWith(reading())
+    closed.gone = true
+    expect(draw(stateWith(reading({ status: 'deleted' })))).not.toMatch(WHOLE)
+    expect(draw(stateWith({ kind: 'loading' }))).not.toMatch(WHOLE)
+    expect(draw(stateWith({ kind: 'gone' }))).not.toMatch(WHOLE)
+    expect(draw(closed)).not.toMatch(WHOLE)
+  })
+
+  it("opens the patch's own path, the new one of a rename", () => {
+    expect(flat(diffSource)).toContain(
+      "const whole = $derived(open && patch !== null && patch.status !== 'deleted' ? patch.path : null)",
+    )
+    expect(flat(diffSource)).toContain('<ToolButton label="Whole file" icon="file-text" size={22} onclick={() => onfile(whole)} />')
   })
 
   it("presses the viewed button by the state's mark of the file", () => {
@@ -149,13 +175,10 @@ describe('Diff', () => {
     expect(flat(diffSource)).toContain('<Viewed {viewed} onflip={() => void changes.mark(path, !viewed)} />')
   })
 
-  it('scrolls the whole diff sideways with unbroken lines and the numbers held at the left', () => {
-    const box = flat(diffSource)
-    expect(box).toContain('overflow-x: auto;')
-    expect(box).toContain('.lines { width: max-content; min-width: 100%; }')
-    const line = flat(lineSource)
-    expect(line).toContain('white-space: pre;')
-    expect(line).toContain('.gutter { position: sticky; left: 0;')
+  it('draws its lines in the code box, which scrolls them sideways with the numbers held at the left', () => {
+    expect(draw(stateWith(reading()))).toMatch(
+      /<div class="box svelte-[\w-]+"><div class="lines svelte-[\w-]+" style="--digits: 1ch;"><!--\[--><div class="code-line hunk /,
+    )
   })
 
   it('tints the lines and their changed characters with the theme', () => {

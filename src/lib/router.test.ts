@@ -32,6 +32,9 @@ const ROW: AgentRow = {
 const TERMINAL = { name: 'terminal', machine: 1, row: ROW } as const
 const CHANGES = { name: 'changes', machine: 1, workspace: 2, title: 'main' } as const
 const CHANGE = { name: 'change', machine: 1, workspace: 2, path: 'src/app.rs' } as const
+const FILES = { name: 'files', machine: 1, workspace: 3, title: 'feature' } as const
+const FILE = { name: 'file', machine: 1, workspace: 3, path: 'src/main.rs' } as const
+const WHOLE = { name: 'file', machine: 1, workspace: 2, path: 'src/app.rs' } as const
 const CONNECTED = { state: 'connected', route: 'ws://127.0.0.1:7000' } as const
 
 describe('Router', () => {
@@ -321,11 +324,13 @@ describe('chatOf', () => {
   })
 })
 
-const opened = (...routes: Route[]) => {
+const routed = (...routes: Route[]) => {
   const router = new Router(HOME)
   routes.forEach((route) => router.go(route))
-  return router.opened
+  return router
 }
+
+const opened = (...routes: Route[]) => routed(...routes).opened
 
 describe('Router, the opened chat', () => {
   it('is none on the board', () => {
@@ -389,5 +394,73 @@ describe('Router, the changes of a workspace', () => {
   it('is no chat of its own', () => {
     expect(chatOf(CHANGES)).toBeNull()
     expect(chatOf(CHANGE)).toBeNull()
+  })
+})
+
+describe('Router, the files of a workspace', () => {
+  it('stacks a file on its tree and goes back to the tree, then to the agent', () => {
+    const router = routed(AGENT, FILES, FILE)
+    expect(router.current).toEqual(FILE)
+    router.back()
+    expect(router.current).toEqual(FILES)
+    router.back()
+    expect(router.current).toEqual(AGENT)
+  })
+
+  it.each<[string, Route[]]>([
+    ['its tree', [AGENT, FILES]],
+    ['a file on it', [AGENT, FILES, FILE]],
+    ['a whole file on a diff', [AGENT, CHANGES, CHANGE, WHOLE]],
+  ])("keeps the agent's chat under %s, so a draft lives on", (_, routes) => {
+    expect(opened(...routes)).toEqual({ machine: 1, pane: 7 })
+  })
+
+  it.each<[string, Route[], { machine: number; workspace: number }]>([
+    ['its tree', [AGENT, FILES], { machine: 1, workspace: 3 }],
+    ['a file on it', [AGENT, FILES, FILE], { machine: 1, workspace: 3 }],
+    ['a whole file on a diff', [AGENT, CHANGES, CHANGE, WHOLE], { machine: 1, workspace: 2 }],
+  ])('browses the workspace of %s on its machine', (_, routes, workspace) => {
+    expect(routed(...routes).browsed).toEqual(workspace)
+  })
+
+  it('reviews nothing under a tree, which is not a diff', () => {
+    expect(routed(AGENT, FILES, FILE).reviewed).toBeNull()
+  })
+
+  it('keeps reviewing the diff under a whole file opened from it, and goes back to that diff', () => {
+    const router = routed(AGENT, CHANGES, CHANGE, WHOLE)
+    expect(router.reviewed).toEqual({ machine: 1, workspace: 2 })
+    router.back()
+    expect(router.current).toEqual(CHANGE)
+    expect(router.reviewed).toEqual({ machine: 1, workspace: 2 })
+    expect(router.browsed).toBeNull()
+  })
+
+  it.each<[string, Route[]]>([
+    ['the board', []],
+    ['an agent', [AGENT]],
+    ['its changes', [AGENT, CHANGES]],
+    ['a diff', [AGENT, CHANGES, CHANGE]],
+    ['Machines', [AGENT, MACHINES]],
+  ])('browses nothing on %s', (_, routes) => {
+    expect(routed(...routes).browsed).toBeNull()
+  })
+
+  it('browses nothing back on the agent', () => {
+    const router = routed(AGENT, FILES, FILE)
+    router.back()
+    router.back()
+    expect(router.browsed).toBeNull()
+  })
+
+  it('reviews and browses nothing on a route above the workspace screens', () => {
+    const router = routed(AGENT, CHANGES, CHANGE, WHOLE, MACHINES)
+    expect(router.reviewed).toBeNull()
+    expect(router.browsed).toBeNull()
+  })
+
+  it('is no chat of its own', () => {
+    expect(chatOf(FILES)).toBeNull()
+    expect(chatOf(FILE)).toBeNull()
   })
 })

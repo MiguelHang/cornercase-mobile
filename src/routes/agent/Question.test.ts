@@ -41,6 +41,7 @@ const screen = (chat: Chat) =>
       onback: () => {},
       onopen: () => {},
       onchanges: () => {},
+      onfiles: () => {},
       onterminal: () => {},
     },
   }).body

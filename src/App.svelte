@@ -13,6 +13,7 @@
   import { ChangesState } from './lib/changes.svelte'
   import { Chat, timers, touches } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
+  import { FilesState } from './lib/files.svelte'
   import { latestWins } from './lib/join'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
@@ -26,6 +27,8 @@
   import Board from './routes/board/Board.svelte'
   import Changes from './routes/changes/Changes.svelte'
   import Diff from './routes/changes/Diff.svelte'
+  import File from './routes/files/File.svelte'
+  import Files from './routes/files/Files.svelte'
   import Machine from './routes/Machine.svelte'
   import Machines from './routes/Machines.svelte'
   import NoMachines from './routes/NoMachines.svelte'
@@ -103,6 +106,25 @@
         ),
   )
 
+  const browsed = $derived(router.browsed)
+  const browsedMachine = $derived(browsed?.machine ?? null)
+  const browsedWorkspace = $derived(browsed?.workspace ?? null)
+  const files = $derived(
+    browsedMachine === null || browsedWorkspace === null
+      ? null
+      : new FilesState(
+          browsedMachine,
+          browsedWorkspace,
+          {
+            list: commands.filesList,
+            read: commands.filesRead,
+            search: commands.filesSearch,
+            stopSearch: commands.filesSearchStop,
+          },
+          (toast) => toasts.push(toast),
+        ),
+  )
+
   $effect(() => {
     const { machine, agents } = current
     if (chat !== null) {
@@ -128,6 +150,18 @@
       state.stop()
       listening.then((unlisten) => unlisten()).catch(toasts.failed)
     }
+  })
+
+  $effect(() => {
+    const state = files
+    if (state === null) {
+      return
+    }
+    untrack(() => {
+      const top = router.current
+      void (top.name === 'file' ? state.open(top.path) : state.start())
+    })
+    return () => state.stop()
   })
 
   const show = (next: Screen) => {
@@ -156,11 +190,37 @@
     }
   }
 
+  const browse = (workspace: number, title: string) => {
+    if (current.machine !== null) {
+      router.go({ name: 'files', machine: current.machine, workspace, title })
+    }
+  }
+
+  const read = (path: string) => {
+    if (files !== null) {
+      void files.open(path)
+      router.go({ name: 'file', machine: files.machine, workspace: files.workspace, path })
+    }
+  }
+
+  const whole = (path: string) => {
+    if (changes !== null) {
+      router.go({ name: 'file', machine: changes.machine, workspace: changes.workspace, path })
+    }
+  }
+
   const goBack = () => {
-    if (router.current.name === 'change') {
+    const top = router.current.name
+    if (top === 'change') {
       changes?.closeDiff()
     }
+    if (top === 'file') {
+      files?.closeFile()
+    }
     router.back()
+    if (top === 'file') {
+      void files?.refresh()
+    }
   }
 
   $effect(() => {
@@ -309,6 +369,7 @@
             onfailed={(message) => toasts.push({ level: 'error', message })}
             onterminal={terminal}
             onchanges={review}
+            onfiles={browse}
           />
         {/if}
       {:else if route.name === 'changes'}
@@ -317,7 +378,15 @@
         {/if}
       {:else if route.name === 'change'}
         {#if changes !== null}
-          <Diff path={route.path} {changes} {backTo} onback={goBack} />
+          <Diff path={route.path} {changes} {backTo} onback={goBack} onfile={whole} />
+        {/if}
+      {:else if route.name === 'files'}
+        {#if files !== null}
+          <Files title={route.title} {files} {backTo} onback={goBack} onopen={read} />
+        {/if}
+      {:else if route.name === 'file'}
+        {#if files !== null}
+          <File path={route.path} {files} {backTo} onback={goBack} />
         {/if}
       {:else if route.name === 'start'}
         <Start

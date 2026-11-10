@@ -27,6 +27,8 @@ const TITLES: Titles = {
   machine: (route, lookups) => lookups.machineName(route.id) ?? null,
   terminal: (route) => label(route.row),
   change: (route) => nameOf(route.path),
+  files: (route) => route.title,
+  file: (route) => nameOf(route.path),
 }
 
 export const titleOf = (route: Route | null, lookups: Lookups): string | null => {
