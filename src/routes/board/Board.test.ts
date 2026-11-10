@@ -221,6 +221,15 @@ describe('Board', () => {
     expect(flat(rowSource)).toContain('padding-left: calc(var(--depth) * var(--inset-wide));')
   })
 
+  it('keeps the time of a child without children in line with its parent, with an empty slot as wide as the fold', () => {
+    const tree = [at(1, 'working', { title: 'Lead' }), at(2, 'idle', { title: 'Kid', parent: 1, depth: 1 }), at(4, 'idle', { title: 'Alone' })]
+    const body = draw(tree, CONNECTED, 0, unfolded(26, 1))
+    expect(body.match(/<button class="fold svelte-[\w-]+"/g)).toHaveLength(1)
+    expect(body.match(/<span class="slot svelte-[\w-]+"><\/span>/g)).toHaveLength(1)
+    expect(body.indexOf('class="slot')).toBeGreaterThan(body.indexOf('>Kid<'))
+    expect(flat(rowSource)).toContain('.slot { flex: none; width: 44px; }')
+  })
+
   it('lets the time go before the attention when the row runs out of room', () => {
     const source = flat(rowSource)
     expect(source).toContain('.time { flex: 0 1 auto; min-width: 0; overflow: hidden;')

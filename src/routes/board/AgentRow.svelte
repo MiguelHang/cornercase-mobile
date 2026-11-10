@@ -46,6 +46,8 @@
     >
       <Icon name={item.folded ? 'chevron-right' : 'chevron-down'} size={18} />
     </button>
+  {:else if item.depth > 0}
+    <span class="slot"></span>
   {/if}
 </div>
 
@@ -90,6 +92,11 @@
     min-width: 44px;
     padding: 0;
     color: var(--soft);
+  }
+
+  .slot {
+    flex: none;
+    width: 44px;
   }
 
   .lines {
