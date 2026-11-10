@@ -136,6 +136,25 @@ export const icons = {
     { kind: 'circle', cx: 9, cy: 9, r: 2 },
     { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
   ],
+  plus: [
+    { kind: 'path', d: 'M5 12h14' },
+    { kind: 'path', d: 'M12 5v14' },
+  ],
+  x: [
+    { kind: 'path', d: 'M18 6 6 18' },
+    { kind: 'path', d: 'm6 6 12 12' },
+  ],
+  keyboard: [
+    { kind: 'path', d: 'M10 8h.01' },
+    { kind: 'path', d: 'M12 12h.01' },
+    { kind: 'path', d: 'M14 8h.01' },
+    { kind: 'path', d: 'M16 12h.01' },
+    { kind: 'path', d: 'M18 8h.01' },
+    { kind: 'path', d: 'M6 8h.01' },
+    { kind: 'path', d: 'M7 16h10' },
+    { kind: 'path', d: 'M8 12h.01' },
+    { kind: 'rect', x: 2, y: 4, width: 20, height: 16, rx: 2 },
+  ],
 } satisfies Record<string, Shape[]>
 
 export type IconName = keyof typeof icons
