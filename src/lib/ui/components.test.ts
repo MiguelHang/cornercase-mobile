@@ -284,13 +284,20 @@ describe('Labelled', () => {
 })
 
 describe('TextArea', () => {
-  type Props = { label: string; value?: string; error?: string | null; disabled?: boolean; placeholder?: string }
+  type Props = {
+    label: string
+    value?: string
+    error?: string | null
+    disabled?: boolean
+    placeholder?: string
+    bare?: boolean
+  }
   const area = (props: Props) => render(TextArea, { props }).body
   const textarea = (body: string) => body.match(/<textarea [^>]*>/)?.[0] ?? ''
 
   it('shows its value, one line high, named for readers', () => {
     expect(area({ label: 'Message', value: 'two\nlines' })).toMatch(
-      /<div class="grow svelte-[\w-]+" data-value="two\nlines"><textarea class="area svelte-[\w-]+" rows="1" aria-label="Message">two\nlines<\/textarea><\/div>/,
+      /<div class="grow svelte-[\w-]+ framed" data-value="two\nlines"><textarea class="area svelte-[\w-]+" rows="1" aria-label="Message">two\nlines<\/textarea><\/div>/,
     )
   })
 
@@ -338,6 +345,22 @@ describe('TextArea', () => {
     '-webkit-user-select: text; user-select: text;',
     '.area:focus { border-color: var(--accent);',
   ])('holds %s', (text) => {
+    expect(flat(textAreaSource)).toContain(text)
+  })
+
+  it('drops its frame when bare, and still grows from its value', () => {
+    expect(area({ label: 'Answer', value: 'hi', bare: true })).toMatch(
+      /<div class="grow svelte-[\w-]+" data-value="hi"><textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer">/,
+    )
+  })
+
+  it.each([
+    '.area, .grow::after { grid-area: 1 / 1; box-sizing: border-box; min-height: 44px; max-height: 152px; padding: 11px 4px; border: none; font: inherit; font-size: 16px;',
+    '.framed .area, .framed::after { padding: 10px 12px; border: 1px solid var(--edge); }',
+    '.area { overflow-y: auto; resize: none; outline: none; background: none;',
+    '.framed .area { border-radius: var(--radius-control); background: var(--field); }',
+    '.framed .area:focus { border-color: var(--accent); box-shadow:',
+  ])('keeps its border, fill and focus ring to the framed field, with %s', (text) => {
     expect(flat(textAreaSource)).toContain(text)
   })
 })
@@ -395,7 +418,6 @@ describe('Icon', () => {
     ['chevron-down', 'm6 9 6 6 6-6', ''],
     ['chevron-right', 'm9 18 6-6-6-6', ''],
     ['trash-2', 'M3 6h18', '<line x1="14" y1="11" x2="14" y2="17"></line>'],
-    ['image-plus', 'M16 5h6', '<circle cx="9" cy="9" r="2"></circle>'],
     ['check', 'M20 6 9 17l-5-5', ''],
     ['plus', 'M5 12h14', '<path d="M12 5v14"></path>'],
     ['pencil', 'm15 5 4 4', ''],
@@ -404,6 +426,8 @@ describe('Icon', () => {
     ['square-check', 'm9 12 2 2 4-4', '<rect x="3" y="3" width="18" height="18" rx="2"></rect>'],
     ['square-terminal', 'm7 11 2-2-2-2', '<rect x="3" y="3" width="18" height="18" rx="2"></rect>'],
     ['git-compare', 'M13 6h3a2 2 0 0 1 2 2v7', '<circle cx="18" cy="18" r="3"></circle>'],
+    ['x', 'M18 6 6 18', '<path d="m6 6 12 12"></path>'],
+    ['keyboard', 'M7 16h10', '<rect x="2" y="4" width="20" height="16" rx="2"></rect>'],
   ] as const)('draws %s', (name, path, other) => {
     const body = render(Icon, { props: { name } }).body
     expect(body).toContain(`<path d="${path}"></path>`)

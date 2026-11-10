@@ -5,7 +5,8 @@ import { subagents } from '../../lib/board'
 import type { Chat } from '../../lib/chat.svelte'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
-import { ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
+import { CHIPS, ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
+import ChatHeader from './ChatHeader.svelte'
 import chatHeaderSource from './ChatHeader.svelte?raw'
 import toolButtonSource from '../../lib/ui/ToolButton.svelte?raw'
 import Children from './Children.svelte'
@@ -49,6 +50,7 @@ const draw = (
       onback: () => {},
       onopen: () => {},
       onfailed: () => {},
+      ontoast: () => {},
       onterminal: () => {},
       onchanges: () => {},
       onfiles: () => {},
@@ -57,8 +59,6 @@ const draw = (
   }).body
 
 const STARTING = /<p class="starting svelte-[\w-]+"><span class="spinner[^]*?<\/span>(?:<!---->)?Starting claude…<\/p>/
-
-const send = (body: string) => body.match(/<button class="([^"]*)" type="button"([^>]*)>(?:<!--[^>]*-->|\s|<span class="spinner[^>]*>.*?<\/span>)*Send/)
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
 
@@ -156,7 +156,7 @@ describe('Agent, its subagents', () => {
   })
 
   it('starts folded again for each agent opened, and opens its children like the board', () => {
-    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} />')
+    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} boxed={seen !== null} />')
   })
 
   it('follows the rows as they change', () => {
@@ -206,9 +206,9 @@ describe('Agent, its sticky header', () => {
 
   it('turns compact past the large header, measured, following the page with a passive listener', () => {
     const source = flat(chatHeaderSource)
-    expect(source).toContain('const compact = $derived(compactHeader(scrolled, tall))')
+    expect(source).toContain('const compact = $derived(boxed || compactHeader(scrolled, tall))')
     expect(source).toContain('<NavBar {backTo} {onback} {below} edge={compact}> {#snippet center()} <div class="short" class:compact aria-hidden="true">')
-    expect(source).toContain('<header class="head" bind:clientHeight={tall}>')
+    expect(source).toContain('<header class="head" class:spoken={boxed} bind:clientHeight={tall}>')
     expect(source).toContain("const seen = () => (scrolled = window.scrollY) seen() window.addEventListener('scroll', seen, { passive: true })")
     expect(source).toContain("return () => window.removeEventListener('scroll', seen)")
   })
@@ -278,9 +278,8 @@ describe('Agent, its message', () => {
     expect(body).not.toContain('class="markdown')
   })
 
-  it('mutes the reason and the note', () => {
+  it('mutes the reason', () => {
     expect(flat(threadSource)).toContain('.reason { margin: 0; color: var(--muted); }')
-    expect(flat(agentSource)).toContain('.note { margin: 0; color: var(--muted); }')
   })
 
   it('reads it again while the screen shows, and stops when it goes', () => {
@@ -290,54 +289,64 @@ describe('Agent, its message', () => {
   })
 })
 
-describe('Agent, its field', () => {
-  it('asks for the answer in a text area, with a Send button ready for typed text', () => {
+describe('Agent, its composer', () => {
+  it('ends the chat with the composer of its agent, below the thread', () => {
     const body = draw(chatWith({ ...ROW, status: 'done' }, 'go on'))
+    expect(body).toMatch(/<div class="composer svelte-[\w-]+" style="--below: 0px;">/)
     expect(body).toMatch(/<textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer" placeholder="Answer claude"/)
     expect(body).toContain('go on</textarea>')
-    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
-    expect(send(body)?.[2]).not.toContain('disabled')
-    expect(body).not.toContain('is asking you')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
   })
 
-  it('cannot send blank text', () => {
-    const body = draw(chatWith({ ...ROW, status: 'done' }, '  '))
-    expect(send(body)?.[1]).toContain(' resting')
-    expect(send(body)?.[2]).toContain('disabled=""')
+  it('offers no attaching without its agent, nor once it is gone', () => {
+    const gone = chatWith({ ...ROW, status: 'done' })
+    gone.attachments.chips = CHIPS
+    gone.see(1, [{ ...ROW, pane: 30 }])
+    expect(draw(chatWith(null))).not.toContain('aria-label="Attach image"')
+    expect(draw(gone)).not.toContain('aria-label="Attach image"')
+    expect(draw(gone)).not.toContain('Attached images')
   })
+})
 
-  it('says the agent is asking on its screen, keeps the text and cannot send', () => {
-    const body = draw(chatWith(ROW, 'yes, go on'))
-    expect(body).toMatch(
-      /<p class="note svelte-[\w-]+">claude is asking you something on its screen; answer with the keys\.<\/p>/,
+const header = (boxed: boolean) =>
+  render(ChatHeader, {
+    props: {
+      row: ROW,
+      agents: [],
+      backTo: 'Agents',
+      boxed,
+      sendable: true,
+      onback: () => {},
+      onterminal: () => {},
+      onchanges: () => {},
+      onfiles: () => {},
+      onstart: () => {},
+    },
+  }).body
+
+describe('Agent, with the phone keyboard open', () => {
+  it('takes the place and height of what the keyboard leaves visible, as the terminal does', () => {
+    const source = flat(agentSource)
+    expect(source).toContain('const keyboard = new Keyboard(globalThis) const seen = $derived(keyboard.covered ? keyboard.height : null)')
+    expect(source).toContain('$effect(() => keyboard.watch())')
+    expect(source).toContain(
+      'class:keyboard={seen !== null} style:--below="{below}px" style:top={seen === null ? undefined : `${keyboard.offset}px`} style:height={seen === null ? undefined : `${seen}px`} >',
     )
-    expect(body).toContain('yes, go on</textarea>')
-    expect(send(body)?.[2]).toContain('disabled=""')
-  })
-
-  it('shows the send under way, with the field emptied and open', () => {
-    const chat = chatWith({ ...ROW, status: 'done' }, 'go on')
-    void chat.send()
-    const body = draw(chat)
-    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+ busy$/)
-    expect(send(body)?.[2]).toContain('aria-busy="true"')
-    expect(body).not.toMatch(/<textarea[^>]* disabled=""/)
-    expect(body).toContain('></textarea>')
-  })
-
-  it('leaves a failed send to its bubble, with no toast', () => {
-    expect(flat(agentSource)).toContain('onclick={() => void chat.send()}>Send</Button>')
-    expect(flat(agentSource)).not.toContain('await chat.send()')
-  })
-
-  it('stays at the bottom of the screen while the message scrolls', () => {
-    expect(flat(agentSource)).toContain('.composer { position: sticky; bottom: 0;')
-  })
-
-  it('never grows over the bar and the title, scrolling within itself instead', () => {
-    expect(flat(agentSource)).toContain(
-      'max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
+    expect(source).toContain(
+      '.keyboard { position: fixed; right: 0; left: 0; min-height: 0; padding-top: calc(env(safe-area-inset-top) + var(--below) + var(--inset));',
     )
+  })
+
+  it('stays in the page while the keyboard is closed', () => {
+    expect(draw(chatWith(ROW))).toMatch(/<section class="agent svelte-[\w-]+" style="--below: 0px;">/)
+  })
+
+  it('turns the header compact at once, taking the large one only out of sight', () => {
+    expect(header(true)).toMatch(/<div class="short svelte-[\w-]+ compact" aria-hidden="true">/)
+    expect(header(true)).toMatch(/<header class="head svelte-[\w-]+ spoken">/)
+    expect(header(true)).toMatch(/<h1 class="title svelte-[\w-]+">Fix the login flow<\/h1>/)
+    expect(header(false)).toMatch(/<header class="head svelte-[\w-]+">/)
+    expect(header(false)).not.toMatch(/class="short[^"]* compact"/)
   })
 })
 
@@ -421,7 +430,7 @@ describe('Agent, without its row', () => {
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain(
-      "{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} sendable={connection.state === 'connected'} {onback} {onterminal} {onchanges} {onfiles} {onstart} /> {#key row.pane}",
+      "{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} boxed={seen !== null} sendable={connection.state === 'connected'} {onback} {onterminal} {onchanges} {onfiles} {onstart} /> {#key row.pane}",
     )
     const source = flat(chatHeaderSource)
     expect(source).toContain('label="Terminal" icon="square-terminal" onclick={() => onterminal(row)}')
@@ -470,101 +479,6 @@ describe('Agent, without its row', () => {
   })
 })
 
-const ATTACHED = [
-  { name: 'IMG_0042.jpg', size: '47 KiB' },
-  { name: 'pasted.png', size: '900 B' },
-]
-
-const attachButton = (body: string) =>
-  body.match(/<button class="([^"]*)" type="button"([^>]*) aria-label="Attach image"[^>]*>(.*?)<\/button>/)
-
-const withChips = (draft = '') => {
-  const chat = chatWith({ ...ROW, status: 'done' }, draft)
-  chat.attachments.chips = ATTACHED
-  return chat
-}
-
-describe('Agent, its attachments', () => {
-  it('offers attaching an image between the field and Send, named for every reader', () => {
-    const body = draw(chatWith({ ...ROW, status: 'done' }))
-    const found = attachButton(body)
-    expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact$/)
-    expect(found?.[2]).not.toContain('disabled')
-    expect(found?.[3]).toContain('<circle cx="9" cy="9" r="2"></circle>')
-    expect(body.indexOf('<textarea')).toBeLessThan(body.indexOf('aria-label="Attach image"'))
-    expect(body.indexOf('aria-label="Attach image"')).toBeLessThan(send(body)?.index ?? -1)
-  })
-
-  it('offers it while the agent is asking, as it pastes into whatever is there', () => {
-    expect(attachButton(draw(chatWith(ROW)))?.[2]).not.toContain('disabled')
-  })
-
-  it('shows the attaching under way with a spinner in place of the icon, taking no second tap', () => {
-    const chat = chatWith({ ...ROW, status: 'done' })
-    void chat.attach()
-    const found = attachButton(draw(chat))
-    expect(found?.[1]).toMatch(/^button plain svelte-[\w-]+ compact busy$/)
-    expect(found?.[2]).toContain('disabled=""')
-    expect(found?.[2]).toContain('aria-busy="true"')
-    expect(found?.[3]).toContain('class="spinner')
-    expect(found?.[3]).not.toContain('<circle')
-  })
-
-  it('hands the reason of a failed attaching over, to be told', () => {
-    expect(flat(agentSource)).toContain('const failed = await chat.attach() if (failed !== null) { onfailed(failed) }')
-    expect(flat(agentSource)).toContain('busy={chat.attachments.attaching} onclick={attach}>')
-  })
-
-  it('shows each attached image as a chip with its name and size, between the keys and the field', () => {
-    const body = draw(withChips())
-    const chips = [...body.matchAll(/<li class="chip svelte-[\w-]+"><span class="name svelte-[\w-]+">([^<]*)<\/span><span class="size svelte-[\w-]+">([^<]*)<\/span><\/li>/g)]
-    expect(chips.map((chip) => [chip[1], chip[2]])).toEqual([
-      ['IMG_0042.jpg', '47 KiB'],
-      ['pasted.png', '900 B'],
-    ])
-    expect(body).toMatch(/<ul class="chips svelte-[\w-]+" aria-label="Attached images">/)
-    expect(body.indexOf('aria-label="Keys"')).toBeLessThan(body.indexOf('aria-label="Attached images"'))
-    expect(body.indexOf('aria-label="Attached images"')).toBeLessThan(body.indexOf('<textarea'))
-  })
-
-  it('shows no chips before an image is attached', () => {
-    expect(draw(chatWith({ ...ROW, status: 'done' }))).not.toContain('Attached images')
-  })
-
-  it('can send an empty field once an image is attached', () => {
-    const body = draw(withChips())
-    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
-    expect(send(body)?.[2]).not.toContain('disabled')
-  })
-
-  it('cuts a long name rather than its size', () => {
-    expect(flat(agentSource)).toContain('.name { overflow: hidden; color: var(--soft); text-overflow: ellipsis; white-space: nowrap; }')
-    expect(flat(agentSource)).toContain('.size { flex: none; color: var(--faint); }')
-  })
-
-  it('rests Send and Enter while an image is being attached, and leaves the other keys', () => {
-    const chat = withChips('what is wrong here?')
-    void chat.attach()
-    const body = draw(chat)
-    const button = (name: string) =>
-      body.match(new RegExp(`<button class="([^"]*)" type="button"([^>]*) aria-label="${name}"`))
-    expect(send(body)?.[1]).toMatch(/^button primary svelte-[\w-]+ resting$/)
-    expect(send(body)?.[2]).toContain('disabled=""')
-    expect(button('Enter')?.[1]).toMatch(/^button plain svelte-[\w-]+ compact resting$/)
-    expect(button('Enter')?.[2]).toBe(' disabled="" aria-disabled="true"')
-    expect(button('Escape')?.[2]).toBe('')
-    expect(flat(keyRowSource)).toContain('resting={!chat.canPressKey(button.key)}')
-  })
-
-  it('offers no attaching without its agent, nor once it is gone', () => {
-    const gone = withChips()
-    gone.see(1, [{ ...ROW, pane: 30 }])
-    expect(attachButton(draw(chatWith(null)))).toBeNull()
-    expect(attachButton(draw(gone))).toBeNull()
-    expect(draw(gone)).not.toContain('Attached images')
-  })
-})
-
 const keys = (chat: Chat, initialDigits = false) =>
   render(KeyRow, { props: { chat, initialDigits, onfailed: () => {} } }).body
 
@@ -577,17 +491,6 @@ const key = (body: string, name: string) =>
   body.match(new RegExp(`<button class="([^"]*)" type="button" aria-label="${name}"[^>]*>(.*?)</button>`))
 
 describe('Agent, its keys', () => {
-  it('shows every key in the composer, above the field, named for every reader', () => {
-    const body = draw(chatWith({ ...ROW, status: 'done' }))
-    expect(labels(group(body, 'Keys'))).toEqual(['Escape', 'Tab', 'Up', 'Down', 'Left', 'Right', 'Enter', 'Ctrl-C', 'Digits'])
-    expect(body.indexOf('aria-label="Keys"')).toBeLessThan(body.indexOf('<textarea'))
-    expect(flat(agentSource)).toContain('{/if} <KeyRow {chat} {onfailed} /> {#if chat.attachments.chips.length > 0}')
-  })
-
-  it('offers the keys while the agent is asking, when the field cannot send', () => {
-    expect(labels(group(draw(chatWith(ROW)), 'Keys'))).toHaveLength(9)
-  })
-
   it('has no keys without its agent, nor once it is gone', () => {
     const gone = chatWith(ROW)
     gone.see(1, [{ ...ROW, pane: 30 }])
@@ -672,7 +575,7 @@ describe('Agent, its keys', () => {
 
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} /> <div class="composer">')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
     expect(flat(threadSource)).toContain('{/each} <AgentLine {chat} {now} /> </div>')
   })
 

@@ -208,6 +208,7 @@ mod without_a_connection {
     #[rstest]
     #[case::sending("send", json!({ "pane": 543, "text": "hello", "force": false }))]
     #[case::attaching("attach", json!({ "pane": 543 }))]
+    #[case::pasting_an_attached_image("paste_attached", json!({ "pane": 543, "id": 1 }))]
     #[case::pressing_a_key("keys", json!({ "pane": 543, "key": "enter" }))]
     #[case::reviewing("mark_reviewed", json!({ "pane": 543 }))]
     fn says_it_is_not_connected_rather_than_queueing(#[case] command: &str, #[case] args: Value) {

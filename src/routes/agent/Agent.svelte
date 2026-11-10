@@ -1,16 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
+  import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize, Toast } from '../../lib/bindings'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
-  import Button from '../../lib/ui/Button.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
+  import { Keyboard } from '../../lib/terminal/keyboard.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
-  import TextArea from '../../lib/ui/TextArea.svelte'
   import ChatHeader from './ChatHeader.svelte'
-  import KeyRow from './KeyRow.svelte'
-  import Question from './Question.svelte'
+  import Composer from './Composer.svelte'
   import Subagents from './Subagents.svelte'
   import Thread from './Thread.svelte'
 
@@ -26,6 +23,7 @@
     onback,
     onopen,
     onfailed,
+    ontoast,
     onterminal,
     onchanges,
     onfiles,
@@ -40,6 +38,7 @@
     onback: () => void
     onopen: (pane: number) => void
     onfailed: (reason: string) => void
+    ontoast: (toast: Toast) => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
     onfiles: (workspace: number, title: string) => void
@@ -47,6 +46,11 @@
   } = $props()
 
   let now = $state(untrack(() => chat.now()))
+
+  const keyboard = new Keyboard(globalThis)
+  const seen = $derived(keyboard.covered ? keyboard.height : null)
+
+  $effect(() => keyboard.watch())
 
   $effect(() => {
     const told = chat
@@ -65,23 +69,15 @@
   })
 
   const row = $derived(chat.row)
-
-  const attach = async () => {
-    const failed = await chat.attach()
-    if (failed !== null) {
-      onfailed(failed)
-    }
-  }
-
-  const choose = async (number: number) => {
-    const failed = await chat.pressOption(number)
-    if (failed !== null) {
-      onfailed(failed)
-    }
-  }
 </script>
 
-<section class="agent" style:--below="{below}px">
+<section
+  class="agent"
+  class:keyboard={seen !== null}
+  style:--below="{below}px"
+  style:top={seen === null ? undefined : `${keyboard.offset}px`}
+  style:height={seen === null ? undefined : `${seen}px`}
+>
   {#if chat.gone}
     <NavBar {backTo} {onback} {below} />
     <p class="gone">This agent is no longer running.</p>
@@ -100,6 +96,7 @@
       agents={agents ?? []}
       {backTo}
       {below}
+      boxed={seen !== null}
       sendable={connection.state === 'connected'}
       {onback}
       {onterminal}
@@ -110,33 +107,8 @@
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
-    <Thread {chat} {now} />
-    <div class="composer">
-      {#if chat.question !== null}
-        <Question question={chat.question} agent={row.agent} onoption={(number) => void choose(number)} />
-      {:else if chat.asking}
-        <p class="note">{row.agent} is asking you something on its screen; answer with the keys.</p>
-      {/if}
-      <KeyRow {chat} {onfailed} />
-      {#if chat.attachments.chips.length > 0}
-        <ul class="chips" aria-label="Attached images">
-          {#each chat.attachments.chips as chip (chip)}
-            <li class="chip"><span class="name">{chip.name}</span><span class="size">{chip.size}</span></li>
-          {/each}
-        </ul>
-      {/if}
-      <div class="fields">
-        <div class="field">
-          <TextArea label="Answer" placeholder="Answer {row.agent}" bind:value={chat.draft} />
-        </div>
-        <Button tone="plain" compact label="Attach image" busy={chat.attachments.attaching} onclick={attach}>
-          {#if !chat.attachments.attaching}
-            <Icon name="image-plus" size={20} />
-          {/if}
-        </Button>
-        <Button resting={!chat.canSend && !chat.sending} busy={chat.sending} onclick={() => void chat.send()}>Send</Button>
-      </div>
-    </div>
+    <Thread {chat} {now} boxed={seen !== null} />
+    <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />
   {/if}
 </section>
 
@@ -148,71 +120,16 @@
     gap: var(--inset-wide);
     min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
-    --over-composer: 132px;
   }
 
-  .note {
-    margin: 0;
-    color: var(--muted);
-  }
-
-  .composer {
-    position: sticky;
-    bottom: 0;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap);
-    max-height: calc(100dvh - env(safe-area-inset-top) - var(--below) - var(--over-composer));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom));
-    padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));
-    background: var(--glass);
-  }
-
-  .fields {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--gap);
-  }
-
-  .field {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gap);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .chip {
-    display: flex;
-    gap: 6px;
-    min-width: 0;
-    max-width: 100%;
-    padding: 4px var(--gap);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-chip);
-    background: var(--hover);
-    font-size: 13px;
-  }
-
-  .name {
-    overflow: hidden;
-    color: var(--soft);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .size {
-    flex: none;
-    color: var(--faint);
+  .keyboard {
+    position: fixed;
+    right: 0;
+    left: 0;
+    min-height: 0;
+    padding-top: calc(env(safe-area-inset-top) + var(--below) + var(--inset));
+    padding-right: calc(env(safe-area-inset-right) + var(--inset-wide));
+    padding-left: calc(env(safe-area-inset-left) + var(--inset-wide));
   }
 
   .waiting {

@@ -151,13 +151,16 @@ describe('App wiring', () => {
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, commands.attach, haptics, timers, asker, ), )',
+      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, images, haptics, timers, asker, ), )',
+    )
+    expect(source).toContain(
+      'const images: Images = { attach: commands.attach, paste: commands.pasteAttached, discard: commands.discard }',
     )
     expect(source).toContain(
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
     )
   })
 
@@ -167,6 +170,10 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const seen = $derived(chat?.row != null)')
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
+  })
+
+  it('lets the chat go once it is left, so that its images waiting on the phone are dropped', () => {
+    expect(source).toContain('$effect(() => { const opened = chat return () => opened?.leave() })')
   })
 
   it('watches the chat for done only while its agent or its terminal is on top and the page shows', () => {
@@ -368,7 +375,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })
