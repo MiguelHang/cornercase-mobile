@@ -17,5 +17,9 @@ que crece hacia arriba con el texto) y "poder eliminar una imagen cuando la sube
   teclado o `⌘` dentro de la cápsula) y se abre sola mientras el agente está `waiting`; decidir y anotarlo.
 - [ ] CA3 — Cada imagen adjunta sale como miniatura sobre la cápsula con una `×` para quitarla antes de enviar; quitarla
   borra la ruta pegada del agente si ya se pegó (o, si upstream no lo permite, la deja y lo dice; anotar el hueco).
-- [ ] CA4 — Nada de lo que funciona se pierde: estados del envío (036), `--force` tras una imagen (018), la pregunta (039).
-- [ ] CA5 — Comprobado en el simulador y en el iPhone del usuario; tests; `hx check full` verde.
+- [ ] CA4 — Tu mensaje enviado se queda a la vista: al enviar, el hilo enseña tu mensaje (enviando → enviado) y, debajo,
+  la línea del agente ("Claude is working…"). Hoy (iPhone del usuario, 2026-11-10) al pasar el agente a `working` solo
+  se ve la línea y tu mensaje desaparece: averiguar por qué (¿la relectura de `last_message` lo sustituye?) y que no
+  pase; tu último mensaje sigue encima hasta que llegue la respuesta, y encima de ella después (036 › CA4).
+- [ ] CA5 — Nada de lo que funciona se pierde: estados del envío (036), `--force` tras una imagen (018), la pregunta (039).
+- [ ] CA6 — Comprobado en el simulador y en el iPhone del usuario; tests; `hx check full` verde.
