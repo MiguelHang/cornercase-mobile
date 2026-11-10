@@ -9,6 +9,7 @@ const press = (key: string, held: Partial<Keydown> = {}): Keydown => ({
   shiftKey: false,
   metaKey: false,
   isComposing: false,
+  keyCode: 0,
   ...held,
 })
 
@@ -203,6 +204,89 @@ describe('composition', () => {
     const input = composing()
     input.compositionend('日本')
     expect(input.keydown(press('Enter'))).toEqual(sent({ key: { code: 'enter' } }))
+  })
+})
+
+describe('an Android keyboard', () => {
+  const ime = (key = 'Unidentified') => press(key, { keyCode: 229 })
+
+  it.each([
+    ['an unidentified key', ime()],
+    ['a named key the keyboard is still processing', ime('Enter')],
+  ])('lets the keydown of %s through', (_, pressed) => {
+    expect(typing().keydown(pressed)).toEqual(passed)
+  })
+
+  it.each([
+    ['a typed character', typed('insertText', 'a'), sent({ text: 'a' })],
+    ['a delete', typed('deleteContentBackward'), sent({ key: { code: 'backspace' } })],
+    ['a line break', typed('insertLineBreak'), sent({ key: { code: 'enter' } })],
+  ])('sends %s that follows an unidentified keydown', (_, event, step) => {
+    const input = typing()
+    input.keydown(ime())
+    expect(input.beforeinput(event)).toEqual(step)
+  })
+
+  it('sends a word typed character by character, one character at a time', () => {
+    const input = typing()
+    const steps = [...'ls'].flatMap((character) => [
+      input.keydown(ime()),
+      input.beforeinput(typed('insertText', character)),
+    ])
+    expect(steps.flatMap(({ send }) => send)).toEqual([{ text: 'l' }, { text: 's' }])
+  })
+
+  it('sends a composed word once, when it ends, and restores the field', () => {
+    const input = typing()
+    input.keydown(ime())
+    input.compositionstart()
+    const steps = ['l', 'ls'].flatMap((data) => [
+      input.keydown(ime()),
+      input.beforeinput(typed('insertCompositionText', data, { isComposing: true })),
+    ])
+    expect([...steps, input.compositionend('ls')]).toEqual([
+      passed,
+      passed,
+      passed,
+      passed,
+      { send: [{ text: 'ls' }], prevent: false, restore: true },
+    ])
+  })
+
+  it('sends nothing for a word deleted while it was composed', () => {
+    const input = typing()
+    input.compositionstart()
+    input.beforeinput(typed('insertCompositionText', 'l', { isComposing: true }))
+    input.beforeinput(typed('insertCompositionText', '', { isComposing: true }))
+    expect(input.compositionend('')).toEqual({ send: [], prevent: false, restore: true })
+  })
+
+  it('sends a delete that comes after an empty composition', () => {
+    const input = typing()
+    input.compositionstart()
+    input.compositionend('')
+    input.keydown(ime())
+    expect(input.beforeinput(typed('deleteContentBackward'))).toEqual(sent({ key: { code: 'backspace' } }))
+  })
+
+  it('sends each delete with the field left at its sentinel and no keydown before it', () => {
+    const input = typing()
+    const steps = [input.beforeinput(typed('deleteContentBackward')), input.beforeinput(typed('deleteContentBackward'))]
+    expect(steps.flatMap(({ send }) => send)).toEqual([{ key: { code: 'backspace' } }, { key: { code: 'backspace' } }])
+  })
+
+  it('sends one Enter for its keydown and its line break', () => {
+    const input = typing()
+    const steps = [input.keydown(press('Enter', { keyCode: 13 })), input.beforeinput(typed('insertLineBreak'))]
+    expect(steps).toEqual([sent({ key: { code: 'enter' } }), swallowed])
+  })
+
+  it('sends a composed word and then the Enter that ended it', () => {
+    const input = typing()
+    input.compositionstart()
+    input.beforeinput(typed('insertCompositionText', 'ls', { isComposing: true }))
+    const steps = [input.compositionend('ls'), input.keydown(press('Enter', { keyCode: 13 }))]
+    expect(steps.flatMap(({ send }) => send)).toEqual([{ text: 'ls' }, { key: { code: 'enter' } }])
   })
 })
 
