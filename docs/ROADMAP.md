@@ -63,6 +63,13 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 037 | [Volver atrás con el gesto de iOS y un chevron en todas las pantallas](tasks/037-back-gesture.md) | 036 | ~350 |
 | 038 | [Tablero: los subagentes, bajo su agente y plegados](tasks/038-board-subagents.md) | 015 | ~450 |
 | 039 | [Chat: ver las preguntas y menús del agente sin ir a la terminal](tasks/039-chat-shows-questions.md) | 036, 020 | ~450 |
+| 040 | [Tablero: plegado que no parezca un "ir" y buscador de agentes](tasks/040-board-fold-and-search.md) | 038 | ~350 |
+| 041 | [Chat: barra de escribir estilo Claude/WhatsApp y quitar una imagen adjunta](tasks/041-chat-composer.md) | 036, 039 | ~400 |
+| 042 | [Chat: la pregunta del agente se lee sin scroll horizontal](tasks/042-chat-question-layout.md) | 039 | ~350 |
+| 043 | [Terminal: ajustada al móvil por defecto, y su scroll](tasks/043-terminal-fit-default.md) | 022 | ~250 |
+| 044 | [Abrir un agente done lo da por visto](tasks/044-done-seen.md) | 016 | ~250 |
+| 045 | [Arrancar: sin worktrees nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~250 |
+| 046 | [Elegir la LAN cuando la LAN y Tailscale contestan](tasks/046-prefer-lan.md) | 035 | ~150 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
@@ -81,7 +88,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
-· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `037`, `038`, `039` (antes de Android; pedidas por el usuario el 2026-11-09) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
+· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `037`, `038`, `039` (antes de Android; pedidas por el usuario el 2026-11-09) · `040`–`046` (de la prueba del usuario en su iPhone, 029, el 2026-11-10) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
 - 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
