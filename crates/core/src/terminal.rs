@@ -1,3 +1,4 @@
+pub mod asking;
 pub(crate) mod fit;
 pub mod grid;
 pub mod live;
