@@ -22,9 +22,12 @@
 
   const chosen = $derived(card.options.find((option) => option.selected)?.number ?? null)
 
+  let tall = $state(0)
+
   const follow =
     (number: number | null): Attachment<HTMLElement> =>
     (box) => {
+      void tall
       const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
       if (option !== null) {
         box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())
@@ -32,7 +35,7 @@
     }
 </script>
 
-<div class="card" role="group" aria-label="{agent} asks" {@attach follow(chosen)}>
+<div class="card" role="group" aria-label="{agent} asks" bind:clientHeight={tall} {@attach follow(chosen)}>
   {#if card.tabs.length > 0}
     <QuestionTabs tabs={card.tabs} open={card.open} {ontab} />
   {/if}

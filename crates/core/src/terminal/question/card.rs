@@ -44,6 +44,7 @@ const TICKS: &str = "☐✔☒✓";
 const ANSWERED: &str = "✔☒✓";
 
 const FENCE: char = '╌';
+const BAR: char = '│';
 
 enum Below {
     Skipped,
@@ -212,7 +213,16 @@ fn unindented(rows: &[String]) -> Option<String> {
     let kept = rows.get(first..=last)?;
     let indent = |row: &str| row.chars().take_while(|c| c.is_whitespace()).count();
     let common = kept.iter().filter(|row| !row.is_empty()).map(|row| indent(row)).min()?;
-    Some(kept.iter().map(|row| row.chars().skip(common).collect::<String>()).collect::<Vec<String>>().join("\n"))
+    let rows: Vec<String> = kept.iter().map(|row| row.chars().skip(common).collect()).collect();
+    Some(unbarred(rows).join("\n"))
+}
+
+fn unbarred(rows: Vec<String>) -> Vec<String> {
+    if !rows.iter().filter(|row| !row.is_empty()).all(|row| row.starts_with(BAR)) {
+        return rows;
+    }
+    let cut = |row: &str| row.strip_prefix(BAR).map(|rest| rest.strip_prefix(' ').unwrap_or(rest).to_owned());
+    rows.iter().map(|row| cut(row).unwrap_or_default()).collect()
 }
 
 fn help(rows: &[Line], cols: u16) -> Option<Vec<String>> {

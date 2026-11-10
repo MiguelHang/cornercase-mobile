@@ -2,7 +2,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::cli::surface::Style;
-use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, WORKING};
+use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, PERMISSION_GUTTER, WORKING};
 use crate::terminal::grid::Run;
 use crate::terminal::question::cropped;
 use crate::terminal::question::tests::{captured, line};
@@ -126,6 +126,8 @@ mod blocks {
     #[case::with_code_between_two_dashed_rules(&["Run", "╌╌╌╌╌╌╌╌", "", "  ls", "    -a", "", "╌╌╌╌╌╌╌╌", "Ok?"], vec![text("Run"), Block::Code("ls\n  -a".to_owned()), text("Ok?")])]
     #[case::with_a_blank_row_inside_the_code(&["╌╌╌╌╌╌╌╌", " ls", "", " pwd", "╌╌╌╌╌╌╌╌"], vec![Block::Code("ls\n\npwd".to_owned())])]
     #[case::with_a_rule_inside_the_code(&["╌╌╌╌╌╌╌╌", "────────", "╌╌╌╌╌╌╌╌"], vec![Block::Code("────────".to_owned())])]
+    #[case::with_a_bar_down_the_code(&["╌╌╌╌╌╌╌╌", " │ ls", " │   -a", "╌╌╌╌╌╌╌╌"], vec![Block::Code("ls\n  -a".to_owned())])]
+    #[case::with_a_bar_on_some_code_rows_only(&["╌╌╌╌╌╌╌╌", " │ ls", " pwd", "╌╌╌╌╌╌╌╌"], vec![Block::Code("│ ls\npwd".to_owned())])]
     #[case::with_nothing_between_two_dashed_rules(&["Run", "╌╌╌╌╌╌╌╌", "  ", "╌╌╌╌╌╌╌╌"], vec![text("Run")])]
     fn split_the_rows_above_the_options(#[case] rows: &[&str], #[case] expected: Vec<Block>) {
         assert_eq!(above(rows).map(|card| card.blocks), Some(expected));
@@ -208,6 +210,13 @@ mod captures {
             help: vec!["Esc to cancel · Tab to amend".to_owned()],
         };
         assert_eq!(of(PERMISSION), Some(expected));
+    }
+
+    #[test]
+    fn read_a_permission_with_a_bar_down_its_command() {
+        let command = "printf 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma\\n' >\ngreek-letters-for-the-phone-check.txt && wc -w greek-letters-for-the-phone-check.txt";
+        let blocks = of(PERMISSION_GUTTER).map(|card| card.blocks);
+        assert_eq!(blocks.as_deref().and_then(|blocks| blocks.get(1)), Some(&Block::Code(command.to_owned())));
     }
 
     #[test]

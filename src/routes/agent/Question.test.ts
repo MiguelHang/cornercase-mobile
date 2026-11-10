@@ -254,8 +254,9 @@ describe('Question, as a card', () => {
     )
   })
 
-  it('follows the chosen option when it changes', () => {
-    expect(flat(cardSource)).toContain('{@attach follow(chosen)}')
+  it('follows the chosen option when it changes and when the card changes height', () => {
+    expect(flat(cardSource)).toContain('bind:clientHeight={tall} {@attach follow(chosen)}')
+    expect(flat(cardSource)).toContain('(box) => { void tall const option')
     expect(flat(cardSource)).toContain('box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())')
   })
 
