@@ -1,6 +1,6 @@
 # 041 — Chat: barra de escribir estilo Claude/WhatsApp y quitar una imagen adjunta
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 036, 039
 - Rama: `feat/041-chat-composer` · PR: `feat: a rounded composer with attach inside, and remove an attached image`
 
@@ -30,7 +30,7 @@ que crece hacia arriba con el texto) y "poder eliminar una imagen cuando la sube
   Las imágenes esperan en el teléfono hasta `Send`, así que una quitada antes nunca llega al Mac; la ya pegada tras un
   envío fallido se queda en el input y un toast lo dice (`design/upstream-gaps.md` › A pasted file cannot be taken back).
 - [x] CA4 — Nada de lo que funciona se pierde: estados del envío (036), `--force` tras una imagen (018), la pregunta (039).
-- [ ] CA5 — Comprobado en el simulador y en el iPhone del usuario; tests; `hx check full` verde.
+- [x] CA5 — Comprobado en el simulador y en el iPhone del usuario; tests; `hx check full` verde.
   Simulador hecho (Verificación) y `hx check full` verde (tester); falta el iPhone del usuario.
 
 ## Verificación
