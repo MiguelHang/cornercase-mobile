@@ -1,19 +1,52 @@
 use rstest::rstest;
 
 use super::*;
-use crate::cli::surface::fixtures::{ASK_ONE, PERMISSION, WORKING};
+use crate::cli::surface::Style;
+use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, WORKING};
+use crate::terminal::grid::Run;
 use crate::terminal::question::cropped;
 use crate::terminal::question::tests::{captured, line};
 
 const COLS: u16 = 8;
 
+const PLAIN: [&str; 2] = ["1. Pear", "2. Plum"];
+
 fn option(number: u8, label: &str, detail: Option<&str>, selected: bool) -> CardOption {
     CardOption { number, label: label.to_owned(), detail: detail.map(str::to_owned), selected }
 }
 
+fn tab(label: &str, answered: bool) -> Tab {
+    Tab { label: label.to_owned(), answered }
+}
+
+fn text(text: &str) -> Block {
+    Block::Text(text.to_owned())
+}
+
+fn parsed(lines: &[Line]) -> Option<Card> {
+    card(lines, COLS)
+}
+
+fn plain(rows: &[&str]) -> Vec<Line> {
+    rows.iter().map(|row| line(row)).collect()
+}
+
 fn read(rows: &[&str]) -> Option<Vec<CardOption>> {
-    let lines: Vec<Line> = rows.iter().map(|row| line(row)).collect();
-    card(&lines, COLS).map(|card| card.options)
+    parsed(&plain(rows)).map(|card| card.options)
+}
+
+fn above(rows: &[&str]) -> Option<Card> {
+    parsed(&plain(&[rows, &PLAIN].concat()))
+}
+
+fn painted(parts: &[(&str, Option<u8>)]) -> Line {
+    let cell = |c: char, bg: Option<u8>| Run {
+        text: c.to_string(),
+        width: 1,
+        style: Style { bg: bg.map(Colour::Index), ..Style::default() },
+        link: None,
+    };
+    parts.iter().flat_map(|(text, bg)| text.chars().map(move |c| cell(c, *bg))).collect()
 }
 
 fn of(json: &str) -> Option<Card> {
@@ -49,30 +82,132 @@ mod options {
     }
 }
 
+mod tabs {
+    use super::*;
+
+    #[rstest]
+    #[case::with_the_open_one_painted(&[(" ☐ Pear ", Some(153)), (" ✔ Plum", None)], &[("Pear", false), ("Plum", true)], Some(0))]
+    #[case::without_the_arrows(&[("←  ", None), ("☐ Pear", None), ("  ☒ Fig", Some(153)), ("  →", None)], &[("Pear", false), ("Fig", true)], Some(1))]
+    #[case::with_a_lone_painted_one(&[(" ☐ Pear ", Some(153))], &[("Pear", false)], Some(0))]
+    #[case::with_the_open_one_on_a_painted_row(&[("☐ Pear ", Some(1)), ("☐ Fig ", Some(2)), ("✓ Plum", Some(2))], &[("Pear", false), ("Fig", false), ("Plum", true)], Some(0))]
+    #[case::without_a_background_of_their_own(&[("☐ Pear ☐ Plum", None)], &[("Pear", false), ("Plum", false)], None)]
+    #[case::with_every_one_painted_alike(&[("☐ Pear ☐ Plum", Some(153))], &[("Pear", false), ("Plum", false)], None)]
+    #[case::with_two_painted_apart(&[("☐ Pear ", Some(1)), ("☐ Fig ", Some(2)), ("☐ Plum", None)], &[("Pear", false), ("Fig", false), ("Plum", false)], None)]
+    fn are_read_from_the_row_above_the_options(
+        #[case] chips: &[(&str, Option<u8>)],
+        #[case] expected: &[(&str, bool)],
+        #[case] open: Option<usize>,
+    ) {
+        let lines = [vec![painted(chips)], plain(&PLAIN)].concat();
+        let card = parsed(&lines).expect("a card");
+        let tabs: Vec<Tab> = expected.iter().map(|(label, answered)| tab(label, *answered)).collect();
+        assert_eq!((card.tabs, card.open, card.blocks), (tabs, open, Vec::new()));
+    }
+
+    #[rstest]
+    #[case::with_text_before_the_mark(&["Pick ☐ one"], "Pick ☐ one")]
+    #[case::with_a_mark_and_no_label(&["☐ Pear ✔"], "☐ Pear ✔")]
+    fn are_none_when_a_row_is_not_made_of_them(#[case] rows: &[&str], #[case] said: &str) {
+        let card = above(rows).expect("a card");
+        assert_eq!((card.tabs, card.open, card.blocks), (Vec::new(), None, vec![text(said)]));
+    }
+}
+
+mod blocks {
+    use super::*;
+
+    #[rstest]
+    #[case::with_one_row(&["Pick one"], vec![text("Pick one")])]
+    #[case::with_a_row_wrapped_to_the_pane(&["Pick a", "fruit"], vec![text("Pick a fruit")])]
+    #[case::with_a_row_that_ends_short(&["Hi", "there"], vec![text("Hi\nthere")])]
+    #[case::with_an_indented_row_wrapped_inside_its_margin(&["  Hi", "  there"], vec![text("Hi there")])]
+    #[case::with_a_blank_row_between_paragraphs(&["Pick", "", "", "Now"], vec![text("Pick"), text("Now")])]
+    #[case::with_a_rule_dropped(&["────────", "Pick", "────────", "Now"], vec![text("Pick"), text("Now")])]
+    #[case::with_code_between_two_dashed_rules(&["Run", "╌╌╌╌╌╌╌╌", "", "  ls", "    -a", "", "╌╌╌╌╌╌╌╌", "Ok?"], vec![text("Run"), Block::Code("ls\n  -a".to_owned()), text("Ok?")])]
+    #[case::with_a_blank_row_inside_the_code(&["╌╌╌╌╌╌╌╌", " ls", "", " pwd", "╌╌╌╌╌╌╌╌"], vec![Block::Code("ls\n\npwd".to_owned())])]
+    #[case::with_a_rule_inside_the_code(&["╌╌╌╌╌╌╌╌", "────────", "╌╌╌╌╌╌╌╌"], vec![Block::Code("────────".to_owned())])]
+    #[case::with_nothing_between_two_dashed_rules(&["Run", "╌╌╌╌╌╌╌╌", "  ", "╌╌╌╌╌╌╌╌"], vec![text("Run")])]
+    fn split_the_rows_above_the_options(#[case] rows: &[&str], #[case] expected: Vec<Block>) {
+        assert_eq!(above(rows).map(|card| card.blocks), Some(expected));
+    }
+
+    #[test]
+    fn are_none_when_a_dashed_rule_does_not_close() {
+        assert_eq!(above(&["Run", "╌╌╌╌╌╌╌╌", "ls"]), None);
+    }
+}
+
+mod help {
+    use super::*;
+
+    #[rstest]
+    #[case::without_rows(&[], &[])]
+    #[case::with_one_row(&["", "Esc to cancel"], &["Esc to cancel"])]
+    #[case::with_two_rows_and_a_rule(&["────────", "Enter", "", "Esc"], &["Enter", "Esc"])]
+    fn is_read_from_the_rows_after_the_options(#[case] rows: &[&str], #[case] expected: &[&str]) {
+        let help = parsed(&plain(&[&PLAIN, rows].concat())).map(|card| card.help);
+        assert_eq!(help, Some(expected.iter().map(|row| (*row).to_owned()).collect()));
+    }
+
+    #[test]
+    fn is_none_with_more_than_two_rows() {
+        assert_eq!(parsed(&plain(&["1. Pear", "2. Plum", "Enter", "Tab", "Esc"])), None);
+    }
+}
+
 mod captures {
     use super::*;
 
-    #[test]
-    fn read_the_answers_to_a_question() {
-        let colours = vec![
+    fn colours() -> Vec<CardOption> {
+        vec![
             option(1, "Red", Some("A warm, bold colour associated with energy and passion."), true),
             option(2, "Green", Some("A natural, calming colour associated with growth and balance."), false),
             option(3, "Blue", Some("A cool, steady colour associated with calm and trust."), false),
             option(4, "Type something.", None, false),
             option(5, "Chat about this", None, false),
-        ];
-        assert_eq!(of(ASK_ONE).map(|card| card.options), Some(colours));
+        ]
     }
 
     #[test]
-    fn read_the_answers_to_a_permission() {
-        let answers = vec![
-            option(1, "Yes", None, true),
-            option(2, "Yes, and always allow access to", Some("/Users/dev/web-shop from this project"), false),
-            option(3, "Yes, and switch to auto mode · auto mode handles these prompts for you", None, false),
-            option(4, "No", None, false),
-        ];
-        assert_eq!(of(PERMISSION).map(|card| card.options), Some(answers));
+    fn read_a_question() {
+        let expected = Card {
+            tabs: vec![tab("Colour", false)],
+            open: Some(0),
+            blocks: vec![text("Which colour do you prefer?")],
+            options: colours(),
+            help: vec!["Enter to select · ↑/↓ to navigate · Esc to cancel".to_owned()],
+        };
+        assert_eq!(of(ASK_ONE), Some(expected));
+    }
+
+    #[test]
+    fn read_a_question_among_several() {
+        let expected = Card {
+            tabs: vec![tab("Colour", false), tab("Size", false), tab("Submit", true)],
+            open: Some(0),
+            blocks: vec![text("Which colour do you prefer?")],
+            options: colours(),
+            help: vec!["Enter to select · Tab/Arrow keys to navigate · Esc to cancel".to_owned()],
+        };
+        assert_eq!(of(ASK_TABS), Some(expected));
+    }
+
+    #[test]
+    fn read_a_permission() {
+        let said = "Bash command\nTip: auto mode handles these prompts for you — choose \"switch to auto mode\" below\nWrite current date to later.txt";
+        let expected = Card {
+            tabs: Vec::new(),
+            open: None,
+            blocks: vec![text(said), Block::Code("date > later.txt".to_owned()), text("Do you want to proceed?")],
+            options: vec![
+                option(1, "Yes", None, true),
+                option(2, "Yes, and always allow access to", Some("/Users/dev/web-shop from this project"), false),
+                option(3, "Yes, and switch to auto mode · auto mode handles these prompts for you", None, false),
+                option(4, "No", None, false),
+            ],
+            help: vec!["Esc to cancel · Tab to amend".to_owned()],
+        };
+        assert_eq!(of(PERMISSION), Some(expected));
     }
 
     #[test]
