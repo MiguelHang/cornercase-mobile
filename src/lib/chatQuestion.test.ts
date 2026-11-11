@@ -236,7 +236,7 @@ describe('Chat, the tabs of its question', () => {
     const haptics = still()
     const { chat, tell } = await watching('waiting', { pressKey, haptics })
     tell(asked(MENU, { card: tabbed(open) }))
-    return { chat, pressKey, haptics }
+    return { chat, pressKey, haptics, tell }
   }
 
   it('presses the arrows to the tab on its pane in one call, with a light tap', async () => {
@@ -250,6 +250,34 @@ describe('Chat, the tabs of its question', () => {
     const { chat, pressKey } = await tabsOf(2)
     await chat.openTab(0)
     expect(pressKey.mock.calls).toEqual([[PANE, ['left', 'left']]])
+  })
+
+  it('presses the arrows once for two taps before the question changes', async () => {
+    const { chat, pressKey } = await tabsOf(0)
+    await chat.openTab(2)
+    expect(await chat.openTab(1)).toBeNull()
+    expect(pressKey.mock.calls).toEqual([[PANE, ['right', 'right']]])
+  })
+
+  it('presses the arrows again from the tab the changed question opens', async () => {
+    const { chat, pressKey, tell } = await tabsOf(0)
+    await chat.openTab(2)
+    tell(asked(MENU, { card: tabbed(2) }))
+    await chat.openTab(1)
+    expect(pressKey.mock.calls).toEqual([
+      [PANE, ['right', 'right']],
+      [PANE, ['left']],
+    ])
+  })
+
+  it('presses the arrows again after they were not pressed', async () => {
+    const { chat, pressKey } = await tabsOf(0, () => Promise.resolve(refused('no pane 12')))
+    await chat.openTab(1)
+    await chat.openTab(1)
+    expect(pressKey.mock.calls).toEqual([
+      [PANE, ['right']],
+      [PANE, ['right']],
+    ])
   })
 
   it('gives the reason the arrows were not pressed', async () => {

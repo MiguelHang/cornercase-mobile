@@ -39,4 +39,6 @@ comando en un bloque que hace salto de línea, y `1. Yes` lo ejecutó. Dos arreg
 opción elegida también cuando cambia de alto (con el teclado y las teclas abiertos se encogía a unos 40 pt), y el comando
 pierde la barra `│` que Claude Code 2.1.322 le pinta delante (fixture `permission_gutter.json`). Sin resolver: con una
 pregunta y las teclas abiertas, enfocar el campo a veces sube la página unos 56 pt; sin pregunta no pasa, y no se
-comparó con `main`. El iPhone del usuario queda pendiente.
+comparó con `main`. Tras la review (2026-11-11), con tres preguntas de cuatro opciones de unas 40 palabras (30 filas desde
+la regla), la tarjeta salió entera, sin la barra `│` en la pregunta, con los chips fijos arriba al hacer scroll. El iPhone
+del usuario queda pendiente.

@@ -43,6 +43,7 @@ mod display {
         "cornercase input: no pane 14"
     )]
     #[case::unknown_key(Error::UnknownKey("--force".to_owned()), "the app sends no key named \"--force\"")]
+    #[case::no_keys(Error::NoKeys, "no key to send")]
     #[case::image_empty(Error::ImageEmpty, "the image is empty: there is nothing to paste")]
     #[case::image_too_large(Error::ImageTooLarge, "the image is over 32 MiB, the most cornercase pastes")]
     #[case::picker(

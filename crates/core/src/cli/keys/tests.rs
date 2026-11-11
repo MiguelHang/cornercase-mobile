@@ -76,6 +76,6 @@ mod refusing {
 
     #[test]
     fn fails_on_an_empty_list() {
-        assert_eq!(args(12, &[]), Err(Error::UnknownKey(String::new())));
+        assert_eq!(args(12, &[]), Err(Error::NoKeys));
     }
 }

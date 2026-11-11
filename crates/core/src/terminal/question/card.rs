@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use super::{Numbered, chars, is_blank, is_rule, listed};
+use super::{FENCE, Numbered, chars, is_blank, is_rule, listed};
 use crate::cli::surface::Colour;
 use crate::terminal::grid::Line;
 
@@ -43,7 +43,6 @@ const TICKS: &str = "☐✔☒✓";
 
 const ANSWERED: &str = "✔☒✓";
 
-const FENCE: char = '╌';
 const BAR: char = '│';
 
 enum Below {
@@ -71,7 +70,7 @@ pub fn card(rows: &[Line], cols: u16) -> Option<Card> {
     let foot = footer(rows, last, cols);
     let options = answers(rows, &listed, foot, cols)?;
     let head = rows.get(..first.row)?;
-    let tabbed = head.iter().enumerate().find_map(|(row, line)| Some((row, chips(line)?)));
+    let tabbed = tabbed(head, cols);
     let open = tabbed.as_ref().and_then(|(_, chips)| open(chips));
     let tabs = tabbed.as_ref().map(|(_, chips)| chips.iter().map(|chip| chip.tab.clone()).collect());
     let blocks = blocks(head, tabbed.map(|(row, _)| row), cols)?;
@@ -114,6 +113,11 @@ fn below(line: &Line, column: usize, cols: u16) -> Below {
         return Below::Other;
     }
     Below::Detail(trimmed(line))
+}
+
+fn tabbed(head: &[Line], cols: u16) -> Option<(usize, Vec<Chip>)> {
+    let row = head.iter().position(|line| !is_blank(line) && !is_rule(line, cols))?;
+    Some((row, chips(head.get(row)?)?))
 }
 
 fn chips(line: &Line) -> Option<Vec<Chip>> {
@@ -189,12 +193,13 @@ impl Blocks {
 }
 
 fn joined(rows: &[String], cols: u16) -> String {
-    let mut text = rows.first().map(|row| row.trim().to_owned()).unwrap_or_default();
-    for pair in rows.windows(2) {
-        if let [row, next] = pair {
-            text.push(if wrapped(row, next, cols) { ' ' } else { '\n' });
-            text.push_str(next.trim());
+    let said = unbarred(rows.iter().map(|row| row.trim().to_owned()).collect());
+    let mut text = String::new();
+    for (at, words) in said.iter().enumerate() {
+        if let Some(row) = at.checked_sub(1).and_then(|above| rows.get(above)) {
+            text.push(if wrapped(row, words, cols) { ' ' } else { '\n' });
         }
+        text.push_str(words.trim());
     }
     text
 }

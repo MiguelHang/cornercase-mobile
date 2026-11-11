@@ -8,7 +8,7 @@ import type {
 import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import { digitOf, type KeyName } from './keys'
-import { Questions, type Asker } from './question.svelte'
+import { Questions, type Asker, type Question } from './question.svelte'
 import { arrowsTo } from './questionTabs'
 import { deliver, messageOf } from './toasts'
 
@@ -123,6 +123,7 @@ export class Chat {
   #cancelFollow: (() => void) | null = null
   #following = false
   #questioning = false
+  #tabbedFrom: Question | null = null
   #watchingDone = false
   #marked: string | null | undefined = undefined
   #asked = 0
@@ -409,13 +410,12 @@ export class Chat {
     if (!this.canPress) {
       return null
     }
-    void tap(this.#haptics)
     if (key === 'ctrl+c' && !this.interrupting) {
+      void tap(this.#haptics)
       this.#arm()
       return null
     }
-    this.#disarm()
-    return deliver(() => this.#pressKey(this.pane, [key]))
+    return this.#send([key])
   }
 
   async pressOption(number: number): Promise<string | null> {
@@ -424,10 +424,20 @@ export class Chat {
   }
 
   async openTab(target: number): Promise<string | null> {
-    const keys = arrowsTo(this.question?.card?.open ?? null, target)
-    if (!this.canPress || keys.length === 0) {
+    const question = this.question
+    const keys = arrowsTo(question?.card?.open ?? null, target)
+    if (!this.canPress || keys.length === 0 || question === this.#tabbedFrom) {
       return null
     }
+    this.#tabbedFrom = question
+    const failed = await this.#send(keys)
+    if (failed !== null && this.#tabbedFrom === question) {
+      this.#tabbedFrom = null
+    }
+    return failed
+  }
+
+  #send(keys: KeyName[]): Promise<string | null> {
     void tap(this.#haptics)
     this.#disarm()
     return deliver(() => this.#pressKey(this.pane, keys))

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Attachment } from 'svelte/attachments'
   import type { Card_Serialize as Card, CardOption_Serialize as CardOption } from '../../lib/bindings'
-  import { revealBy } from '../../lib/reveal'
+  import { revealBy, under } from '../../lib/reveal'
   import Button from '../../lib/ui/Button.svelte'
   import QuestionTabs from './QuestionTabs.svelte'
 
@@ -29,8 +29,10 @@
     (box) => {
       void tall
       const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
+      const tabs = box.querySelector('[aria-label="Questions"]')
       if (option !== null) {
-        box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())
+        const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)
+        box.scrollTop += revealBy(seen, option.getBoundingClientRect())
       }
     }
 </script>

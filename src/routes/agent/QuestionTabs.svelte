@@ -11,11 +11,13 @@
     ontab: (index: number) => void
   } = $props()
 
+  const TICK = '\u2714\uFE0E'
+
   const tappable = $derived(open !== null && tabs.length > 1)
 </script>
 
 {#snippet chip(tab: Tab)}
-  {#if tab.answered}<span class="tick" role="img" aria-label="answered">✔</span>{/if}{tab.label}
+  {#if tab.answered}<span class="tick" role="img" aria-label="answered">{TICK}</span>{/if}{tab.label}
 {/snippet}
 
 <div class="tabs" role="group" aria-label="Questions">
@@ -34,16 +36,20 @@
 
 <style>
   .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    background: var(--glass);
   }
 
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    min-height: 32px;
+    min-height: 44px;
     padding: 0 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-chip);

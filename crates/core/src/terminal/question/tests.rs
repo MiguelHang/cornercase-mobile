@@ -1,7 +1,7 @@
 use rstest::rstest;
 
 use super::*;
-use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, WORKING};
+use crate::cli::surface::fixtures::{ASK_LONG, ASK_ONE, ASK_TABS, PERMISSION, WORKING};
 use crate::cli::surface::{Frame, Size, Style};
 use crate::terminal::grid::{Grid, Run};
 
@@ -93,6 +93,47 @@ mod window {
     }
 }
 
+mod question {
+    use super::*;
+
+    fn asked(above: &[&str], options: &[&str]) -> Vec<String> {
+        above.iter().chain(options).map(|row| (*row).to_owned()).collect()
+    }
+
+    fn taller_than_the_window() -> Vec<String> {
+        let mut rows = asked(&["said", "────────", "Pick", "1. a"], &[]);
+        rows.extend(numbered(QUESTION_ROWS).into_iter().map(|row| format!("   {row}")));
+        rows.extend(["2. b".to_owned(), "────────".to_owned(), "3. c".to_owned()]);
+        rows
+    }
+
+    #[test]
+    fn starts_at_the_rule_above_its_first_option_however_far_up() {
+        let rows = taller_than_the_window();
+        assert_eq!(crops(8, &rows), rows[1..]);
+    }
+
+    #[rstest]
+    #[case::under_a_rule_of_the_conversation(&["────────", "said", "────────", "Pick"], &["────────", "Pick", "1. a", "2. b"])]
+    #[case::with_a_dashed_rule_above_its_options(&["────────", "Run", "╌╌╌╌╌╌╌╌", "ls", "╌╌╌╌╌╌╌╌"], &["────────", "Run", "╌╌╌╌╌╌╌╌", "ls", "╌╌╌╌╌╌╌╌", "1. a", "2. b"])]
+    #[case::inside_a_box(&["said", " ╭──────╮ ", "│ Pick │"], &[" ╭──────╮ ", "│ Pick │", "1. a", "2. b"])]
+    fn starts_at_the_nearest_rule_above_its_first_option(#[case] above: &[&str], #[case] expected: &[&str]) {
+        assert_eq!(crops(8, &asked(above, &["1. a", "2. b"])), expected);
+    }
+
+    #[test]
+    fn starts_at_the_highest_rule_without_one_above_its_options() {
+        assert_eq!(crops(8, &asked(&["Pick", "1. a", "2. b", "────────", "c"], &[])), ["────────", "c"]);
+    }
+
+    #[test]
+    fn keeps_the_window_when_its_options_end_above_it() {
+        let mut rows = asked(&["────────", "1. a", "2. b"], &[]);
+        rows.extend(numbered(QUESTION_ROWS));
+        assert_eq!(crops(8, &rows), numbered(QUESTION_ROWS));
+    }
+}
+
 mod options {
     use super::*;
 
@@ -168,6 +209,7 @@ mod captures {
     #[rstest]
     #[case::of_a_question(ASK_ONE, 16, "Enter to select · ↑/↓ to navigate · Esc to cancel")]
     #[case::of_two_questions(ASK_TABS, 16, "Enter to select · Tab/Arrow keys to navigate · Esc to cancel")]
+    #[case::taller_than_the_window(ASK_LONG, 30, "Enter to select · Tab/Arrow keys to navigate · Esc to cancel")]
     #[case::of_a_permission(PERMISSION, 16, " Esc to cancel · Tab to amend")]
     #[case::of_an_agent_at_work(WORKING, 5, "  ⏸ manual mode on")]
     fn crop_from_the_rule_above_the_question(#[case] json: &str, #[case] count: usize, #[case] last: &str) {

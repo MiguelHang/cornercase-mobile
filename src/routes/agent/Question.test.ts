@@ -219,9 +219,9 @@ describe('Question, as a card', () => {
   })
 
   it.each<[string, Card, (string | boolean)[][]]>([
-    ['makes every tab but the open one a button', tabbed(0), [['span', true, 'Colour'], ['button', false, 'Size'], ['button', false, '✔Submit']]],
-    ['follows the open tab', tabbed(1), [['button', false, 'Colour'], ['span', true, 'Size'], ['button', false, '✔Submit']]],
-    ['offers no tab to tap when none is seen open', tabbed(null), [['span', false, 'Colour'], ['span', false, 'Size'], ['span', false, '✔Submit']]],
+    ['makes every tab but the open one a button', tabbed(0), [['span', true, 'Colour'], ['button', false, 'Size'], ['button', false, '✔\uFE0ESubmit']]],
+    ['follows the open tab', tabbed(1), [['button', false, 'Colour'], ['span', true, 'Size'], ['button', false, '✔\uFE0ESubmit']]],
+    ['offers no tab to tap when none is seen open', tabbed(null), [['span', false, 'Colour'], ['span', false, 'Size'], ['span', false, '✔\uFE0ESubmit']]],
     ['shows a lone question as a heading, not a button', tabbed(0, ['Colour']), [['span', true, 'Colour']]],
   ])('%s', (_, card, expected) => {
     expect(chips(carded(card))).toEqual(expected)
@@ -229,7 +229,7 @@ describe('Question, as a card', () => {
 
   it('names the answered tabs for VoiceOver', () => {
     expect(carded(tabbed(0))).toContain('<span class="tick svelte-')
-    expect(carded(tabbed(0))).toMatch(/<span class="tick svelte-[\w-]+" role="img" aria-label="answered">✔<\/span>/)
+    expect(carded(tabbed(0))).toMatch(/<span class="tick svelte-[\w-]+" role="img" aria-label="answered">✔\uFE0E<\/span>/)
   })
 
   it.each([
@@ -257,11 +257,21 @@ describe('Question, as a card', () => {
   it('follows the chosen option when it changes and when the card changes height', () => {
     expect(flat(cardSource)).toContain('bind:clientHeight={tall} {@attach follow(chosen)}')
     expect(flat(cardSource)).toContain('(box) => { void tall const option')
-    expect(flat(cardSource)).toContain('box.scrollTop += revealBy(box.getBoundingClientRect(), option.getBoundingClientRect())')
+    expect(flat(cardSource)).toContain('const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)')
+    expect(flat(cardSource)).toContain('box.scrollTop += revealBy(seen, option.getBoundingClientRect())')
+  })
+
+  it('keeps the tabs in sight over the scrolled card, on the composer\'s own background', () => {
+    expect(flat(tabsSource)).toContain('.tabs { position: sticky; top: 0; z-index: 1;')
+    expect(flat(tabsSource)).toContain('background: var(--glass); }')
+  })
+
+  it('gives every tab a touch target of 44 px', () => {
+    expect(flat(tabsSource)).toContain('min-height: 44px;')
   })
 
   it('wraps the tabs onto more lines rather than hiding any', () => {
-    expect(flat(tabsSource)).toContain('.tabs { display: flex; flex-wrap: wrap; gap: 6px; }')
+    expect(flat(tabsSource)).toContain('display: flex; flex-wrap: wrap; gap: 6px;')
     expect(flat(tabsSource)).toContain('.open { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }')
   })
 })

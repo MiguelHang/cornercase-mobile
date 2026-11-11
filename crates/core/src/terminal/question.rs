@@ -14,6 +14,8 @@ const CHOSEN: &str = "❯›>▶";
 
 const RULE: [char; 12] = ['─', '━', '═', '╌', '╭', '╮', '╰', '╯', '┌', '┐', '└', '┘'];
 
+const FENCE: char = '╌';
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Choice {
@@ -24,11 +26,27 @@ pub struct Choice {
 #[must_use]
 pub fn cropped(pane: &PaneGrid) -> &[Line] {
     let end = pane.lines.iter().rposition(|line| !is_blank(line)).map_or(0, |last| last + 1);
-    let window = pane.lines.get(end.saturating_sub(QUESTION_ROWS)..end).unwrap_or_default();
-    let ruled = window.iter().position(|line| is_rule(line, pane.size.cols)).unwrap_or(0);
-    let asked = window.get(ruled..).unwrap_or_default();
+    let shown = pane.lines.get(..end).unwrap_or_default();
+    let top = end.saturating_sub(QUESTION_ROWS);
+    let start = opened(shown, top, pane.size.cols).unwrap_or_else(|| highest(shown, top, pane.size.cols));
+    let asked = shown.get(start..).unwrap_or_default();
     let first = asked.iter().position(|line| !is_blank(line)).unwrap_or(asked.len());
     asked.get(first..).unwrap_or_default()
+}
+
+fn opened(shown: &[Line], top: usize, cols: u16) -> Option<usize> {
+    let listed = listed(shown);
+    let (first, last) = (listed.first()?, listed.last()?);
+    if last.row < top {
+        return None;
+    }
+    let above = shown.get(..first.row)?;
+    above.iter().rposition(|line| is_rule(line, cols) && !chars(line).any(|c| c == FENCE))
+}
+
+fn highest(shown: &[Line], top: usize, cols: u16) -> usize {
+    let window = shown.get(top..).unwrap_or_default();
+    top + window.iter().position(|line| is_rule(line, cols)).unwrap_or(0)
 }
 
 #[must_use]
