@@ -77,6 +77,14 @@ describe('scrolledTo', () => {
       10,
     ],
     [
+      'keeps the start of the question in view half a pixel above the chips',
+      0,
+      false,
+      { top: 99.5, bottom: 140 },
+      { top: 250, bottom: 330 },
+      0,
+    ],
+    [
       'still follows the option of a question swiped past its start',
       80,
       false,

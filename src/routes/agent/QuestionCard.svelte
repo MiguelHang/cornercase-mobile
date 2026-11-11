@@ -120,7 +120,9 @@
 
   .mark {
     flex: none;
+    align-self: flex-start;
     width: 1em;
+    padding-top: var(--gap);
     color: var(--accent);
   }
 

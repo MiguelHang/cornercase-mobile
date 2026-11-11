@@ -243,6 +243,13 @@ describe('Question, as a card', () => {
     expect(flat(cardSource)).toContain(text)
   })
 
+  it('puts the mark of the chosen option on the line of its label, not in the middle of a tall button', () => {
+    expect(flat(cardSource)).toContain(
+      '.mark { flex: none; align-self: flex-start; width: 1em; padding-top: var(--gap); color: var(--accent); }',
+    )
+    expect(flat(cardSource)).toContain('padding: var(--gap) 0;')
+  })
+
   it('never keeps a line whole nor cuts it with an ellipsis', () => {
     expect(flat(cardSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow|overflow-x: (auto|scroll|visible)/)
     expect(flat(tabsSource)).not.toMatch(/white-space: (pre|nowrap);|text-overflow/)

@@ -23,5 +23,5 @@ export const scrolledTo = (top: number, fresh: boolean, view: Span, item: Span |
   const shift = top - from
   const by = revealBy(view, { top: item.top + shift, bottom: item.bottom + shift })
   const room = lead === null ? by : lead.top + shift - view.top
-  return Math.max(0, from + (room < 0 ? by : Math.min(by, room)))
+  return Math.max(0, from + (room < -1 ? by : Math.min(by, room)))
 }
