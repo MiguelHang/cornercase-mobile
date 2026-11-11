@@ -28,16 +28,24 @@
 
   let shown: string | null = null
 
+  let picked: number | null = null
+
+  let moved = false
+
   const follow =
     (number: number | null, question: string): Attachment<HTMLElement> =>
     (box) => {
       void tall
       const fresh = question !== shown
+      moved = !fresh && (moved || number !== picked)
       shown = question
+      picked = number
       const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
       const tabs = box.querySelector('[aria-label="Questions"]')
+      const lead = moved ? null : box.querySelector(':scope > .text, :scope > .code')
       const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)
-      box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, option?.getBoundingClientRect() ?? null)
+      const rect = (element: Element | null | undefined) => element?.getBoundingClientRect() ?? null
+      box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, rect(option), rect(lead))
     }
 </script>
 

@@ -15,11 +15,13 @@ export const revealBy = (view: Span, item: Span): number => {
   return 0
 }
 
-export const scrolledTo = (top: number, fresh: boolean, view: Span, item: Span | null): number => {
+export const scrolledTo = (top: number, fresh: boolean, view: Span, item: Span | null, lead: Span | null): number => {
   const from = fresh ? 0 : top
   if (item === null) {
     return from
   }
   const shift = top - from
-  return Math.max(0, from + revealBy(view, { top: item.top + shift, bottom: item.bottom + shift }))
+  const by = revealBy(view, { top: item.top + shift, bottom: item.bottom + shift })
+  const room = lead === null ? by : lead.top + shift - view.top
+  return Math.max(0, from + (room < 0 ? by : Math.min(by, room)))
 }

@@ -40,6 +40,59 @@ describe('scrolledTo', () => {
     ['never scrolls a new question above its top', 80, true, { top: 0, bottom: 10 }, 0],
     ['scrolls a new question from its top down to its option', 80, true, { top: 250, bottom: 300 }, 80],
   ])('%s', (_, top, fresh, item, to) => {
-    expect(scrolledTo(top, fresh, VIEW, item)).toBe(to)
+    expect(scrolledTo(top, fresh, VIEW, item, null)).toBe(to)
+  })
+
+  it.each<[string, number, boolean, Span, Span, number]>([
+    [
+      'scrolls a new question down to an option that fits under its start',
+      80,
+      true,
+      { top: 50, bottom: 90 },
+      { top: 150, bottom: 225 },
+      5,
+    ],
+    [
+      'keeps a new question from its start when its option does not fit under it',
+      80,
+      true,
+      { top: 30, bottom: 70 },
+      { top: 280, bottom: 330 },
+      10,
+    ],
+    [
+      'keeps a new question at its top when its start is right under the chips',
+      80,
+      true,
+      { top: 20, bottom: 60 },
+      { top: 300, bottom: 360 },
+      0,
+    ],
+    [
+      'keeps the start of the question in view as the card shrinks',
+      0,
+      false,
+      { top: 110, bottom: 150 },
+      { top: 250, bottom: 330 },
+      10,
+    ],
+    [
+      'still follows the option of a question swiped past its start',
+      80,
+      false,
+      { top: 40, bottom: 80 },
+      { top: 280, bottom: 330 },
+      110,
+    ],
+    [
+      'still scrolls up to an option above with the question kept',
+      80,
+      false,
+      { top: 40, bottom: 80 },
+      { top: 60, bottom: 90 },
+      40,
+    ],
+  ])('%s', (_, top, fresh, lead, item, to) => {
+    expect(scrolledTo(top, fresh, VIEW, item, lead)).toBe(to)
   })
 })

@@ -257,11 +257,15 @@ describe('Question, as a card', () => {
   it('follows the chosen option when it changes, when the question changes and when the card changes height', () => {
     expect(flat(cardSource)).toContain('const asked = $derived(JSON.stringify([card.open, card.blocks]))')
     expect(flat(cardSource)).toContain('bind:clientHeight={tall} {@attach follow(chosen, asked)}')
-    expect(flat(cardSource)).toContain('(box) => { void tall const fresh = question !== shown shown = question')
-    expect(flat(cardSource)).toContain('const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)')
     expect(flat(cardSource)).toContain(
-      'box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, option?.getBoundingClientRect() ?? null)',
+      '(box) => { void tall const fresh = question !== shown moved = !fresh && (moved || number !== picked) shown = question picked = number',
     )
+    expect(flat(cardSource)).toContain('const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)')
+    expect(flat(cardSource)).toContain('box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, rect(option), rect(lead))')
+  })
+
+  it('keeps the start of the question in sight until the choice moves within it', () => {
+    expect(flat(cardSource)).toContain("const lead = moved ? null : box.querySelector(':scope > .text, :scope > .code')")
   })
 
   it('keeps the tabs in sight over the scrolled card, on the composer\'s own background', () => {
