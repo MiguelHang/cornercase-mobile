@@ -71,7 +71,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 045 | [Arrancar: sin workspaces nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~1.500 |
 | 046 | [Elegir la LAN cuando la LAN y Tailscale contestan](tasks/046-prefer-lan.md) | 035 | ~150 |
 | 047 | [Arrancar una issue con un flow](tasks/047-start-issue-with-flow.md) | 024, 045 | ~350 |
-| 048 | [El chat como conversación: historial en el móvil, y el de cornercase cuando exista](tasks/048-chat-history.md) | 036, 041 | ~450 |
+| 048 | [El chat como conversación: historial en el móvil, y el de cornercase cuando exista](tasks/048-chat-history.md) (hecha; en el iPhone del usuario, pendiente) | 036, 041 | ~450 |
 | 049 | [El icono de la app](tasks/049-app-icon.md) (hecha; en el iPhone del usuario, pendiente) | 030 | ~50 (+ generados) |
 | 050 | [Partir por temas los ficheros de `design/` de más de 40 KB](tasks/050-split-design-by-topic.md) | 043 | ~0 (solo docs) |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |

@@ -151,8 +151,9 @@ describe('App wiring', () => {
     expect(source).toContain('const pane = $derived(opening?.pane ?? null)')
     expect(source).toContain('const owner = $derived(opening?.machine ?? null)')
     expect(source).toContain(
-      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, images, haptics, timers, asker, ), )',
+      'const chat = $derived( pane === null ? null : new Chat( owner, pane, commands.lastMessage, commands.send, commands.keys, commands.markReviewed, images, haptics, timers, asker, history, ), )',
     )
+    expect(source).toContain('const history = new LocalHistory(commands)')
     expect(source).toContain(
       'const images: Images = { attach: commands.attach, paste: commands.pasteAttached, discard: commands.discard }',
     )
@@ -254,9 +255,9 @@ describe('App wiring', () => {
     )
   })
 
-  it('reads again on a status change of its pane on its machine', () => {
+  it('reads again on a status change of its pane on its machine, vouching for nothing after one of the machine', () => {
     expect(source).toContain(
-      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, chat.machine, chat.pane)) { void chat.refresh() } }),',
+      'events.paneStatusChanged.listen((event) => { if (chat !== null && touches(event.payload, chat.machine, chat.pane)) { if (event.payload.pane === null) { chat.lose() } void chat.refresh() } }),',
     )
   })
 

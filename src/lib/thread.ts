@@ -1,6 +1,7 @@
-import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
+import type { AgentRow_Serialize as AgentRow, HistoryEntry_Serialize as Entry, SendState } from './bindings'
 import { elapsed, span } from './board'
 import type { Outgoing, Reading } from './chat.svelte'
+import { lastAgent } from './history'
 
 export const STALL_MS = 120_000
 
@@ -46,20 +47,28 @@ export const sendNews = (outgoing: Pick<Outgoing, 'state' | 'reason'> | null) =>
   return outgoing.state === 'sending' ? 'Sending' : 'Sent'
 }
 
-export type Part = 'agent' | 'you'
+export type Bubble = { entry: Entry; live: boolean; going: boolean }
 
 export const AT_END_MARGIN = 48
 
-export const isAnswer = (answered: LastMessage | null, reading: Reading) =>
-  reading.kind === 'message' &&
-  (answered === null || reading.message.text !== answered.text || reading.message.written !== answered.written)
-
-export const threadOf = (reading: Reading, outgoing: { answered: LastMessage | null } | null): Part[] => {
-  if (outgoing === null) {
-    return ['agent']
-  }
-  return isAnswer(outgoing.answered, reading) ? ['you', 'agent'] : ['agent', 'you']
+export const threadOf = (conversation: Entry[], live: boolean): Bubble[] => {
+  const agent = lastAgent(conversation)
+  const you = conversation.findLast((entry) => entry.kind === 'you')
+  return conversation.map((entry) => ({
+    entry,
+    live: live && entry === you,
+    going: entry === agent && agent.turn_over === false,
+  }))
 }
+
+export const readingNote = (reading: Reading) => {
+  if (reading.kind === 'message') {
+    return null
+  }
+  return reading.kind === 'loading' ? 'Reading its last message…' : reading.reason
+}
+
+export const shownState = (state: SendState, live: boolean) => (state === 'sending' && !live ? 'unconfirmed' : state)
 
 export const atEnd = (scrollY: number, viewport: number, height: number, margin = AT_END_MARGIN) =>
   scrollY + viewport >= height - margin

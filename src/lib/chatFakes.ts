@@ -3,6 +3,7 @@ import type { AttachImage, Discard, Images, PasteAttached } from './attach.svelt
 import type {
   AgentRow_Serialize as AgentRow,
   CommandError,
+  HistoryEntry_Serialize as HistoryEntry,
   LastMessage_Serialize as LastMessage,
   QuestionChanged_Serialize as QuestionChanged,
   Style_Serialize as Style,
@@ -17,6 +18,7 @@ import {
   type SendText,
 } from './chat.svelte'
 import type { HapticsApi } from './haptics'
+import type { History } from './history'
 import type { Asker } from './question.svelte'
 
 export const MACHINE = 1
@@ -56,6 +58,17 @@ export const gate = <T>() => {
   let open: (value: T) => void = () => {}
   const promise = new Promise<T>((resolve) => (open = resolve))
   return { promise, open }
+}
+
+export const fakeHistory = (stored: HistoryEntry[] = [], loaded: Promise<void> = Promise.resolve()) => {
+  const kept: HistoryEntry[][] = []
+  const keep = (entries: HistoryEntry[]) => {
+    kept.push(entries)
+  }
+  const history: History = {
+    open: vi.fn<History['open']>(() => loaded.then(() => ({ entries: kept.at(-1) ?? stored, keep }))),
+  }
+  return { history, kept }
 }
 
 export const noRead: ReadLast = () => Promise.resolve(ok(message('')))
@@ -163,6 +176,7 @@ export type Calls = {
   haptics?: HapticsApi
   clock?: Clock
   asker?: Asker
+  history?: History
 }
 
 const imagesOf = ({ attachImage = attachedOk, pasteAttached = pastedOk, discard = discardedOk }: Calls): Images => ({
@@ -180,8 +194,10 @@ export const fresh = (calls: Calls = {}) => {
     haptics = still(),
     clock = fakeClock().clock,
     asker = fakeAsker().asker,
+    history = fakeHistory().history,
   } = calls
-  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, imagesOf(calls), haptics, clock, asker)
+  const images = imagesOf(calls)
+  return new Chat(MACHINE, PANE, readLast, sendText, pressKey, markReviewed, images, haptics, clock, asker, history)
 }
 
 export const seen = (calls: Calls = {}, status: string | null = 'done') => {

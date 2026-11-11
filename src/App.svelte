@@ -16,6 +16,7 @@
   import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
+  import { LocalHistory } from './lib/history'
   import { IssuesState, IssueState } from './lib/issues.svelte'
   import type { Found } from './lib/issueSweep'
   import { latestWins } from './lib/join'
@@ -59,6 +60,7 @@
     close: commands.questionClose,
     listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)),
   }
+  const history = new LocalHistory(commands)
 
   const route = $derived(router.current)
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
@@ -79,6 +81,7 @@
           haptics,
           timers,
           asker,
+          history,
         ),
   )
   const seen = $derived(chat?.row != null)
@@ -391,6 +394,9 @@
       events.agentsChanged.listen((event) => show(apply(current, event.payload))),
       events.paneStatusChanged.listen((event) => {
         if (chat !== null && touches(event.payload, chat.machine, chat.pane)) {
+          if (event.payload.pane === null) {
+            chat.lose()
+          }
           void chat.refresh()
         }
       }),

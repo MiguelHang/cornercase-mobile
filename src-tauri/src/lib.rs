@@ -34,7 +34,7 @@ pub fn run() {
             let data_dir = app.path().app_data_dir();
             let store = secrets::store(app.handle());
             let routes = secrets::routes(data_dir.as_deref().ok(), Arc::clone(&store));
-            app.manage(AppState::load(data_dir, &*store, routes));
+            app.manage(AppState::load(data_dir, &*store, routes).keeping_history(app.path().app_cache_dir().ok()));
             network::follow_in_background(app.handle(), paths);
             Ok(())
         })

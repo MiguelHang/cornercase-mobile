@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use cornercase_core::error::Error;
+use cornercase_core::history::store::JsonFolderStore;
 use cornercase_core::identity::Identity;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::registry::Machines;
@@ -20,6 +21,7 @@ use crate::state::attached::AttachedImages;
 pub(crate) mod attached;
 
 const MACHINES_FILE: &str = "machines.json";
+const HISTORY_FOLDER: &str = "history";
 
 pub(crate) struct AppState {
     machines: SharedMachines,
@@ -28,6 +30,7 @@ pub(crate) struct AppState {
     network: Mutex<Option<Network>>,
     boots: Mutex<HashMap<MachineId, String>>,
     attached: AttachedImages,
+    history: Mutex<Option<JsonFolderStore>>,
 }
 
 #[derive(Clone)]
@@ -66,7 +69,12 @@ impl AppState {
             network: Mutex::new(None),
             boots: Mutex::new(HashMap::new()),
             attached: AttachedImages::default(),
+            history: Mutex::new(None),
         }
+    }
+
+    pub(crate) fn keeping_history(self, cache_dir: Option<PathBuf>) -> Self {
+        Self { history: Mutex::new(cache_dir.map(|folder| JsonFolderStore::new(folder.join(HISTORY_FOLDER)))), ..self }
     }
 
     pub(crate) fn machines<T>(
@@ -109,6 +117,10 @@ impl AppState {
 
     pub(crate) fn attached(&self) -> &AttachedImages {
         &self.attached
+    }
+
+    pub(crate) fn history(&self) -> MutexGuard<'_, Option<JsonFolderStore>> {
+        self.history.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 

@@ -1,10 +1,12 @@
 use std::fs;
+use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
+use cornercase_core::history::HistoryEntry;
 use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
 use rstest::rstest;
@@ -13,6 +15,7 @@ use tauri::async_runtime::{self, JoinHandle};
 use super::*;
 use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::ErrorCode;
+use crate::commands::history;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::Active;
 use crate::test_util::{
@@ -38,6 +41,20 @@ fn gated(task: Task) -> JoinHandle<()> {
 
 fn names(state: &AppState) -> Vec<String> {
     list(state).expect("the machines load").machines.into_iter().map(|machine| machine.name).collect()
+}
+
+fn keeping_history(studio: Studio) -> (TempDir, AppState, MachineId) {
+    let Studio { dir, state, id, .. } = studio;
+    let state = state.keeping_history(Some(dir.path().to_path_buf()));
+    (dir, state, id)
+}
+
+fn said(state: &AppState, machine: MachineId) {
+    history::save(state, machine, BOOT, 7, &[HistoryEntry::Gap { id: 0, seen: 1_000 }]).expect("the history is saved");
+}
+
+fn history_of(dir: &TempDir, machine: MachineId) -> PathBuf {
+    dir.path().join("history").join(machine.0.to_string())
 }
 
 mod adding_a_machine {
@@ -208,6 +225,29 @@ mod removing_a_machine {
         });
         assert!(studio.state.active().is_none());
         assert_eq!(recorder.connections(), [changed(studio.id, ConnectionView::None)]);
+    }
+
+    #[test]
+    fn forgets_its_history_and_keeps_the_others() {
+        let (dir, state, studio) = keeping_history(Studio::new());
+        let laptop = add(&state, LAPTOP, "laptop").expect("the laptop is added");
+        said(&state, studio);
+        said(&state, laptop);
+        remove(&state, &Recorder::default(), studio).expect("removed");
+        assert!(!history_of(&dir, studio).exists());
+        assert!(history_of(&dir, laptop).is_dir());
+    }
+
+    #[test]
+    fn keeps_the_history_of_a_machine_it_could_not_remove() {
+        let (dir, state, studio) = keeping_history(Studio::new());
+        said(&state, studio);
+        let machines = dir.path().join("machines.json");
+        fs::remove_file(&machines).expect("remove the machines file");
+        fs::create_dir_all(machines.join("in-the-way")).expect("put a folder in its place");
+        remove(&state, &Recorder::default(), studio).expect_err("the machines are not saved");
+        assert_eq!(names(&state), ["studio"]);
+        assert!(history_of(&dir, studio).is_dir());
     }
 
     #[test]

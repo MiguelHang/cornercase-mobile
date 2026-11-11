@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "boot": "1731250000-4242",
+  "entries": [
+    { "kind": "gap", "id": 0, "seen": 1731250001000 },
+    {
+      "kind": "you",
+      "id": 1,
+      "text": "fix the login",
+      "chips": ["screenshot.png"],
+      "state": "sent",
+      "reason": null,
+      "seen": 1731250002000
+    },
+    {
+      "kind": "agent",
+      "id": 2,
+      "text": "Fixed it.",
+      "written": "2026-11-10T14:52:03Z",
+      "turn_over": true,
+      "seen": 1731250013000
+    },
+    {
+      "kind": "you",
+      "id": 3,
+      "text": "now the tests",
+      "chips": [],
+      "state": "failed",
+      "reason": "the connection to the bridge dropped before the command finished",
+      "seen": 1731250020000
+    }
+  ]
+}

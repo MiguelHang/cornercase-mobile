@@ -2,14 +2,15 @@
   import { tick, untrack } from 'svelte'
   import { elapsed } from '../../lib/board'
   import type { Chat } from '../../lib/chat.svelte'
-  import { atEnd, threadOf } from '../../lib/thread'
+  import { atEnd, readingNote, threadOf } from '../../lib/thread'
   import Markdown from '../../lib/ui/Markdown.svelte'
   import AgentLine from './AgentLine.svelte'
   import Sent from './Sent.svelte'
 
   let { chat, now, boxed = false }: { chat: Chat; now: number; boxed?: boolean } = $props()
 
-  const parts = $derived(threadOf(chat.reading, chat.outgoing))
+  const bubbles = $derived(threadOf(chat.conversation, chat.outgoing !== null))
+  const note = $derived(readingNote(chat.reading))
 
   let box = $state<HTMLElement>()
   let tall = $state(0)
@@ -26,15 +27,16 @@
     return atEnd(scrollTop, clientHeight, scrollHeight)
   }
 
-  let read = false
+  let drawn = false
   let wasBoxed = untrack(() => boxed)
   let pinned = true
 
   $effect.pre(() => {
-    const was = read
-    read = chat.reading.kind === 'message'
+    void chat.reading
     void chat.outgoing
-    if (was && untrack(ending)) {
+    const was = drawn
+    drawn = chat.conversation.length > 0
+    if (drawn && (!was || untrack(ending))) {
       void tick().then(toEnd)
     }
   })
@@ -49,27 +51,27 @@
 </script>
 
 <div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={() => (pinned = ending())}>
-  {#each parts as part (part)}
-    {#if part === 'you'}
-      <Sent {chat} />
-    {:else}
+  {#each bubbles as { entry, live, going } (entry.id)}
+    {#if entry.kind === 'you'}
+      <Sent {entry} chat={live ? chat : null} />
+    {:else if entry.kind === 'agent'}
+      {@const written = elapsed(entry.written, now)}
       <article class="message">
-        {#if chat.reading.kind === 'message'}
-          {@const message = chat.reading.message}
-          {@const written = elapsed(message.written, now)}
-          {#if written !== ''}
-            <p class="written">{written}</p>
-          {/if}
-          <Markdown text={message.text} />
-          {#if message.turn_over === false}
-            <p class="going">More to come…</p>
-          {/if}
-        {:else}
-          <p class="reason">{chat.reading.kind === 'loading' ? 'Reading its last message…' : chat.reading.reason}</p>
+        {#if written !== ''}
+          <p class="written">{written}</p>
+        {/if}
+        <Markdown text={entry.text} />
+        {#if going}
+          <p class="going">More to come…</p>
         {/if}
       </article>
+    {:else}
+      <p class="gap">Earlier messages are on the Mac</p>
     {/if}
   {/each}
+  {#if note !== null}
+    <p class="reason">{note}</p>
+  {/if}
   <AgentLine {chat} {now} />
 </div>
 
@@ -109,5 +111,12 @@
   .reason {
     margin: 0;
     color: var(--muted);
+  }
+
+  .gap {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: center;
   }
 </style>

@@ -1,12 +1,15 @@
 import type {
   AgentRow_Serialize as AgentRow,
   commands,
+  HistoryEntry_Serialize as HistoryEntry,
   LastMessage_Serialize as LastMessage,
   PaneStatusChanged_Serialize as PaneStatusChanged,
+  SendState,
   Toast,
 } from './bindings'
 import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
+import { edited, heard, type History, type Kept, restated, sent } from './history'
 import { digitOf, type KeyName } from './keys'
 import { Questions, type Asker } from './question.svelte'
 import { deliver, messageOf } from './toasts'
@@ -45,10 +48,11 @@ export type Outgoing = {
   chips: Chip[]
   state: 'sending' | 'sent' | 'failed'
   reason: string | null
-  answered: LastMessage | null
 }
 
 type Answer = Reading | { kind: 'lost'; reason: string }
+
+type Change = (entries: HistoryEntry[]) => HistoryEntry[]
 
 export const read = async (readLast: ReadLast, pane: number): Promise<Answer> => {
   try {
@@ -69,6 +73,8 @@ const kept = (shown: Reading, answer: Answer): Reading => {
   }
   return shown.kind === 'message' ? shown : { kind: 'unreadable', reason: answer.reason }
 }
+
+const busy = (status: string | null | undefined) => status === 'working' || status === 'shell'
 
 const news = (shown: Reading, next: Reading) =>
   next.kind === 'message' && (shown.kind !== 'message' || shown.message.text !== next.message.text)
@@ -110,6 +116,7 @@ export class Chat {
   gone = $state(false)
   interrupting = $state(false)
   keysOpen = $state(false)
+  conversation = $state.raw<HistoryEntry[]>([])
   readonly attachments: Attachments
   readonly #questions: Questions
   #readLast: ReadLast
@@ -118,6 +125,15 @@ export class Chat {
   #markReviewed: MarkReviewed
   #haptics: HapticsApi
   #clock: Clock
+  #history: History
+  #keep: Kept['keep'] = () => {}
+  #recording: 'closed' | 'loading' | 'open' = 'closed'
+  #unloaded: Change[] = []
+  #sentId: number | null = null
+  #vouched = false
+  #broken = 0
+  #expecting = false
+  #agent: string | null = null
   #cancelExpiry: () => void = () => {}
   #cancelFollow: (() => void) | null = null
   #following = false
@@ -143,6 +159,7 @@ export class Chat {
     haptics: HapticsApi,
     clock: Clock,
     asker: Asker,
+    history: History,
   ) {
     this.machine = machine
     this.pane = pane
@@ -154,6 +171,7 @@ export class Chat {
     this.#questions = new Questions(machine, pane, asker)
     this.#haptics = haptics
     this.#clock = clock
+    this.#history = history
     this.lastNews = clock.now()
   }
 
@@ -201,6 +219,7 @@ export class Chat {
       this.leave()
       return
     }
+    this.#open(row)
     this.#hear(row)
     this.row = row
     this.#pace()
@@ -208,12 +227,100 @@ export class Chat {
     this.#review()
   }
 
+  #open(row: AgentRow | null) {
+    if (row === null || this.machine === null || this.#recording !== 'closed') {
+      return
+    }
+    this.#recording = 'loading'
+    void this.#history.open(this.machine, row.boot, this.pane).then((kept) => this.#loaded(kept))
+  }
+
+  #loaded({ entries: loaded, keep }: Kept) {
+    if (this.gone) {
+      return
+    }
+    this.#keep = keep
+    const entries = this.#unloaded.reduce((sofar, change) => change(sofar), loaded)
+    this.#unloaded = []
+    this.#recording = 'open'
+    this.conversation = entries
+    if (entries !== loaded) {
+      this.#keep(entries)
+    }
+  }
+
+  #record(change: Change) {
+    if (this.#recording === 'closed') {
+      return
+    }
+    if (this.#recording === 'loading') {
+      this.#unloaded.push(change)
+      return
+    }
+    const entries = change(this.conversation)
+    if (entries !== this.conversation) {
+      this.conversation = entries
+      this.#keep(entries)
+    }
+  }
+
+  #recordSent(text: string, chips: Chip[], again: boolean) {
+    if (again) {
+      this.#restate('sending', null)
+      return
+    }
+    const names = chips.map((chip) => chip.name)
+    const seen = this.#clock.now()
+    this.#record((entries) => {
+      const recorded = sent(entries, text, names, seen)
+      this.#sentId = recorded.id
+      return recorded.entries
+    })
+  }
+
+  #restate(state: SendState, reason: string | null) {
+    this.#record((entries) => (this.#sentId === null ? entries : restated(entries, this.#sentId, state, reason)))
+  }
+
+  #recordEdit() {
+    this.#record((entries) => (this.#sentId === null ? entries : edited(entries, this.#sentId)))
+  }
+
+  #recordHeard(answer: Answer, broken: number) {
+    const seen = this.#clock.now()
+    const continuous = this.#vouched
+    if (answer.kind === 'message' && broken === this.#broken) {
+      this.#vouched = true
+    }
+    this.#record((entries) => heard(entries, answer, seen, continuous))
+  }
+
+  lose() {
+    this.#vouched = false
+    this.#broken += 1
+  }
+
   #hear(row: AgentRow | null) {
-    if (row !== null && row.status !== this.#heard) {
+    if (row === null) {
+      return
+    }
+    this.#vouch(row)
+    if (row.status !== this.#heard) {
       this.#heard = row.status
       this.#turnKeys(row.status)
       this.lastNews = this.#clock.now()
     }
+  }
+
+  #vouch(row: AgentRow) {
+    const another = row.agent !== this.#agent
+    this.#agent = row.agent
+    const turned = busy(row.status) !== busy(this.#heard)
+    const started = turned && busy(row.status)
+    if (another || (started && !this.#expecting && this.#heard !== 'waiting')) {
+      this.lose()
+    }
+    this.#expecting &&= !turned
   }
 
   #turnKeys(status: string | null) {
@@ -251,15 +358,18 @@ export class Chat {
     while (this.#busy) {
       this.#again = false
       const number = ++this.#asked
+      const broken = this.#broken
       const answer = await read(this.#readLast, this.pane)
       if (number === this.#asked) {
         this.#show(kept(this.reading, answer))
+        this.#recordHeard(answer, broken)
       }
       this.#busy = this.#again
     }
   }
 
   follow() {
+    this.lose()
     this.#following = true
     this.#pace()
     return () => {
@@ -336,7 +446,7 @@ export class Chat {
 
   async retry() {
     if (this.canRetry && this.outgoing !== null) {
-      await this.#deliver(this.outgoing.text)
+      await this.#deliver(this.outgoing.text, true)
     }
   }
 
@@ -346,13 +456,16 @@ export class Chat {
     }
     this.draft = [this.outgoing.text, this.draft].filter((part) => part !== '').join('\n\n')
     this.outgoing = null
+    this.#recordEdit()
   }
 
-  async #deliver(text: string) {
+  async #deliver(text: string, again = false) {
     const chips = this.attachments.take()
-    const shown = this.reading.kind === 'message' ? { ...this.reading.message } : null
-    const bubble: Outgoing = { text, chips, state: 'sending', reason: null, answered: shown }
+    const broken = this.#broken
+    const bubble: Outgoing = { text, chips, state: 'sending', reason: null }
     this.outgoing = bubble
+    this.#expecting = true
+    this.#recordSent(text, chips, again)
     const failed = await this.#handOver(text, chips)
     if (this.gone) {
       void this.attachments.release(chips)
@@ -360,12 +473,16 @@ export class Chat {
     }
     if (failed === null) {
       this.#leftOnTheMac = false
+      this.#vouched ||= broken === this.#broken
       this.lastNews = this.#clock.now()
       this.outgoing = { ...bubble, state: 'sent' }
+      this.#restate('sent', null)
       return
     }
+    this.#expecting = false
     this.attachments.giveBack(chips)
     this.outgoing = { ...bubble, state: 'failed', reason: failed }
+    this.#restate('failed', failed)
   }
 
   async #handOver(text: string, chips: Chip[]): Promise<string | null> {

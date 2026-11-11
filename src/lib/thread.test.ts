@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRow_Serialize as AgentRow, LastMessage_Serialize as LastMessage } from './bindings'
+import type { AgentRow_Serialize as AgentRow, HistoryEntry_Serialize as Entry } from './bindings'
 import type { Reading } from './chat.svelte'
-import { AT_END_MARGIN, STALL_MS, agentLine, atEnd, compactHeader, isAnswer, sendNews, threadOf } from './thread'
+import {
+  AT_END_MARGIN,
+  STALL_MS,
+  agentLine,
+  atEnd,
+  compactHeader,
+  readingNote,
+  sendNews,
+  shownState,
+  threadOf,
+} from './thread'
 
 const NOW = Date.parse('2026-11-09T21:30:00.000Z')
 
@@ -109,21 +119,26 @@ describe('agentLine, without news', () => {
   })
 })
 
-const said = (text: string, written: string | null = '2026-11-09T21:20:00.000Z'): LastMessage => ({
-  pane: 11,
-  agent: 'claude',
+const gap = (id: number): Entry => ({ kind: 'gap', id, seen: NOW })
+
+const agent = (id: number, text: string, turn_over: boolean | null = true): Entry => ({
+  kind: 'agent',
+  id,
   text,
-  written,
-  turn_over: true,
+  written: null,
+  turn_over,
+  seen: NOW,
 })
 
-const shown = (message: LastMessage): Reading => ({ kind: 'message', message })
-
-const BEFORE = said('Which file should I fix?')
-
-const LOADING: Reading = { kind: 'loading' }
-
-const UNREADABLE: Reading = { kind: 'unreadable', reason: 'no transcript' }
+const you = (id: number, text: string): Entry => ({
+  kind: 'you',
+  id,
+  text,
+  chips: [],
+  state: 'sent',
+  reason: null,
+  seen: NOW,
+})
 
 describe('sendNews', () => {
   it.each([
@@ -140,59 +155,67 @@ describe('sendNews', () => {
   })
 })
 
-describe('isAnswer', () => {
-  it('takes the message seen when sending for no answer', () => {
-    expect(isAnswer(BEFORE, shown({ ...BEFORE }))).toBe(false)
+describe('threadOf', () => {
+  const conversation = [gap(0), agent(1, 'Which file?'), you(2, 'thread.ts'), agent(3, 'Fixed.'), you(4, 'and tests')]
+
+  const lives = (bubbles: ReturnType<typeof threadOf>) => bubbles.map((bubble) => bubble.live)
+
+  const goings = (bubbles: ReturnType<typeof threadOf>) => bubbles.map((bubble) => bubble.going)
+
+  it('keeps every entry, in the order the phone saw them', () => {
+    expect(threadOf(conversation, false).map((bubble) => bubble.entry)).toEqual(conversation)
   })
 
-  it('takes a message with other text for the answer', () => {
-    expect(isAnswer(BEFORE, shown({ ...BEFORE, text: 'Fixed thread.ts.' }))).toBe(true)
+  it('draws nothing for an empty conversation', () => {
+    expect(threadOf([], true)).toEqual([])
   })
 
-  it('takes the same text written again for the answer', () => {
-    expect(isAnswer(BEFORE, shown({ ...BEFORE, written: '2026-11-09T21:25:00.000Z' }))).toBe(true)
+  it('lets only your last message keep its actions while the chat sent it', () => {
+    expect(lives(threadOf(conversation, true))).toEqual([false, false, false, false, true])
   })
 
-  it('takes a message that gains its time for the answer', () => {
-    expect(isAnswer(said('Done.', null), shown(said('Done.')))).toBe(true)
+  it('takes your last message for the live one even when the agent answered it', () => {
+    expect(lives(threadOf(conversation.slice(0, 4), true))).toEqual([false, false, true, false])
   })
 
-  it('looks at no clock but the message', () => {
-    expect(isAnswer(BEFORE, shown({ ...BEFORE, turn_over: false, pane: 12, agent: 'codex' }))).toBe(false)
+  it('leaves every message of yours without actions when the chat sent nothing', () => {
+    expect(lives(threadOf(conversation, false))).toEqual([false, false, false, false, false])
   })
 
-  it('takes any message for the answer when none was seen when sending', () => {
-    expect(isAnswer(null, shown(BEFORE))).toBe(true)
+  it('marks only the last message of the agent as having more to come', () => {
+    const working = [agent(0, 'Reading', false), you(1, 'go on'), agent(2, 'Writing', false)]
+    expect(goings(threadOf(working, false))).toEqual([false, false, true])
   })
 
-  it.each([
-    ['loading', LOADING],
-    ['unreadable', UNREADABLE],
-  ])('takes no answer from a %s reading', (_, reading) => {
-    expect(isAnswer(BEFORE, reading)).toBe(false)
-    expect(isAnswer(null, reading)).toBe(false)
+  it.each([true, null])('marks nothing to come when the last turn is %o', (turnOver) => {
+    expect(goings(threadOf([agent(0, 'Reading', false), agent(1, 'Done.', turnOver)], false))).toEqual([false, false])
   })
 })
 
-describe('threadOf', () => {
-  it('shows only the agent before anything is sent', () => {
-    expect(threadOf(shown(BEFORE), null)).toEqual(['agent'])
+describe('readingNote', () => {
+  it.each<[string, Reading, string | null]>([
+    ['reading', { kind: 'loading' }, 'Reading its last message…'],
+    ['unreadable', { kind: 'unreadable', reason: 'no transcript' }, 'no transcript'],
+    [
+      'read',
+      { kind: 'message', message: { pane: 11, agent: 'claude', text: 'Done.', written: null, turn_over: true } },
+      null,
+    ],
+  ])('says %s messages as %o', (_, reading, note) => {
+    expect(readingNote(reading)).toBe(note)
   })
+})
 
-  it('puts what you sent under the message it answers', () => {
-    expect(threadOf(shown(BEFORE), { answered: BEFORE })).toEqual(['agent', 'you'])
-  })
-
-  it('puts the answer under what you sent', () => {
-    expect(threadOf(shown(said('Fixed.')), { answered: BEFORE })).toEqual(['you', 'agent'])
-  })
-
-  it('keeps what you sent under the reading while the message is not read yet', () => {
-    expect(threadOf(LOADING, { answered: null })).toEqual(['agent', 'you'])
-  })
-
-  it('puts the first message read after sending under it', () => {
-    expect(threadOf(shown(BEFORE), { answered: null })).toEqual(['you', 'agent'])
+describe('shownState', () => {
+  it.each([
+    ['sending', true, 'sending'],
+    ['sending', false, 'unconfirmed'],
+    ['sent', false, 'sent'],
+    ['sent', true, 'sent'],
+    ['failed', false, 'failed'],
+    ['failed', true, 'failed'],
+  ] as const)('shows a %s message, live %s, as %s', (state, live, shown) => {
+    expect(shownState(state, live)).toBe(shown)
   })
 })
 
