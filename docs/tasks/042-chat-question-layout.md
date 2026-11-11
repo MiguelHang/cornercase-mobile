@@ -40,5 +40,8 @@ opción elegida también cuando cambia de alto (con el teclado y las teclas abie
 pierde la barra `│` que Claude Code 2.1.322 le pinta delante (fixture `permission_gutter.json`). Sin resolver: con una
 pregunta y las teclas abiertas, enfocar el campo a veces sube la página unos 56 pt; sin pregunta no pasa, y no se
 comparó con `main`. Tras la review (2026-11-11), con tres preguntas de cuatro opciones de unas 40 palabras (30 filas desde
-la regla), la tarjeta salió entera, sin la barra `│` en la pregunta, con los chips fijos arriba al hacer scroll. El iPhone
-del usuario queda pendiente.
+la regla), la tarjeta salió entera, sin la barra `│` en la pregunta, con los chips fijos arriba al hacer scroll. Tras la
+segunda review (2026-11-11), con la tarjeta desplazada, cada pestaña abierta con un chip o al contestar empezó por su
+pregunta con la opción elegida a la vista, el resumen de `Review your answers` salió sin `│` y con `1. Submit answers` a
+la vista, y los chips volvieron a mandar sus flechas pasados 1,5 s sin cambio de pantalla. El iPhone del usuario queda
+pendiente.

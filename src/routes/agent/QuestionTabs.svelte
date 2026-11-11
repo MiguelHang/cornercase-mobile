@@ -42,6 +42,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    margin-bottom: calc(-1 * var(--gap));
+    padding-bottom: var(--gap);
+    border-bottom: 1px solid var(--border);
     background: var(--glass);
   }
 

@@ -2,7 +2,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::cli::surface::Style;
-use crate::cli::surface::fixtures::{ASK_LONG, ASK_ONE, ASK_TABS, PERMISSION, PERMISSION_GUTTER, WORKING};
+use crate::cli::surface::fixtures::{ASK_LONG, ASK_ONE, ASK_REVIEW, ASK_TABS, PERMISSION, PERMISSION_GUTTER, WORKING};
 use crate::terminal::grid::Run;
 use crate::terminal::question::cropped;
 use crate::terminal::question::tests::{captured, line};
@@ -132,7 +132,9 @@ mod blocks {
     #[case::with_a_bar_down_the_text(&["│ Pick a", "│ fruit"], vec![text("Pick a fruit")])]
     #[case::with_a_bar_counted_in_the_width_of_a_row(&["│ Pick", "│ ab"], vec![text("Pick ab")])]
     #[case::with_a_bar_down_a_text_that_ends_short(&["│ Hi", "│ yo"], vec![text("Hi\nyo")])]
-    #[case::with_a_bar_on_some_text_rows_only(&["│ Hi", "Yo"], vec![text("│ Hi\nYo")])]
+    #[case::with_a_bar_on_some_text_rows_only(&["│ Hi", "Yo"], vec![text("Hi\nYo")])]
+    #[case::with_a_bar_on_the_rows_of_a_wrapped_sentence_only(&["│ Pick a", "│ fig", "→ Fig"], vec![text("Pick a fig\n→ Fig")])]
+    #[case::with_a_bar_without_a_space(&["│Hi", "Yo"], vec![text("Hi\nYo")])]
     #[case::with_a_bar_on_some_code_rows_only(&["╌╌╌╌╌╌╌╌", " │ ls", " pwd", "╌╌╌╌╌╌╌╌"], vec![Block::Code("│ ls\npwd".to_owned())])]
     #[case::with_nothing_between_two_dashed_rules(&["Run", "╌╌╌╌╌╌╌╌", "  ", "╌╌╌╌╌╌╌╌"], vec![text("Run")])]
     fn split_the_rows_above_the_options(#[case] rows: &[&str], #[case] expected: Vec<Block>) {
@@ -288,6 +290,26 @@ mod captures {
             help: vec!["Enter to select · Tab/Arrow keys to navigate · Esc to cancel".to_owned()],
         };
         assert_eq!(of(ASK_LONG), Some(expected));
+    }
+
+    #[test]
+    fn read_the_review_of_several_answers_with_a_bar_down_each_question() {
+        let summary = [
+            "● Our small team is shipping a multi-tenant web shop next quarter, and every merchant's data must stay isolated. Which database approach should we commit to for tenant separation, scaling, and day-to-day operations, with only a few engineers available to maintain it?",
+            "→ Shared tables with tenant_id",
+            "● Our small team is shipping a multi-tenant web shop next quarter and needs a hosting setup that handles traffic spikes during sales without a dedicated platform group. Which hosting model should we choose, balancing cost, deployment speed, and how much infrastructure the team must own?",
+            "→ Serverless or PaaS",
+            "● Our small team is shipping a multi-tenant web shop next quarter, and a outage could hit many merchants at once. Since we cannot staff a full operations group, which on-call model should we adopt for handling production incidents and overnight alerts?",
+            "→ Business hours only",
+        ];
+        let expected = Card {
+            tabs: vec![tab("DB", true), tab("Hosting", true), tab("On-call", true), tab("Submit", true)],
+            open: Some(3),
+            blocks: vec![text("Review your answers"), text(&summary.join("\n")), text("Ready to submit your answers?")],
+            options: vec![option(1, "Submit answers", None, true), option(2, "Cancel", None, false)],
+            help: Vec::new(),
+        };
+        assert_eq!(of(ASK_REVIEW), Some(expected));
     }
 
     #[test]

@@ -26,6 +26,8 @@ export const INTERRUPT_WINDOW_MS = 3000
 
 export const FOLLOW_MS = 10_000
 
+export const TAB_HOLD_MS = 1500
+
 export const staysOnTheMac = (agent: string) => `The image stays in ${agent}'s input on the Mac`
 
 export const timers: Clock = {
@@ -123,7 +125,7 @@ export class Chat {
   #cancelFollow: (() => void) | null = null
   #following = false
   #questioning = false
-  #tabbedFrom: Question | null = null
+  #tabbedFrom: { question: Question | null; at: number } | null = null
   #watchingDone = false
   #marked: string | null | undefined = undefined
   #asked = 0
@@ -426,15 +428,21 @@ export class Chat {
   async openTab(target: number): Promise<string | null> {
     const question = this.question
     const keys = arrowsTo(question?.card?.open ?? null, target)
-    if (!this.canPress || keys.length === 0 || question === this.#tabbedFrom) {
+    if (!this.canPress || keys.length === 0 || this.#holding(question)) {
       return null
     }
-    this.#tabbedFrom = question
+    const tabbed = { question, at: this.#clock.now() }
+    this.#tabbedFrom = tabbed
     const failed = await this.#send(keys)
-    if (failed !== null && this.#tabbedFrom === question) {
+    if (failed !== null && this.#tabbedFrom === tabbed) {
       this.#tabbedFrom = null
     }
     return failed
+  }
+
+  #holding(question: Question | null) {
+    const tabbed = this.#tabbedFrom
+    return tabbed !== null && tabbed.question === question && this.#clock.now() - tabbed.at < TAB_HOLD_MS
   }
 
   #send(keys: KeyName[]): Promise<string | null> {

@@ -193,7 +193,7 @@ impl Blocks {
 }
 
 fn joined(rows: &[String], cols: u16) -> String {
-    let said = unbarred(rows.iter().map(|row| row.trim().to_owned()).collect());
+    let said: Vec<&str> = rows.iter().map(|row| row.trim()).map(|row| unbarred_row(row).unwrap_or(row)).collect();
     let mut text = String::new();
     for (at, words) in said.iter().enumerate() {
         if let Some(row) = at.checked_sub(1).and_then(|above| rows.get(above)) {
@@ -226,8 +226,11 @@ fn unbarred(rows: Vec<String>) -> Vec<String> {
     if !rows.iter().filter(|row| !row.is_empty()).all(|row| row.starts_with(BAR)) {
         return rows;
     }
-    let cut = |row: &str| row.strip_prefix(BAR).map(|rest| rest.strip_prefix(' ').unwrap_or(rest).to_owned());
-    rows.iter().map(|row| cut(row).unwrap_or_default()).collect()
+    rows.iter().map(|row| unbarred_row(row).unwrap_or_default().to_owned()).collect()
+}
+
+fn unbarred_row(row: &str) -> Option<&str> {
+    row.strip_prefix(BAR).map(|rest| rest.strip_prefix(' ').unwrap_or(rest))
 }
 
 fn help(rows: &[Line], cols: u16) -> Option<Vec<String>> {

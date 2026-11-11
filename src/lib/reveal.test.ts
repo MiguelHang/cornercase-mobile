@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { revealBy, under, type Span } from './reveal'
+import { revealBy, scrolledTo, under, type Span } from './reveal'
 
 const VIEW: Span = { top: 100, bottom: 300 }
 
@@ -27,5 +27,19 @@ describe('under', () => {
 
   it('scrolls up to an option hidden under the header', () => {
     expect(revealBy(under(VIEW, { top: 100, bottom: 144 }), { top: 120, bottom: 160 })).toBe(-24)
+  })
+})
+
+describe('scrolledTo', () => {
+  it.each<[string, number, boolean, Span | null, number]>([
+    ['keeps the scroll of the same question with its option in view', 80, false, { top: 150, bottom: 200 }, 80],
+    ['scrolls the same question down to its option below', 80, false, { top: 280, bottom: 330 }, 110],
+    ['keeps the scroll of the same question without an option', 80, false, null, 80],
+    ['starts a new question at its top', 80, true, null, 0],
+    ['starts a new question at its top with its option in view there', 80, true, { top: 60, bottom: 110 }, 0],
+    ['never scrolls a new question above its top', 80, true, { top: 0, bottom: 10 }, 0],
+    ['scrolls a new question from its top down to its option', 80, true, { top: 250, bottom: 300 }, 80],
+  ])('%s', (_, top, fresh, item, to) => {
+    expect(scrolledTo(top, fresh, VIEW, item)).toBe(to)
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Card_Serialize as Card, QuestionChanged_Serialize as QuestionChanged } from './bindings'
-import { whileShown } from './chat.svelte'
+import { TAB_HOLD_MS, whileShown } from './chat.svelte'
 import {
   MACHINE,
   PANE,
@@ -15,6 +15,7 @@ import {
   asked,
   fakeAsker,
   FakePage,
+  fakeClock,
 } from './chatFakes'
 import { digitOf } from './keys'
 
@@ -234,9 +235,10 @@ describe('Chat, the tabs of its question', () => {
   const tabsOf = async (open: number | null, answer: typeof pressedOk = pressedOk) => {
     const pressKey = vi.fn(answer)
     const haptics = still()
-    const { chat, tell } = await watching('waiting', { pressKey, haptics })
+    const { clock, tick } = fakeClock()
+    const { chat, tell } = await watching('waiting', { pressKey, haptics, clock })
     tell(asked(MENU, { card: tabbed(open) }))
-    return { chat, pressKey, haptics, tell }
+    return { chat, pressKey, haptics, tell, tick }
   }
 
   it('presses the arrows to the tab on its pane in one call, with a light tap', async () => {
@@ -257,6 +259,19 @@ describe('Chat, the tabs of its question', () => {
     await chat.openTab(2)
     expect(await chat.openTab(1)).toBeNull()
     expect(pressKey.mock.calls).toEqual([[PANE, ['right', 'right']]])
+  })
+
+  it('presses the arrows again once the question stays the same for a while', async () => {
+    const { chat, pressKey, tick } = await tabsOf(0)
+    await chat.openTab(2)
+    tick(TAB_HOLD_MS - 1)
+    await chat.openTab(2)
+    tick(1)
+    await chat.openTab(1)
+    expect(pressKey.mock.calls).toEqual([
+      [PANE, ['right', 'right']],
+      [PANE, ['right']],
+    ])
   })
 
   it('presses the arrows again from the tab the changed question opens', async () => {

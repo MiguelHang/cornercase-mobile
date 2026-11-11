@@ -254,16 +254,25 @@ describe('Question, as a card', () => {
     )
   })
 
-  it('follows the chosen option when it changes and when the card changes height', () => {
-    expect(flat(cardSource)).toContain('bind:clientHeight={tall} {@attach follow(chosen)}')
-    expect(flat(cardSource)).toContain('(box) => { void tall const option')
+  it('follows the chosen option when it changes, when the question changes and when the card changes height', () => {
+    expect(flat(cardSource)).toContain('const asked = $derived(JSON.stringify([card.open, card.blocks]))')
+    expect(flat(cardSource)).toContain('bind:clientHeight={tall} {@attach follow(chosen, asked)}')
+    expect(flat(cardSource)).toContain('(box) => { void tall const fresh = question !== shown shown = question')
     expect(flat(cardSource)).toContain('const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)')
-    expect(flat(cardSource)).toContain('box.scrollTop += revealBy(seen, option.getBoundingClientRect())')
+    expect(flat(cardSource)).toContain(
+      'box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, option?.getBoundingClientRect() ?? null)',
+    )
   })
 
   it('keeps the tabs in sight over the scrolled card, on the composer\'s own background', () => {
     expect(flat(tabsSource)).toContain('.tabs { position: sticky; top: 0; z-index: 1;')
     expect(flat(tabsSource)).toContain('background: var(--glass); }')
+  })
+
+  it('ends the tabs in a band of their own with a line, so a row cut under them reads as cut', () => {
+    expect(flat(tabsSource)).toContain(
+      'margin-bottom: calc(-1 * var(--gap)); padding-bottom: var(--gap); border-bottom: 1px solid var(--border);',
+    )
   })
 
   it('gives every tab a touch target of 44 px', () => {

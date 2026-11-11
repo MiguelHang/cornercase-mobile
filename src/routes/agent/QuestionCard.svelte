@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Attachment } from 'svelte/attachments'
   import type { Card_Serialize as Card, CardOption_Serialize as CardOption } from '../../lib/bindings'
-  import { revealBy, under } from '../../lib/reveal'
+  import { scrolledTo, under } from '../../lib/reveal'
   import Button from '../../lib/ui/Button.svelte'
   import QuestionTabs from './QuestionTabs.svelte'
 
@@ -22,22 +22,26 @@
 
   const chosen = $derived(card.options.find((option) => option.selected)?.number ?? null)
 
+  const asked = $derived(JSON.stringify([card.open, card.blocks]))
+
   let tall = $state(0)
 
+  let shown: string | null = null
+
   const follow =
-    (number: number | null): Attachment<HTMLElement> =>
+    (number: number | null, question: string): Attachment<HTMLElement> =>
     (box) => {
       void tall
+      const fresh = question !== shown
+      shown = question
       const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
       const tabs = box.querySelector('[aria-label="Questions"]')
-      if (option !== null) {
-        const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)
-        box.scrollTop += revealBy(seen, option.getBoundingClientRect())
-      }
+      const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)
+      box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, option?.getBoundingClientRect() ?? null)
     }
 </script>
 
-<div class="card" role="group" aria-label="{agent} asks" bind:clientHeight={tall} {@attach follow(chosen)}>
+<div class="card" role="group" aria-label="{agent} asks" bind:clientHeight={tall} {@attach follow(chosen, asked)}>
   {#if card.tabs.length > 0}
     <QuestionTabs tabs={card.tabs} open={card.open} {ontab} />
   {/if}
