@@ -3,6 +3,7 @@ use cornercase_core::machines::code::MachineCode;
 use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
+use crate::commands::history;
 use crate::events::{ConnectionChanged, Emit, Emitted};
 use crate::state::AppState;
 use crate::view::{ConnectionView, MachineList};
@@ -64,6 +65,9 @@ pub(crate) fn remove(state: &AppState, emit: &dyn Emit, id: MachineId) -> Result
 }
 
 fn release(state: &AppState, emit: &dyn Emit, id: MachineId) {
+    if let Err(line) = history::forget(state, id) {
+        eprintln!("{line}");
+    }
     let mut active = state.active();
     if active.as_ref().is_some_and(|active| active.machine() == id) {
         *active = None;

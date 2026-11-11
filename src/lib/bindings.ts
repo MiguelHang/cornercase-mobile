@@ -48,6 +48,8 @@ export const commands = {
 	issueRead: (project: number, source: string, key: string) => typedError<ReadIssue_Serialize, CommandError>(__TAURI_INVOKE("issue_read", { project, source, key })),
 	issueFlows: (project: number) => typedError<Flows_Serialize, CommandError>(__TAURI_INVOKE("issue_flows", { project })),
 	startFlow: (form: StartFlow) => typedError<FlowStarted_Serialize, CommandError>(__TAURI_INVOKE("start_flow", { form })),
+	historyLoad: (machine: number, boot: string, pane: number) => __TAURI_INVOKE<HistoryEntry_Serialize[]>("history_load", { machine, boot, pane }),
+	historySave: (machine: number, boot: string, pane: number, entries: HistoryEntry_Deserialize[]) => __TAURI_INVOKE<void>("history_save", { machine, boot, pane, entries }),
 };
 
 /** Events */
@@ -501,6 +503,12 @@ export type Found_Serialize = {
 	matches: number,
 	capped: boolean,
 };
+
+export type HistoryEntry = HistoryEntry_Serialize | HistoryEntry_Deserialize;
+
+export type HistoryEntry_Deserialize = { kind: "you"; id: number; text: string; chips: string[]; state: SendState; reason?: string | null; seen: number | null } | { kind: "agent"; id: number; text: string; written?: string | null; turn_over?: boolean | null; seen: number | null } | { kind: "gap"; id: number; seen: number | null };
+
+export type HistoryEntry_Serialize = { kind: "you"; id: number; text: string; chips: string[]; state: SendState; reason: string | null; seen: number | null } | { kind: "agent"; id: number; text: string; written: string | null; turn_over: boolean | null; seen: number | null } | { kind: "gap"; id: number; seen: number | null };
 
 export type Hunk = Hunk_Serialize | Hunk_Deserialize;
 
@@ -983,6 +991,8 @@ export type Searched = Searched_Serialize | Searched_Deserialize;
 export type Searched_Deserialize = { searched: "found"; found: Found_Deserialize } | { searched: "cancelled" };
 
 export type Searched_Serialize = { searched: "found"; found: Found_Serialize } | { searched: "cancelled" };
+
+export type SendState = "sending" | "sent" | "failed";
 
 export type Shape = Shape_Serialize | Shape_Deserialize;
 

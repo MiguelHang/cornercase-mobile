@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::PathBuf;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::error::Category;
 
@@ -73,15 +74,19 @@ impl MachineStore for JsonFileStore {
 }
 
 fn parsed(text: &[u8]) -> Result<Saved, Error> {
-    let Version { version } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
-    if version != VERSION {
-        return Err(Error::Store(format!("the file's format version {version} is unknown")));
-    }
-    let Read { next_id, machines, active } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
+    let Read { next_id, machines, active } = versioned(text, VERSION)?;
     Ok(Saved { next_id, machines, active })
 }
 
-fn io_error(what: &str, error: &io::Error) -> Error {
+pub(crate) fn versioned<T: DeserializeOwned>(text: &[u8], expected: u32) -> Result<T, Error> {
+    let Version { version } = serde_json::from_slice(text).map_err(|error| unreadable(&error))?;
+    if version != expected {
+        return Err(Error::Store(format!("the file's format version {version} is unknown")));
+    }
+    serde_json::from_slice(text).map_err(|error| unreadable(&error))
+}
+
+pub(crate) fn io_error(what: &str, error: &io::Error) -> Error {
     Error::Store(format!("{what}: {error}"))
 }
 
