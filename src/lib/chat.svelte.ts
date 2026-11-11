@@ -74,6 +74,8 @@ const kept = (shown: Reading, answer: Answer): Reading => {
   return shown.kind === 'message' ? shown : { kind: 'unreadable', reason: answer.reason }
 }
 
+const busy = (status: string | null | undefined) => status === 'working' || status === 'shell'
+
 const news = (shown: Reading, next: Reading) =>
   next.kind === 'message' && (shown.kind !== 'message' || shown.message.text !== next.message.text)
 
@@ -313,12 +315,12 @@ export class Chat {
   #vouch(row: AgentRow) {
     const another = row.agent !== this.#agent
     this.#agent = row.agent
-    const changed = row.status !== this.#heard
-    const started = changed && (row.status === 'working' || row.status === 'shell')
+    const turned = busy(row.status) !== busy(this.#heard)
+    const started = turned && busy(row.status)
     if (another || (started && !this.#expecting && this.#heard !== 'waiting')) {
       this.lose()
     }
-    this.#expecting &&= !changed
+    this.#expecting &&= !turned
   }
 
   #turnKeys(status: string | null) {

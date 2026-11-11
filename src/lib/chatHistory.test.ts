@@ -248,6 +248,28 @@ describe('Chat, vouching for the conversation', () => {
     expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'agent: Fixed.'])
   })
 
+  it('adds no gap for a turn followed on screen that waits on a command and wakes up again', async () => {
+    const { chat } = await caughtUp()
+    await chat.refresh()
+    await sendOn(chat, 'fix the login')
+    told(chat, 'working')
+    told(chat, 'shell')
+    told(chat, 'working')
+    told(chat, 'done')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'agent: Fixed.'])
+  })
+
+  it('adds no gap for the answer to a send made while done that starts once the agent is idle', async () => {
+    const { chat } = await caughtUp()
+    await chat.refresh()
+    await sendOn(chat, 'fix the login')
+    told(chat, 'idle')
+    told(chat, 'working')
+    await chat.refresh()
+    expect(said(chat.conversation)).toEqual(['gap', 'agent: Done.', 'you: fix the login', 'agent: Fixed.'])
+  })
+
   it('adds no gap for the answer to a send made before any reading', async () => {
     const { chat } = await loaded(fakeHistory(stored), saying('Fixed.'))
     await sendOn(chat, 'fix the login')

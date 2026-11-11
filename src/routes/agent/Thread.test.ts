@@ -108,7 +108,7 @@ describe('Sent', () => {
     expect(bubble(yours(1, 'failed', { reason: null }), null)).toMatch(/(?:<!---->)?Not sent<\/p>/)
   })
 
-  it('says a message the app closed on while sending was not confirmed, with no spinner and nothing to do', () => {
+  it('says a message the chat closed on while sending was not confirmed, with no spinner and nothing to do', () => {
     const body = bubble(yours(1, 'sending'), null)
     expect(body).toContain('aria-label="Your message, not confirmed"')
     expect(body).toMatch(
@@ -302,8 +302,10 @@ describe('Thread', () => {
     expect(thread(threadChat(conversation))).not.toContain('Retry')
   })
 
-  it('shows a send the app closed on as not confirmed', () => {
-    expect(thread(threadChat([GAP, ASKED, yours(2, 'sending')]))).toContain('Not confirmed: the app closed')
+  it('shows a send the chat closed on as not confirmed', () => {
+    expect(thread(threadChat([GAP, ASKED, yours(2, 'sending')]))).toContain(
+      'Not confirmed: the chat closed before an answer came back',
+    )
   })
 
   it('shows your message sending while the chat sends it', () => {
