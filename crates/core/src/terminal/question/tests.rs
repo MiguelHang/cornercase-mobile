@@ -127,6 +127,13 @@ mod question {
     }
 
     #[test]
+    fn starts_at_its_rule_when_its_last_option_is_the_first_row_of_the_window() {
+        let mut rows = asked(&["said", "────────", "Pick", "1. a", "2. b"], &[]);
+        rows.extend(numbered(QUESTION_ROWS - 1).into_iter().map(|row| format!("   {row}")));
+        assert_eq!(crops(8, &rows), rows[1..]);
+    }
+
+    #[test]
     fn keeps_the_window_when_its_options_end_above_it() {
         let mut rows = asked(&["────────", "1. a", "2. b"], &[]);
         rows.extend(numbered(QUESTION_ROWS));

@@ -169,7 +169,6 @@ mod pressing_a_key {
     }
 
     #[rstest]
-    #[case::no_keys(&[], "")]
     #[case::empty(&[""], "")]
     #[case::an_option(&["--force"], "--force")]
     #[case::two_keys_in_one_name(&["down enter"], "down enter")]
@@ -178,6 +177,17 @@ mod pressing_a_key {
     async fn refuses_a_name_the_app_never_sends_and_queues_nothing(#[case] names: &[&str], #[case] bad: &str) {
         let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), names).await;
         assert_eq!(pressed, Err(json_of(&CommandError::from(Error::UnknownKey(bad.to_owned())))));
+        assert_eq!(written, Vec::<Value>::new());
+    }
+}
+
+mod pressing_no_key {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn is_refused_as_no_keys_and_queues_nothing() {
+        let (pressed, written) = pressing(Some(json!({ "status": 0, "text": "" })), &[]).await;
+        assert_eq!(pressed, Err(json_of(&CommandError::from(Error::NoKeys))));
         assert_eq!(written, Vec::<Value>::new());
     }
 }
