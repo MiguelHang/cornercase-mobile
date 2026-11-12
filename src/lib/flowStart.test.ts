@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
+  AgentAccounts_Serialize as AgentAccounts,
   CommandError,
   FlowChoice_Serialize as FlowChoice,
   FlowStarted_Serialize as FlowStarted,
@@ -62,14 +63,14 @@ const ORCHESTRATOR: FlowStarted = {
 
 const booted = (boot: string): Promise<{ status: 'ok'; data: StartChoices }> => reply({ boot, projects: [] })
 
-type Calls = Partial<FlowCalls & Pick<StartCalls, 'startProjects'>>
+type Calls = Partial<FlowCalls & Pick<StartCalls, 'startProjects' | 'installedAgents'>>
 
 const built = (overrides: Calls, memory: FlowMemory) => {
   const calls = {
     issueFlows: vi.fn(overrides.issueFlows ?? (() => ok(SHOP))),
     startFlow: vi.fn(overrides.startFlow ?? (() => reply(ORCHESTRATOR))),
     startProjects: vi.fn(overrides.startProjects ?? (() => booted('boot-1'))),
-    installedAgents: () => reply({ agents: [], accounts: [] }),
+    installedAgents: overrides.installedAgents ?? (() => reply({ agents: [], accounts: [] })),
     startAgent: vi.fn(),
     startIssue: vi.fn(),
   }
@@ -522,5 +523,96 @@ describe('FlowStart, starting a flow', () => {
     await flows.use('flow')
     await flows.start()
     expect([flows.flowError, calls.issueFlows.mock.calls, calls.startFlow.mock.calls]).toEqual([null, [], []])
+  })
+})
+
+describe('FlowStart, with the accounts of the team', () => {
+  const LOGINS: AgentAccounts[] = [
+    {
+      agent: 'claude',
+      default: 'work',
+      options: [
+        { name: '', label: 'Own login', login: 'unknown' },
+        { name: 'work', label: 'Work', login: 'signed-in' },
+        { name: 'home', label: 'Home', login: 'failed' },
+      ],
+    },
+    {
+      agent: 'codex',
+      default: '',
+      options: [
+        { name: '', label: 'Own login', login: 'signed-in' },
+        { name: 'ci', label: 'CI', login: 'signed-out' },
+      ],
+    },
+  ]
+
+  const SOLO = flow('Solo', { roles: [role('coder', 'codex')] })
+  const ANYONE = flow('Anyone', { roles: [role('orchestrator', ''), role('coder', 'auto'), role('tester', 'gemini')] })
+
+  const signedIn = (accounts: AgentAccounts[] = LOGINS) =>
+    inFlow({ issueFlows: () => ok([SHIP, SOLO, ANYONE]), installedAgents: () => reply({ agents: [], accounts }) })
+
+  const run = (accounts: { agent: string; account: string }[]) => ({
+    project: 8,
+    name: 'Ship it',
+    key: '#482',
+    source: 'github',
+    branch: ISSUE_BRANCH,
+    issue_branch: ISSUE_BRANCH,
+    accounts,
+  })
+
+  it('offers an account for each agent of the team that has accounts, once each, in the order of the roles', async () => {
+    const { flows } = await signedIn()
+    expect(flows.teamAgents).toEqual(['codex', 'claude'])
+  })
+
+  it('offers none for a team whose agents have no accounts', async () => {
+    const { flows } = await signedIn([])
+    expect(flows.teamAgents).toEqual([])
+  })
+
+  it('offers them again for the flow chosen, and none without a flow that runs', async () => {
+    const { flows } = await signedIn()
+    flows.flow = 'Solo'
+    expect(flows.teamAgents).toEqual(['codex'])
+    flows.flow = 'Anyone'
+    expect(flows.teamAgents).toEqual([])
+    flows.flow = null
+    expect(flows.teamAgents).toEqual([])
+  })
+
+  it('shares each agent s choice with the Agent way of starting it', async () => {
+    const { form, flows } = await signedIn()
+    await flows.use('agent')
+    form.accounts.choose('claude', 'home')
+    await flows.use('flow')
+    expect([flows.accounts, flows.accounts.chosen('claude')]).toEqual([form.accounts, 'home'])
+    flows.accounts.choose('codex', 'ci')
+    await flows.use('agent')
+    expect(form.accounts.chosen('codex')).toBe('ci')
+  })
+
+  const CI = { agent: 'codex', account: 'ci' }
+  const HOME = { agent: 'claude', account: 'home' }
+
+  it.each<[string, [string, string][], { agent: string; account: string }[]]>([
+    ['nothing with every default', [], []],
+    ['only the accounts that differ from the default, in the order of the team', [['claude', 'home'], ['codex', 'ci']], [CI, HOME]],
+    ['the own login of an agent whose default is an account', [['claude', ''], ['codex', '']], [{ agent: 'claude', account: '' }]],
+  ])('sends %s', async (_, chosen, accounts) => {
+    const { flows, calls } = await signedIn()
+    chosen.forEach(([agent, name]) => flows.accounts.choose(agent, name))
+    await flows.start()
+    expect(calls.startFlow.mock.calls).toEqual([[run(accounts)]])
+  })
+
+  it('sends no account of an agent left out of the team chosen', async () => {
+    const { flows, calls } = await signedIn()
+    flows.accounts.choose('claude', 'home')
+    flows.flow = 'Solo'
+    await flows.start()
+    expect(calls.startFlow.mock.calls).toEqual([[{ ...run([]), name: 'Solo' }]])
   })
 })

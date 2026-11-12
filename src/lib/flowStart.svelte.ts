@@ -103,6 +103,15 @@ export class FlowStart {
     return chosen === undefined ? [] : teamOf(chosen)
   }
 
+  get accounts() {
+    return this.#form.accounts
+  }
+
+  get teamAgents() {
+    const agents = this.chosen?.roles.map((role) => role.agent) ?? []
+    return agents.filter((agent, at) => agents.indexOf(agent) === at && this.accounts.optionsOf(agent).length > 0)
+  }
+
   async read(project: number, boot: string | null) {
     const restarted = this.#restarted(boot)
     if (project === this.#project && !restarted && this.flows.kind !== 'failed') {
@@ -170,7 +179,8 @@ export class FlowStart {
     const { key, source } = issue.issue
     const { branch, issueBranch } = form
     const { project } = place
-    const run = { project, name: chosen.name, key, source, branch, issue_branch: issueBranch, accounts: [] }
+    const accounts = this.accounts.picks(this.teamAgents)
+    const run = { project, name: chosen.name, key, source, branch, issue_branch: issueBranch, accounts }
     if (await form.launch(() => this.#calls.startFlow(run), FLOW_UNANSWERED)) {
       this.remember(chosen.name)
     }

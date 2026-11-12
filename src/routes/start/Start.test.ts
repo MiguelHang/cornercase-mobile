@@ -651,6 +651,22 @@ describe('Start, a flow on an issue', () => {
     expect(labels(body)).toEqual(['Where', 'Agent', 'Model'])
     expect(optionsOf(body)).toContain('*workspace-9 api › Login · new tab')
   })
+
+  it("offers an account for each of the team's agents with accounts under the team, as the Agent way chose it", async () => {
+    const own = { name: '', label: 'This Mac', login: 'signed-in' as const }
+    const accounts = [
+      { agent: 'claude', default: '', options: [own, { name: 'lab', label: 'Lab', login: 'signed-in' as const }] },
+      { agent: 'codex', default: 'ops', options: [own, { name: 'ops', label: 'Ops', login: 'unknown' as const }] },
+    ]
+    const opening = await flowing({ installedAgents: () => answer({ ...installed('claude', 'codex'), accounts }) })
+    opening.form.accounts.choose('claude', 'lab')
+    const body = drawn(opening)
+    expect(labels(body)).toEqual(['Where', 'Branch', 'Flow', 'codex account', 'claude account'])
+    expect(body.indexOf('aria-label="Team"')).toBeLessThan(body.indexOf('>codex account</label>'))
+    expect(optionsOf(body).slice(-4)).toEqual(['  This Mac', '*ops Ops', '  This Mac', '*lab Lab'])
+    opening.flows.flow = 'Quick'
+    expect(labels(drawn(opening))).toEqual(['Where', 'Branch', 'Flow', 'claude account'])
+  })
 })
 
 describe('Switch', () => {
