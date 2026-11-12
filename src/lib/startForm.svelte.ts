@@ -6,6 +6,7 @@ import type {
   Place,
   PlaceInfo_Serialize as PlaceInfo,
   ProjectChoice,
+  StartAgents_Serialize as StartAgents,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
   commands,
@@ -60,6 +61,9 @@ const choicesOf = <T>(reply: Reply<T[]>): Choices<T> =>
 
 const projectsOf = (reply: Reply<StartChoices>): Reply<ProjectChoice[]> =>
   reply.ok ? { ok: true, data: reply.data.projects } : reply
+
+const agentsOf = (reply: Reply<StartAgents>): Reply<AgentChoice[]> =>
+  reply.ok ? { ok: true, data: reply.data.agents } : reply
 
 const errorIf = (empty: boolean, error: string) => (empty ? error : null)
 
@@ -216,7 +220,7 @@ export class StartForm {
   async loadAgents() {
     const asked = ++this.#agentsAsked
     this.agents = { kind: 'loading' }
-    const agents = choicesOf(await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED))
+    const agents = choicesOf(agentsOf(await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED)))
     if (asked === this.#agentsAsked) {
       this.agents = agents
       this.#pickAgent()

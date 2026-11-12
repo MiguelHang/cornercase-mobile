@@ -2,11 +2,11 @@ import { render } from 'svelte/server'
 import { describe, expect, it, vi } from 'vitest'
 import comments from '../../../crates/core/tests/fixtures/control/issue-read/v1/comments.json'
 import type {
-  AgentChoice_Serialize,
   ConnectionView_Serialize,
   FlowChoice_Serialize as FlowChoice,
   Place,
   ReadIssue_Serialize as ReadIssue,
+  StartAgents_Serialize,
 } from '../../lib/bindings'
 import { FlowStart } from '../../lib/flowStart.svelte'
 import type { StartingIssue } from '../../lib/router.svelte'
@@ -34,8 +34,10 @@ const answer = <T>(data: T) => Promise.resolve({ status: 'ok' as const, data })
 
 const never = () => new Promise<never>(() => {})
 
-const installed = (...names: string[]): AgentChoice_Serialize[] =>
-  names.map((name) => ({ agent: name, command: name, installed: true }))
+const installed = (...names: string[]): StartAgents_Serialize => ({
+  agents: names.map((name) => ({ agent: name, command: name, installed: true })),
+  accounts: [],
+})
 
 const CALLS: StartCalls = {
   startProjects: () =>
@@ -186,7 +188,7 @@ describe('Start, its agent form', () => {
   })
 
   it('says when no agent is installed and holds Start', async () => {
-    const body = agentForm(await formOf({ installedAgents: () => answer([]) }))
+    const body = agentForm(await formOf({ installedAgents: () => answer(installed()) }))
     expect(body).toContain('No agent is installed on this Mac.')
     expect(submit(body)?.[1]).toContain('disabled=""')
   })

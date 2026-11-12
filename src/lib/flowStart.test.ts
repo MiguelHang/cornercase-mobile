@@ -69,7 +69,7 @@ const built = (overrides: Calls, memory: FlowMemory) => {
     issueFlows: vi.fn(overrides.issueFlows ?? (() => ok(SHOP))),
     startFlow: vi.fn(overrides.startFlow ?? (() => reply(ORCHESTRATOR))),
     startProjects: vi.fn(overrides.startProjects ?? (() => booted('boot-1'))),
-    installedAgents: () => reply([]),
+    installedAgents: () => reply({ agents: [], accounts: [] }),
     startAgent: vi.fn(),
     startIssue: vi.fn(),
   }

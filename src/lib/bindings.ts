@@ -32,7 +32,7 @@ export const commands = {
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
 	terminalScroll: (pane: number, rowsUp: number) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_scroll", { pane, rowsUp })),
 	startProjects: () => typedError<StartChoices_Serialize, CommandError>(__TAURI_INVOKE("start_projects")),
-	installedAgents: () => typedError<AgentChoice_Serialize[], CommandError>(__TAURI_INVOKE("installed_agents")),
+	installedAgents: () => typedError<StartAgents_Serialize, CommandError>(__TAURI_INVOKE("installed_agents")),
 	startAgent: (form: StartAgent) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_agent", { form })),
 	startIssue: (form: StartIssue) => typedError<Started_Serialize, CommandError>(__TAURI_INVOKE("start_issue", { form })),
 	changesFile: (workspace: number, path: string, mode: Mode) => typedError<Patch_Serialize, CommandError>(__TAURI_INVOKE("changes_file", { workspace, path, mode })),
@@ -64,9 +64,37 @@ export const events = {
 };
 
 /* Types */
+export type AccountChoice = AccountChoice_Serialize | AccountChoice_Deserialize;
+
+export type AccountChoice_Deserialize = {
+	name: string,
+	label: string,
+	login: Login_Deserialize,
+};
+
+export type AccountChoice_Serialize = {
+	name: string,
+	label: string,
+	login: Login_Serialize,
+};
+
 export type AccountPick = {
 	agent: string,
 	account: string,
+};
+
+export type AgentAccounts = AgentAccounts_Serialize | AgentAccounts_Deserialize;
+
+export type AgentAccounts_Deserialize = {
+	agent: string,
+	default: string,
+	options: AccountChoice_Deserialize[],
+};
+
+export type AgentAccounts_Serialize = {
+	agent: string,
+	default: string,
+	options: AccountChoice_Serialize[],
 };
 
 export type AgentChoice = AgentChoice_Serialize | AgentChoice_Deserialize;
@@ -699,6 +727,12 @@ export type Lists_Serialize = {
 	sources: ListedInfo_Serialize[],
 };
 
+export type Login = Login_Serialize | Login_Deserialize;
+
+export type Login_Deserialize = "signed-in" | "signed-out" | "failed" | string;
+
+export type Login_Serialize = "signed-in" | "signed-out" | "failed" | "unknown";
+
 export type MachineList = MachineList_Serialize | MachineList_Deserialize;
 
 export type MachineList_Deserialize = {
@@ -1075,6 +1109,18 @@ export type StartAgent = {
 	model: string,
 	prompt: string,
 	accounts: AccountPick[],
+};
+
+export type StartAgents = StartAgents_Serialize | StartAgents_Deserialize;
+
+export type StartAgents_Deserialize = {
+	agents: AgentChoice_Deserialize[],
+	accounts: AgentAccounts_Deserialize[],
+};
+
+export type StartAgents_Serialize = {
+	agents: AgentChoice_Serialize[],
+	accounts: AgentAccounts_Serialize[],
 };
 
 export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;

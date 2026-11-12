@@ -36,6 +36,8 @@ const UNANSWERED: CommandError = { code: 'unanswered', message: 'the request was
 
 const agent = (name: string) => ({ agent: name, command: name, installed: true })
 
+const installed = (...names: string[]) => ({ agents: names.map(agent), accounts: [] })
+
 const workspace = (id: number, name = `w${id}`): WorkspaceChoice => ({ id, name })
 
 const project = (id: number, name = `p${id}`, workspaces: WorkspaceChoice[] = []): ProjectChoice => ({
@@ -58,7 +60,7 @@ const gate = <T>() => {
 
 const calls = (overrides: Partial<StartCalls> = {}) => ({
   startProjects: vi.fn(overrides.startProjects ?? (() => ok(choices(SESSION)))),
-  installedAgents: vi.fn(overrides.installedAgents ?? (() => ok([agent('claude'), agent('codex')]))),
+  installedAgents: vi.fn(overrides.installedAgents ?? (() => ok(installed('claude', 'codex')))),
   startAgent: vi.fn(overrides.startAgent ?? (() => ok(STARTED))),
   startIssue: vi.fn(overrides.startIssue ?? (() => ok(STARTED))),
   issueFlows: vi.fn(overrides.issueFlows ?? (() => ok({ flows: [] }))),
@@ -166,19 +168,19 @@ describe('StartForm choices', () => {
   })
 
   it('shows the projects while the agents are still loading', async () => {
-    const agents = gate<{ status: 'ok'; data: ReturnType<typeof agent>[] }>()
+    const agents = gate<{ status: 'ok'; data: ReturnType<typeof installed> }>()
     const { form } = made({ installedAgents: () => agents.promise })
     const loading = form.load()
     await vi.waitFor(() => expect(form.projects.kind).toBe('ready'))
     expect(form.agents.kind).toBe('loading')
-    agents.open({ status: 'ok', data: [agent('claude')] })
+    agents.open({ status: 'ok', data: installed('claude') })
     await loading
     expect(form.agents.kind).toBe('ready')
   })
 
   it('says why the agents could not be read and reads them again on Try again', async () => {
-    const answers = [failed('account list failed'), ok([agent('claude')])]
-    const { form } = await loaded({ installedAgents: () => answers.shift() ?? ok([]) })
+    const answers = [failed('account list failed'), ok(installed('claude'))]
+    const { form } = await loaded({ installedAgents: () => answers.shift() ?? ok(installed()) })
     expect(form.agents).toEqual({ kind: 'failed', reason: 'account list failed' })
     await form.loadAgents()
     expect([form.agents.kind, form.agent]).toEqual(['ready', 'claude'])
@@ -209,7 +211,7 @@ describe('StartForm choices', () => {
   })
 
   it('knows when no agent is installed and refuses to start', async () => {
-    const { form, commands } = await loaded({ installedAgents: () => ok([]) })
+    const { form, commands } = await loaded({ installedAgents: () => ok(installed()) })
     form.prompt = 'fix it'
     await form.start()
     expect([form.noAgents, form.agent, form.agentError]).toEqual([true, '', AGENT_EMPTY])
@@ -217,12 +219,12 @@ describe('StartForm choices', () => {
   })
 
   it('keeps only the latest answer of the agents', async () => {
-    const first = gate<{ status: 'ok'; data: ReturnType<typeof agent>[] }>()
-    const answers = [first.promise, ok([agent('codex')])]
-    const { form } = made({ installedAgents: () => answers.shift() ?? ok([]) })
+    const first = gate<{ status: 'ok'; data: ReturnType<typeof installed> }>()
+    const answers = [first.promise, ok(installed('codex'))]
+    const { form } = made({ installedAgents: () => answers.shift() ?? ok(installed()) })
     const stale = form.loadAgents()
     await form.loadAgents()
-    first.open({ status: 'ok', data: [agent('claude')] })
+    first.open({ status: 'ok', data: installed('claude') })
     await stale
     expect([form.agents, form.agent]).toEqual([{ kind: 'ready', items: [agent('codex')] }, 'codex'])
   })
@@ -357,8 +359,8 @@ describe('StartForm when the connection comes back', () => {
   })
 
   it('reads the agents again on the same boot when they had failed', async () => {
-    const answers = [refused({ code: 'not_connected', message: 'offline' }), ok([agent('claude')])]
-    const { form, commands } = await loaded({ installedAgents: () => answers.shift() ?? ok([]) })
+    const answers = [refused({ code: 'not_connected', message: 'offline' }), ok(installed('claude'))]
+    const { form, commands } = await loaded({ installedAgents: () => answers.shift() ?? ok(installed()) })
     await reconnect(form)
     expect(reads(commands)).toEqual([2, 2])
     expect(form.agents).toEqual({ kind: 'ready', items: [agent('claude')] })
