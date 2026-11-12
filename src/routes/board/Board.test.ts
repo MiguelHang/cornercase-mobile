@@ -239,7 +239,7 @@ describe('Board', () => {
     expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
     expect(source).toContain('.turn { transition: transform var(--turn); }')
     expect(source).toContain('.turn.open { transform: rotate(90deg); }')
-    expect(source).toContain('.fold { display: flex; flex: none; flex-direction: column; align-items: center; gap: 6px; padding: 0; color: var(--soft); }')
+    expect(source).toContain('display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 44px; padding: 0; color: var(--soft); }')
   })
 
   it('draws a triangle only on the rows with children', () => {
@@ -255,9 +255,7 @@ describe('Board', () => {
     const fold = body.indexOf('<button class="fold')
     const row = body.indexOf('<button class="row')
     expect(body.indexOf('<span aria-hidden="true"><!--$s1--><svg class="dot', fold)).toBeLessThan(row)
-    expect(body.indexOf('<span class="mark"><!--[0--><span class="spoken">Working</span>', row)).toBe(
-      body.indexOf('<span class="mark', row),
-    )
+    expect(body.slice(row)).toMatch(/^<button class="row svelte-[\w-]+" type="button"><span class="mark svelte-[\w-]+"><!--\[0--><span class="spoken">Working<\/span>/)
     expect(body.indexOf('<svg class="dot', row)).toBeGreaterThan(body.indexOf('<span class="folded', row))
     expect(flat(rowSource)).toContain('<span class="spoken">{statusName(row.status)}</span>')
   })
@@ -269,7 +267,7 @@ describe('Board', () => {
     expect(body).not.toContain('<span class="spoken')
     expect(body.indexOf('<svg class="dot', row)).toBeGreaterThan(body.indexOf('<span class="mark', row))
     expect(body.indexOf('<svg class="dot', row)).toBeLessThan(body.indexOf('<span class="lines', row))
-    expect(body).toMatch(/<span class="mark"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="Done"/)
+    expect(body).toMatch(/<span class="mark svelte-[\w-]+"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="Done"/)
   })
 
   it('turns the triangle at once with reduced motion', () => {
@@ -299,10 +297,23 @@ describe('Board', () => {
     const tree = [at(1, 'working', { title: 'Lead' }), at(2, 'idle', { title: 'Kid', parent: 1, depth: 1 }), at(4, 'idle', { title: 'Alone' })]
     const body = draw(tree, CONNECTED, 0, unfolded(26, 1))
     expect(body.match(/<button class="fold svelte-[\w-]+"/g)).toHaveLength(1)
-    expect(body.match(/<button class="row svelte-[\w-]+" type="button"><span class="mark/g)).toHaveLength(3)
+    expect(body.match(/<button class="row svelte-[\w-]+" type="button"><span class="mark svelte-[\w-]+">/g)).toHaveLength(3)
     expect(body).not.toContain('slot')
-    expect(rowSource).not.toContain('slot')
-    expect(rowSource).not.toContain('60px')
+    expect(rowSource).not.toMatch(/slot|\.lead|60px/)
+    expect(flat(rowSource)).toContain('.mark { display: flex; flex: none; justify-content: center; width: 14px;')
+  })
+
+  it('gives the fold a 44 pt target centred on the dot, clear of the title', () => {
+    const source = flat(rowSource)
+    expect(source).toContain('.agent { position: relative;')
+    expect(source).toContain(
+      '.fold { position: absolute; top: 0; bottom: 0; left: calc(var(--depth) * var(--inset-wide) + var(--inset) - 15px); z-index: 1;',
+    )
+    expect(source).toContain('width: 44px;')
+    expect(source).toContain('.row, .fold { box-sizing: border-box; min-height: 44px;')
+    expect(source).toContain('padding: var(--gap) var(--inset);')
+    expect(source).toContain('width: 14px; margin-right: calc(var(--inset-wide) - var(--inset)); }')
+    expect(source).toContain('.row { display: flex; flex: 1; align-items: center; gap: var(--inset);')
   })
 
   it('says what a folded row hides inside it, before the time', () => {

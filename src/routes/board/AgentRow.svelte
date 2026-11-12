@@ -71,6 +71,7 @@
 
 <style>
   .agent {
+    position: relative;
     display: flex;
     align-items: center;
     padding-left: calc(var(--depth) * var(--inset-wide));
@@ -103,13 +104,27 @@
   }
 
   .fold {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--depth) * var(--inset-wide) + var(--inset) - 15px);
+    z-index: 1;
     display: flex;
-    flex: none;
     flex-direction: column;
+    justify-content: center;
     align-items: center;
     gap: 6px;
+    width: 44px;
     padding: 0;
     color: var(--soft);
+  }
+
+  .mark {
+    display: flex;
+    flex: none;
+    justify-content: center;
+    width: 14px;
+    margin-right: calc(var(--inset-wide) - var(--inset));
   }
 
   .turn {
