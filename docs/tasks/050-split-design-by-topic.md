@@ -1,6 +1,6 @@
 # 050 — Partir por temas los ficheros de `design/` de más de 40 KB
 
-- Estado: pendiente
+- Estado: hecha
 - Depende de: 043
 - Rama: `docs/050-split-design-by-topic` · PR: `docs: split the largest design files by topic`
 
@@ -10,8 +10,8 @@
 mezclar el movimiento de texto con su diff).
 
 ## Criterios de aceptación
-- [ ] CA1 — `design/terminal.md` se parte en `design/terminal/` (p. ej. `grid.md`, `fit.md`, `typing.md`), y
+- [x] CA1 — `design/terminal.md` se parte en `design/terminal/` (p. ej. `grid.md`, `fit.md`, `typing.md`), y
   `design/chat.md` en `design/chat/`, como `design/look/`: el fichero del área se queda con lo que vale para toda el
   área y la lista de temas, y `DESIGN.md` sigue con una línea por área.
-- [ ] CA2 — Las citas "Terminal › …" y "Chat › …" del resto de `design/`, `docs/` y `CLAUDE.md` siguen llevando a su
+- [x] CA2 — Las citas "Terminal › …" y "Chat › …" del resto de `design/`, `docs/` y `CLAUDE.md` siguen llevando a su
   sitio; ningún texto se pierde ni se duplica (diff sin cambios de redacción).
