@@ -75,7 +75,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 049 | [El icono de la app](tasks/049-app-icon.md) (hecha; en el iPhone del usuario, pendiente) | 030 | ~50 (+ generados) |
 | 050 | [Partir por temas los ficheros de `design/` de más de 40 KB](tasks/050-split-design-by-topic.md) | 043 | ~0 (solo docs) |
 | 051 | [Tablero: las filas aprovechan todo el ancho](tasks/051-board-full-width.md) (hecha; en el iPhone del usuario, pendiente) | 040 | ~80 |
-| 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) | 045, 047 | ~250 |
+| 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) (hecha; en el iPhone del usuario, pendiente) | 045, 047 | ~250 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
