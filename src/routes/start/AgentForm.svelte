@@ -4,6 +4,7 @@
   import Field from '../../lib/ui/Field.svelte'
   import Switch from './Switch.svelte'
   import TextArea from '../../lib/ui/TextArea.svelte'
+  import AccountPicker from './AccountPicker.svelte'
   import AgentPicker from './AgentPicker.svelte'
   import FormFrame from './FormFrame.svelte'
   import WorkspacePicker from './WorkspacePicker.svelte'
@@ -23,6 +24,7 @@
     {/if}
   </div>
   <AgentPicker {form} />
+  <AccountPicker label="Account" accounts={form.accounts} agent={form.agent} disabled={form.sending} />
   <Field label="Model" placeholder="The agent's default" bind:value={form.model} disabled={form.sending} />
   <TextArea label="Prompt" bind:value={form.prompt} error={form.promptError} disabled={form.sending} />
   {#snippet button()}

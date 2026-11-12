@@ -46,7 +46,18 @@ pub const REQUIRED: Required = Required {
         "flow-list",
         "flow-run",
     ],
-    features: &["boot", "notices", "views", "surface-patches", "machine-start", "issues", "changes", "files"],
+    features: &[
+        "boot",
+        "notices",
+        "views",
+        "surface-patches",
+        "machine-start",
+        "issues",
+        "changes",
+        "files",
+        "accounts",
+        "account-switch",
+    ],
     streams: &[("events", 1), ("watch", 1), ("app", 1), ("surface", 1), ("view", 1), ("changes", 1), ("files", 1)],
 };
 

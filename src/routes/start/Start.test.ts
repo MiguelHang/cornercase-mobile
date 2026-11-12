@@ -2,11 +2,11 @@ import { render } from 'svelte/server'
 import { describe, expect, it, vi } from 'vitest'
 import comments from '../../../crates/core/tests/fixtures/control/issue-read/v1/comments.json'
 import type {
-  AgentChoice_Serialize,
   ConnectionView_Serialize,
   FlowChoice_Serialize as FlowChoice,
   Place,
   ReadIssue_Serialize as ReadIssue,
+  StartAgents_Serialize,
 } from '../../lib/bindings'
 import { FlowStart } from '../../lib/flowStart.svelte'
 import type { StartingIssue } from '../../lib/router.svelte'
@@ -34,8 +34,10 @@ const answer = <T>(data: T) => Promise.resolve({ status: 'ok' as const, data })
 
 const never = () => new Promise<never>(() => {})
 
-const installed = (...names: string[]): AgentChoice_Serialize[] =>
-  names.map((name) => ({ agent: name, command: name, installed: true }))
+const installed = (...names: string[]): StartAgents_Serialize => ({
+  agents: names.map((name) => ({ agent: name, command: name, installed: true })),
+  accounts: [],
+})
 
 const CALLS: StartCalls = {
   startProjects: () =>
@@ -186,7 +188,7 @@ describe('Start, its agent form', () => {
   })
 
   it('says when no agent is installed and holds Start', async () => {
-    const body = agentForm(await formOf({ installedAgents: () => answer([]) }))
+    const body = agentForm(await formOf({ installedAgents: () => answer(installed()) }))
     expect(body).toContain('No agent is installed on this Mac.')
     expect(submit(body)?.[1]).toContain('disabled=""')
   })
@@ -264,7 +266,8 @@ describe('Start, where its agent works', () => {
     form.ownWorktree = own
     form.branch = branch
     void form.start()
-    expect(startAgent.mock.calls).toEqual([[{ place, agent: 'claude', model: '', prompt: 'fix the login' }]])
+    const sent = { place, agent: 'claude', model: '', prompt: 'fix the login', accounts: [] }
+    expect(startAgent.mock.calls).toEqual([[sent]])
   })
 
   it('says no workspace is open and holds Start without any', async () => {
@@ -272,6 +275,56 @@ describe('Start, where its agent works', () => {
     const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects }) }))
     expect(body).toContain('No workspace is open on this Mac.')
     expect(submit(body)?.[1]).toContain('disabled=""')
+  })
+})
+
+describe('Start, the account its agent starts with', () => {
+  const TEAM: StartAgents_Serialize = {
+    ...installed('claude', 'codex'),
+    accounts: [
+      {
+        agent: 'codex',
+        default: 'team',
+        options: [
+          { name: '', label: 'Mac login', login: 'signed-in' },
+          { name: 'team', label: 'Team', login: 'signed-in' },
+          { name: 'old', label: 'Old', login: 'signed-out' },
+        ],
+      },
+    ],
+  }
+
+  const onCodex = async () => {
+    const form = await formOf({ installedAgents: () => answer(TEAM) })
+    form.agent = 'codex'
+    return form
+  }
+
+  const SIGNED_OUT = 'This account is signed out: the agent will ask to log in on the Mac.'
+
+  it('offers the own login and each account of the agent under it, its default chosen', async () => {
+    const body = agentForm(await onCodex())
+    expect(labels(body)).toEqual(['Workspace', 'Agent', 'Account', 'Model', 'Prompt'])
+    expect(optionsOf(body).slice(-3)).toEqual(['  Mac login', '*team Team', ' old Old · signed out'])
+  })
+
+  it('shows no Account for an agent without accounts', async () => {
+    const form = await onCodex()
+    form.agent = 'claude'
+    expect(labels(agentForm(form))).toEqual(['Workspace', 'Agent', 'Model', 'Prompt'])
+  })
+
+  it('notes that the account chosen is signed out', async () => {
+    const form = await onCodex()
+    expect(agentForm(form)).not.toContain(SIGNED_OUT)
+    form.accounts.choose('codex', 'old')
+    const body = agentForm(form)
+    expect(body).toMatch(new RegExp(`<p class="note[^"]*">${SIGNED_OUT}</p>`))
+    expect(optionsOf(body).slice(-1)).toEqual(['*old Old · signed out'])
+  })
+
+  it('offers the accounts on an issue under its agent', async () => {
+    expect(labels(onIssue(await onCodex()))).toEqual(['Where', 'Branch', 'Agent', 'Account', 'Model'])
   })
 })
 
@@ -407,7 +460,8 @@ describe('Start, on an issue', () => {
     }
     await sent('project-2')
     await sent('workspace-9')
-    const issue = { agent: 'claude', model: '', key: '#41', source: 'github', issue_branch: READ.issue.branch }
+    const branch = READ.issue.branch
+    const issue = { agent: 'claude', model: '', key: '#41', source: 'github', issue_branch: branch, accounts: [] }
     expect(startIssue.mock.calls).toEqual([
       [{ ...issue, place: { kind: 'worktree', project: 2, branch: READ.issue.branch } }],
       [{ ...issue, place: { kind: 'workspace', workspace: 9 } }],
@@ -582,7 +636,7 @@ describe('Start, a flow on an issue', () => {
     await flows.start()
     const branch = READ.issue.branch
     expect(startFlow.mock.calls).toEqual([
-      [{ project: 2, name: 'Ship it', key: '#41', source: 'github', branch, issue_branch: branch }],
+      [{ project: 2, name: 'Ship it', key: '#41', source: 'github', branch, issue_branch: branch, accounts: [] }],
     ])
     expect(startIssue).not.toHaveBeenCalled()
     expect(onstarted.mock.calls).toEqual([[ORCHESTRATOR, 'claude']])
@@ -596,6 +650,22 @@ describe('Start, a flow on an issue', () => {
     const body = drawn(opening)
     expect(labels(body)).toEqual(['Where', 'Agent', 'Model'])
     expect(optionsOf(body)).toContain('*workspace-9 api › Login · new tab')
+  })
+
+  it("offers an account for each of the team's agents with accounts under the team, as the Agent way chose it", async () => {
+    const own = { name: '', label: 'This Mac', login: 'signed-in' as const }
+    const accounts = [
+      { agent: 'claude', default: '', options: [own, { name: 'lab', label: 'Lab', login: 'signed-in' as const }] },
+      { agent: 'codex', default: 'ops', options: [own, { name: 'ops', label: 'Ops', login: 'unknown' as const }] },
+    ]
+    const opening = await flowing({ installedAgents: () => answer({ ...installed('claude', 'codex'), accounts }) })
+    opening.form.accounts.choose('claude', 'lab')
+    const body = drawn(opening)
+    expect(labels(body)).toEqual(['Where', 'Branch', 'Flow', 'codex account', 'claude account'])
+    expect(body.indexOf('aria-label="Team"')).toBeLessThan(body.indexOf('>codex account</label>'))
+    expect(optionsOf(body).slice(-4)).toEqual(['  This Mac', '*ops Ops', '  This Mac', '*lab Lab'])
+    opening.flows.flow = 'Quick'
+    expect(labels(drawn(opening))).toEqual(['Where', 'Branch', 'Flow', 'claude account'])
   })
 })
 

@@ -1,0 +1,134 @@
+{
+  "agents": [
+    {
+      "agent": "claude",
+      "command": "claude",
+      "installed": true
+    },
+    {
+      "agent": "codex",
+      "command": "codex",
+      "installed": false
+    },
+    {
+      "agent": "gemini",
+      "command": "gemini",
+      "installed": false
+    },
+    {
+      "agent": "opencode",
+      "command": "opencode",
+      "installed": false
+    },
+    {
+      "agent": "grok",
+      "command": "grok",
+      "installed": false
+    },
+    {
+      "agent": "cursor",
+      "command": "cursor-agent",
+      "installed": false
+    },
+    {
+      "agent": "copilot",
+      "command": "copilot",
+      "installed": false
+    },
+    {
+      "agent": "vibe",
+      "command": "vibe",
+      "installed": false
+    },
+    {
+      "agent": "amp",
+      "command": "amp",
+      "installed": false
+    },
+    {
+      "agent": "droid",
+      "command": "droid",
+      "installed": false
+    },
+    {
+      "agent": "pi",
+      "command": "pi",
+      "installed": false
+    },
+    {
+      "agent": "qwen",
+      "command": "qwen",
+      "installed": false
+    },
+    {
+      "agent": "kimi",
+      "command": "kimi",
+      "installed": false
+    },
+    {
+      "agent": "cline",
+      "command": "cline",
+      "installed": false
+    },
+    {
+      "agent": "goose",
+      "command": "goose",
+      "installed": false
+    },
+    {
+      "agent": "aider",
+      "command": "aider",
+      "installed": false
+    }
+  ],
+  "profile": "",
+  "profiles": [],
+  "providers": [
+    {
+      "accounts": [
+        {
+          "login": {
+            "checked": "2026-11-12T08:20:12.626Z",
+            "state": "signed-out"
+          },
+          "name": "home",
+          "path": "/Users/user/.local/state/cornercase/accounts/claude/home",
+          "unshared": []
+        },
+        {
+          "label": "Work",
+          "login": {
+            "checked": "2026-11-12T08:20:12.624Z",
+            "state": "signed-out"
+          },
+          "name": "work",
+          "path": "/Users/user/.local/state/cornercase/accounts/claude/work",
+          "unshared": []
+        }
+      ],
+      "active": "work",
+      "env": "CLAUDE_CONFIG_DIR",
+      "provider": "claude",
+      "system_login": {
+        "checked": "2026-11-12T08:20:12.624Z",
+        "state": "signed-out"
+      },
+      "system_path": "/Users/user/.claude",
+      "title": "Claude Code"
+    },
+    {
+      "accounts": [],
+      "env": "CODEX_HOME",
+      "provider": "codex",
+      "system_path": "/Users/user/.codex",
+      "title": "Codex"
+    },
+    {
+      "accounts": [],
+      "env": "GEMINI_CLI_HOME",
+      "provider": "gemini",
+      "system_path": "/Users/user",
+      "title": "Gemini CLI"
+    }
+  ]
+}

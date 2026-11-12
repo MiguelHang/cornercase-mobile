@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { FlowOption, FlowStart } from '../../lib/flowStart.svelte'
+  import AccountPicker from './AccountPicker.svelte'
   import Picker from './Picker.svelte'
 
   let { flows, disabled }: { flows: FlowStart; disabled: boolean } = $props()
@@ -28,6 +29,9 @@
     </ul>
   {/if}
 </div>
+{#each flows.teamAgents as agent (agent)}
+  <AccountPicker label="{agent} account" accounts={flows.accounts} {agent} {disabled} />
+{/each}
 
 <style>
   .flow {

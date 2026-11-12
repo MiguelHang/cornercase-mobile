@@ -1,4 +1,4 @@
-use cornercase_core::cli::agents::{self, AgentChoice};
+use cornercase_core::cli::agents::{self, StartAgents};
 use cornercase_core::cli::start::{self, StartAgent, StartIssue, Started};
 use cornercase_core::error::Error;
 use cornercase_core::queue::Outcome;
@@ -20,7 +20,7 @@ pub(crate) fn start_projects(state: State<'_, AppState>) -> Result<StartChoices,
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn installed_agents(state: State<'_, AppState>) -> Result<Vec<AgentChoice>, CommandError> {
+pub(crate) async fn installed_agents(state: State<'_, AppState>) -> Result<StartAgents, CommandError> {
     installed(&state).await
 }
 
@@ -43,7 +43,7 @@ pub(crate) fn projects(state: &AppState) -> Result<StartChoices, CommandError> {
     Ok(StartChoices { boot: store.boot(), projects: session.projects.iter().map(ProjectChoice::from).collect() })
 }
 
-pub(crate) async fn installed(state: &AppState) -> Result<Vec<AgentChoice>, CommandError> {
+pub(crate) async fn installed(state: &AppState) -> Result<StartAgents, CommandError> {
     let queue = queue(state)?;
     answered(queue.ask(ACCOUNT_LIST.map(str::to_owned).to_vec(), None).await, agents::installed)
 }

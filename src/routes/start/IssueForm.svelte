@@ -5,6 +5,7 @@
   import { placeKey, type StartForm } from '../../lib/startForm.svelte'
   import Button from '../../lib/ui/Button.svelte'
   import Field from '../../lib/ui/Field.svelte'
+  import AccountPicker from './AccountPicker.svelte'
   import AgentPicker from './AgentPicker.svelte'
   import FlowPicker from './FlowPicker.svelte'
   import FormFrame from './FormFrame.svelte'
@@ -86,6 +87,7 @@
     <FlowPicker {flows} disabled={form.sending} />
   {:else}
     <AgentPicker {form} />
+    <AccountPicker label="Account" accounts={form.accounts} agent={form.agent} disabled={form.sending} />
     <Field label="Model" placeholder="The agent's default" bind:value={form.model} disabled={form.sending} />
   {/if}
   {#if starting !== null}

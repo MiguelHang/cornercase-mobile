@@ -35,6 +35,7 @@ fn form(branch: &str) -> StartFlow {
         source: "github".to_owned(),
         branch: branch.to_owned(),
         issue_branch: ISSUE_BRANCH.to_owned(),
+        accounts: vec![],
     }
 }
 
@@ -144,7 +145,7 @@ mod over_ipc {
         let listed = ipc.invoke("issue_flows", json!({ "project": 8 })).expect_err("no machine");
         let form = json!({
             "project": 8, "name": "Quick", "key": "#482", "source": "github", "branch": ISSUE_BRANCH,
-            "issue_branch": ISSUE_BRANCH
+            "issue_branch": ISSUE_BRANCH, "accounts": [{ "agent": "codex", "account": "work" }]
         });
         let started = ipc.invoke("start_flow", json!({ "form": form })).expect_err("no machine");
         assert_eq!([&listed["code"], &started["code"]], [&json!("not_connected"); 2]);

@@ -6,11 +6,13 @@ import type {
   Place,
   PlaceInfo_Serialize as PlaceInfo,
   ProjectChoice,
+  StartAgents_Serialize as StartAgents,
   StartChoices_Serialize as StartChoices,
   Started_Serialize as Started,
   commands,
 } from './bindings'
 import type { StartingIssue, Where } from './router.svelte'
+import { StartAccounts } from './startAccounts.svelte'
 import { messageOf } from './toasts'
 
 export type StartCalls = Pick<
@@ -61,6 +63,9 @@ const choicesOf = <T>(reply: Reply<T[]>): Choices<T> =>
 const projectsOf = (reply: Reply<StartChoices>): Reply<ProjectChoice[]> =>
   reply.ok ? { ok: true, data: reply.data.projects } : reply
 
+const agentsOf = (reply: Reply<StartAgents>): Reply<AgentChoice[]> =>
+  reply.ok ? { ok: true, data: reply.data.agents } : reply
+
 const errorIf = (empty: boolean, error: string) => (empty ? error : null)
 
 const everywhere: Keep = () => true
@@ -110,6 +115,7 @@ export class StartForm {
   promptError = $state<string | null>(null)
   formError = $state<string | null>(null)
   sending = $state(false)
+  accounts = new StartAccounts()
   #calls: StartCalls
   #onstarted: (started: Started, agent: string) => void
   #memory: Memory
@@ -216,9 +222,11 @@ export class StartForm {
   async loadAgents() {
     const asked = ++this.#agentsAsked
     this.agents = { kind: 'loading' }
-    const agents = choicesOf(await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED))
+    this.accounts.read([])
+    const reply = await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED)
     if (asked === this.#agentsAsked) {
-      this.agents = agents
+      this.agents = choicesOf(agentsOf(reply))
+      this.accounts.read(reply.ok ? reply.data.accounts : [])
       this.#pickAgent()
     }
   }
@@ -262,6 +270,7 @@ export class StartForm {
   #forgetIds() {
     this.workspace = null
     this.place = null
+    this.accounts.forget()
     this.#placesStale = this.issue !== null
   }
 
@@ -274,7 +283,7 @@ export class StartForm {
     if (chosen === null) {
       return
     }
-    const form = { place: this.#agentPlace(chosen), agent, model, prompt }
+    const form = { place: this.#agentPlace(chosen), agent, model, prompt, accounts: this.accounts.picks([agent]) }
     const boot = this.#boot
     if (await this.#launch(() => this.#calls.startAgent(form), agent)) {
       this.#memory.workspace = boot === null ? null : { boot, id: chosen.id }
@@ -315,7 +324,9 @@ export class StartForm {
       return
     }
     const { key, source } = issue.issue
-    const form = { place: placeOf(chosen, branch), agent, model, key, source, issue_branch: issueBranch }
+    const place = placeOf(chosen, branch)
+    const accounts = this.accounts.picks([agent])
+    const form = { place, agent, model, key, source, issue_branch: issueBranch, accounts }
     await this.#launch(() => this.#calls.startIssue(form), agent)
   }
 

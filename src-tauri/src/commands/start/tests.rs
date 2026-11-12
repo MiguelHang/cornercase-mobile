@@ -1,3 +1,4 @@
+use cornercase_core::cli::agents::{AccountChoice, AgentAccounts, AgentChoice, Login, StartAgents};
 use cornercase_core::cli::start::Place;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
@@ -11,6 +12,11 @@ use crate::test_util::{BOOT, Ipc, Recorder, Studio, launcher, serving, settle};
 const ACCOUNTS: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../crates/core/tests/fixtures/control/account-list/0.13.19.json"
+));
+
+const WITH_ACCOUNTS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../crates/core/tests/fixtures/control/account-list/0.13.31/accounts.json"
 ));
 
 const STARTED: &str =
@@ -46,6 +52,10 @@ fn listing(stdout: &str) -> FakeTransport {
 
 fn choice(agent: &str, command: &str) -> AgentChoice {
     AgentChoice { agent: agent.to_owned(), command: command.to_owned(), installed: true }
+}
+
+fn option(name: &str, label: &str, login: Login) -> AccountChoice {
+    AccountChoice { name: name.to_owned(), label: label.to_owned(), login }
 }
 
 mod projects {
@@ -95,7 +105,17 @@ mod agents {
     #[tokio::test(start_paused = true)]
     async fn lists_the_agents_installed_on_the_mac_of_cornercase_0_13_19() {
         let studio = connected(listing(ACCOUNTS)).await;
-        assert_eq!(installed(&studio.state).await, Ok(vec![choice("claude", "claude")]));
+        let expected = StartAgents { agents: vec![choice("claude", "claude")], accounts: Vec::new() };
+        assert_eq!(installed(&studio.state).await, Ok(expected));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn gives_the_accounts_of_each_agent_from_the_same_list_of_cornercase_0_13_31() {
+        let studio = connected(listing(WITH_ACCOUNTS)).await;
+        let options = vec![option("", "work", Login::SignedIn), option("personal", "personal", Login::SignedIn)];
+        let claude = AgentAccounts { agent: "claude".to_owned(), default: String::new(), options };
+        let expected = StartAgents { agents: vec![choice("claude", "claude")], accounts: vec![claude] };
+        assert_eq!(installed(&studio.state).await, Ok(expected));
     }
 
     #[tokio::test(start_paused = true)]
@@ -107,7 +127,7 @@ mod agents {
         ] });
         let studio = connected(listing(&answer.to_string())).await;
         let expected = vec![choice("codex", "codex"), choice("cursor", "cursor-agent")];
-        assert_eq!(installed(&studio.state).await, Ok(expected));
+        assert_eq!(installed(&studio.state).await.map(|found| found.agents), Ok(expected));
     }
 
     #[tokio::test(start_paused = true)]
@@ -142,6 +162,7 @@ fn form() -> StartAgent {
         agent: "claude".to_owned(),
         model: "opus".to_owned(),
         prompt: "  Fix the login\n".to_owned(),
+        accounts: vec![],
     }
 }
 
@@ -225,6 +246,7 @@ mod issue {
             key: "#41".to_owned(),
             source: "github".to_owned(),
             issue_branch: "issue-41-coupon".to_owned(),
+            accounts: vec![],
         }
     }
 
@@ -315,11 +337,14 @@ mod over_ipc {
     #[test]
     fn reads_both_forms_and_refuses_them_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        let agent = json!({ "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix" });
+        let agent = json!({
+            "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix",
+            "accounts": [{ "agent": "claude", "account": "work" }]
+        });
         let started = ipc.invoke("start_agent", json!({ "form": agent })).expect_err("no machine");
         let issue = json!({
             "place": { "kind": "worktree", "project": 5, "branch": "issue-41" }, "agent": "claude", "model": "",
-            "key": "#41", "source": "github", "issue_branch": "issue-41"
+            "key": "#41", "source": "github", "issue_branch": "issue-41", "accounts": []
         });
         let from_issue = ipc.invoke("start_issue", json!({ "form": issue })).expect_err("no machine");
         let codes = [&started["code"], &from_issue["code"]];

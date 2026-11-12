@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::cli::start::{Started, optional, other_branch, words};
+use crate::cli::start::{AccountPick, Started, account_args, optional, other_branch, words};
 use crate::error::Error;
 use crate::transport::json_error;
 
@@ -43,6 +43,7 @@ pub struct StartFlow {
     pub source: String,
     pub branch: String,
     pub issue_branch: String,
+    pub accounts: Vec<AccountPick>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -79,6 +80,7 @@ impl StartFlow {
         argv.push(format!("--issue={}", self.key.trim()));
         argv.extend(optional("--source", &self.source));
         argv.extend(optional("--worktree", other_branch(&self.branch, &self.issue_branch)));
+        argv.extend(account_args(&self.accounts));
         argv.extend(words(&["--json", "--", self.name.trim()]));
         argv
     }
