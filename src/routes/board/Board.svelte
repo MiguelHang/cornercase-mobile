@@ -124,7 +124,7 @@
   }
 
   .items {
-    margin: 0;
+    margin: 0 calc(-1 * var(--inset));
     padding: 0;
     list-style: none;
   }

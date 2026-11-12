@@ -2,12 +2,12 @@
   import { hiddenName } from '../board'
   import StatusDot from './StatusDot.svelte'
 
-  let { hidden, attention, gap }: { hidden: number; attention: string | null; gap?: string } = $props()
+  let { hidden, attention }: { hidden: number; attention: string | null } = $props()
 </script>
 
 {#if hidden > 0}
   <span class="folded" role="img" aria-label={hiddenName(hidden, attention)}>
-    <span class="marks" style:gap={gap} aria-hidden="true">
+    <span class="marks" aria-hidden="true">
       {#if attention !== null}
         <StatusDot status={attention} size={10} />
       {/if}
