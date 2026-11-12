@@ -12,6 +12,7 @@ import type {
   commands,
 } from './bindings'
 import type { StartingIssue, Where } from './router.svelte'
+import { StartAccounts } from './startAccounts.svelte'
 import { messageOf } from './toasts'
 
 export type StartCalls = Pick<
@@ -114,6 +115,7 @@ export class StartForm {
   promptError = $state<string | null>(null)
   formError = $state<string | null>(null)
   sending = $state(false)
+  accounts = new StartAccounts()
   #calls: StartCalls
   #onstarted: (started: Started, agent: string) => void
   #memory: Memory
@@ -220,9 +222,11 @@ export class StartForm {
   async loadAgents() {
     const asked = ++this.#agentsAsked
     this.agents = { kind: 'loading' }
-    const agents = choicesOf(agentsOf(await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED)))
+    this.accounts.read([])
+    const reply = await ask(() => this.#calls.installedAgents(), CHOICES_UNANSWERED)
     if (asked === this.#agentsAsked) {
-      this.agents = agents
+      this.agents = choicesOf(agentsOf(reply))
+      this.accounts.read(reply.ok ? reply.data.accounts : [])
       this.#pickAgent()
     }
   }
@@ -266,6 +270,7 @@ export class StartForm {
   #forgetIds() {
     this.workspace = null
     this.place = null
+    this.accounts.forget()
     this.#placesStale = this.issue !== null
   }
 
