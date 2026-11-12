@@ -27,9 +27,9 @@ de todas las filas por encima del ancho; en el teléfono real pesa más el ancho
   del resto de pantallas (Look).
 - [x] CA5 — Comprobado en el simulador (raíces sin hijos, con hijos plegados y desplegados, `+12` con atención, título
   largo) con capturas; `design/board.md` actualizado (por qué se dejó la columna de 60); `hx check full` verde.
-  - En el iPhone 17 del simulador (iOS 27.2, cornercase 0.13.31): el punto de una raíz queda a 16–30 pt del borde y el
-    título empieza en 46; el triángulo va bajo el punto de una fila con hijos, y el punto o el triángulo pliegan
-    (área de 1 a 45 pt: en x=44 pliega, en x=47 abre el chat); el título y `+12` abren el chat; plegada, las marcas van
-    antes de la hora (`+4 1 min`) y el título largo se corta. El buscador y `Cancel` no mueven los puntos en
-    horizontal, y VoiceOver lee `Show 4 subagents` y la fila una vez. `design/board.md` › Checked live, y por qué se
-    dejó la columna de 60 en › A row. Capturas en `.harness/tasks/t051/shots/` (fuera del repo).
+  - En el iPhone 17 del simulador (iOS 27.2, cornercase 0.13.31): el punto de una raíz ocupa de 16 a 30 pt (borde
+    izquierdo a 16) y el título empieza en 46; el triángulo va bajo el punto de una fila con hijos, y el punto o el
+    triángulo pliegan (área de 1 a 45 pt: en x=44 pliega, en x=47 abre el chat); el título y `+12` abren el chat;
+    plegada, las marcas van antes de la hora (`+4 1 min`) y el título largo se corta. El buscador y `Cancel` no mueven
+    los puntos en horizontal, y VoiceOver lee `Show 4 subagents` y la fila una vez. `design/board.md` › Checked live,
+    y por qué se dejó la columna de 60 en › A row. Capturas en `.harness/tasks/t051/shots/` (fuera del repo).

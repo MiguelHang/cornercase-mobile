@@ -35,7 +35,7 @@
       onclick={() => onfold(row.pane)}
       ontouchstart={() => {}}
     >
-      <span aria-hidden="true"><StatusDot status={row.status} /></span>
+      <span class="face" aria-hidden="true"><StatusDot status={row.status} /></span>
       <svg
         class="turn"
         class:open={!item.folded}
@@ -117,6 +117,10 @@
     width: 44px;
     padding: 0;
     color: var(--soft);
+  }
+
+  .face {
+    display: flex;
   }
 
   .mark {

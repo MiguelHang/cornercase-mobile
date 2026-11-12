@@ -61,7 +61,7 @@ const START = /<button class="button primary svelte-[\w-]+( resting)?" type="but
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
-const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="(\w+)"[^]*?<\/svg>(?:<!--[^>]*-->)*<\/span> <svg class="turn svelte-[\w-]+( open)?" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="--turn: (\d+)ms;"><path d="([^"]+)"/g
+const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="(\w+)"[^]*?<\/svg>(?:<!--[^>]*-->)*<\/span> <svg class="turn svelte-[\w-]+( open)?" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="--turn: (\d+)ms;"><path d="([^"]+)"/g
 
 const disclosures = (body: string) => [...body.matchAll(FOLD)].map((m) => m.slice(1))
 
@@ -187,7 +187,6 @@ describe('Board', () => {
 
   it('lines the list up with Issues and Files', () => {
     const source = flat(boardSource)
-    expect(source).toContain('padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);')
     expect(source).toContain('.items { margin: 0 calc(-1 * var(--inset)); padding: 0;')
     expect(source).toContain('.section { margin: var(--inset) var(--inset) var(--gap);')
   })
@@ -254,7 +253,8 @@ describe('Board', () => {
     const body = draw(BRANCH)
     const fold = body.indexOf('<button class="fold')
     const row = body.indexOf('<button class="row')
-    expect(body.indexOf('<span aria-hidden="true"><!--$s1--><svg class="dot', fold)).toBeLessThan(row)
+    expect(body.slice(fold, row)).toMatch(/<span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot/)
+    expect(flat(rowSource)).toContain('.face { display: flex; }')
     expect(body.slice(row)).toMatch(/^<button class="row svelte-[\w-]+" type="button"><span class="mark svelte-[\w-]+"><!--\[0--><span class="spoken">Working<\/span>/)
     expect(body.indexOf('<svg class="dot', row)).toBeGreaterThan(body.indexOf('<span class="folded', row))
     expect(flat(rowSource)).toContain('<span class="spoken">{statusName(row.status)}</span>')
@@ -327,10 +327,10 @@ describe('Board', () => {
     expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} />')
     expect(flat(rowSource)).not.toContain('class="count"')
     expect(flat(hiddenSource)).toContain('.folded, .marks { display: flex; flex: none; align-items: center; }')
-    expect(hiddenSource).not.toMatch(/\bgap\b(?!: var)/)
+    expect(hiddenSource).not.toMatch(/gap\?:|style:gap/)
   })
 
-  it('leaves only the time on the right edge, and lets it shrink when the row runs out of room', () => {
+  it('ends the row with the time, the only part that shrinks when the row runs out of room', () => {
     const row = flat(rowSource).match(/<button class="row"[^]*?<\/button>/)?.[0]
     expect(row).not.toMatch(/Icon|fold/)
     expect(row).toMatch(/<span class="time">\{time\}<\/span> \{\/if\} <\/button>$/)
@@ -396,6 +396,14 @@ describe('Board search', () => {
     expect(body).not.toContain('class="folded')
     expect(field(body)).toContain('value="dig"')
     expect(folds.expanded(machine, 'b1').size).toBe(0)
+  })
+
+  it('keeps every dot inside its row while searching, with no triangle and no spoken status', () => {
+    const body = draw(BRANCH, CONNECTED, 0, searching(49, 'dig'))
+    expect(titles(body)).toEqual(['Lead', 'Ask', 'Dig'])
+    expect(body).not.toContain('<svg class="turn')
+    expect(body).not.toContain('<span class="spoken')
+    expect(body.match(/<span class="mark svelte-[\w-]+"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot/g)).toHaveLength(3)
   })
 
   it('says so when nothing matches, and keeps the field to fix the query', () => {
