@@ -169,7 +169,8 @@ export class FlowStart {
     }
     const { key, source } = issue.issue
     const { branch, issueBranch } = form
-    const run = { project: place.project, name: chosen.name, key, source, branch, issue_branch: issueBranch }
+    const { project } = place
+    const run = { project, name: chosen.name, key, source, branch, issue_branch: issueBranch, accounts: [] }
     if (await form.launch(() => this.#calls.startFlow(run), FLOW_UNANSWERED)) {
       this.remember(chosen.name)
     }

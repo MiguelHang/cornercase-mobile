@@ -16,6 +16,7 @@ fn agent(model: &str, branch: &str) -> StartAgent {
         agent: "claude".to_owned(),
         model: model.to_owned(),
         prompt: "fix the login".to_owned(),
+        accounts: vec![],
     }
 }
 
@@ -27,7 +28,12 @@ fn issue(model: &str, branch: &str) -> StartIssue {
         key: "#41".to_owned(),
         source: "github".to_owned(),
         issue_branch: "issue-41-checkout".to_owned(),
+        accounts: vec![],
     }
+}
+
+fn pick(agent: &str, account: &str) -> AccountPick {
+    AccountPick { agent: agent.to_owned(), account: account.to_owned() }
 }
 
 mod start {
@@ -68,6 +74,7 @@ mod start {
             agent: " codex\n".to_owned(),
             model: "  gpt-5.5 ".to_owned(),
             prompt: "\n  fix it \n".to_owned(),
+            accounts: vec![],
         };
         let expected = [
             "start",
@@ -91,6 +98,17 @@ mod start {
     #[test]
     fn never_moves_the_window_of_the_mac() {
         assert!(!agent("opus", "fix/login").argv().iter().any(|word| word == "--focus"));
+    }
+
+    #[rstest]
+    #[case::an_added_account(pick("claude", "work"), "--account=claude=work")]
+    #[case::the_agent_s_own_login(pick("claude", ""), "--account=claude=")]
+    #[case::with_spaces(pick(" claude ", " work\n"), "--account=claude=work")]
+    fn names_the_chosen_account_just_before_the_placed_answer(#[case] chosen: AccountPick, #[case] word: &str) {
+        let form = StartAgent { accounts: vec![chosen], ..agent("opus", "") };
+        let expected =
+            ["start", "claude", "--project", "3", "--model=opus", "--prompt=fix the login", word, "--placed", "--json"];
+        assert_eq!(form.argv(), expected);
     }
 }
 
@@ -143,6 +161,14 @@ mod start_issue {
     fn never_sends_a_prompt_nor_moves_the_window_of_the_mac() {
         let argv = issue("opus", "fix/coupon").argv();
         assert!(!argv.iter().any(|word| word.starts_with("--prompt") || word == "--focus"), "{argv:?}");
+    }
+
+    #[rstest]
+    #[case::an_added_account(pick("claude", "work"), "--account=claude=work")]
+    #[case::the_agent_s_own_login(pick("claude", ""), "--account=claude=")]
+    fn names_the_chosen_account_just_before_the_placed_answer(#[case] chosen: AccountPick, #[case] word: &str) {
+        let form = StartIssue { accounts: vec![chosen], ..issue("opus", "fix/coupon") };
+        assert_eq!(form.argv(), after_the_head(&["--worktree=fix/coupon", "--model=opus", word, "--placed", "--json"]));
     }
 }
 

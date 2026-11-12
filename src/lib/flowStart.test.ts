@@ -426,6 +426,7 @@ describe('FlowStart, starting a flow', () => {
     source: 'github',
     branch,
     issue_branch: ISSUE_BRANCH,
+    accounts: [],
   })
 
   it.each([

@@ -274,7 +274,7 @@ export class StartForm {
     if (chosen === null) {
       return
     }
-    const form = { place: this.#agentPlace(chosen), agent, model, prompt }
+    const form = { place: this.#agentPlace(chosen), agent, model, prompt, accounts: [] }
     const boot = this.#boot
     if (await this.#launch(() => this.#calls.startAgent(form), agent)) {
       this.#memory.workspace = boot === null ? null : { boot, id: chosen.id }
@@ -315,7 +315,8 @@ export class StartForm {
       return
     }
     const { key, source } = issue.issue
-    const form = { place: placeOf(chosen, branch), agent, model, key, source, issue_branch: issueBranch }
+    const place = placeOf(chosen, branch)
+    const form = { place, agent, model, key, source, issue_branch: issueBranch, accounts: [] }
     await this.#launch(() => this.#calls.startIssue(form), agent)
   }
 

@@ -118,6 +118,7 @@ fn run(branch: &str) -> StartFlow {
         source: "github".to_owned(),
         branch: branch.to_owned(),
         issue_branch: ISSUE_BRANCH.to_owned(),
+        accounts: vec![],
     }
 }
 
@@ -177,6 +178,7 @@ mod start_flow {
             source: " github\t".to_owned(),
             branch: " fix/login-email ".to_owned(),
             issue_branch: ISSUE_BRANCH.to_owned(),
+            accounts: vec![],
         };
         assert_eq!(form.argv(), around(&["--worktree=fix/login-email"], "Bug, test first"));
     }
@@ -185,6 +187,15 @@ mod start_flow {
     fn leaves_out_a_blank_tracker() {
         let form = StartFlow { source: " ".to_owned(), ..run("") };
         assert_eq!(form.argv(), ["flow", "run", "--project", "8", "--issue=#482", "--json", "--", "Quick"]);
+    }
+
+    #[test]
+    fn names_each_chosen_account_in_the_order_given_before_the_name() {
+        let accounts = [("codex", "work"), ("claude", "")]
+            .map(|(agent, account)| AccountPick { agent: agent.to_owned(), account: account.to_owned() });
+        let form = StartFlow { accounts: accounts.into(), ..run("fix/login-email") };
+        let middle = ["--worktree=fix/login-email", "--account=codex=work", "--account=claude="];
+        assert_eq!(form.argv(), around(&middle, "Quick"));
     }
 }
 

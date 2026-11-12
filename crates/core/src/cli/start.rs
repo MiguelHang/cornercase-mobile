@@ -23,11 +23,19 @@ pub enum Place {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct AccountPick {
+    pub agent: String,
+    pub account: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct StartAgent {
     pub place: Place,
     pub agent: String,
     pub model: String,
     pub prompt: String,
+    pub accounts: Vec<AccountPick>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -39,6 +47,7 @@ pub struct StartIssue {
     pub key: String,
     pub source: String,
     pub issue_branch: String,
+    pub accounts: Vec<AccountPick>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
@@ -79,6 +88,7 @@ impl StartAgent {
         argv.extend(optional("--worktree", self.place.branch()));
         argv.extend(optional("--model", &self.model));
         argv.push(format!("--prompt={}", self.prompt.trim()));
+        argv.extend(account_args(&self.accounts));
         argv.extend(words(&["--placed", "--json"]));
         argv
     }
@@ -92,6 +102,7 @@ impl StartIssue {
         argv.extend(optional("--source", &self.source));
         argv.extend(optional("--worktree", other_branch(self.place.branch(), &self.issue_branch)));
         argv.extend(optional("--model", &self.model));
+        argv.extend(account_args(&self.accounts));
         argv.extend(words(&["--placed", "--json"]));
         argv
     }
@@ -113,6 +124,10 @@ pub(crate) fn other_branch<'a>(branch: &'a str, issue_branch: &str) -> &'a str {
 pub(crate) fn optional(name: &str, value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| format!("{name}={value}"))
+}
+
+pub(crate) fn account_args(accounts: &[AccountPick]) -> impl Iterator<Item = String> {
+    accounts.iter().map(|pick| format!("--account={}={}", pick.agent.trim(), pick.account.trim()))
 }
 
 #[cfg(test)]

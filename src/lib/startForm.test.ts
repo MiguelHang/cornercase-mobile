@@ -419,6 +419,7 @@ describe('StartForm start', () => {
           agent: 'codex',
           model: ' opus ',
           prompt: 'fix the login\nand its tests',
+          accounts: [],
         },
       ],
     ])
@@ -520,6 +521,7 @@ describe('StartForm from an issue', () => {
     key: 'sc-7',
     source: 'shortcut',
     issue_branch: 'ada/sc-7/refunds',
+    accounts: [],
   })
 
   it("keeps the issue's project and fills the branch with the issue's, leaving the model empty", async () => {

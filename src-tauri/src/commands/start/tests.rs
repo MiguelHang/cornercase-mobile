@@ -142,6 +142,7 @@ fn form() -> StartAgent {
         agent: "claude".to_owned(),
         model: "opus".to_owned(),
         prompt: "  Fix the login\n".to_owned(),
+        accounts: vec![],
     }
 }
 
@@ -225,6 +226,7 @@ mod issue {
             key: "#41".to_owned(),
             source: "github".to_owned(),
             issue_branch: "issue-41-coupon".to_owned(),
+            accounts: vec![],
         }
     }
 
@@ -315,11 +317,14 @@ mod over_ipc {
     #[test]
     fn reads_both_forms_and_refuses_them_without_a_connected_machine() {
         let ipc = Ipc::new(Studio::new().reloaded());
-        let agent = json!({ "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix" });
+        let agent = json!({
+            "place": { "kind": "workspace", "workspace": 12 }, "agent": "claude", "model": "", "prompt": "Fix",
+            "accounts": [{ "agent": "claude", "account": "work" }]
+        });
         let started = ipc.invoke("start_agent", json!({ "form": agent })).expect_err("no machine");
         let issue = json!({
             "place": { "kind": "worktree", "project": 5, "branch": "issue-41" }, "agent": "claude", "model": "",
-            "key": "#41", "source": "github", "issue_branch": "issue-41"
+            "key": "#41", "source": "github", "issue_branch": "issue-41", "accounts": []
         });
         let from_issue = ipc.invoke("start_issue", json!({ "form": issue })).expect_err("no machine");
         let codes = [&started["code"], &from_issue["code"]];

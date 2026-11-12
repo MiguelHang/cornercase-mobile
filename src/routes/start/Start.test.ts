@@ -264,7 +264,8 @@ describe('Start, where its agent works', () => {
     form.ownWorktree = own
     form.branch = branch
     void form.start()
-    expect(startAgent.mock.calls).toEqual([[{ place, agent: 'claude', model: '', prompt: 'fix the login' }]])
+    const sent = { place, agent: 'claude', model: '', prompt: 'fix the login', accounts: [] }
+    expect(startAgent.mock.calls).toEqual([[sent]])
   })
 
   it('says no workspace is open and holds Start without any', async () => {
@@ -407,7 +408,8 @@ describe('Start, on an issue', () => {
     }
     await sent('project-2')
     await sent('workspace-9')
-    const issue = { agent: 'claude', model: '', key: '#41', source: 'github', issue_branch: READ.issue.branch }
+    const branch = READ.issue.branch
+    const issue = { agent: 'claude', model: '', key: '#41', source: 'github', issue_branch: branch, accounts: [] }
     expect(startIssue.mock.calls).toEqual([
       [{ ...issue, place: { kind: 'worktree', project: 2, branch: READ.issue.branch } }],
       [{ ...issue, place: { kind: 'workspace', workspace: 9 } }],
@@ -582,7 +584,7 @@ describe('Start, a flow on an issue', () => {
     await flows.start()
     const branch = READ.issue.branch
     expect(startFlow.mock.calls).toEqual([
-      [{ project: 2, name: 'Ship it', key: '#41', source: 'github', branch, issue_branch: branch }],
+      [{ project: 2, name: 'Ship it', key: '#41', source: 'github', branch, issue_branch: branch, accounts: [] }],
     ])
     expect(startIssue).not.toHaveBeenCalled()
     expect(onstarted.mock.calls).toEqual([[ORCHESTRATOR, 'claude']])

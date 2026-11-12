@@ -64,6 +64,11 @@ export const events = {
 };
 
 /* Types */
+export type AccountPick = {
+	agent: string,
+	account: string,
+};
+
 export type AgentChoice = AgentChoice_Serialize | AgentChoice_Deserialize;
 
 export type AgentChoice_Deserialize = {
@@ -1069,6 +1074,7 @@ export type StartAgent = {
 	agent: string,
 	model: string,
 	prompt: string,
+	accounts: AccountPick[],
 };
 
 export type StartChoices = StartChoices_Serialize | StartChoices_Deserialize;
@@ -1090,6 +1096,7 @@ export type StartFlow = {
 	source: string,
 	branch: string,
 	issue_branch: string,
+	accounts: AccountPick[],
 };
 
 export type StartIssue = {
@@ -1099,6 +1106,7 @@ export type StartIssue = {
 	key: string,
 	source: string,
 	issue_branch: string,
+	accounts: AccountPick[],
 };
 
 export type Started = Started_Serialize | Started_Deserialize;
