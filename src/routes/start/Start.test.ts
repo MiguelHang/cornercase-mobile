@@ -278,6 +278,56 @@ describe('Start, where its agent works', () => {
   })
 })
 
+describe('Start, the account its agent starts with', () => {
+  const TEAM: StartAgents_Serialize = {
+    ...installed('claude', 'codex'),
+    accounts: [
+      {
+        agent: 'codex',
+        default: 'team',
+        options: [
+          { name: '', label: 'Mac login', login: 'signed-in' },
+          { name: 'team', label: 'Team', login: 'signed-in' },
+          { name: 'old', label: 'Old', login: 'signed-out' },
+        ],
+      },
+    ],
+  }
+
+  const onCodex = async () => {
+    const form = await formOf({ installedAgents: () => answer(TEAM) })
+    form.agent = 'codex'
+    return form
+  }
+
+  const SIGNED_OUT = 'This account is signed out: the agent will ask to log in on the Mac.'
+
+  it('offers the own login and each account of the agent under it, its default chosen', async () => {
+    const body = agentForm(await onCodex())
+    expect(labels(body)).toEqual(['Workspace', 'Agent', 'Account', 'Model', 'Prompt'])
+    expect(optionsOf(body).slice(-3)).toEqual(['  Mac login', '*team Team', ' old Old · signed out'])
+  })
+
+  it('shows no Account for an agent without accounts', async () => {
+    const form = await onCodex()
+    form.agent = 'claude'
+    expect(labels(agentForm(form))).toEqual(['Workspace', 'Agent', 'Model', 'Prompt'])
+  })
+
+  it('notes that the account chosen is signed out', async () => {
+    const form = await onCodex()
+    expect(agentForm(form)).not.toContain(SIGNED_OUT)
+    form.accounts.choose('codex', 'old')
+    const body = agentForm(form)
+    expect(body).toMatch(new RegExp(`<p class="note[^"]*">${SIGNED_OUT}</p>`))
+    expect(optionsOf(body).slice(-1)).toEqual(['*old Old · signed out'])
+  })
+
+  it('offers the accounts on an issue under its agent', async () => {
+    expect(labels(onIssue(await onCodex()))).toEqual(['Where', 'Branch', 'Agent', 'Account', 'Model'])
+  })
+})
+
 describe('Start, its way to the issues', () => {
   it('asks for no project and offers Show issues, for the issues of every project', () => {
     const body = showIssues()

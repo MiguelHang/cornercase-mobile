@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
+  AgentAccounts_Serialize as AgentAccounts,
   CommandError,
   IssueInfo_Serialize as IssueInfo,
   PlaceInfo_Serialize as PlaceInfo,
@@ -624,6 +625,79 @@ describe('StartForm from an issue', () => {
     await form.startIssue()
     expect([form.agentError, form.formError, form.sending]).toEqual([null, null, false])
     expect(commands.startIssue).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartForm, with the accounts of the agent', () => {
+  const CLAUDE: AgentAccounts = {
+    agent: 'claude',
+    default: 'work',
+    options: [
+      { name: '', label: 'System', login: 'unknown' },
+      { name: 'work', label: 'Work', login: 'signed-in' },
+      { name: 'home', label: 'home', login: 'signed-out' },
+    ],
+  }
+
+  const ACCOUNTS = { installedAgents: () => ok({ ...installed('claude', 'codex'), accounts: [CLAUDE] }) }
+
+  const byPrompt = async (choose: (form: StartForm) => void) => {
+    const { form, commands } = await filled(ACCOUNTS)
+    choose(form)
+    await form.start()
+    return commands.startAgent.mock.calls[0][0].accounts
+  }
+
+  const byIssue = async (choose: (form: StartForm) => void) => {
+    const { form, commands } = await fromIssue(ACCOUNTS)
+    choose(form)
+    await form.startIssue()
+    return commands.startIssue.mock.calls[0][0].accounts
+  }
+
+  describe.each([
+    ['a prompt', byPrompt],
+    ['an issue', byIssue],
+  ])('started with %s', (_, started) => {
+    it('sends no account while the default one stays chosen', async () => {
+      expect(await started(() => {})).toEqual([])
+    })
+
+    it('sends the account chosen when it is not the default', async () => {
+      expect(await started((form) => form.accounts.choose('claude', 'home'))).toEqual([
+        { agent: 'claude', account: 'home' },
+      ])
+    })
+
+    it("sends the agent's own login, empty, when the default is an added account", async () => {
+      expect(await started((form) => form.accounts.choose('claude', ''))).toEqual([{ agent: 'claude', account: '' }])
+    })
+
+    it('sends no account for an agent other than the one it starts', async () => {
+      const toCodex = (form: StartForm) => {
+        form.accounts.choose('claude', 'home')
+        form.agent = 'codex'
+      }
+      expect(await started(toCodex)).toEqual([])
+    })
+  })
+
+  it('keeps what was typed and the account chosen when cornercase refuses the account', async () => {
+    const { form } = await filled({ ...ACCOUNTS, startAgent: () => failed('no account home') })
+    form.accounts.choose('claude', 'home')
+    const before = typed(form)
+    await form.start()
+    expect(typed(form)).toEqual(before)
+    expect([form.formError, form.accounts.chosen('claude')]).toEqual(['no account home', 'home'])
+  })
+
+  it('keeps the model and the account chosen when cornercase refuses to start the issue with it', async () => {
+    const { form } = await fromIssue({ ...ACCOUNTS, startIssue: () => failed('no account home') })
+    form.model = 'opus'
+    form.accounts.choose('claude', 'home')
+    await form.startIssue()
+    expect(issueFields(form)).toEqual([null, 'claude', 'opus', 'ada/sc-7/refunds'])
+    expect([form.formError, form.accounts.chosen('claude')]).toEqual(['no account home', 'home'])
   })
 })
 
