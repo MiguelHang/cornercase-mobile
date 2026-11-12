@@ -196,7 +196,7 @@ describe('Board', () => {
     const body = draw(BRANCH)
     expect(titles(body)).toEqual(['Lead'])
     expect(body).toMatch(/<span class="hidden svelte-[\w-]+">\+2<\/span>/)
-    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true" style="gap: 4px;">/)
+    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true">/)
     expect(body).toMatch(/aria-label="Waiting" width="10" height="10"/)
     expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', undefined, '180', CHEVRON_RIGHT]])
   })
@@ -218,7 +218,6 @@ describe('Board', () => {
     const fold = body.indexOf('<button class="fold')
     expect(body.indexOf('<div class="lead')).toBeLessThan(fold)
     expect(body.indexOf('</button>', fold)).toBeLessThan(body.indexOf('<button class="row'))
-    expect(body.indexOf('<span class="folded')).toBeLessThan(body.indexOf('<button class="row'))
     expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
     expect(flat(rowSource)).toContain('.fold { display: flex; flex: 1; align-items: center; padding: 0 0 0 6px;')
     expect(flat(boardSource)).toContain('<AgentRow {item} {agents} {now} {onopen} onfold={fold} />')
@@ -274,24 +273,26 @@ describe('Board', () => {
     expect(flat(rowSource)).toContain('.lead { position: relative; display: flex; flex: none; align-items: center; width: 60px; }')
   })
 
-  it('lays the hidden count over the disclosure, so a tap on it folds and the column keeps its width', () => {
-    const body = draw(BRANCH)
-    const fold = body.indexOf('<button class="fold')
-    const count = body.indexOf('<span class="count')
-    expect(body.indexOf('</button>', fold)).toBeLessThan(count)
-    expect(body.indexOf('<span class="folded', count)).toBeGreaterThan(count)
-    expect(count).toBeLessThan(body.indexOf('<button class="row'))
-    expect(flat(rowSource)).toContain('.count { position: absolute; left: 24px; pointer-events: none; }')
-    expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} gap="4px" />')
-    expect(flat(rowSource)).not.toContain(':global(.marks)')
+  it('says what a folded row hides inside it, before the time', () => {
+    const since = new Date(NOW - 5 * 60_000).toISOString()
+    const body = draw(BRANCH.map((agent) => ({ ...agent, since })))
+    const row = body.indexOf('<button class="row')
+    const folded = body.indexOf('<span class="folded', row)
+    expect(body.indexOf('<span class="lines', row)).toBeLessThan(folded)
+    expect(folded).toBeLessThan(body.indexOf('<span class="time', row))
+    expect(body.indexOf('<span class="time', row)).toBeLessThan(body.indexOf('</button>', row))
+    expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} />')
+    expect(flat(rowSource)).not.toContain('class="count"')
+    expect(flat(hiddenSource)).toContain('.folded, .marks { display: flex; flex: none; align-items: center; }')
+    expect(hiddenSource).not.toMatch(/\bgap\b(?!: var)/)
   })
 
   it('leaves only the time on the right edge, and lets it shrink when the row runs out of room', () => {
     const row = flat(rowSource).match(/<button class="row"[^]*?<\/button>/)?.[0]
-    expect(row).not.toMatch(/Hidden|Icon|fold/)
+    expect(row).not.toMatch(/Icon|fold/)
     expect(row).toMatch(/<span class="time">\{time\}<\/span> \{\/if\} <\/button>$/)
     expect(flat(rowSource)).toContain('.time { flex: 0 1 auto; min-width: 0; overflow: hidden;')
-    expect(flat(hiddenSource)).toContain('.folded, .marks { display: flex; flex: none; align-items: center; }')
+    expect(flat(rowSource).match(/flex: 0 1 auto/g)).toHaveLength(1)
   })
 
   it('names the members of a flow by their role under its orchestrator', () => {

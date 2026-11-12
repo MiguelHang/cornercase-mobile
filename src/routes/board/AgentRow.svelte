@@ -41,9 +41,6 @@
           <Icon name="chevron-right" size={18} />
         </span>
       </button>
-      <span class="count">
-        <Hidden hidden={item.hidden} attention={item.attention} gap="4px" />
-      </span>
     {/if}
   </div>
   <button class="row" type="button" onclick={() => onopen(row.pane)} ontouchstart={() => {}}>
@@ -52,6 +49,7 @@
       <span class="title">{label(row, agents)}</span>
       <span class="place">{place(row, agents)}</span>
     </span>
+    <Hidden hidden={item.hidden} attention={item.attention} />
     {#if time !== ''}
       <span class="time">{time}</span>
     {/if}
@@ -105,12 +103,6 @@
     align-items: center;
     padding: 0 0 0 6px;
     color: var(--soft);
-  }
-
-  .count {
-    position: absolute;
-    left: 24px;
-    pointer-events: none;
   }
 
   .chevron {
