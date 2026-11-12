@@ -26,8 +26,9 @@ pub(crate) async fn send(state: State<'_, AppState>, pane: u64, text: String, fo
 
 #[tauri::command(async)]
 #[specta::specta]
-pub(crate) async fn keys(state: State<'_, AppState>, pane: u64, key: String) -> Result<(), CommandError> {
-    press_key(&state, pane, &key).await
+pub(crate) async fn keys(state: State<'_, AppState>, pane: u64, keys: Vec<String>) -> Result<(), CommandError> {
+    let names: Vec<&str> = keys.iter().map(String::as_str).collect();
+    press_key(&state, pane, &names).await
 }
 
 #[tauri::command(async)]
@@ -49,12 +50,12 @@ pub(crate) async fn send_message(state: &AppState, pane: u64, text: String, forc
     match (force, text.is_empty()) {
         (false, _) => ask(state, last_message::send_args(pane), Some(Stdin::Text(text))).await,
         (true, false) => ask(state, last_message::forced_send_args(pane), Some(Stdin::Text(text))).await,
-        (true, true) => press_key(state, pane, ENTER).await,
+        (true, true) => press_key(state, pane, &[ENTER]).await,
     }
 }
 
-pub(crate) async fn press_key(state: &AppState, pane: u64, key: &str) -> Result<(), CommandError> {
-    let args = keys::args(pane, key).map_err(|error| CommandError::reason(&error))?;
+pub(crate) async fn press_key(state: &AppState, pane: u64, names: &[&str]) -> Result<(), CommandError> {
+    let args = keys::args(pane, names).map_err(|error| CommandError::reason(&error))?;
     ask(state, args, None).await
 }
 

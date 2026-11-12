@@ -174,6 +174,7 @@ fn asked() -> Emitted {
         colours: Colours::default(),
         rows: Vec::new(),
         options,
+        card: None,
         closed: false,
     })
 }
@@ -181,7 +182,8 @@ fn asked() -> Emitted {
 fn asked_json() -> Value {
     let colours = json!({ "fg": null, "bg": null, "cursor": null, "palette": {} });
     let options = json!([{ "number": 1, "label": "Yes" }, { "number": 2, "label": "No" }]);
-    json!({ "machine": 7, "tab": 3, "pane": 4, "colours": colours, "rows": [], "options": options, "closed": false })
+    json!({ "machine": 7, "tab": 3, "pane": 4, "colours": colours, "rows": [], "options": options, "card": null,
+        "closed": false })
 }
 
 fn closed_changes() -> Emitted {

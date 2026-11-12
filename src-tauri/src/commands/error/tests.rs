@@ -31,6 +31,7 @@ mod from_a_core_error {
     #[case::settle_timeout(Error::SettleTimeout, "settle_timeout")]
     #[case::input_rejected(Error::InputRejected("closed".into()), "input_rejected")]
     #[case::unknown_key(Error::UnknownKey("--force".into()), "unknown_key")]
+    #[case::no_keys(Error::NoKeys, "no_keys")]
     #[case::image_empty(Error::ImageEmpty, "image_empty")]
     #[case::image_too_large(Error::ImageTooLarge, "image_too_large")]
     #[case::picker(Error::Picker("cancelled by the system".into()), "picker")]

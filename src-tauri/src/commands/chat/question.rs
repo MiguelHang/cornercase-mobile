@@ -73,12 +73,12 @@ impl Asks {
     }
 
     fn changed(&self, question: Option<Question>, closed: bool) -> QuestionChanged {
-        let Question { pane, colours, rows, options } = question.unwrap_or_else(|| self.nothing());
-        QuestionChanged { machine: self.machine, tab: self.tab, pane, colours, rows, options, closed }
+        let Question { pane, colours, rows, options, card } = question.unwrap_or_else(|| self.nothing());
+        QuestionChanged { machine: self.machine, tab: self.tab, pane, colours, rows, options, card, closed }
     }
 
     fn nothing(&self) -> Question {
-        Question { pane: self.pane, colours: Colours::default(), rows: Vec::new(), options: Vec::new() }
+        Question { pane: self.pane, colours: Colours::default(), rows: Vec::new(), options: Vec::new(), card: None }
     }
 }
 

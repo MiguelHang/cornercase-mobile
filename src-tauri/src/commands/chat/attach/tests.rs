@@ -220,7 +220,7 @@ mod pasting_an_attached_image {
         let (ipc, lines) = in_line().await;
         let state = ipc.state();
         let id = stored(&state);
-        let (pressed, pasted) = tokio::join!(press_key(&state, 543, "enter"), paste_image(&state, 543, id));
+        let (pressed, pasted) = tokio::join!(press_key(&state, 543, &["enter"]), paste_image(&state, 543, id));
         assert_eq!(pressed, Ok(()));
         assert!(pasted.is_ok(), "{pasted:?}");
         let keys = json!({ "args": ["keys", "--pane", "543", "enter"] });

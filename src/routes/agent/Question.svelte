@@ -5,6 +5,7 @@
   import { anchor } from '../../lib/terminal/touch'
   import { BASE, LINE } from '../../lib/terminal/zoom'
   import Button from '../../lib/ui/Button.svelte'
+  import QuestionCard from './QuestionCard.svelte'
 
   const PROBE = 'M'.repeat(100)
   const ADVANCE = 0.6
@@ -13,10 +14,12 @@
     question,
     agent,
     onoption,
+    ontab,
   }: {
     question: Question
     agent: string
     onoption: (number: number) => void
+    ontab: (index: number) => void
   } = $props()
 
   let measured = $state(0)
@@ -34,31 +37,35 @@
   }
 </script>
 
-<div
-  class="screen"
-  role="group"
-  aria-label="{agent} asks"
-  style:background={rgb(ink.bg)}
-  style:color={rgb(ink.fg)}
-  style:font-size="{BASE}px"
-  style:--line="{LINE}em"
-  {@attach anchored}
->
-  <div class="rows" style:width="{cell * cols}em">
-    {#each question.rows as runs, row (row)}
-      <Row {runs} colours={question.colours} {cell} />
-    {/each}
+{#if question.card !== null}
+  <QuestionCard card={question.card} {agent} {onoption} {ontab} />
+{:else}
+  <div
+    class="screen"
+    role="group"
+    aria-label="{agent} asks"
+    style:background={rgb(ink.bg)}
+    style:color={rgb(ink.fg)}
+    style:font-size="{BASE}px"
+    style:--line="{LINE}em"
+    {@attach anchored}
+  >
+    <div class="rows" style:width="{cell * cols}em">
+      {#each question.rows as runs, row (row)}
+        <Row {runs} colours={question.colours} {cell} />
+      {/each}
+    </div>
+    <span class="probe" aria-hidden="true"><span {@attach measure}>{PROBE}</span></span>
   </div>
-  <span class="probe" aria-hidden="true"><span {@attach measure}>{PROBE}</span></span>
-</div>
-{#if question.options.length > 0}
-  <div class="options" role="group" aria-label="Options">
-    {#each question.options as option (option.number)}
-      <Button tone="plain" label="Option {option.number}, {option.label}" onclick={() => onoption(option.number)}
-        ><span class="label">{option.number}. {option.label}</span></Button
-      >
-    {/each}
-  </div>
+  {#if question.options.length > 0}
+    <div class="options" role="group" aria-label="Options">
+      {#each question.options as option (option.number)}
+        <Button tone="plain" label="Option {option.number}, {option.label}" onclick={() => onoption(option.number)}
+          ><span class="label">{option.number}. {option.label}</span></Button
+        >
+      {/each}
+    </div>
+  {/if}
 {/if}
 
 <style>

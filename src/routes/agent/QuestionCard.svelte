@@ -1,0 +1,153 @@
+<script lang="ts">
+  import type { Attachment } from 'svelte/attachments'
+  import type { Card_Serialize as Card, CardOption_Serialize as CardOption } from '../../lib/bindings'
+  import { scrolledTo, under } from '../../lib/reveal'
+  import Button from '../../lib/ui/Button.svelte'
+  import QuestionTabs from './QuestionTabs.svelte'
+
+  let {
+    card,
+    agent,
+    onoption,
+    ontab,
+  }: {
+    card: Card
+    agent: string
+    onoption: (number: number) => void
+    ontab: (index: number) => void
+  } = $props()
+
+  const named = (option: CardOption) =>
+    [`Option ${option.number}`, option.label, ...(option.detail === null ? [] : [option.detail])].join(', ')
+
+  const chosen = $derived(card.options.find((option) => option.selected)?.number ?? null)
+
+  const asked = $derived(JSON.stringify([card.open, card.blocks]))
+
+  let tall = $state(0)
+
+  let shown: string | null = null
+
+  let picked: number | null = null
+
+  let moved = false
+
+  const follow =
+    (number: number | null, question: string): Attachment<HTMLElement> =>
+    (box) => {
+      void tall
+      const fresh = question !== shown
+      moved = !fresh && (moved || number !== picked)
+      shown = question
+      picked = number
+      const option = number === null ? null : box.querySelector('.options [aria-current="true"]')
+      const tabs = box.querySelector('[aria-label="Questions"]')
+      const lead = moved ? null : box.querySelector(':scope > .text, :scope > .code')
+      const seen = under(box.getBoundingClientRect(), tabs?.getBoundingClientRect() ?? null)
+      const rect = (element: Element | null | undefined) => element?.getBoundingClientRect() ?? null
+      box.scrollTop = scrolledTo(box.scrollTop, fresh, seen, rect(option), rect(lead))
+    }
+</script>
+
+<div class="card" role="group" aria-label="{agent} asks" bind:clientHeight={tall} {@attach follow(chosen, asked)}>
+  {#if card.tabs.length > 0}
+    <QuestionTabs tabs={card.tabs} open={card.open} {ontab} />
+  {/if}
+  {#each card.blocks as block, at (at)}
+    {#if block.kind === 'code'}
+      <pre class="code">{block.text}</pre>
+    {:else}
+      <p class="text">{block.text}</p>
+    {/if}
+  {/each}
+  <div class="options" role="group" aria-label="Options">
+    {#each card.options as option (option.number)}
+      <Button tone="plain" current={option.selected} label={named(option)} onclick={() => onoption(option.number)}
+        ><span class="mark" aria-hidden="true">{option.selected ? '❯' : ''}</span><span class="answer"
+          ><span class="label">{option.number}. {option.label}</span>{#if option.detail !== null}<span class="detail"
+              >{option.detail}</span
+            >{/if}</span
+        ></Button
+      >
+    {/each}
+  </div>
+  {#each card.help as line, at (at)}
+    <p class="help">{line}</p>
+  {/each}
+</div>
+
+<style>
+  .card {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    gap: var(--gap);
+    min-width: 0;
+    min-height: calc(44px + 2 * var(--gap) + 3lh);
+    max-height: 40dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: var(--text);
+  }
+
+  .text,
+  .code,
+  .help {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .text {
+    font-family: var(--font-ui);
+    white-space: pre-line;
+  }
+
+  .code {
+    padding: var(--gap);
+    border-radius: var(--radius-control);
+    background: var(--raised);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--gap);
+  }
+
+  .mark {
+    flex: none;
+    align-self: flex-start;
+    width: 1em;
+    padding-top: var(--gap);
+    color: var(--accent);
+  }
+
+  .answer {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--gap) 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .detail,
+  .help {
+    color: var(--muted);
+  }
+
+  .detail {
+    font-size: 14px;
+  }
+
+  .help {
+    font-size: 13px;
+  }
+</style>

@@ -258,7 +258,7 @@ describe('Chat, while an image is being attached', () => {
     const pressKey = vi.fn(pressedOk)
     const { chat } = await attachingAnother({ pressKey })
     await chat.press(key)
-    expect(pressKey.mock.calls).toEqual([[PANE, key]])
+    expect(pressKey.mock.calls).toEqual([[PANE, [key]]])
   })
 
   it('sends again once the image is attached, with every chip', async () => {
@@ -440,7 +440,7 @@ describe('Chat, its keys', () => {
   it('sends a key to its pane, and gives no reason once sent', async () => {
     const pressKey = vi.fn(pressedOk)
     expect(await seen({ pressKey }).press('down')).toBeNull()
-    expect(pressKey.mock.calls).toEqual([[PANE, 'down']])
+    expect(pressKey.mock.calls).toEqual([[PANE, ['down']]])
   })
 
   it('sends keys pressed quickly in the order pressed, without waiting for an answer', async () => {
@@ -450,9 +450,9 @@ describe('Chat, its keys', () => {
     const chat = seen({ pressKey })
     const pressed = [chat.press('down'), chat.press('down'), chat.press('enter')]
     expect(pressKey.mock.calls).toEqual([
-      [PANE, 'down'],
-      [PANE, 'down'],
-      [PANE, 'enter'],
+      [PANE, ['down']],
+      [PANE, ['down']],
+      [PANE, ['enter']],
     ])
     answers[2].open(ok(null))
     answers[0].open(refused('nothing was sent', 'not_sent'))
@@ -468,7 +468,7 @@ describe('Chat, its keys', () => {
     const sent = chat.send()
     expect([chat.sending, chat.canPress]).toEqual([true, true])
     expect(await chat.press('enter')).toBeNull()
-    expect(pressKey.mock.calls).toEqual([[PANE, 'enter']])
+    expect(pressKey.mock.calls).toEqual([[PANE, ['enter']]])
     answer.open(ok(null))
     await sent
   })
@@ -528,7 +528,7 @@ describe('Chat, its keys', () => {
     const pressKey = vi.fn(pressedOk)
     const chat = seen({ pressKey, haptics: { impactFeedback: () => Promise.reject(new Error('no plugin')) } })
     expect(await chat.press('tab')).toBeNull()
-    expect(pressKey.mock.calls).toEqual([[PANE, 'tab']])
+    expect(pressKey.mock.calls).toEqual([[PANE, ['tab']]])
   })
 })
 
@@ -551,7 +551,7 @@ describe('Chat, its Ctrl-C', () => {
     await chat.press('ctrl+c')
     tick(INTERRUPT_WINDOW_MS - 1)
     expect(await chat.press('ctrl+c')).toBeNull()
-    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, 'ctrl+c']]])
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, ['ctrl+c']]]])
   })
 
   it('gives the reason when the confirmed ctrl+c fails', async () => {
@@ -573,7 +573,7 @@ describe('Chat, its Ctrl-C', () => {
     const { chat, pressKey } = armed()
     await chat.press('ctrl+c')
     expect(await chat.press('down')).toBeNull()
-    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, 'down']]])
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([false, [[PANE, ['down']]]])
   })
 
   it.each<[string, KeyName]>([
@@ -597,7 +597,7 @@ describe('Chat, its Ctrl-C', () => {
     await chat.press('ctrl+c')
     await chat.press('ctrl+c')
     await chat.press('ctrl+c')
-    expect([chat.interrupting, pressKey.mock.calls]).toEqual([true, [[PANE, 'ctrl+c']]])
+    expect([chat.interrupting, pressKey.mock.calls]).toEqual([true, [[PANE, ['ctrl+c']]]])
   })
 })
 

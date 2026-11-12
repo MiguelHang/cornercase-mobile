@@ -11,14 +11,15 @@ import { Attachments, type Chip, type Images } from './attach.svelte'
 import { tap, type HapticsApi } from './haptics'
 import { edited, heard, type History, type Kept, restated, sent } from './history'
 import { digitOf, type KeyName } from './keys'
-import { Questions, type Asker } from './question.svelte'
+import { Questions, type Asker, type Question } from './question.svelte'
+import { arrowsTo } from './questionTabs'
 import { deliver, messageOf } from './toasts'
 
 export type ReadLast = typeof commands.lastMessage
 
 export type SendText = typeof commands.send
 
-export type PressKey = typeof commands.keys
+export type PressKey = (pane: number, keys: KeyName[]) => ReturnType<typeof commands.keys>
 
 export type MarkReviewed = typeof commands.markReviewed
 
@@ -27,6 +28,8 @@ export type Clock = { after: (ms: number, then: () => void) => () => void; now: 
 export const INTERRUPT_WINDOW_MS = 3000
 
 export const FOLLOW_MS = 10_000
+
+export const TAB_HOLD_MS = 1500
 
 export const staysOnTheMac = (agent: string) => `The image stays in ${agent}'s input on the Mac`
 
@@ -138,6 +141,7 @@ export class Chat {
   #cancelFollow: (() => void) | null = null
   #following = false
   #questioning = false
+  #tabbedFrom: { question: Question | null; at: number } | null = null
   #watchingDone = false
   #marked: string | null | undefined = undefined
   #asked = 0
@@ -525,18 +529,43 @@ export class Chat {
     if (!this.canPress) {
       return null
     }
-    void tap(this.#haptics)
     if (key === 'ctrl+c' && !this.interrupting) {
+      void tap(this.#haptics)
       this.#arm()
       return null
     }
-    this.#disarm()
-    return deliver(() => this.#pressKey(this.pane, key))
+    return this.#send([key])
   }
 
   async pressOption(number: number): Promise<string | null> {
     const digit = digitOf(number)
     return digit === null ? null : this.press(digit)
+  }
+
+  async openTab(target: number): Promise<string | null> {
+    const question = this.question
+    const keys = arrowsTo(question?.card?.open ?? null, target)
+    if (!this.canPress || keys.length === 0 || this.#holding(question)) {
+      return null
+    }
+    const tabbed = { question, at: this.#clock.now() }
+    this.#tabbedFrom = tabbed
+    const failed = await this.#send(keys)
+    if (failed !== null && this.#tabbedFrom === tabbed) {
+      this.#tabbedFrom = null
+    }
+    return failed
+  }
+
+  #holding(question: Question | null) {
+    const tabbed = this.#tabbedFrom
+    return tabbed !== null && tabbed.question === question && this.#clock.now() - tabbed.at < TAB_HOLD_MS
+  }
+
+  #send(keys: KeyName[]): Promise<string | null> {
+    void tap(this.#haptics)
+    this.#disarm()
+    return deliver(() => this.#pressKey(this.pane, keys))
   }
 
   #arm() {

@@ -1,11 +1,11 @@
 use rstest::rstest;
 
 use super::*;
-use crate::cli::surface::fixtures::{ASK_ONE, ASK_TABS, PERMISSION, WORKING};
+use crate::cli::surface::fixtures::{ASK_LONG, ASK_ONE, ASK_TABS, PERMISSION, WORKING};
 use crate::cli::surface::{Frame, Size, Style};
 use crate::terminal::grid::{Grid, Run};
 
-fn line(text: &str) -> Line {
+pub(super) fn line(text: &str) -> Line {
     text.chars().map(|c| Run { text: c.to_string(), width: 1, style: Style::default(), link: None }).collect()
 }
 
@@ -45,7 +45,7 @@ fn owned(expected: &[(u8, &str)]) -> Vec<(u8, String)> {
     expected.iter().map(|(number, label)| (*number, (*label).to_owned())).collect()
 }
 
-fn captured(json: &str) -> PaneGrid {
+pub(super) fn captured(json: &str) -> PaneGrid {
     let mut grid = Grid::default();
     grid.apply(serde_json::from_str::<Frame>(json).expect("a surface frame"));
     grid.panes.into_iter().next().expect("the agent's pane")
@@ -93,6 +93,54 @@ mod window {
     }
 }
 
+mod question {
+    use super::*;
+
+    fn asked(above: &[&str], options: &[&str]) -> Vec<String> {
+        above.iter().chain(options).map(|row| (*row).to_owned()).collect()
+    }
+
+    fn taller_than_the_window() -> Vec<String> {
+        let mut rows = asked(&["said", "────────", "Pick", "1. a"], &[]);
+        rows.extend(numbered(QUESTION_ROWS).into_iter().map(|row| format!("   {row}")));
+        rows.extend(["2. b".to_owned(), "────────".to_owned(), "3. c".to_owned()]);
+        rows
+    }
+
+    #[test]
+    fn starts_at_the_rule_above_its_first_option_however_far_up() {
+        let rows = taller_than_the_window();
+        assert_eq!(crops(8, &rows), rows[1..]);
+    }
+
+    #[rstest]
+    #[case::under_a_rule_of_the_conversation(&["────────", "said", "────────", "Pick"], &["────────", "Pick", "1. a", "2. b"])]
+    #[case::with_a_dashed_rule_above_its_options(&["────────", "Run", "╌╌╌╌╌╌╌╌", "ls", "╌╌╌╌╌╌╌╌"], &["────────", "Run", "╌╌╌╌╌╌╌╌", "ls", "╌╌╌╌╌╌╌╌", "1. a", "2. b"])]
+    #[case::inside_a_box(&["said", " ╭──────╮ ", "│ Pick │"], &[" ╭──────╮ ", "│ Pick │", "1. a", "2. b"])]
+    fn starts_at_the_nearest_rule_above_its_first_option(#[case] above: &[&str], #[case] expected: &[&str]) {
+        assert_eq!(crops(8, &asked(above, &["1. a", "2. b"])), expected);
+    }
+
+    #[test]
+    fn starts_at_the_highest_rule_without_one_above_its_options() {
+        assert_eq!(crops(8, &asked(&["Pick", "1. a", "2. b", "────────", "c"], &[])), ["────────", "c"]);
+    }
+
+    #[test]
+    fn starts_at_its_rule_when_its_last_option_is_the_first_row_of_the_window() {
+        let mut rows = asked(&["said", "────────", "Pick", "1. a", "2. b"], &[]);
+        rows.extend(numbered(QUESTION_ROWS - 1).into_iter().map(|row| format!("   {row}")));
+        assert_eq!(crops(8, &rows), rows[1..]);
+    }
+
+    #[test]
+    fn keeps_the_window_when_its_options_end_above_it() {
+        let mut rows = asked(&["────────", "1. a", "2. b"], &[]);
+        rows.extend(numbered(QUESTION_ROWS));
+        assert_eq!(crops(8, &rows), numbered(QUESTION_ROWS));
+    }
+}
+
 mod options {
     use super::*;
 
@@ -126,12 +174,49 @@ mod options {
     }
 }
 
+mod numbered_rows {
+    use super::*;
+
+    fn read(row: &str) -> Option<(usize, bool, u8, String)> {
+        numbered_at(&line(row)).map(|(column, selected, choice)| (column, selected, choice.number, choice.label))
+    }
+
+    #[rstest]
+    #[case::at_the_first_column("1. Pear", (0, false, 1, "Pear"))]
+    #[case::after_spaces("   2. Plum", (3, false, 2, "Plum"))]
+    #[case::chosen_with_a_chevron(" ❯ 1. Pear", (3, true, 1, "Pear"))]
+    #[case::chosen_with_a_guillemet("│ › 3. Fig │", (4, true, 3, "Fig"))]
+    #[case::chosen_with_a_triangle("▶ 4. Lime", (2, true, 4, "Lime"))]
+    #[case::chosen_with_a_greater_than_sign(">5. Kiwi", (1, true, 5, "Kiwi"))]
+    #[case::not_chosen_inside_a_box("│   2. Plum │", (4, false, 2, "Plum"))]
+    #[case::not_chosen_with_a_circle("○ 6. Date", (2, false, 6, "Date"))]
+    fn give_the_column_of_the_number_and_whether_it_is_chosen(
+        #[case] row: &str,
+        #[case] expected: (usize, bool, u8, &str),
+    ) {
+        let (column, selected, number, label) = expected;
+        assert_eq!(read(row), Some((column, selected, number, label.to_owned())));
+    }
+
+    #[rstest]
+    #[case::with_ten(" ❯ 10. Pear")]
+    #[case::with_zero("0. Pear")]
+    #[case::with_an_empty_label(" ❯ 1.  ")]
+    #[case::with_text_before_the_number("Step 1. Pear")]
+    #[case::with_only_marks(" ❯ │ ")]
+    #[case::empty("")]
+    fn are_none_without_an_option(#[case] row: &str) {
+        assert_eq!(read(row), None);
+    }
+}
+
 mod captures {
     use super::*;
 
     #[rstest]
     #[case::of_a_question(ASK_ONE, 16, "Enter to select · ↑/↓ to navigate · Esc to cancel")]
     #[case::of_two_questions(ASK_TABS, 16, "Enter to select · Tab/Arrow keys to navigate · Esc to cancel")]
+    #[case::taller_than_the_window(ASK_LONG, 30, "Enter to select · Tab/Arrow keys to navigate · Esc to cancel")]
     #[case::of_a_permission(PERMISSION, 16, " Esc to cancel · Tab to amend")]
     #[case::of_an_agent_at_work(WORKING, 5, "  ⏸ manual mode on")]
     fn crop_from_the_rule_above_the_question(#[case] json: &str, #[case] count: usize, #[case] last: &str) {

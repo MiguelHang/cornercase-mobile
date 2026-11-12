@@ -147,6 +147,7 @@ export const asked = (lines: string[], changes: Partial<QuestionChanged> = {}): 
     const numbered = /^(\d)\. (.+)$/.exec(text)
     return numbered === null ? [] : [{ number: Number(numbered[1]), label: numbered[2] }]
   }),
+  card: null,
   closed: false,
   ...changes,
 })

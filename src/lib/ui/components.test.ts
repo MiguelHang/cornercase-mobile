@@ -137,6 +137,13 @@ describe('Button', () => {
     expect(named(true)).toContain('aria-label="Digits" aria-expanded="true">')
   })
 
+  it('marks itself as the current one, for the eye and for VoiceOver', () => {
+    const body = render(Button, { props: { tone: 'plain', current: true, children: html('1. Yes') } }).body
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+ current" type="button" aria-current="true">/)
+    expect(button({ tone: 'plain' })).not.toContain('current')
+    expect(flat(buttonSource)).toContain('.plain.current { border-color: var(--edge); background: var(--selected); color: var(--text); }')
+  })
+
   it('narrows to a square of 44 px when compact', () => {
     const body = render(Button, { props: { tone: 'plain', compact: true, children: html('Esc') } }).body
     expect(body).toMatch(/<button class="button plain svelte-[\w-]+ compact" type="button">/)

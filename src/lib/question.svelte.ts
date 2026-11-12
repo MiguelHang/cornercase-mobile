@@ -1,4 +1,5 @@
 import type {
+  Card_Serialize as Card,
   Choice,
   Colours_Serialize as Colours,
   commands,
@@ -6,7 +7,7 @@ import type {
   Run_Serialize as Run,
 } from './bindings'
 
-export type Question = { rows: Run[][]; options: Choice[]; colours: Colours }
+export type Question = { rows: Run[][]; options: Choice[]; colours: Colours; card: Card | null }
 
 export type Asker = {
   open: typeof commands.questionOpen
@@ -69,7 +70,7 @@ export class Questions {
     if (!ours || this.#opened !== opened) {
       return
     }
-    const { rows, options, colours } = changed
-    this.question = changed.closed || rows.length === 0 ? null : { rows, options, colours }
+    const { rows, options, colours, card } = changed
+    this.question = changed.closed || rows.length === 0 ? null : { rows, options, colours, card }
   }
 }

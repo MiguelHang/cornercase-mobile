@@ -20,7 +20,7 @@ export const commands = {
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
-	keys: (pane: number, key: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, key })),
+	keys: (pane: number, keys: string[]) => typedError<null, CommandError>(__TAURI_INVOKE("keys", { pane, keys })),
 	markReviewed: (pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("mark_reviewed", { pane })),
 	attach: (pane: number) => typedError<AttachedImage_Serialize | null, CommandError>(__TAURI_INVOKE("attach", { pane })),
 	pasteAttached: (pane: number, id: number) => typedError<Pasted_Serialize, CommandError>(__TAURI_INVOKE("paste_attached", { pane, id })),
@@ -148,7 +148,43 @@ export type AttachedImage_Serialize = {
 	thumbnail: string | null,
 };
 
+export type Block = { kind: "text"; text: string } | { kind: "code"; text: string };
+
 export type Button = "left" | "middle" | "right";
+
+export type Card = Card_Serialize | Card_Deserialize;
+
+export type CardOption = CardOption_Serialize | CardOption_Deserialize;
+
+export type CardOption_Deserialize = {
+	number: number,
+	label: string,
+	detail?: string | null,
+	selected: boolean,
+};
+
+export type CardOption_Serialize = {
+	number: number,
+	label: string,
+	detail: string | null,
+	selected: boolean,
+};
+
+export type Card_Deserialize = {
+	tabs: Tab[],
+	open?: number | null,
+	blocks: Block[],
+	options: CardOption_Deserialize[],
+	help: string[],
+};
+
+export type Card_Serialize = {
+	tabs: Tab[],
+	open: number | null,
+	blocks: Block[],
+	options: CardOption_Serialize[],
+	help: string[],
+};
 
 export type ChangedFile = ChangedFile_Serialize | ChangedFile_Deserialize;
 
@@ -338,7 +374,7 @@ export type Entry_Serialize = {
 	status: Status_Serialize | null,
 };
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
+export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "no_keys" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
 
 export type FileShown = FileShown_Serialize | FileShown_Deserialize;
 
@@ -860,6 +896,7 @@ export type QuestionChanged_Deserialize = {
 	colours: Colours_Deserialize,
 	rows: Run_Deserialize[][],
 	options: Choice[],
+	card?: Card_Deserialize | null,
 	closed: boolean,
 };
 
@@ -870,6 +907,7 @@ export type QuestionChanged_Serialize = {
 	colours: Colours_Serialize,
 	rows: Run_Serialize[][],
 	options: Choice[],
+	card: Card_Serialize | null,
 	closed: boolean,
 };
 
@@ -1149,6 +1187,11 @@ export type Summary_Serialize = {
 	state: State_Serialize,
 	error: string | null,
 	workspaces: ChangedWorkspace_Serialize[],
+};
+
+export type Tab = {
+	label: string,
+	answered: boolean,
 };
 
 export type TerminalChanged = TerminalChanged_Serialize | TerminalChanged_Deserialize;

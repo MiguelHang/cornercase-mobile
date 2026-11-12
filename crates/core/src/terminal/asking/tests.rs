@@ -66,6 +66,15 @@ impl Read {
         })
     }
 
+    fn chosen(&mut self) -> Vec<(u64, Option<u8>)> {
+        self.0.seen(|asked| match asked {
+            Asked::Question(question) => question
+                .card
+                .and_then(|card| card.options.iter().find(|option| option.selected).map(|option| option.number)),
+            Asked::Failed(_) | Asked::Closed => None,
+        })
+    }
+
     fn launched(&mut self) -> Vec<String> {
         self.0.launched(&["surface", "view "])
     }
@@ -122,6 +131,19 @@ mod the_question {
         let moved = patched(&[(13, "  1. Red"), (15, "❯ 2. Green")]);
         let mut read = Read::after_a_minute(reading(vec![vec![asked(), Said::After(1), moved]])).await;
         assert_eq!(read.seen(), [(0, RED.to_owned()), (1, "941: ❯ 2. Green (5)".to_owned())]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn carries_its_card_with_the_chosen_option_as_it_moves() {
+        let moved = patched(&[(13, "  1. Red"), (15, "❯ 2. Green")]);
+        let mut read = Read::after_a_minute(reading(vec![vec![asked(), Said::After(1), moved]])).await;
+        assert_eq!(read.chosen(), [(0, Some(1)), (1, Some(2))]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn has_no_card_in_a_pane_without_options() {
+        let mut read = Read::of_pane(950, reading(vec![vec![beside_a_shell()]])).await;
+        assert_eq!(read.chosen(), [(0, None)]);
     }
 
     #[tokio::test(start_paused = true)]

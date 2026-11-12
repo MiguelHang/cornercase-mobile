@@ -47,6 +47,13 @@
       onfailed(failed)
     }
   }
+
+  const openTab = async (index: number) => {
+    const failed = await chat.openTab(index)
+    if (failed !== null) {
+      onfailed(failed)
+    }
+  }
 </script>
 
 <div
@@ -56,7 +63,12 @@
   style:--seen={seen === null ? undefined : `${seen}px`}
 >
   {#if chat.question !== null}
-    <Question question={chat.question} {agent} onoption={(number) => void choose(number)} />
+    <Question
+      question={chat.question}
+      {agent}
+      onoption={(number) => void choose(number)}
+      ontab={(index) => void openTab(index)}
+    />
   {:else if chat.asking}
     <p class="note">{agent} is asking you something on its screen; answer with the keys.</p>
   {/if}

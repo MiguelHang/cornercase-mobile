@@ -263,7 +263,7 @@ describe('Chat, Enter with images attached', () => {
     const discard = vi.fn(discardedOk)
     const chat = await holdingTwo({ pasteAttached, pressKey, discard })
     expect(await chat.press('enter')).toBeNull()
-    expect([pressKey.mock.calls, pasteAttached.mock.calls, discard.mock.calls]).toEqual([[[PANE, 'enter']], [], []])
+    expect([pressKey.mock.calls, pasteAttached.mock.calls, discard.mock.calls]).toEqual([[[PANE, ['enter']]], [], []])
     expect(chat.attachments.chips.length).toBe(2)
   })
 })

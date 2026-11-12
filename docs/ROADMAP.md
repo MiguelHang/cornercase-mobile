@@ -65,7 +65,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 039 | [Chat: ver las preguntas y menús del agente sin ir a la terminal](tasks/039-chat-shows-questions.md) | 036, 020 | ~450 |
 | 040 | [Tablero: plegado que no parezca un "ir" y buscador de agentes](tasks/040-board-fold-and-search.md) | 038 | ~350 |
 | 041 | [Chat: barra de escribir estilo Claude/WhatsApp y quitar una imagen adjunta](tasks/041-chat-composer.md) | 036, 039 | ~400 |
-| 042 | [Chat: la pregunta del agente se lee sin scroll horizontal](tasks/042-chat-question-layout.md) | 039 | ~350 |
+| 042 | [Chat: la pregunta del agente se lee sin scroll horizontal](tasks/042-chat-question-layout.md) | 039 | ~1.550 |
 | 043 | [Terminal: ajustada al móvil por defecto, y su scroll](tasks/043-terminal-fit-default.md) | 022 | ~250 |
 | 044 | [Abrir un agente done lo da por visto](tasks/044-done-seen.md) | 016 | ~250 |
 | 045 | [Arrancar: sin workspaces nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~1.500 |
