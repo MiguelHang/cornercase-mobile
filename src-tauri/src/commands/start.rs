@@ -46,6 +46,7 @@ pub(crate) fn projects(state: &AppState) -> Result<StartChoices, CommandError> {
 pub(crate) async fn installed(state: &AppState) -> Result<Vec<AgentChoice>, CommandError> {
     let queue = queue(state)?;
     answered(queue.ask(ACCOUNT_LIST.map(str::to_owned).to_vec(), None).await, agents::installed)
+        .map(|found| found.agents)
 }
 
 pub(crate) async fn run(state: &AppState, argv: Vec<String>) -> Result<Started, CommandError> {
