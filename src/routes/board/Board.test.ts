@@ -185,6 +185,13 @@ describe('Board', () => {
     expect(flat(boardSource)).toContain('padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);')
   })
 
+  it('lines the list up with Issues and Files', () => {
+    const source = flat(boardSource)
+    expect(source).toContain('padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);')
+    expect(source).toContain('.items { margin: 0 calc(-1 * var(--inset)); padding: 0;')
+    expect(source).toContain('.section { margin: var(--inset) var(--inset) var(--gap);')
+  })
+
   it('folds a branch by default, with the attention and count of what it hides', () => {
     const body = draw(BRANCH)
     expect(titles(body)).toEqual(['Lead'])

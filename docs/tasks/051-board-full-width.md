@@ -15,11 +15,14 @@ de todas las filas por encima del ancho; en el teléfono real pesa más el ancho
 ## Criterios de aceptación
 - [ ] CA1 — Una fila sin hijos empieza su punto a la distancia del borde que usan las listas de iOS (unos 16–20 pt), no
   a ~88. Nada de columna vacía de 60 px.
-- [ ] CA2 — El disclosure sigue a la izquierda y no parece un "ir" (lo decidido en 040), pero estrecho: solo el chevron
-  (área de toque de 44 pt que puede solaparse con el padding, no ancho reservado). La atención y el `+n` salen de esa
-  columna (por ejemplo, junto a la hora a la derecha en gris o bajo el título), sin tocar el punto.
-- [ ] CA3 — Si ninguna fila visible tiene hijos, ninguna reserva sitio para el disclosure; si alguna lo tiene, los puntos
-  siguen en una columna (el hueco que quede es el del chevron, no 60 px). La sangría por nivel se mantiene.
+- [ ] CA2 — Decisión del usuario (2026-11-12): el indicador de que la fila tiene hijos y se despliega va **debajo del
+  punto de estado**, un triangulito del mismo tamaño que el punto (apunta a la derecha plegado y hacia abajo desplegado,
+  girando como el chevron de 040). Sin columna propia: el punto y el triángulo comparten la columna del punto, así que
+  una fila con hijos y otra sin ellos alinean sus puntos sin reservar ancho. Tocar el punto o el triángulo pliega o
+  despliega (área de toque de 44 pt sobre esa columna, que no abre el chat); el resto de la fila abre el chat. La
+  atención y el `+n` salen de la columna de 60 px (por ejemplo, junto a la hora a la derecha en gris), sin tocar el punto.
+- [ ] CA3 — Ninguna fila reserva ancho para el disclosure; los puntos de todas las filas de un nivel siguen en una
+  columna. La sangría por nivel se mantiene.
 - [ ] CA4 — El buscador y las cabeceras de sección se alinean con las filas; los márgenes laterales del tablero, como los
   del resto de pantallas (Look).
 - [ ] CA5 — Comprobado en el simulador (raíces sin hijos, con hijos plegados y desplegados, `+12` con atención, título
