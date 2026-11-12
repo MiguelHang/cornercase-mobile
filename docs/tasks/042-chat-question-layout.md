@@ -1,6 +1,6 @@
 # 042 — Chat: la pregunta del agente se lee sin scroll horizontal
 
-- Estado: en curso
+- Estado: hecha
 - Depende de: 039
 - Rama: `feat/042-question-layout` · PR: `feat: lay the agent's question out to the phone's width`
 
