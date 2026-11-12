@@ -2,7 +2,7 @@ use rstest::rstest;
 use serde_json::json;
 
 use super::*;
-use crate::cli::agents::fixtures::ACCOUNT_LIST;
+use crate::cli::agents::fixtures::{ACCOUNT_LIST, ACCOUNTS, SIGNED_OUT};
 
 fn choice(agent: &str, command: &str, installed: bool) -> AgentChoice {
     AgentChoice { agent: agent.to_owned(), command: command.to_owned(), installed }
@@ -26,6 +26,13 @@ mod reading {
     #[test]
     fn keeps_only_the_installed_agents_of_cornercase_0_13_19() {
         assert_eq!(installed(ACCOUNT_LIST), Ok(vec![choice("claude", "claude", true)]));
+    }
+
+    #[rstest]
+    #[case::signed_in(ACCOUNTS)]
+    #[case::signed_out(SIGNED_OUT)]
+    fn keeps_only_the_installed_agents_of_cornercase_0_13_31_with_accounts(#[case] text: &str) {
+        assert_eq!(installed(text), Ok(vec![choice("claude", "claude", true)]));
     }
 
     #[test]
