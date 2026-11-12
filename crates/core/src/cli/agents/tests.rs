@@ -135,6 +135,17 @@ mod accounts {
     }
 
     #[test]
+    fn reads_a_null_login_as_unknown() {
+        let provider = json!({
+            "provider": "claude",
+            "system_login": null,
+            "accounts": [{ "name": "home", "login": null }],
+        });
+        let expected = vec![option("", "System", Login::Unknown), option("home", "home", Login::Unknown)];
+        assert_eq!(accounts(&json!({ "providers": [provider] })), [claude("", expected)]);
+    }
+
+    #[test]
     fn keeps_the_order_and_the_agents_cornercase_gives() {
         let value = json!({ "providers": [
             { "provider": "codex", "accounts": [{ "name": "b" }, { "name": "a", "label": "A" }] },

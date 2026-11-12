@@ -19,7 +19,7 @@ cuenta para ese agente sobre las de por defecto; `AGENT=` = su login propio). La
   la de por defecto. Sin cuentas configuradas, no sale nada.
 - [x] CA2 — En el formulario de flow (047), igual: si hay perfiles (`profile list`) o cuentas, elegir con qué arranca el
   equipo; decidir con lo que dé upstream si es `--profile` o una `--account` por agente del flow, y anotarlo en
-  `design/starting-work.md`.
+  `design/starting-work.md` (perfiles fuera, P1).
 - [x] CA3 — Cambiar de agente actualiza las cuentas; una cuenta que falla su check (`account list --check`) se ve como
   tal y se puede elegir igualmente o no, según lo que diga upstream de qué pasa al arrancar con ella.
 - [x] CA4 — Servidor sin `ProfileArg` en `start`/`flow run` (más viejo): no se ofrece el selector (decidir cómo se

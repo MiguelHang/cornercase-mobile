@@ -65,7 +65,7 @@ struct AgentLogins {
     provider: String,
     accounts: Vec<Account>,
     system_label: Option<String>,
-    system_login: Checked,
+    system_login: Option<Checked>,
     active: Option<String>,
 }
 
@@ -74,13 +74,19 @@ struct AgentLogins {
 struct Account {
     name: String,
     label: Option<String>,
-    login: Checked,
+    login: Option<Checked>,
 }
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 struct Checked {
     state: Login,
+}
+
+impl Checked {
+    fn state(checked: Option<Self>) -> Login {
+        checked.map_or(Login::Unknown, |checked| checked.state)
+    }
 }
 
 const SYSTEM: &str = "System";
@@ -98,7 +104,7 @@ impl From<AgentLogins> for AgentAccounts {
         let active = provider.active.unwrap_or_default();
         let known = provider.accounts.iter().any(|account| account.name == active);
         let label = provider.system_label.unwrap_or_else(|| SYSTEM.to_owned());
-        let own = AccountChoice { name: String::new(), label, login: provider.system_login.state };
+        let own = AccountChoice { name: String::new(), label, login: Checked::state(provider.system_login) };
         let options = once(own).chain(provider.accounts.into_iter().map(AccountChoice::from)).collect();
         Self { agent: provider.provider, default: if known { active } else { String::new() }, options }
     }
@@ -107,7 +113,7 @@ impl From<AgentLogins> for AgentAccounts {
 impl From<Account> for AccountChoice {
     fn from(account: Account) -> Self {
         let label = account.label.unwrap_or_else(|| account.name.clone());
-        Self { name: account.name, label, login: account.login.state }
+        Self { name: account.name, label, login: Checked::state(account.login) }
     }
 }
 
