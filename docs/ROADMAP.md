@@ -75,6 +75,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 049 | [El icono de la app](tasks/049-app-icon.md) (hecha; en el iPhone del usuario, pendiente) | 030 | ~50 (+ generados) |
 | 050 | [Partir por temas los ficheros de `design/` de más de 40 KB](tasks/050-split-design-by-topic.md) | 043 | ~0 (solo docs) |
 | 051 | [Tablero: las filas aprovechan todo el ancho](tasks/051-board-full-width.md) | 040 | ~80 |
+| 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) | 045, 047 | ~250 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
@@ -93,7 +94,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
 Ramas laterales: `009` (tras 001, antes de 013) · `019` (tras 012, antes de 020) · `006` (tras 005, antes de 029)
-· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `037`, `038`, `039` (antes de Android; pedidas por el usuario el 2026-11-09) · `040`–`049` (de la prueba del usuario en su iPhone, 029, el 2026-11-10) · `050` (tras 043, de su review) · `051` (de la segunda prueba en el iPhone, 2026-11-12) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
+· `028` (tras 013) · `035` (tras 027 y 028, antes de Android; pedida por el usuario el 2026-11-09) · `036` (tras 018, antes de Android; pedida por el usuario el 2026-11-09) · `037`, `038`, `039` (antes de Android; pedidas por el usuario el 2026-11-09) · `040`–`049` (de la prueba del usuario en su iPhone, 029, el 2026-11-10) · `050` (tras 043, de su review) · `051`, `052` (de la segunda prueba en el iPhone, 2026-11-12) · `030 → 031, 032` (tras 015–028; la 029, la prueba en el iPhone, va al final, justo antes de la 033) · `033` (al final, tras 029: borradores de issues en una épica de cornercase-terminal, sin PR).
 
 ## Qué puede ir en paralelo (si algún día hay más de un implementador)
 - 002, 003 y 009 tras 001; 034 tras 002. 008, 010 y 011 tras 007. 019 en cuanto exista 012.
