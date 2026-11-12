@@ -257,7 +257,7 @@ describe('Question, as a card', () => {
 
   it('yields to the composer and scrolls only up and down inside itself', () => {
     expect(flat(cardSource)).toContain(
-      '.card { display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--gap); min-width: 0; min-height: 0; max-height: 40dvh; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;',
+      '.card { display: flex; flex: 0 1 auto; flex-direction: column; gap: var(--gap); min-width: 0; min-height: calc(44px + 2 * var(--gap) + 3lh); max-height: 40dvh; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;',
     )
   })
 

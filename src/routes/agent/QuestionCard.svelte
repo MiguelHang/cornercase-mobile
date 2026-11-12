@@ -83,7 +83,7 @@
     flex-direction: column;
     gap: var(--gap);
     min-width: 0;
-    min-height: 0;
+    min-height: calc(44px + 2 * var(--gap) + 3lh);
     max-height: 40dvh;
     overflow-x: hidden;
     overflow-y: auto;

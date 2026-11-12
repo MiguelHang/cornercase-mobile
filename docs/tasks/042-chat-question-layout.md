@@ -42,10 +42,13 @@ pregunta y las teclas abiertas, enfocar el campo a veces sube la página unos 56
 comparó con `main`. Tras la review (2026-11-11), con tres preguntas de cuatro opciones de unas 40 palabras (30 filas desde
 la regla), la tarjeta salió entera, sin la barra `│` en la pregunta, con los chips fijos arriba al hacer scroll. Tras la
 segunda review (2026-11-11), con la tarjeta desplazada, cada pestaña abierta con un chip o al contestar empezó por su
-pregunta con la opción elegida a la vista, el resumen de `Review your answers` salió sin `│` y los chips volvieron a mandar sus flechas pasados 1,5 s sin cambio de
-pantalla. Tras la tercera review (2026-11-11), con tres preguntas de unas cinco filas y opciones de unas 45 palabras, la
-pregunta empezó justo bajo los chips en la primera vista, al tocar un chip y al contestar, con la `1.` debajo; en
-`Review your answers` ganó el resumen y `1. Submit answers` quedó a un swipe, que la alcanzó y envió las respuestas. Tras
-la cuarta review (2026-11-11), el `❯` de la elegida quedó en la línea de su `N. etiqueta`, a la vista sobre el borde de la
-tarjeta, y la rama se mezcló con `main` (048): `openTab` y el historial del chat conviven. El iPhone del usuario queda
+pregunta con la opción elegida a la vista, el resumen de `Review your answers` salió sin `│` y los chips volvieron a
+mandar sus flechas pasados 1,5 s sin cambio de pantalla. Tras la tercera review (2026-11-11), con tres preguntas de unas
+cinco filas y opciones de unas 45 palabras, la pregunta empezó justo bajo los chips en la primera vista, al tocar un
+chip y al contestar, con la `1.` debajo; en `Review your answers` ganó el resumen y `1. Submit answers` quedó a un
+swipe, que la alcanzó y envió las respuestas. Tras la cuarta review (2026-11-11), el `❯` de la elegida quedó en la línea
+de su `N. etiqueta`, a la vista sobre el borde de la tarjeta, y la rama se mezcló con `main` (048): `openTab` y el
+historial del chat conviven. Tras la quinta review (2026-11-12), la tarjeta guarda un mínimo de la banda de chips y tres
+líneas: con el teclado abierto tras `Send`, la pregunta llegó con sus chips, la pregunta y el principio de `1. Cat` a la
+vista y la barra sin tapar; el campo quedó bajo el borde del compositor hasta escribir. El iPhone del usuario queda
 pendiente.
