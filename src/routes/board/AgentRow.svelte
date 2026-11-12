@@ -132,6 +132,7 @@
   }
 
   .turn {
+    translate: calc((7px + var(--inset-wide)) / 2);
     transition: transform var(--turn);
   }
 

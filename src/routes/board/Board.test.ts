@@ -236,9 +236,16 @@ describe('Board', () => {
     expect(source.match(/<path /g)).toHaveLength(1)
     expect(source).toContain(`<path d="${TRIANGLE}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />`)
     expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
-    expect(source).toContain('.turn { transition: transform var(--turn); }')
+    expect(source).toContain('.turn { translate: calc((7px + var(--inset-wide)) / 2); transition: transform var(--turn); }')
     expect(source).toContain('.turn.open { transform: rotate(90deg); }')
     expect(source).toContain('display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 44px; padding: 0; color: var(--soft); }')
+  })
+
+  it('moves the triangle halfway from the dot to the title with the tokens', () => {
+    const rule = flat(rowSource).match(/\.turn \{[^}]*\}/)?.[0]
+    expect(rule).toContain('translate: calc((7px + var(--inset-wide)) / 2);')
+    expect(rule).not.toMatch(/11\.5|11px|12px/)
+    expect(rowSource).not.toContain('translateX')
   })
 
   it('draws a triangle only on the rows with children', () => {
