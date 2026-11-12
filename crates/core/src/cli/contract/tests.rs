@@ -192,6 +192,8 @@ mod missing {
     #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
+    #[case::accounts("accounts")]
+    #[case::account_switch("account-switch")]
     fn reports_a_feature_the_server_lacks(#[case] name: &str) {
         let descriptor = real_but(|value| without(value, "features", name));
         assert_eq!(missing(&descriptor), [one(name, Kind::Feature, None)]);
