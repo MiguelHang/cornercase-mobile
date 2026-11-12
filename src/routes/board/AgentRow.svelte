@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { AgentRow_Serialize as Agent } from '../../lib/bindings'
-  import { disclosureName, elapsed, label, place, type Row } from '../../lib/board'
+  import { disclosureName, elapsed, label, place, statusName, type Row } from '../../lib/board'
   import Hidden from '../../lib/ui/Hidden.svelte'
-  import Icon from '../../lib/ui/Icon.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
 
@@ -27,31 +26,43 @@
 </script>
 
 <div class="agent" style:--depth={item.depth}>
-  <div class="lead">
-    {#if item.hasChildren}
-      <button
-        class="fold"
-        type="button"
-        aria-label={disclosureName(item.total, item.folded)}
-        aria-expanded={!item.folded}
-        onclick={() => onfold(row.pane)}
-        ontouchstart={() => {}}
+  {#if item.hasChildren}
+    <button
+      class="fold"
+      type="button"
+      aria-label={disclosureName(item.total, item.folded)}
+      aria-expanded={!item.folded}
+      onclick={() => onfold(row.pane)}
+      ontouchstart={() => {}}
+    >
+      <span class="face" aria-hidden="true"><StatusDot status={row.status} /></span>
+      <svg
+        class="turn"
+        class:open={!item.folded}
+        style:--turn="{turn}ms"
+        aria-hidden="true"
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="currentColor"
       >
-        <span class="chevron" class:open={!item.folded} style:--turn="{turn}ms">
-          <Icon name="chevron-right" size={18} />
-        </span>
-      </button>
-      <span class="count">
-        <Hidden hidden={item.hidden} attention={item.attention} gap="4px" />
-      </span>
-    {/if}
-  </div>
+        <path d="M6.5 5v14l11-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+      </svg>
+    </button>
+  {/if}
   <button class="row" type="button" onclick={() => onopen(row.pane)} ontouchstart={() => {}}>
-    <StatusDot status={row.status} />
+    <span class="mark">
+      {#if item.hasChildren}
+        <span class="spoken">{statusName(row.status)}</span>
+      {:else}
+        <StatusDot status={row.status} />
+      {/if}
+    </span>
     <span class="lines">
       <span class="title">{label(row, agents)}</span>
       <span class="place">{place(row, agents)}</span>
     </span>
+    <Hidden hidden={item.hidden} attention={item.attention} />
     {#if time !== ''}
       <span class="time">{time}</span>
     {/if}
@@ -60,6 +71,7 @@
 
 <style>
   .agent {
+    position: relative;
     display: flex;
     align-items: center;
     padding-left: calc(var(--depth) * var(--inset-wide));
@@ -91,34 +103,39 @@
     text-align: left;
   }
 
-  .lead {
-    position: relative;
-    display: flex;
-    flex: none;
-    align-items: center;
-    width: 60px;
-  }
-
   .fold {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--depth) * var(--inset-wide) + var(--inset) - 15px);
+    z-index: 1;
     display: flex;
-    flex: 1;
+    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    padding: 0 0 0 6px;
+    gap: 6px;
+    width: 44px;
+    padding: 0;
     color: var(--soft);
   }
 
-  .count {
-    position: absolute;
-    left: 24px;
-    pointer-events: none;
+  .face {
+    display: flex;
   }
 
-  .chevron {
+  .mark {
     display: flex;
+    flex: none;
+    justify-content: center;
+    width: 14px;
+    margin-right: calc(var(--inset-wide) - var(--inset));
+  }
+
+  .turn {
     transition: transform var(--turn);
   }
 
-  .chevron.open {
+  .turn.open {
     transform: rotate(90deg);
   }
 

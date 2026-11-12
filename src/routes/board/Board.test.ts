@@ -61,11 +61,11 @@ const START = /<button class="button primary svelte-[\w-]+( resting)?" type="but
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
-const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span class="chevron svelte-[\w-]+( open)?" style="--turn: (\d+)ms;"><svg [^>]*width="18" height="18"[^]*?<path d="([^"]+)"><\/path>/g
+const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="(\w+)"[^]*?<\/svg>(?:<!--[^>]*-->)*<\/span> <svg class="turn svelte-[\w-]+( open)?" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="--turn: (\d+)ms;"><path d="([^"]+)"/g
 
 const disclosures = (body: string) => [...body.matchAll(FOLD)].map((m) => m.slice(1))
 
-const CHEVRON_RIGHT = 'm9 18 6-6-6-6'
+const TRIANGLE = 'M6.5 5v14l11-7z'
 
 const sections = (body: string) => [...body.matchAll(/<h2 class="section svelte-[\w-]+">(\w+)<\/h2>/g)].map((m) => m[1])
 
@@ -185,21 +185,27 @@ describe('Board', () => {
     expect(flat(boardSource)).toContain('padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);')
   })
 
+  it('lines the list up with Issues and Files', () => {
+    const source = flat(boardSource)
+    expect(source).toContain('.items { margin: 0 calc(-1 * var(--inset)); padding: 0;')
+    expect(source).toContain('.section { margin: var(--inset) var(--inset) var(--gap);')
+  })
+
   it('folds a branch by default, with the attention and count of what it hides', () => {
     const body = draw(BRANCH)
     expect(titles(body)).toEqual(['Lead'])
     expect(body).toMatch(/<span class="hidden svelte-[\w-]+">\+2<\/span>/)
-    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true" style="gap: 4px;">/)
+    expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true">/)
     expect(body).toMatch(/aria-label="Waiting" width="10" height="10"/)
-    expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', undefined, '180', CHEVRON_RIGHT]])
+    expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', 'Working', undefined, '180', TRIANGLE]])
   })
 
   it('unfolds the branches the board keeps for its machine and boot', () => {
     const machine = unfolded(20, 1)
     expect(titles(draw(BRANCH, CONNECTED, 0, machine))).toEqual(['Lead', 'Ask'])
     expect(disclosures(draw(BRANCH, CONNECTED, 0, machine))).toEqual([
-      ['Hide 2 subagents', 'true', ' open', '180', CHEVRON_RIGHT],
-      ['Show 1 subagent', 'false', undefined, '180', CHEVRON_RIGHT],
+      ['Hide 2 subagents', 'true', 'Working', ' open', '180', TRIANGLE],
+      ['Show 1 subagent', 'false', 'Waiting', undefined, '180', TRIANGLE],
     ])
     expect(titles(draw(BRANCH, CONNECTED, 0, unfolded(21, 1, 2)))).toEqual(['Lead', 'Ask', 'Dig'])
     expect(titles(draw(BRANCH, CONNECTED, 0, 22))).toEqual(['Lead'])
@@ -209,11 +215,11 @@ describe('Board', () => {
   it('folds and unfolds from its own button, before the row and never inside it', () => {
     const body = draw(BRANCH)
     const fold = body.indexOf('<button class="fold')
-    expect(body.indexOf('<div class="lead')).toBeLessThan(fold)
+    expect(body.indexOf('<div class="agent')).toBeLessThan(fold)
     expect(body.indexOf('</button>', fold)).toBeLessThan(body.indexOf('<button class="row'))
-    expect(body.indexOf('<span class="folded')).toBeLessThan(body.indexOf('<button class="row'))
+    expect(body).not.toContain('class="lead')
     expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
-    expect(flat(rowSource)).toContain('.fold { display: flex; flex: 1; align-items: center; padding: 0 0 0 6px;')
+    expect(rowSource).not.toMatch(/\.lead|chevron/)
     expect(flat(boardSource)).toContain('<AgentRow {item} {agents} {now} {onopen} onfold={fold} />')
     expect(flat(boardSource)).toContain('if (machine !== null) { folds.toggle(machine, boot, pane) }')
   })
@@ -224,20 +230,50 @@ describe('Board', () => {
     expect(fold).not.toContain('onopen')
   })
 
-  it('turns one chevron a quarter in the time of ENTER_MS', () => {
+  it('turns the triangle a quarter in the time of ENTER_MS', () => {
     const source = flat(rowSource)
-    expect(source.match(/<Icon /g)).toHaveLength(1)
-    expect(source).toContain('<Icon name="chevron-right" size={18} />')
-    expect(source).not.toContain('chevron-down')
+    expect(source).not.toContain('<Icon')
+    expect(source.match(/<path /g)).toHaveLength(1)
+    expect(source).toContain(`<path d="${TRIANGLE}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />`)
     expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
-    expect(source).toContain('.chevron { display: flex; transition: transform var(--turn); }')
-    expect(source).toContain('.chevron.open { transform: rotate(90deg); }')
+    expect(source).toContain('.turn { transition: transform var(--turn); }')
+    expect(source).toContain('.turn.open { transform: rotate(90deg); }')
+    expect(source).toContain('display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 44px; padding: 0; color: var(--soft); }')
   })
 
-  it('turns the chevron at once with reduced motion', () => {
+  it('draws a triangle only on the rows with children', () => {
+    const tree = [at(1, 'working', { title: 'Lead' }), at(2, 'idle', { title: 'Kid', parent: 1, depth: 1 }), at(4, 'idle', { title: 'Alone' })]
+    const body = draw(tree, CONNECTED, 0, unfolded(27, 1))
+    expect(titles(body)).toEqual(['Lead', 'Kid', 'Alone'])
+    expect(body.match(/<svg class="turn/g)).toHaveLength(1)
+    expect(disclosures(body).map(([label]) => label)).toEqual(['Hide 1 subagent'])
+  })
+
+  it('moves the dot of a row with children into its fold, hidden from VoiceOver, and says its status in the row', () => {
+    const body = draw(BRANCH)
+    const fold = body.indexOf('<button class="fold')
+    const row = body.indexOf('<button class="row')
+    expect(body.slice(fold, row)).toMatch(/<span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot/)
+    expect(flat(rowSource)).toContain('.face { display: flex; }')
+    expect(body.slice(row)).toMatch(/^<button class="row svelte-[\w-]+" type="button"><span class="mark svelte-[\w-]+"><!--\[0--><span class="spoken">Working<\/span>/)
+    expect(body.indexOf('<svg class="dot', row)).toBeGreaterThan(body.indexOf('<span class="folded', row))
+    expect(flat(rowSource)).toContain('<span class="spoken">{statusName(row.status)}</span>')
+  })
+
+  it('keeps the dot of a row without children inside the row, where a touch opens the agent', () => {
+    const body = draw([at(4, 'done', { title: 'Alone' })])
+    const row = body.indexOf('<button class="row')
+    expect(body).not.toContain('class="fold')
+    expect(body).not.toContain('<span class="spoken')
+    expect(body.indexOf('<svg class="dot', row)).toBeGreaterThan(body.indexOf('<span class="mark', row))
+    expect(body.indexOf('<svg class="dot', row)).toBeLessThan(body.indexOf('<span class="lines', row))
+    expect(body).toMatch(/<span class="mark svelte-[\w-]+"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="Done"/)
+  })
+
+  it('turns the triangle at once with reduced motion', () => {
     vi.stubGlobal('window', { matchMedia: (query: string) => ({ matches: query.includes('reduce') }) })
     try {
-      expect(disclosures(draw(BRANCH)).map((m) => m[3])).toEqual(['0'])
+      expect(disclosures(draw(BRANCH)).map((m) => m[4])).toEqual(['0'])
     } finally {
       vi.unstubAllGlobals()
     }
@@ -257,34 +293,49 @@ describe('Board', () => {
     expect(flat(rowSource)).toContain('padding-left: calc(var(--depth) * var(--inset-wide));')
   })
 
-  it('keeps the dots of siblings in a column, with the room of the disclosure on rows without children', () => {
+  it('keeps the dots of siblings in a column, each in a mark that starts its row', () => {
     const tree = [at(1, 'working', { title: 'Lead' }), at(2, 'idle', { title: 'Kid', parent: 1, depth: 1 }), at(4, 'idle', { title: 'Alone' })]
     const body = draw(tree, CONNECTED, 0, unfolded(26, 1))
     expect(body.match(/<button class="fold svelte-[\w-]+"/g)).toHaveLength(1)
-    expect(body.match(/<div class="lead svelte-[\w-]+">/g)).toHaveLength(3)
+    expect(body.match(/<button class="row svelte-[\w-]+" type="button"><span class="mark svelte-[\w-]+">/g)).toHaveLength(3)
     expect(body).not.toContain('slot')
-    expect(rowSource).not.toContain('slot')
-    expect(flat(rowSource)).toContain('.lead { position: relative; display: flex; flex: none; align-items: center; width: 60px; }')
+    expect(rowSource).not.toMatch(/slot|\.lead|60px/)
+    expect(flat(rowSource)).toContain('.mark { display: flex; flex: none; justify-content: center; width: 14px;')
   })
 
-  it('lays the hidden count over the disclosure, so a tap on it folds and the column keeps its width', () => {
-    const body = draw(BRANCH)
-    const fold = body.indexOf('<button class="fold')
-    const count = body.indexOf('<span class="count')
-    expect(body.indexOf('</button>', fold)).toBeLessThan(count)
-    expect(body.indexOf('<span class="folded', count)).toBeGreaterThan(count)
-    expect(count).toBeLessThan(body.indexOf('<button class="row'))
-    expect(flat(rowSource)).toContain('.count { position: absolute; left: 24px; pointer-events: none; }')
-    expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} gap="4px" />')
-    expect(flat(rowSource)).not.toContain(':global(.marks)')
+  it('gives the fold a 44 pt target centred on the dot, clear of the title', () => {
+    const source = flat(rowSource)
+    expect(source).toContain('.agent { position: relative;')
+    expect(source).toContain(
+      '.fold { position: absolute; top: 0; bottom: 0; left: calc(var(--depth) * var(--inset-wide) + var(--inset) - 15px); z-index: 1;',
+    )
+    expect(source).toContain('width: 44px;')
+    expect(source).toContain('.row, .fold { box-sizing: border-box; min-height: 44px;')
+    expect(source).toContain('padding: var(--gap) var(--inset);')
+    expect(source).toContain('width: 14px; margin-right: calc(var(--inset-wide) - var(--inset)); }')
+    expect(source).toContain('.row { display: flex; flex: 1; align-items: center; gap: var(--inset);')
   })
 
-  it('leaves only the time on the right edge, and lets it shrink when the row runs out of room', () => {
+  it('says what a folded row hides inside it, before the time', () => {
+    const since = new Date(NOW - 5 * 60_000).toISOString()
+    const body = draw(BRANCH.map((agent) => ({ ...agent, since })))
+    const row = body.indexOf('<button class="row')
+    const folded = body.indexOf('<span class="folded', row)
+    expect(body.indexOf('<span class="lines', row)).toBeLessThan(folded)
+    expect(folded).toBeLessThan(body.indexOf('<span class="time', row))
+    expect(body.indexOf('<span class="time', row)).toBeLessThan(body.indexOf('</button>', row))
+    expect(flat(rowSource)).toContain('<Hidden hidden={item.hidden} attention={item.attention} />')
+    expect(flat(rowSource)).not.toContain('class="count"')
+    expect(flat(hiddenSource)).toContain('.folded, .marks { display: flex; flex: none; align-items: center; }')
+    expect(hiddenSource).not.toMatch(/gap\?:|style:gap/)
+  })
+
+  it('ends the row with the time, the only part that shrinks when the row runs out of room', () => {
     const row = flat(rowSource).match(/<button class="row"[^]*?<\/button>/)?.[0]
-    expect(row).not.toMatch(/Hidden|Icon|fold/)
+    expect(row).not.toMatch(/Icon|fold/)
     expect(row).toMatch(/<span class="time">\{time\}<\/span> \{\/if\} <\/button>$/)
     expect(flat(rowSource)).toContain('.time { flex: 0 1 auto; min-width: 0; overflow: hidden;')
-    expect(flat(hiddenSource)).toContain('.folded, .marks { display: flex; flex: none; align-items: center; }')
+    expect(flat(rowSource).match(/flex: 0 1 auto/g)).toHaveLength(1)
   })
 
   it('names the members of a flow by their role under its orchestrator', () => {
@@ -345,6 +396,14 @@ describe('Board search', () => {
     expect(body).not.toContain('class="folded')
     expect(field(body)).toContain('value="dig"')
     expect(folds.expanded(machine, 'b1').size).toBe(0)
+  })
+
+  it('keeps every dot inside its row while searching, with no triangle and no spoken status', () => {
+    const body = draw(BRANCH, CONNECTED, 0, searching(49, 'dig'))
+    expect(titles(body)).toEqual(['Lead', 'Ask', 'Dig'])
+    expect(body).not.toContain('<svg class="turn')
+    expect(body).not.toContain('<span class="spoken')
+    expect(body.match(/<span class="mark svelte-[\w-]+"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot/g)).toHaveLength(3)
   })
 
   it('says so when nothing matches, and keeps the field to fix the query', () => {
