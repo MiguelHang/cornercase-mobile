@@ -43,8 +43,8 @@ Topics, in `design/starting-work/`:
 
 - `--machine`, `--mode`, `--effort`, a tab's `--name`, profiles (`--profile`, also for a flow: With a flow), `queue add`, also with an issue (`queue add --issue`), and a flow without an issue, from Start's `Agent`.
 - For issues: connecting a tracker or keeping a token on the phone, people to filter by (`issue people`), the workspace's name from the issue (`--workspace-name`, for an agent or a flow), a prompt of the user's own with the issue, for an agent (Upstream gaps) or a flow (`flow run --prompt`, With a flow), and opening the issue in the phone's browser or copying its link.
-- For accounts: remembering the last one used (Which account is chosen), adding, renaming, logging in or changing the default from the phone (`account add`, `login`, `rename`, `use`), warning about tokens in the Mac's environment (`tokens`, which win over any account), and an account for `queue add` or a flow without an issue, which stay left out themselves.
+- For accounts: remembering the last one used (Where the choices come from › Which account is chosen), adding, renaming, logging in or changing the default from the phone (`account add`, `login`, `rename`, `use`), warning about tokens in the Mac's environment (`tokens`, which win over any account), and an account for `queue add` or a flow without an issue, which stay left out themselves.
 - For flows: following a run (`flow runs`, `flow messages`, `flow files`), editing, importing or ordering flows and choosing the default one, their diagram, and a flow in an open workspace, which upstream does not make.
 - Going back from the issues to Start opens a new form, on `Agent`, with the workspace of Where the choices come from.
-- Starting an issue in an open workspace of a project whose folder is a repository's root: upstream's places give only a new worktree of it (Where).
+- Starting an issue in an open workspace of a project whose folder is a repository's root: upstream's places give only a new worktree of it (From an issue › Where).
 - Opening the terminal of a workspace without an agent: the `terminal` route needs an agent's row.
