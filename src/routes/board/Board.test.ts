@@ -1,7 +1,13 @@
 import { render } from 'svelte/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
+import type {
+  AgentClosing_Serialize as AgentClosing,
+  AgentRow_Serialize as Agent,
+  ConnectionView_Serialize,
+} from '../../lib/bindings'
 import { boardSearch } from '../../lib/boardSearch.svelte'
+import { fakeClock, ok } from '../../lib/chatFakes'
+import { CloseAgent, type CloseCalls, type Closing } from '../../lib/closeAgent.svelte'
 import { folds } from '../../lib/folds.svelte'
 import hiddenSource from '../../lib/ui/Hidden.svelte?raw'
 import Board from './Board.svelte'
@@ -41,8 +47,13 @@ const at = (pane: number, status: string | null, more: Partial<Agent> = {}): Age
   ...more,
 })
 
-const draw = (agents: Agent[] | null, connection: ConnectionView_Serialize = CONNECTED, below = 0, machine: number | null = 1) =>
-  render(Board, { props: { machine, agents, connection, below, onopen: () => {}, onstart: () => {} } }).body
+const draw = (
+  agents: Agent[] | null,
+  connection: ConnectionView_Serialize = CONNECTED,
+  below = 0,
+  machine: number | null = 1,
+  closer: CloseAgent | null = null,
+) => render(Board, { props: { machine, agents, connection, closer, below, onopen: () => {}, onstart: () => {} } }).body
 
 const BRANCH = [
   at(1, 'working', { title: 'Lead', rank_status: 'waiting' }),
@@ -134,7 +145,7 @@ describe('Board', () => {
     expect(draw([at(1, 'idle')])).toMatch(/<button class="row svelte-[\w-]+" type="button">/)
     expect(flat(rowSource)).toContain('min-height: 44px;')
     expect(flat(rowSource)).toContain(
-      '<button class="row" type="button" onclick={() => onopen(row.pane)} ontouchstart={() => {}}>',
+      '<button class="row" type="button" aria-busy={progress === null ? undefined : \'true\'} onclick={() => onopen(row.pane)} ontouchstart={() => {}} >',
     )
   })
 
@@ -220,7 +231,7 @@ describe('Board', () => {
     expect(body).not.toContain('class="lead')
     expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
     expect(rowSource).not.toMatch(/\.lead|chevron/)
-    expect(flat(boardSource)).toContain('<AgentRow {item} {agents} {now} {onopen} onfold={fold} />')
+    expect(flat(boardSource)).toContain('{onopen} onfold={fold}')
     expect(flat(boardSource)).toContain('if (machine !== null) { folds.toggle(machine, boot, pane) }')
   })
 
@@ -246,7 +257,7 @@ describe('Board', () => {
     const rule = flat(rowSource).match(/\.turn \{[^}]*\}/)?.[0]
     expect(rule).toContain('position: relative; left: calc((7px + var(--inset-wide)) / 2);')
     expect(rule).not.toMatch(/11\.5|11px|12px/)
-    expect(rowSource).not.toMatch(/translate/)
+    expect(flat(rowSource).match(/\.turn[^{]*\{[^}]*\}/g)?.join(' ')).not.toMatch(/translate/)
   })
 
   it('turns the drawing inside the triangle and never the triangle itself, whose frame would reach the title', () => {
@@ -474,5 +485,162 @@ describe('Board search', () => {
   it('searches nothing without a machine', () => {
     searching(48, 'dig')
     expect(titles(draw(BRANCH, CONNECTED, 0, null))).toEqual(['Lead'])
+  })
+})
+
+describe('Closing an agent from the board', () => {
+  const ref = (pane: number) => ({ agent: 'codex', pane, project: 1, tab: 3, workspace: 2 })
+
+  const PLAN: AgentClosing = {
+    pane: 1,
+    agent: 'codex',
+    project: 1,
+    workspace: 2,
+    tabs: [3],
+    stops: [ref(1), ref(2), ref(3)],
+    keeps: [],
+    run: null,
+    closed: false,
+    warning: null,
+  }
+
+  const never = () => new Promise<never>(() => {})
+
+  const flushed = async () => {
+    for (let step = 0; step < 10; step += 1) await Promise.resolve()
+  }
+
+  const closerAt = async (kind: Closing['kind'] | 'idle', rows: Agent[] = BRANCH) => {
+    let checks = 0
+    const calls: CloseCalls = {
+      closeAgentCheck: () => {
+        checks += 1
+        return kind === 'checking' || (kind === 'rechecking' && checks > 1) ? never() : Promise.resolve(ok(PLAN))
+      },
+      closeAgent: never,
+    }
+    const closer = new CloseAgent(calls, () => {}, () => {}, fakeClock().clock)
+    closer.seen(rows)
+    if (kind !== 'idle') void closer.ask(rows[0])
+    await flushed()
+    if (kind === 'rechecking' || kind === 'closing') void closer.confirm(1)
+    await flushed()
+    return closer
+  }
+
+  const CLOSE = /<button class="close svelte-[\w-]+ eased" type="button" tabindex="-1" aria-hidden="true" style="width: 88px; --reveal: 0px;">\s*Close\s*<\/button>/g
+
+  const ending = (body: string) =>
+    [...body.matchAll(/<span class="title svelte-[\w-]+">(\w+)<\/span>[^]*?(Closing…|class="spinner|<\/button>)/g)].map(
+      (m) => [m[1], m[2]],
+    )
+
+  const dialog = (body: string) => body.match(/<div class="sheet svelte-[\w-]+" role="dialog" aria-modal="true" aria-label="([^"]+)"/)?.[1]
+
+  it('hides a red Close behind each closable row on iOS, out of reach until the row opens', async () => {
+    const body = draw(BRANCH, CONNECTED, 0, unfolded(60, 1, 2), await closerAt('idle'))
+    expect(body.match(CLOSE)).toHaveLength(3)
+    const source = flat(rowSource)
+    expect(source).toContain("{#if gesture === 'swipe' && closable}")
+    expect(source).toContain("tabindex={open ? undefined : -1} aria-hidden={open ? undefined : 'true'} onclick={() => onclose(row)}")
+    expect(source).toContain('background: var(--failed); color: var(--glass);')
+    expect(source).toContain('clip-path: inset(0 0 0 calc(100% - var(--reveal)));')
+  })
+
+  it.each<[string, Agent[], boolean]>([
+    ['a row without a boot', BRANCH.map((agent) => ({ ...agent, boot: '' })), true],
+    ['a board without a closer', BRANCH, false],
+  ])('offers no Close on %s', async (_, rows, closing) => {
+    const closer = closing ? await closerAt('idle', rows) : null
+    expect(draw(rows, CONNECTED, 0, unfolded(61, 1, 2), closer)).not.toContain('class="close')
+    expect(flat(boardSource)).toContain("const gestureOf = (row: Agent) => (closer === null || row.boot === '' ? null : gesture)")
+  })
+
+  it('says Closing… on the closed row and on the rows of what it stops, in place of their time', async () => {
+    const since = new Date(Date.now() - 5 * 60_000).toISOString()
+    const rows = [...BRANCH.map((agent) => ({ ...agent, since })), at(4, 'waiting', { title: 'Other', since })]
+    const body = draw(rows, CONNECTED, 0, unfolded(62, 1, 2), await closerAt('closing', rows))
+    expect(ending(body)).toEqual([
+      ['Lead', 'Closing…'],
+      ['Ask', 'Closing…'],
+      ['Dig', 'Closing…'],
+      ['Other', '</button>'],
+    ])
+    expect(body.match(/<span class="time svelte-[\w-]+">5 min<\/span>/g)).toHaveLength(1)
+    expect(body.match(/aria-busy="true"/g)).toHaveLength(3)
+    expect(body.match(CLOSE)).toHaveLength(1)
+    expect(body.indexOf('class="close')).toBeGreaterThan(body.indexOf('>Dig<'))
+  })
+
+  it('turns a spinner on the row while cornercase checks what closing it stops', async () => {
+    const body = draw(BRANCH, CONNECTED, 0, unfolded(63, 1, 2), await closerAt('checking'))
+    expect(ending(body)).toEqual([
+      ['Lead', 'class="spinner'],
+      ['Ask', '</button>'],
+      ['Dig', '</button>'],
+    ])
+    expect(dialog(body)).toBeUndefined()
+  })
+
+  it.each([
+    ['confirming', ' type="button">'],
+    ['rechecking', ' type="button" disabled="" aria-busy="true">'],
+  ] as const)('asks before closing while %s, naming the row as the board does', async (kind, button) => {
+    const body = draw(BRANCH, CONNECTED, 0, 64, await closerAt(kind))
+    expect(dialog(body)).toBe('Close Lead?')
+    expect(body).toContain('Also stops 2 subagents')
+    expect(body).toMatch(new RegExp(`<button class="button danger svelte-[\\w-]+( busy)?"${button}`))
+    expect(flat(boardSource)).toContain(
+      "<CloseConfirm plan={asking.state.plan} label={label(asking.row, agents ?? [])} rechecking={asking.state.kind === 'rechecking'} oncancel={() => closer?.cancel(pane)} onconfirm={() => void closer?.confirm(pane)} />",
+    )
+  })
+
+  it('never slides the section headers or the search field', async () => {
+    const body = draw(BRANCH, CONNECTED, 0, unfolded(65, 1, 2), await closerAt('idle'))
+    expect(body.match(/<div class="layer/g)).toHaveLength(3)
+    expect(body.indexOf('<div class="layer')).toBeGreaterThan(body.indexOf('<h2 class="section'))
+    expect(flat(boardSource)).not.toMatch(/<h2 class="section"[^>]*@attach|<div class="find"[^>]*@attach/)
+    expect(flat(rowSource)).toContain('<div class="layer" class:eased={dragged === null} style:transform={offset < 0 ? `translateX(${offset}px)` : undefined} {@attach touches} >')
+  })
+
+  it('slides the fold with the row, its offset measured inside the sliding layer', () => {
+    const source = flat(rowSource)
+    expect(source.indexOf('<div class="layer"')).toBeLessThan(source.indexOf('<button class="fold"'))
+    expect(source).toContain('.agent { position: relative; overflow: clip; }')
+    expect(source).toContain('.layer { position: relative; display: flex; align-items: center; padding-left: calc(var(--depth) * var(--inset-wide)); }')
+  })
+
+  it('opens the row at the width of Close and settles it eased, at once with reduced motion', () => {
+    const source = flat(rowSource)
+    expect(source).toContain('const offset = $derived(dragged ?? (open ? -OPEN_WIDTH : 0))')
+    expect(source).toContain('.layer.eased { transition: transform var(--leave) ease-out; }')
+    expect(source).toContain('.close.eased { transition: clip-path var(--leave) ease-out; }')
+    expect(source).toContain('@media (prefers-reduced-motion: reduce) { .layer.eased, .close.eased { transition: none; } }')
+  })
+
+  it('swipes on iOS and holds on Android, with a light tap when the hold fires', () => {
+    const source = flat(rowSource)
+    expect(source).toContain("if (gesture === 'swipe') { return watchRowSwipe(node, {")
+    expect(source).toContain("if (gesture === 'hold') { return watchLongPress(node, () => onclose(row)) }")
+    expect(source).toContain('ondrag: (next) => (dragged = closable ? next : null), onsettle: (next) => onswipe(row.pane, next),')
+    const board = flat(boardSource)
+    expect(board).toContain('const gesture = rowGesture(platform)')
+    expect(board).toContain("if (gesture === 'hold') { void tap(haptics) } shut() void closer.ask(row)")
+  })
+
+  it('keeps one row open at most, shut by a touch elsewhere, a scroll or a list that moves it', () => {
+    const board = flat(boardSource)
+    expect(board).toContain('let swiped = $state<{ pane: number; at: number } | null>(null)')
+    expect(board).toContain('swiped = open ? { pane, at: placeOf(pane) } : null')
+    expect(board).toContain(
+      "const placeOf = (pane: number) => shown.findIndex((item) => item.kind === 'row' && item.row.pane === pane)",
+    )
+    expect(board).toContain('if (swiped !== null && placeOf(swiped.pane) !== swiped.at) { shut() }')
+    expect(board).toContain(
+      "['touchstart', outside, { capture: true, passive: true }], ['scroll', shut, { capture: true, passive: true }],",
+    )
+    expect(board).toContain("event.target.closest('[data-open]') !== null")
+    expect(board).toContain('const opens = (row: Agent) => swiped?.pane === row.pane && closer?.offered(row) === true')
+    expect(flat(rowSource)).toContain("<div class=\"agent\" style:--depth={item.depth} data-open={open ? '' : undefined}>")
   })
 })

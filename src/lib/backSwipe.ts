@@ -127,7 +127,7 @@ export type Watching = {
 
 const EDGES: Record<EdgeState, Edge> = { pending: 'pending', claimed: 'claimed', cancelled: 'idle' }
 
-const touched = (event: Touches) => Array.from(event.changedTouches)
+export const touched = (event: Touches) => Array.from(event.changedTouches)
 
 class Watch {
   #swipe = new BackSwipe()
@@ -198,19 +198,26 @@ class Watch {
 
 export type Listened = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>
 
+export type Listener = [string, EventListener, AddEventListenerOptions]
+
+export const listening = (target: Listened, listeners: Listener[]) => {
+  for (const [name, listener, options] of listeners) target.addEventListener(name, listener, options)
+  return () => {
+    for (const [name, listener, options] of listeners) target.removeEventListener(name, listener, options)
+  }
+}
+
 export const watchBackSwipe = (target: Listened, watching: Watching) => {
   const watch = new Watch(watching)
-  const listeners: [string, EventListener, AddEventListenerOptions][] = [
+  const stop = listening(target, [
     ['touchstart', (event) => watch.pressed(event as TouchEvent), { capture: true }],
     ['touchmove', (event) => watch.moved(event as TouchEvent), { capture: true, passive: false }],
     ['touchend', (event) => watch.lifted(event as TouchEvent), { capture: true }],
     ['touchcancel', () => watch.cancelled(), { capture: true }],
     ['pointercancel', () => watch.cancelled(), { capture: true }],
-  ]
-  for (const [name, listener, options] of listeners) target.addEventListener(name, listener, options)
+  ])
   return () => {
-    for (const [name, listener, options] of listeners)
-      target.removeEventListener(name, listener, options)
+    stop()
     watch.stop()
   }
 }

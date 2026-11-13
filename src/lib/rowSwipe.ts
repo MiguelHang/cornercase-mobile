@@ -1,4 +1,4 @@
-import { CLAIM, decided, leans, type EdgeState } from './backSwipe'
+import { CLAIM, decided, leans, listening, touched, type EdgeState, type Listened } from './backSwipe'
 import { timers, type Clock } from './chat.svelte'
 import type { Platform } from './platform'
 import type { Point } from './terminal/pinch'
@@ -126,5 +126,69 @@ export class LongPress {
   #hold() {
     this.#held = true
     this.#onheld()
+  }
+}
+
+export type RowWatching = {
+  open: () => boolean
+  ondrag: (offset: number | null) => void
+  onsettle: (open: boolean) => void
+}
+
+const settled = (ending: RowEnding, open: boolean) => {
+  if (ending === 'open') return true
+  if (ending === 'shut' || (ending === 'tap' && open)) return false
+  return null
+}
+
+const each = (event: Event, touch: (id: number, point: Point) => void) => {
+  for (const { identifier, clientX, clientY } of touched(event as TouchEvent)) touch(identifier, [clientX, clientY])
+}
+
+export const watchRowSwipe = (target: Listened, watching: RowWatching) => {
+  const swipe = new RowSwipe()
+  const moved = (event: Event) => {
+    each(event, (id, point) => {
+      const { state, offset } = swipe.move(id, point)
+      watching.ondrag(state === 'claimed' ? offset : null)
+    })
+    if (swipe.holds) event.preventDefault()
+  }
+  const lifted = (event: Event) =>
+    each(event, (id) => {
+      const open = settled(swipe.lift(id), watching.open())
+      watching.ondrag(null)
+      if (open !== null) {
+        event.preventDefault()
+        watching.onsettle(open)
+      }
+    })
+  const cancelled = () => {
+    swipe.cancel()
+    watching.ondrag(null)
+  }
+  return listening(target, [
+    ['touchstart', (event) => each(event, (id, point) => swipe.press(id, point, watching.open())), { passive: true }],
+    ['touchmove', moved, { passive: false }],
+    ['touchend', lifted, {}],
+    ['touchcancel', cancelled, {}],
+  ])
+}
+
+export const watchLongPress = (target: Listened, onheld: () => void, clock: Pick<Clock, 'after'> = timers) => {
+  const press = new LongPress(onheld, clock)
+  const lifted = (event: Event) =>
+    each(event, (id) => {
+      if (press.lift(id)) event.preventDefault()
+    })
+  const stop = listening(target, [
+    ['touchstart', (event) => each(event, (id, point) => press.press(id, point)), { passive: true }],
+    ['touchmove', (event) => each(event, (id, point) => press.move(id, point)), { passive: true }],
+    ['touchend', lifted, {}],
+    ['touchcancel', () => press.cancel(), {}],
+  ])
+  return () => {
+    stop()
+    press.cancel()
   }
 }

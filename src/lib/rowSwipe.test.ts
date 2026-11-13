@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CLAIM } from './backSwipe'
 import { fakeClock } from './chatFakes'
-import { LONG_PRESS_MS, LongPress, OPEN_WIDTH, RowSwipe, STAY, rowGesture } from './rowSwipe'
+import {
+  LONG_PRESS_MS,
+  LongPress,
+  OPEN_WIDTH,
+  RowSwipe,
+  STAY,
+  rowGesture,
+  watchLongPress,
+  watchRowSwipe,
+} from './rowSwipe'
+import { Target } from './touchFakes'
 
 const X = 300
 
@@ -262,5 +272,163 @@ describe('LongPress', () => {
     press.press(2, [X, Y])
     tick(LONG_PRESS_MS - 1)
     expect([onheld.mock.calls.length, press.lift(2)]).toEqual([1, false])
+  })
+})
+
+const toucher = (target: Target) => {
+  let prevented = 0
+  const touch = (name: string, x = X, y = Y, id = 1) =>
+    target.fire(name, {
+      changedTouches: [{ identifier: id, clientX: x, clientY: y }],
+      timeStamp: 0,
+      preventDefault: () => prevented++,
+    })
+  return { touch, prevented: () => prevented }
+}
+
+const watchedRow = (open = false) => {
+  const target = new Target()
+  const drags: (number | null)[] = []
+  const settles: boolean[] = []
+  const stop = watchRowSwipe(target, {
+    open: () => open,
+    ondrag: (offset) => drags.push(offset),
+    onsettle: (next) => settles.push(next),
+  })
+  return { target, drags, settles, stop, ...toucher(target) }
+}
+
+const swiped = (dx: number, open = false) => {
+  const watch = watchedRow(open)
+  watch.touch('touchstart')
+  watch.touch('touchmove', X + Math.sign(dx) * CLAIM)
+  watch.touch('touchmove', X + dx)
+  return watch
+}
+
+describe('watchRowSwipe', () => {
+  it('listens to the touches of its row, holding only the moves as not passive', () => {
+    expect(watchedRow().target.options()).toEqual({
+      touchstart: { passive: true },
+      touchmove: { passive: false },
+      touchend: {},
+      touchcancel: {},
+    })
+  })
+
+  it('stops listening when stopped', () => {
+    const { target, stop } = watchedRow()
+    stop()
+    expect(target.listeners.size).toBe(0)
+  })
+
+  it('drags the row with the finger once it claims the touch, holding the page still', () => {
+    const { drags, prevented } = swiped(-40)
+    expect(drags).toEqual([-CLAIM, -40])
+    expect(prevented()).toBe(2)
+  })
+
+  it('leaves a vertical scroll to the page and settles nothing', () => {
+    const { touch, drags, settles, prevented } = watchedRow()
+    touch('touchstart')
+    touch('touchmove', X - 4, Y + 40)
+    touch('touchend', X - 4, Y + 40)
+    expect([drags, settles, prevented()]).toEqual([[null, null], [], 0])
+  })
+
+  it.each([
+    ['opens', -OPEN_WIDTH * STAY, true],
+    ['shuts', -OPEN_WIDTH * STAY + 1, false],
+  ])('%s on a lift, letting go of the drag and swallowing the click', (_, dx, open) => {
+    const watch = swiped(dx)
+    watch.touch('touchend', X + dx)
+    expect([watch.settles, watch.drags.at(-1), watch.prevented()]).toEqual([[open], null, 3])
+  })
+
+  it('lets a tap on a shut row through to its button', () => {
+    const { touch, settles, prevented } = watchedRow()
+    touch('touchstart')
+    touch('touchend')
+    expect([settles, prevented()]).toEqual([[], 0])
+  })
+
+  it('shuts an open row on a tap and swallows the click, so the chat and the fold stay put', () => {
+    const { touch, settles, prevented } = watchedRow(true)
+    touch('touchstart')
+    touch('touchend')
+    expect([settles, prevented()]).toEqual([[false], 1])
+  })
+
+  it('shuts an open row dragged right', () => {
+    const watch = swiped(OPEN_WIDTH, true)
+    watch.touch('touchend', X + OPEN_WIDTH)
+    expect([watch.drags.slice(0, 2), watch.settles]).toEqual([[-OPEN_WIDTH + CLAIM, 0], [false]])
+  })
+
+  it('lets go of the drag when the touch is cancelled, and settles nothing on the lift', () => {
+    const watch = swiped(-60)
+    watch.touch('touchcancel')
+    watch.touch('touchend', X - 60)
+    expect([watch.drags.slice(-2), watch.settles]).toEqual([[null, null], []])
+  })
+})
+
+const watchedHold = () => {
+  const target = new Target()
+  const onheld = vi.fn()
+  const time = fakeClock()
+  const stop = watchLongPress(target, onheld, time.clock)
+  return { target, onheld, stop, ...time, ...toucher(target) }
+}
+
+describe('watchLongPress', () => {
+  it('listens to the touches of its row without holding the page', () => {
+    expect(watchedHold().target.options()).toEqual({
+      touchstart: { passive: true },
+      touchmove: { passive: true },
+      touchend: {},
+      touchcancel: {},
+    })
+  })
+
+  it('fires a held touch and swallows the click of its lift', () => {
+    const { touch, onheld, tick, prevented } = watchedHold()
+    touch('touchstart')
+    tick(LONG_PRESS_MS)
+    touch('touchend')
+    expect([onheld.mock.calls.length, prevented()]).toEqual([1, 1])
+  })
+
+  it('lets a short tap through to its button', () => {
+    const { touch, onheld, tick, prevented } = watchedHold()
+    touch('touchstart')
+    tick(LONG_PRESS_MS - 1)
+    touch('touchend')
+    tick(LONG_PRESS_MS)
+    expect([onheld.mock.calls.length, prevented()]).toEqual([0, 0])
+  })
+
+  it('gives up once the finger moves away, as a scroll does', () => {
+    const { touch, onheld, tick } = watchedHold()
+    touch('touchstart')
+    touch('touchmove', X, Y + CLAIM)
+    tick(LONG_PRESS_MS)
+    expect(onheld).not.toHaveBeenCalled()
+  })
+
+  it('gives up when the touch is cancelled', () => {
+    const { touch, onheld, tick, pending } = watchedHold()
+    touch('touchstart')
+    touch('touchcancel')
+    tick(LONG_PRESS_MS)
+    expect([onheld.mock.calls.length, pending()]).toEqual([0, 0])
+  })
+
+  it('stops listening and drops the wait when stopped', () => {
+    const { target, touch, onheld, stop, tick, pending } = watchedHold()
+    touch('touchstart')
+    stop()
+    tick(LONG_PRESS_MS)
+    expect([target.listeners.size, onheld.mock.calls.length, pending()]).toEqual([0, 0, 0])
   })
 })

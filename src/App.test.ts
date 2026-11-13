@@ -136,7 +136,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
     expect(source).toContain(
-      "<Board machine={current.machine} agents={current.agents} connection={current.connection} below={barHeight} onopen={open} onstart={start} />",
+      "<Board machine={current.machine} agents={current.agents} connection={current.connection} {closer} below={barHeight} onopen={open} onstart={start} />",
     )
     expect(source).toContain(
       "const open = (pane: number) => router.go({ name: 'agent', machine: current.machine, pane })",
@@ -144,6 +144,17 @@ describe('App wiring', () => {
     expect(source).toContain(
       '<ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />',
     )
+  })
+
+  it('keeps one closer per shown machine, fed every listed board and never a list it does not have', () => {
+    expect(source).toContain('const shownMachine = $derived(current.machine)')
+    expect(source).toContain(
+      'const closer = $derived( shownMachine === null ? null : new CloseAgent(commands, (toast) => toasts.push(toast), () => {}), )',
+    )
+    expect(source).toContain(
+      '$effect(() => { const { agents } = current if (closer !== null && agents !== null) { untrack(() => closer.seen(agents)) } })',
+    )
+    expect(source.match(/new CloseAgent\(/g)).toHaveLength(1)
   })
 
   it('opens a chat for the tapped pane on its own machine, kept alive under its terminal and under Machines, and goes back from it', () => {

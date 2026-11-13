@@ -13,6 +13,7 @@
   import { backPressed, handled, watchBackButton } from './lib/backButton'
   import { backSwipes, RESTING, translated, watchBackSwipe, type Shift } from './lib/backSwipe'
   import { ChangesState } from './lib/changes.svelte'
+  import { CloseAgent } from './lib/closeAgent.svelte'
   import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
@@ -63,6 +64,10 @@
   const history = new LocalHistory(commands)
 
   const route = $derived(router.current)
+  const shownMachine = $derived(current.machine)
+  const closer = $derived(
+    shownMachine === null ? null : new CloseAgent(commands, (toast) => toasts.push(toast), () => {}),
+  )
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
   const opening = $derived(router.opened)
   const pane = $derived(opening?.pane ?? null)
@@ -150,6 +155,13 @@
     if (chat !== null) {
       const waiting = starting !== null
       untrack(() => chat.see(machine, agents, waiting))
+    }
+  })
+
+  $effect(() => {
+    const { agents } = current
+    if (closer !== null && agents !== null) {
+      untrack(() => closer.seen(agents))
     }
   })
 
@@ -433,6 +445,7 @@
           machine={current.machine}
           agents={current.agents}
           connection={current.connection}
+          {closer}
           below={barHeight}
           onopen={open}
           onstart={start}
