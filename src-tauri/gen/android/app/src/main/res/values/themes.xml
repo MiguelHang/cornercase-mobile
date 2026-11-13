@@ -1,6 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.cornercase_mobile" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+    <style name="Base.Theme.cornercase_mobile" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
     </style>
+
+    <style name="Theme.cornercase_mobile" parent="Base.Theme.cornercase_mobile" />
 </resources>

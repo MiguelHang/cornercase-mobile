@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.cornercase_mobile" parent="Base.Theme.cornercase_mobile">
+        <item name="android:windowSplashScreenBackground">@color/ground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_mark</item>
+    </style>
+</resources>
