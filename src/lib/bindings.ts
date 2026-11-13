@@ -27,6 +27,8 @@ export const commands = {
 	discard: (ids: number[]) => __TAURI_INVOKE<void>("discard", { ids }),
 	questionOpen: (tab: number, pane: number) => typedError<null, CommandError>(__TAURI_INVOKE("question_open", { tab, pane })),
 	questionClose: (tab: number, pane: number) => __TAURI_INVOKE<void>("question_close", { tab, pane }),
+	closeAgentCheck: (pane: number, boot: string) => typedError<AgentClosing_Serialize, CommandError>(__TAURI_INVOKE("close_agent_check", { pane, boot })),
+	closeAgent: (pane: number, boot: string) => typedError<AgentClosing_Serialize, CommandError>(__TAURI_INVOKE("close_agent", { pane, boot })),
 	terminalOpen: (tab: number, pane: number | null, shape: Shape_Deserialize) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_open", { tab, pane, shape })),
 	terminalClose: (tab: number) => __TAURI_INVOKE<void>("terminal_close", { tab }),
 	terminalInput: (pane: number, events: InputEvent_Deserialize[]) => typedError<null, CommandError>(__TAURI_INVOKE("terminal_input", { pane, events })),
@@ -109,6 +111,34 @@ export type AgentChoice_Serialize = {
 	agent: string,
 	command: string,
 	installed: boolean,
+};
+
+export type AgentClosing = AgentClosing_Serialize | AgentClosing_Deserialize;
+
+export type AgentClosing_Deserialize = {
+	pane?: number,
+	agent?: string,
+	project?: number,
+	workspace?: number,
+	tabs?: number[],
+	stops?: PaneRef_Deserialize[],
+	keeps?: PaneRef_Deserialize[],
+	run?: number | null,
+	closed?: boolean,
+	warning?: string | null,
+};
+
+export type AgentClosing_Serialize = {
+	pane: number,
+	agent: string,
+	project: number,
+	workspace: number,
+	tabs: number[],
+	stops: PaneRef_Serialize[],
+	keeps: PaneRef_Serialize[],
+	run: number | null,
+	closed: boolean,
+	warning: string | null,
 };
 
 export type AgentRow = AgentRow_Serialize | AgentRow_Deserialize;
@@ -858,6 +888,24 @@ export type Name_Deserialize = {
 export type Name_Serialize = {
 	path: string,
 	indices: number[],
+};
+
+export type PaneRef = PaneRef_Serialize | PaneRef_Deserialize;
+
+export type PaneRef_Deserialize = {
+	agent?: string | null,
+	pane?: number,
+	project?: number,
+	tab?: number,
+	workspace?: number,
+};
+
+export type PaneRef_Serialize = {
+	agent: string | null,
+	pane: number,
+	project: number,
+	tab: number,
+	workspace: number,
 };
 
 export type PaneStatusChanged = PaneStatusChanged_Serialize | PaneStatusChanged_Deserialize;

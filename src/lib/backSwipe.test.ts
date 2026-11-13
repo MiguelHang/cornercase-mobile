@@ -13,6 +13,7 @@ import {
   type Watching,
 } from './backSwipe'
 import { edge } from './edge.svelte'
+import { Target } from './touchFakes'
 import type { Route } from './router.svelte'
 import type { Point } from './terminal/pinch'
 import { LEAVE_MS } from './ui/motion'
@@ -302,24 +303,6 @@ describe('BackSwipe', () => {
   })
 })
 
-type Options = AddEventListenerOptions
-
-class Target {
-  listeners = new Map<string, { listener: EventListener; options: Options }>()
-
-  addEventListener(name: string, listener: EventListener, options: Options) {
-    this.listeners.set(name, { listener, options })
-  }
-
-  removeEventListener(name: string, listener: EventListener) {
-    if (this.listeners.get(name)?.listener === listener) this.listeners.delete(name)
-  }
-
-  fire(name: string, event: object) {
-    this.listeners.get(name)?.listener(event as Event)
-  }
-}
-
 const watched = (options: Partial<Watching> = {}) => {
   const target = new Target()
   const seen: unknown[] = []
@@ -373,7 +356,7 @@ describe('watchBackSwipe', () => {
   describe('listening', () => {
     it('listens to the touches in capture, holding the moves as not passive', () => {
       const { target } = watched()
-      expect(Object.fromEntries([...target.listeners].map(([name, { options }]) => [name, options]))).toEqual({
+      expect(target.options()).toEqual({
         touchstart: { capture: true },
         touchmove: { capture: true, passive: false },
         touchend: { capture: true },

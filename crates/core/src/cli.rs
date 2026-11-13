@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod changes;
+pub mod close;
 pub mod contract;
 pub mod events;
 pub mod files;

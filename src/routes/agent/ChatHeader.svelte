@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { AgentRow_Serialize as AgentRow } from '../../lib/bindings'
   import { label, place, statusName } from '../../lib/board'
+  import type { Progress } from '../../lib/closeAgent.svelte'
   import { compactHeader } from '../../lib/thread'
+  import Button from '../../lib/ui/Button.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
   import ToolButton from '../../lib/ui/ToolButton.svelte'
@@ -13,11 +15,14 @@
     below = 0,
     boxed = false,
     sendable,
+    closable,
+    progress,
     onback,
     onterminal,
     onchanges,
     onfiles,
     onstart,
+    onclose,
   }: {
     row: AgentRow
     backTo: string | null
@@ -25,11 +30,14 @@
     below?: number
     boxed?: boolean
     sendable: boolean
+    closable: boolean
+    progress: Progress
     onback: () => void
     onterminal: (row: AgentRow) => void
     onchanges: (workspace: number, title: string) => void
     onfiles: (workspace: number, title: string) => void
     onstart: (workspace: number) => void
+    onclose: () => void
   } = $props()
 
   let scrolled = $state(0)
@@ -67,6 +75,15 @@
     <p class="place"><span class="status">{statusName(row.status)}</span> · {place(row)} › {row.tab_name}</p>
   </div>
 </header>
+<div class="close" class:spoken={boxed}>
+  {#if progress === 'closing'}
+    <Button tone="danger" resting>Closing…</Button>
+  {:else}
+    <Button tone="danger" resting={!closable && progress === null} busy={progress === 'checking'} onclick={onclose}>
+      Close agent
+    </Button>
+  {/if}
+</div>
 
 <style>
   .short {
@@ -138,6 +155,10 @@
 
   .status {
     color: var(--soft);
+  }
+
+  .close {
+    display: flex;
   }
 
   @media (prefers-reduced-motion: reduce) {

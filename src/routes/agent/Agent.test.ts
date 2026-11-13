@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize } from '../../lib/bindings'
 import { subagents } from '../../lib/board'
 import type { Chat } from '../../lib/chat.svelte'
+import type { CloseAgent, Closing } from '../../lib/closeAgent.svelte'
+import { closerAt } from '../../lib/closeFakes'
 import Agent from './Agent.svelte'
 import agentSource from './Agent.svelte?raw'
 import { CHIPS, ROW, SINCE, chatWith, clockAt, flat, lineChat } from './agentFakes'
@@ -38,12 +40,14 @@ const draw = (
   connection: ConnectionView_Serialize = CONNECTED,
   starting: string | null = null,
   agents: AgentRow[] | null = null,
+  closer: CloseAgent | null = null,
 ) =>
   render(Agent, {
     props: {
       chat,
       agents,
       connection,
+      closer,
       backTo: 'Agents',
       below,
       starting,
@@ -117,7 +121,7 @@ describe('Agent, its subagents', () => {
   it('counts the subagents of every level on a folded line under the header', () => {
     const body = draw(chatWith(LEAD), 0, CONNECTED, null, TEAM)
     expect(body.match(COUNT)?.[1]).toBe('3 subagents · 1 waiting, 2 working')
-    expect(body).toMatch(/<\/header>(?:<!--[^>]*-->|\s)*<div class="subagents[^]*?<div class="thread/)
+    expect(body).toMatch(/<\/header>(?:<!--[^>]*-->|\s)*<div class="close[^]*?<\/div>(?:<!--[^>]*-->|\s)*<div class="subagents[^]*?<div class="thread/)
     expect(body).toContain('aria-expanded="false"')
     expect(body).toMatch(CHEVRON_RIGHT)
     expect(body).not.toContain('class="children')
@@ -231,7 +235,7 @@ describe('Agent, its sticky header', () => {
     expect(source).toContain('{#snippet right()} <ToolButton label="Terminal"')
     expect(flat(toolButtonSource)).toContain('.tool { display: flex; flex: none; align-items: center; justify-content: center; width: 44px; height: 44px;')
     expect(source).toContain('.short { display: inline-flex; align-items: center; max-width: 0; overflow: hidden; vertical-align: middle;')
-    expect(source).not.toContain('<Button')
+    expect(source.slice(source.indexOf('<NavBar'), source.indexOf('</NavBar>'))).not.toContain('<Button')
   })
 
   it('leaves the back button the whole room while the compact line is hidden, taking it back once faded out', () => {
@@ -312,11 +316,14 @@ const header = (boxed: boolean) =>
       backTo: 'Agents',
       boxed,
       sendable: true,
+      closable: true,
+      progress: null,
       onback: () => {},
       onterminal: () => {},
       onchanges: () => {},
       onfiles: () => {},
       onstart: () => {},
+      onclose: () => {},
     },
   }).body
 
@@ -426,7 +433,7 @@ describe('Agent, without its row', () => {
   it('offers opening the terminal and the changes of its agent, beside going back', () => {
     expect(draw(chatWith(ROW))).toMatch(TERMINAL)
     expect(flat(agentSource)).toContain(
-      "{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} boxed={seen !== null} sendable={connection.state === 'connected'} {onback} {onterminal} {onchanges} {onfiles} {onstart} /> {#key row.pane}",
+      "{:else} <ChatHeader {row} agents={agents ?? []} {backTo} {below} boxed={seen !== null} sendable={connection.state === 'connected'} {closable} progress={closer?.progress(row.pane) ?? null} {onback} {onterminal} {onchanges} {onfiles} {onstart} onclose={ask} /> {#key row.pane}",
     )
     const source = flat(chatHeaderSource)
     expect(source).toContain('label="Terminal" icon="square-terminal" onclick={() => onterminal(row)}')
@@ -586,5 +593,90 @@ describe('Agent, its live line', () => {
     expect(flat(agentSource)).toContain(
       '$effect(() => { const told = chat const timer = setInterval(() => (now = told.now()), TICK_MS) return () => clearInterval(timer) })',
     )
+  })
+})
+
+describe('Agent, closing its agent', () => {
+  const PLAN = {
+    pane: ROW.pane,
+    agent: 'claude',
+    project: ROW.project,
+    workspace: ROW.workspace,
+    tabs: [ROW.tab],
+    stops: [{ agent: 'claude', pane: ROW.pane, project: ROW.project, tab: ROW.tab, workspace: ROW.workspace }],
+    keeps: [],
+    run: null,
+    closed: false,
+    warning: null,
+  }
+
+  const at = (kind: Closing['kind'] | 'idle', row: AgentRow = ROW) => closerAt(kind, [row], { ...PLAN, pane: row.pane })
+
+  const shown = async (kind: Closing['kind'] | 'idle', connection = CONNECTED, row: AgentRow = ROW) =>
+    draw(chatWith(row), 0, connection, null, [row], await at(kind, row))
+
+  const CLOSE_AGENT = /<div class="close svelte-[\w-]+">(?:<!--[^>]*-->)*<button class="button danger svelte-[\w-]+([^"]*)"([^>]*)>([^]*?)<\/button>/
+
+  const button = (body: string) => {
+    const [, classes, attributes, inside] = body.match(CLOSE_AGENT) ?? []
+    if (inside === undefined) return null
+    const text = inside.replace(/<[^>]*>/g, '').trim()
+    return { classes: classes.trim(), attributes: attributes.trim(), spinner: inside.includes('class="spinner'), text }
+  }
+
+  const RESTING = { classes: 'resting', attributes: 'type="button" disabled="" aria-disabled="true"', spinner: false }
+
+  const dialog = (body: string) => body.match(/<div class="sheet svelte-[\w-]+" role="dialog" aria-modal="true" aria-label="([^"]+)"/)?.[1]
+
+  it('offers a danger Close agent at the foot of the large header, named by its text for VoiceOver', async () => {
+    const body = await shown('idle')
+    expect(button(body)).toEqual({ classes: '', attributes: 'type="button"', spinner: false, text: 'Close agent' })
+    expect(body.search(CLOSE_AGENT)).toBeGreaterThan(body.indexOf('</header>'))
+    expect(body.search(CLOSE_AGENT)).toBeLessThan(body.indexOf('class="composer'))
+    expect(dialog(body)).toBeUndefined()
+  })
+
+  it.each<[string, ConnectionView_Serialize, AgentRow, boolean]>([
+    ['while connecting', { state: 'connecting' }, ROW, true],
+    ['without a connection', { state: 'none' }, ROW, true],
+    ['for a row without a boot', CONNECTED, { ...ROW, boot: '' }, true],
+    ['without a closer', CONNECTED, ROW, false],
+  ])('rests %s, as New agent does', async (_, connection, row, closing) => {
+    const closer = closing ? await at('idle', row) : null
+    const body = draw(chatWith(row), 0, connection, null, [row], closer)
+    expect(button(body)).toEqual({ ...RESTING, text: 'Close agent' })
+  })
+
+  it('turns a spinner while cornercase checks what closing it stops', async () => {
+    const body = await shown('checking')
+    expect(button(body)).toEqual({ classes: 'busy', attributes: 'type="button" disabled="" aria-busy="true"', spinner: true, text: 'Close agent' })
+  })
+
+  it('says Closing… while it closes, and takes no other close', async () => {
+    const body = await shown('closing')
+    expect(button(body)).toEqual({ ...RESTING, text: 'Closing…' })
+    expect(body).not.toContain('no longer running')
+  })
+
+  it.each(['confirming', 'rechecking'] as const)('asks before closing while %s, naming the agent as its header does', async (kind) => {
+    const body = await shown(kind)
+    expect(dialog(body)).toBe('Close Fix the login flow?')
+    expect(body).toContain('Nothing is deleted from disk')
+    expect(flat(agentSource)).toContain(
+      "{#if asking !== null} {@const pane = row.pane} <CloseConfirm plan={asking.plan} label={label(row, agents ?? [])} rechecking={asking.kind === 'rechecking'} oncancel={() => closer?.cancel(pane)} onconfirm={() => void closer?.confirm(pane)} /> {/if}",
+    )
+  })
+
+  it('asks only while it is offered, the screen has its row and the phone is connected', () => {
+    const source = flat(agentSource)
+    expect(source).toContain(
+      "const closable = $derived(row !== null && connection.state === 'connected' && closer?.offered(row) === true)",
+    )
+    expect(source).toContain('const ask = () => { if (row !== null && closable) { void closer?.ask(row) } }')
+  })
+
+  it('leaves the button out of sight with the large header while the phone keyboard is open', () => {
+    expect(header(true)).toMatch(/<div class="close svelte-[\w-]+ spoken">(?:<!--[^>]*-->)*<button class="button danger/)
+    expect(header(false)).toMatch(/<div class="close svelte-[\w-]+">(?:<!--[^>]*-->)*<button class="button danger/)
   })
 })

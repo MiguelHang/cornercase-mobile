@@ -1,10 +1,17 @@
 <script lang="ts">
+  import * as haptics from '@tauri-apps/plugin-haptics'
   import { flip } from 'svelte/animate'
+  import { listening } from '../../lib/backSwipe'
   import type { AgentRow_Serialize as Agent, ConnectionView_Serialize } from '../../lib/bindings'
-  import { items } from '../../lib/board'
+  import { items, label } from '../../lib/board'
   import { boardSearch } from '../../lib/boardSearch.svelte'
+  import type { CloseAgent } from '../../lib/closeAgent.svelte'
   import { folds } from '../../lib/folds.svelte'
+  import { tap } from '../../lib/haptics'
+  import { platform } from '../../lib/platform'
+  import { rowGesture } from '../../lib/rowSwipe'
   import Button from '../../lib/ui/Button.svelte'
+  import CloseConfirm from '../../lib/ui/CloseConfirm.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import SearchField from '../../lib/ui/SearchField.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
@@ -16,6 +23,7 @@
     machine,
     agents,
     connection,
+    closer,
     below = 0,
     onopen,
     onstart,
@@ -23,6 +31,7 @@
     machine: number | null
     agents: Agent[] | null
     connection: ConnectionView_Serialize
+    closer: CloseAgent | null
     below?: number
     onopen: (pane: number) => void
     onstart: () => void
@@ -56,6 +65,72 @@
   const shown = $derived(agents === null ? [] : items(agents, opened, query))
 
   const moving = { duration: prefersReducedMotion() ? 0 : ENTER_MS }
+
+  const gesture = rowGesture(platform)
+
+  let swiped = $state<{ pane: number; at: number } | null>(null)
+
+  const placeOf = (pane: number) => shown.findIndex((item) => item.kind === 'row' && item.row.pane === pane)
+
+  const swipe = (pane: number, open: boolean) => {
+    swiped = open ? { pane, at: placeOf(pane) } : null
+  }
+
+  const shut = () => (swiped = null)
+
+  const outside = (event: Event) => {
+    if (!(event.target instanceof Element && event.target.closest('[data-open]') !== null)) {
+      shut()
+    }
+  }
+
+  $effect(() => {
+    if (swiped !== null && placeOf(swiped.pane) !== swiped.at) {
+      shut()
+    }
+  })
+
+  $effect(() => {
+    if (swiped !== null && connection.state !== 'connected') {
+      shut()
+    }
+  })
+
+  $effect(() => {
+    if (swiped !== null) {
+      return listening(document, [
+        ['touchstart', outside, { capture: true, passive: true }],
+        ['scroll', shut, { capture: true, passive: true }],
+      ])
+    }
+  })
+
+  const closes = (row: Agent) => closer !== null && row.boot !== '' && connection.state === 'connected'
+
+  const gestureOf = (row: Agent) => (closes(row) ? gesture : null)
+
+  const opens = (row: Agent) => swiped?.pane === row.pane && closes(row) && closer?.offered(row) === true
+
+  const ask = (row: Agent) => {
+    if (closer === null || !closes(row) || !closer.offered(row)) {
+      return
+    }
+    if (gesture === 'hold') {
+      void tap(haptics)
+    }
+    shut()
+    void closer.ask(row)
+  }
+
+  const asking = $derived.by(() => {
+    for (const row of agents ?? []) {
+      const state = closer?.stateOf(row.pane)
+      if (state?.kind === 'confirming' || state?.kind === 'rechecking') {
+        return { row, state }
+      }
+    }
+    return null
+  })
 </script>
 
 <section class="board" style:--below="{below}px">
@@ -87,12 +162,34 @@
             {#if item.kind === 'header'}
               <h2 class="section">{item.section}</h2>
             {:else}
-              <AgentRow {item} {agents} {now} {onopen} onfold={fold} />
+              <AgentRow
+                {item}
+                {agents}
+                {now}
+                gesture={gestureOf(item.row)}
+                closable={closer?.offered(item.row) ?? false}
+                open={opens(item.row)}
+                progress={closer?.progress(item.row.pane) ?? null}
+                {onopen}
+                onfold={fold}
+                onswipe={swipe}
+                onclose={ask}
+              />
             {/if}
           </li>
         {/each}
       </ul>
     {/if}
+  {/if}
+  {#if asking !== null}
+    {@const pane = asking.row.pane}
+    <CloseConfirm
+      plan={asking.state.plan}
+      label={label(asking.row, agents ?? [])}
+      rechecking={asking.state.kind === 'rechecking'}
+      oncancel={() => closer?.cancel(pane)}
+      onconfirm={() => void closer?.confirm(pane)}
+    />
   {/if}
 </section>
 

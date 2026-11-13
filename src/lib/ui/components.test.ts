@@ -1,7 +1,10 @@
 import { createRawSnippet } from 'svelte'
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
+import type { AgentClosing_Serialize as AgentClosing } from '../bindings'
+import { NOTHING_DELETED } from '../closeAgent.svelte'
 import Button from './Button.svelte'
+import CloseConfirm from './CloseConfirm.svelte'
 import CodeBox from './CodeBox.svelte'
 import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
@@ -9,16 +12,19 @@ import Glass from './Glass.svelte'
 import Icon from './Icon.svelte'
 import Labelled from './Labelled.svelte'
 import SearchField from './SearchField.svelte'
+import Sheet from './Sheet.svelte'
 import Spinner from './Spinner.svelte'
 import TextArea from './TextArea.svelte'
 import ToolButton from './ToolButton.svelte'
 import buttonSource from './Button.svelte?raw'
+import closeConfirmSource from './CloseConfirm.svelte?raw'
 import codeBoxSource from './CodeBox.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
 import labelledSource from './Labelled.svelte?raw'
 import searchFieldSource from './SearchField.svelte?raw'
+import sheetSource from './Sheet.svelte?raw'
 import spinnerSource from './Spinner.svelte?raw'
 import textAreaSource from './TextArea.svelte?raw'
 import toolButtonSource from './ToolButton.svelte?raw'
@@ -48,6 +54,109 @@ describe('Glass', () => {
   it('blurs what is behind it with and without the prefix', () => {
     expect(glassSource).toContain('-webkit-backdrop-filter: blur(24px);')
     expect(glassSource).toContain('\n    backdrop-filter: blur(24px);')
+  })
+})
+
+describe('Glass as a sheet', () => {
+  it('rounds only its top corners with the sheet radius and drops its bottom edge', () => {
+    const body = render(Glass, { props: { sheet: true, children: html('<p>inside</p>') } }).body
+    expect(body).toMatch(/<div class="glass svelte-[\w-]+ sheet"><span class="highlight svelte-[\w-]+"><\/span>/)
+    expect(flat(glassSource)).toContain(
+      '.sheet { border-bottom: 0; border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; }',
+    )
+    expect(flat(glassSource)).toContain('.sheet .highlight { left: var(--radius-sheet); right: var(--radius-sheet); }')
+  })
+})
+
+describe('Sheet', () => {
+  const body = render(Sheet, { props: { label: 'Close it?', oncancel: () => {}, children: html('<p>inside</p>') } }).body
+
+  it('draws a named modal dialog of glass over a veil that is no target for VoiceOver', () => {
+    expect(body).toMatch(
+      /<div class="layer svelte-[\w-]+"><button class="scrim svelte-[\w-]+" type="button" tabindex="-1" aria-hidden="true"><\/button> <div class="sheet svelte-[\w-]+" role="dialog" aria-modal="true" aria-label="Close it\?" tabindex="-1"><div class="glass svelte-[\w-]+ sheet">/,
+    )
+    expect(body).toMatch(/<div class="body svelte-[\w-]+"><p>inside<\/p>/)
+  })
+
+  it('cancels on a tap outside it, on the veil', () => {
+    expect(flat(sheetSource)).toContain('aria-hidden="true" onclick={oncancel}></button>')
+  })
+
+  it('sits over the whole page, out of the screens that slide, and takes the focus', () => {
+    expect(sheetSource).toContain('{@attach overPage}')
+    expect(sheetSource).toContain('{@attach focused}')
+    expect(sheetSource).toContain('node.focus({ preventScroll: true })')
+  })
+
+  it.each([
+    '.layer { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; justify-content: flex-end; }',
+    '.scrim { position: absolute; inset: 0; padding: 0; border: 0; background: var(--veil); touch-action: none; }',
+    '.sheet { position: relative; width: 100%; max-width: 520px; margin: 0 auto;',
+    'padding: var(--inset-wide) var(--inset-wide) calc(env(safe-area-inset-bottom) + var(--inset-wide));',
+    'out:fadeOut',
+    'in:riseIn',
+  ])('holds %s', (text) => {
+    expect(flat(sheetSource)).toContain(text)
+  })
+})
+
+describe('CloseConfirm', () => {
+  const PLAN: AgentClosing = {
+    pane: 4,
+    agent: 'codex',
+    project: 2,
+    workspace: 3,
+    tabs: [5],
+    stops: [{ pane: 4, tab: 5, workspace: 3, project: 2, agent: 'codex' }],
+    keeps: [],
+    run: null,
+    closed: false,
+    warning: 'Its worktree has changes',
+  }
+  const confirm = (rechecking?: boolean, plan = PLAN) =>
+    render(CloseConfirm, { props: { plan, label: 'codex · api', rechecking, oncancel: () => {}, onconfirm: () => {} } })
+      .body
+
+  it('titles the sheet with the agent, then says each line of the plan', () => {
+    const body = confirm()
+    expect(body).toContain('aria-label="Close codex · api?"')
+    expect(body).toMatch(/<h2 class="title svelte-[\w-]+">Close codex · api\?<\/h2>/)
+    const lines = [...body.matchAll(/<p class="line svelte-[\w-]+">([^<]*)<\/p>/g)].map((match) => match[1])
+    expect(lines).toEqual([NOTHING_DELETED, 'Its worktree has changes'])
+  })
+
+  it('offers Cancel plain and Close danger', () => {
+    const body = confirm()
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(<!--[^>]*-->| )*Cancel/)
+    expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(<!--[^>]*-->| )*Close/)
+  })
+
+  it('spins on Close and rests Cancel while it checks again', () => {
+    const body = confirm(true)
+    expect(body).toMatch(/<button class="button plain svelte-[\w-]+ resting" type="button" disabled="" aria-disabled="true">/)
+    expect(body).toMatch(
+      /<button class="button danger svelte-[\w-]+ busy" type="button" disabled="" aria-busy="true">(<!--[^>]*-->)*<span class="spinner /,
+    )
+  })
+
+  it('says the plan it is given, so a plan that grew shows its new lines', () => {
+    const grown = { ...PLAN, stops: [...PLAN.stops, { ...PLAN.stops[0], pane: 6 }], warning: null }
+    expect(confirm(false, grown)).toMatch(/<p class="line svelte-[\w-]+">Also stops 1 subagent<\/p>/)
+    expect(closeConfirmSource).toContain('const text = $derived(confirmationText(plan, label))')
+  })
+
+  it('passes its buttons on to what it was given', () => {
+    expect(closeConfirmSource).toContain('<Sheet label={text.title} {oncancel}>')
+    expect(closeConfirmSource).toContain('onclick={oncancel}>Cancel</Button>')
+    expect(closeConfirmSource).toContain('onclick={onconfirm}>Close</Button>')
+  })
+
+  it.each([
+    '.title { margin: 0 0 4px; color: var(--text); font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }',
+    '.line { margin: 0; color: var(--soft); font-size: 15px; line-height: 20px; }',
+    '.actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); margin-top: var(--inset); }',
+  ])('holds %s', (text) => {
+    expect(flat(closeConfirmSource)).toContain(text)
   })
 })
 

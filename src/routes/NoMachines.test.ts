@@ -7,6 +7,7 @@ import type { Offer } from '../lib/machineForm'
 import SameOffer from '../lib/ui/SameOffer.svelte'
 import ScanOverlay from '../lib/ui/ScanOverlay.svelte'
 import overlaySource from '../lib/ui/ScanOverlay.svelte?raw'
+import overPageSource from '../lib/ui/overPage.ts?raw'
 import urlFieldSource from '../lib/ui/UrlField.svelte?raw'
 import MachineForm from './MachineForm.svelte'
 import NoMachines from './NoMachines.svelte'
@@ -251,7 +252,8 @@ describe('scanning a QR code', () => {
 
   it('lays the frame over the whole page, out of the hidden app', () => {
     expect(markup).toContain('<div class="layer" {@attach overPage}>')
-    expect(markup).toContain('document.body.append(node) return () => node.remove()')
+    expect(markup).toContain("import { overPage } from './overPage'")
+    expect(flat(overPageSource)).toContain('document.body.append(node) return () => node.remove()')
     expect(markup).toContain('.layer { position: fixed; inset: 0; z-index: 20;')
     expect(markup).toContain('box-shadow: 0 0 0 100vmax var(--veil);')
   })

@@ -1,8 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { AgentRow_Serialize as AgentRow, ConnectionView_Serialize, Toast } from '../../lib/bindings'
+  import { label } from '../../lib/board'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
+  import type { CloseAgent } from '../../lib/closeAgent.svelte'
   import { Keyboard } from '../../lib/terminal/keyboard.svelte'
+  import CloseConfirm from '../../lib/ui/CloseConfirm.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
   import NavBar from '../../lib/ui/NavBar.svelte'
   import Spinner from '../../lib/ui/Spinner.svelte'
@@ -17,6 +20,7 @@
     chat,
     agents,
     connection,
+    closer,
     backTo,
     below = 0,
     starting = null,
@@ -32,6 +36,7 @@
     chat: Chat
     agents: AgentRow[] | null
     connection: ConnectionView_Serialize
+    closer: CloseAgent | null
     backTo: string | null
     below?: number
     starting?: string | null
@@ -69,6 +74,18 @@
   })
 
   const row = $derived(chat.row)
+
+  const closing = $derived(row === null ? undefined : closer?.stateOf(row.pane))
+
+  const asking = $derived(closing?.kind === 'confirming' || closing?.kind === 'rechecking' ? closing : null)
+
+  const closable = $derived(row !== null && connection.state === 'connected' && closer?.offered(row) === true)
+
+  const ask = () => {
+    if (row !== null && closable) {
+      void closer?.ask(row)
+    }
+  }
 </script>
 
 <section
@@ -98,17 +115,30 @@
       {below}
       boxed={seen !== null}
       sendable={connection.state === 'connected'}
+      {closable}
+      progress={closer?.progress(row.pane) ?? null}
       {onback}
       {onterminal}
       {onchanges}
       {onfiles}
       {onstart}
+      onclose={ask}
     />
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
     <Thread {chat} {now} boxed={seen !== null} />
     <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />
+    {#if asking !== null}
+      {@const pane = row.pane}
+      <CloseConfirm
+        plan={asking.plan}
+        label={label(row, agents ?? [])}
+        rechecking={asking.kind === 'rechecking'}
+        oncancel={() => closer?.cancel(pane)}
+        onconfirm={() => void closer?.confirm(pane)}
+      />
+    {/if}
   {/if}
 </section>
 

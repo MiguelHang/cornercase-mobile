@@ -2,6 +2,10 @@
 
 The active machine's screen, under the connection bar: every agent of its projects with its status and how long it has been in it, the agents they started folded under them, the ones that need the user first, live. Follows cornercase-gpui's agents section (`design/session-model.md`: loudest status, `status_rank`, `agent_title`; `src/model.rs`, `src/sidebar/agents.rs`), read on `main` on 2026-11-09.
 
+Topics, in `design/board/`:
+
+- [Closing an agent](board/closing.md) (`crates/core/src/cli/close.rs`, `src-tauri/src/commands/close.rs`, `src/lib/closeAgent.svelte.ts`, `src/lib/rowSwipe.ts`, `src/lib/ui/Sheet.svelte`, `src/lib/ui/CloseConfirm.svelte`): where the action is, the row's swipe on iOS and long press on Android and their conflicts, the confirmation as a sheet, checking again before closing, `--boot`, `Closing…` until the rows go, why nothing on disk goes and why danger, the return to the board.
+
 ## Rows
 
 - **One row per pane with an agent** (`crates/core/src/board.rs`, `AgentRow`), from every project of the session; a pane without one gives none. The rows are built in the core, beside the session and the record of since when (below), and only they reach the WebView, over `agents` and `agents-changed` (`design/architecture.md` › Commands and events). Rejected: grouping and sorting the session in TypeScript after a `session-changed`, which sent the whole snapshot over IPC about every 500 ms while an agent worked and left the order untested against upstream's fixtures.
