@@ -1,0 +1,40 @@
+{
+  "agent": "claude",
+  "branches": [],
+  "closed": false,
+  "keeps": [],
+  "pane": 22,
+  "project": 9,
+  "removes": null,
+  "run": 20,
+  "stops": [
+    {
+      "agent": null,
+      "pane": 21,
+      "project": 9,
+      "tab": 24,
+      "workspace": 19
+    },
+    {
+      "agent": "claude",
+      "pane": 22,
+      "project": 9,
+      "tab": 25,
+      "workspace": 19
+    },
+    {
+      "agent": "claude",
+      "pane": 23,
+      "project": 9,
+      "tab": 26,
+      "workspace": 19
+    }
+  ],
+  "tabs": [
+    24,
+    25,
+    26
+  ],
+  "warning": null,
+  "workspace": 19
+}
