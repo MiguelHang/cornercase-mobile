@@ -91,6 +91,12 @@
   })
 
   $effect(() => {
+    if (swiped !== null && connection.state !== 'connected') {
+      shut()
+    }
+  })
+
+  $effect(() => {
     if (swiped !== null) {
       return listening(document, [
         ['touchstart', outside, { capture: true, passive: true }],
@@ -103,7 +109,7 @@
 
   const gestureOf = (row: Agent) => (closes(row) ? gesture : null)
 
-  const opens = (row: Agent) => swiped?.pane === row.pane && closer?.offered(row) === true
+  const opens = (row: Agent) => swiped?.pane === row.pane && closes(row) && closer?.offered(row) === true
 
   const ask = (row: Agent) => {
     if (closer === null || !closes(row) || !closer.offered(row)) {

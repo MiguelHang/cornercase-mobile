@@ -612,7 +612,7 @@ describe('Closing an agent from the board', () => {
     expect(board).toContain("if (gesture === 'hold') { void tap(haptics) } shut() void closer.ask(row)")
   })
 
-  it('keeps one row open at most, shut by a touch elsewhere, a scroll or a list that moves it', () => {
+  it('keeps one row open at most, shut by a touch elsewhere, a scroll, a list that moves it or a lost connection', () => {
     const board = flat(boardSource)
     expect(board).toContain('let swiped = $state<{ pane: number; at: number } | null>(null)')
     expect(board).toContain('swiped = open ? { pane, at: placeOf(pane) } : null')
@@ -624,7 +624,10 @@ describe('Closing an agent from the board', () => {
       "['touchstart', outside, { capture: true, passive: true }], ['scroll', shut, { capture: true, passive: true }],",
     )
     expect(board).toContain("event.target.closest('[data-open]') !== null")
-    expect(board).toContain('const opens = (row: Agent) => swiped?.pane === row.pane && closer?.offered(row) === true')
+    expect(board).toContain(
+      'const opens = (row: Agent) => swiped?.pane === row.pane && closes(row) && closer?.offered(row) === true',
+    )
+    expect(board).toContain("if (swiped !== null && connection.state !== 'connected') { shut() }")
     expect(flat(rowSource)).toContain("<div class=\"agent\" style:--depth={item.depth} data-open={open ? '' : undefined}>")
   })
 })
