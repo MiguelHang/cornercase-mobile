@@ -20,6 +20,7 @@
   import { IssuesState, IssueState } from './lib/issues.svelte'
   import type { Found } from './lib/issueSweep'
   import { latestWins } from './lib/join'
+  import { dismiss, exit, ready } from './lib/launch'
   import { titleOf, type Lookups } from './lib/navigation'
   import { platform } from './lib/platform'
   import { chatOf, openedTerminal, Router, routeFor, type Route, type StartingIssue, type Where } from './lib/router.svelte'
@@ -48,6 +49,7 @@
   const idle = screen({ machine: null, connection: { state: 'none' } }, null)
 
   let current = $state(idle)
+  let listed = $state(!isTauri())
   let machines = $state<MachineView_Serialize[]>([])
   let barHeight = $state(0)
   let launched = $state('')
@@ -144,6 +146,15 @@
   const issues = $derived(listing === null ? null : new IssuesState(listing.machine, commands))
   const shown = $derived(router.latest('issue'))
   const issue = $derived(shown === null ? null : new IssueState(shown.machine, shown, commands))
+
+  $effect(() => {
+    const leaving = exit(() => void dismiss(document.getElementById('launch'), prefersReducedMotion()))
+    $effect(() => {
+      const isReady = ready(listed, current)
+      untrack(() => leaving.when(isReady))
+    })
+    return () => leaving.stop()
+  })
 
   $effect(() => {
     const { machine, agents } = current
@@ -372,14 +383,15 @@
   }
 
   const load = async () => {
-    const [listed, state, agents] = await Promise.all([
+    const [list, state, agents] = await Promise.all([
       commands.machinesList(),
       commands.connectionState(),
       commands.agents(),
     ])
-    const known = remember(listed)
-    show(screen(state, agents))
+    const known = remember(list)
     const first = firstToConnect(known, state)
+    show(first === null ? screen(state, agents) : connecting(first))
+    listed = true
     if (first !== null) {
       await join(first)
     }
@@ -402,122 +414,124 @@
       }),
       events.toast.listen((event) => toasts.push(event.payload)),
     ]
-    Promise.all(listening).then(load).catch(toasts.failed)
+    Promise.all(listening).then(load).catch(toasts.failed).finally(() => (listed = true))
     return () => listening.forEach((stop) => stop.then((unlisten) => unlisten()))
   })
 </script>
 
 <main>
-  {#if viewed !== undefined}
-    <Terminal
-      machine={viewed.machine}
-      row={viewed.row}
-      {backTo}
-      {shift}
-      onback={goBack}
-      onfailed={toasts.failed}
-      bind:height={barHeight}
-    />
-  {:else}
-    {#if barred}
-      <ConnectionBar
-        connection={current.connection}
-        {machineName}
+  {#if listed}
+    {#if viewed !== undefined}
+      <Terminal
+        machine={viewed.machine}
+        row={viewed.row}
+        {backTo}
+        {shift}
+        onback={goBack}
+        onfailed={toasts.failed}
         bind:height={barHeight}
-        onmachines={() => router.go({ name: 'machines' })}
       />
-    {/if}
-    <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>
-      {#if route.name === 'home'}
-        <Board
-          machine={current.machine}
-          agents={current.agents}
+    {:else}
+      {#if barred}
+        <ConnectionBar
           connection={current.connection}
-          below={barHeight}
-          onopen={open}
-          onstart={start}
+          {machineName}
+          bind:height={barHeight}
+          onmachines={() => router.go({ name: 'machines' })}
         />
-      {:else if barred}
-        {#if chat !== null}
-          <Agent
-            {chat}
+      {/if}
+      <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>
+        {#if route.name === 'home'}
+          <Board
+            machine={current.machine}
             agents={current.agents}
             connection={current.connection}
-            {backTo}
             below={barHeight}
-            {starting}
-            onback={goBack}
             onopen={open}
-            onfailed={(message) => toasts.push({ level: 'error', message })}
-            ontoast={(toast) => toasts.push(toast)}
-            onterminal={terminal}
-            onchanges={review}
-            onfiles={browse}
-            onstart={startIn}
+            onstart={start}
           />
+        {:else if barred}
+          {#if chat !== null}
+            <Agent
+              {chat}
+              agents={current.agents}
+              connection={current.connection}
+              {backTo}
+              below={barHeight}
+              {starting}
+              onback={goBack}
+              onopen={open}
+              onfailed={(message) => toasts.push({ level: 'error', message })}
+              ontoast={(toast) => toasts.push(toast)}
+              onterminal={terminal}
+              onchanges={review}
+              onfiles={browse}
+              onstart={startIn}
+            />
+          {/if}
+        {:else if route.name === 'changes'}
+          {#if changes !== null}
+            <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} />
+          {/if}
+        {:else if route.name === 'change'}
+          {#if changes !== null}
+            <Diff path={route.path} {changes} {backTo} onback={goBack} onfile={whole} />
+          {/if}
+        {:else if route.name === 'files'}
+          {#if files !== null}
+            <Files title={route.title} {files} {backTo} onback={goBack} onopen={read} />
+          {/if}
+        {:else if route.name === 'file'}
+          {#if files !== null}
+            <File path={route.path} {files} {backTo} onback={goBack} />
+          {/if}
+        {:else if route.name === 'start'}
+          <Start
+            connection={current.connection}
+            issue={route.issue}
+            workspace={route.workspace}
+            {backTo}
+            onback={goBack}
+            onstarted={started}
+            onissues={listIssues}
+          />
+        {:else if route.name === 'issues'}
+          {#if issues !== null}
+            <Issues {issues} {backTo} onback={goBack} onopen={openIssue} />
+          {/if}
+        {:else if route.name === 'issue'}
+          {#if issue !== null}
+            <Issue {issue} where={whereOf(route)} {backTo} onback={goBack} onstart={startOn} />
+          {/if}
+        {:else if route.name === 'machines'}
+          <Machines
+            {machines}
+            active={current.machine}
+            connection={current.connection}
+            {backTo}
+            onback={goBack}
+            onpick={(machine) => void join(machine)}
+            onadded={added}
+            onrouted={reload}
+            onedit={(machine) => router.go({ name: 'machine', id: machine })}
+            onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
+          />
+        {:else if editing !== undefined}
+          <Machine
+            machine={editing}
+            {taken}
+            connection={editing.id === current.machine ? current.connection : null}
+            {backTo}
+            onback={goBack}
+            onchanged={reload}
+            onremoved={removed}
+            adding={rescanning}
+          />
+        {:else}
+          <NoMachines onadded={added} />
         {/if}
-      {:else if route.name === 'changes'}
-        {#if changes !== null}
-          <Changes title={route.title} {changes} {backTo} onback={goBack} onopen={change} />
-        {/if}
-      {:else if route.name === 'change'}
-        {#if changes !== null}
-          <Diff path={route.path} {changes} {backTo} onback={goBack} onfile={whole} />
-        {/if}
-      {:else if route.name === 'files'}
-        {#if files !== null}
-          <Files title={route.title} {files} {backTo} onback={goBack} onopen={read} />
-        {/if}
-      {:else if route.name === 'file'}
-        {#if files !== null}
-          <File path={route.path} {files} {backTo} onback={goBack} />
-        {/if}
-      {:else if route.name === 'start'}
-        <Start
-          connection={current.connection}
-          issue={route.issue}
-          workspace={route.workspace}
-          {backTo}
-          onback={goBack}
-          onstarted={started}
-          onissues={listIssues}
-        />
-      {:else if route.name === 'issues'}
-        {#if issues !== null}
-          <Issues {issues} {backTo} onback={goBack} onopen={openIssue} />
-        {/if}
-      {:else if route.name === 'issue'}
-        {#if issue !== null}
-          <Issue {issue} where={whereOf(route)} {backTo} onback={goBack} onstart={startOn} />
-        {/if}
-      {:else if route.name === 'machines'}
-        <Machines
-          {machines}
-          active={current.machine}
-          connection={current.connection}
-          {backTo}
-          onback={goBack}
-          onpick={(machine) => void join(machine)}
-          onadded={added}
-          onrouted={reload}
-          onedit={(machine) => router.go({ name: 'machine', id: machine })}
-          onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
-        />
-      {:else if editing !== undefined}
-        <Machine
-          machine={editing}
-          {taken}
-          connection={editing.id === current.machine ? current.connection : null}
-          {backTo}
-          onback={goBack}
-          onchanged={reload}
-          onremoved={removed}
-          adding={rescanning}
-        />
-      {:else}
-        <NoMachines onadded={added} />
-      {/if}
-    </div>
+      </div>
+    {/if}
   {/if}
   <ToastStack items={toasts.items} ondismiss={(id) => toasts.dismiss(id)} below={barred ? barHeight : 0} />
 </main>
