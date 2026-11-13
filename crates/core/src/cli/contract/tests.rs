@@ -189,11 +189,18 @@ mod missing {
         assert_eq!(missing(&descriptor), [one(name, Kind::Operation, None)]);
     }
 
+    #[test]
+    fn reports_a_server_that_cannot_close_an_agent() {
+        let descriptor = real_but(|value| without(value, "operations", "close-agent"));
+        assert_eq!(missing(&descriptor), [one("close-agent", Kind::Operation, None)]);
+    }
+
     #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
     #[case::accounts("accounts")]
     #[case::account_switch("account-switch")]
+    #[case::close_agent_tabs("close-agent-tabs")]
     fn reports_a_feature_the_server_lacks(#[case] name: &str) {
         let descriptor = real_but(|value| without(value, "features", name));
         assert_eq!(missing(&descriptor), [one(name, Kind::Feature, None)]);

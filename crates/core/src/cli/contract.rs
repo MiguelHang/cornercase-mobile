@@ -45,6 +45,7 @@ pub const REQUIRED: Required = Required {
         "files-search",
         "flow-list",
         "flow-run",
+        "close-agent",
     ],
     features: &[
         "boot",
@@ -57,6 +58,7 @@ pub const REQUIRED: Required = Required {
         "files",
         "accounts",
         "account-switch",
+        "close-agent-tabs",
     ],
     streams: &[("events", 1), ("watch", 1), ("app", 1), ("surface", 1), ("view", 1), ("changes", 1), ("files", 1)],
 };
