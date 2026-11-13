@@ -33,46 +33,11 @@ const markCell = (name: string) => {
 
 const token = (name: string) => tokens.match(new RegExp(`--${name}: (#[0-9a-f]+);`))?.[1]
 
-const cellBox = (cell: Record<string, string>) => ({
-  left: parseFloat(cell.left),
-  top: parseFloat(cell.top),
-  width: parseFloat(cell.width),
-  height: parseFloat(cell.height),
-})
-
 const hex = (color: string) =>
   `#${['red', 'green', 'blue']
     .map((channel) => Number(color.match(new RegExp(` ${channel}="([\\d.]+)"`))?.[1]))
     .map((value) => Math.round(value * 255).toString(16).padStart(2, '0'))
     .join('')}`
-
-const nativeView = (label: string) => {
-  const open = storyboard.match(new RegExp(`<view [^>]*userLabel="${label}"[^>]*>`))
-  const after = storyboard.slice((open?.index ?? 0) + (open?.[0].length ?? 0))
-  return { id: open?.[0].match(/ id="([^"]+)"/)?.[1], body: after.slice(0, after.indexOf('</view>')), after }
-}
-
-const constant = (scope: string, attributes: string) => {
-  const found = scope.match(new RegExp(`<constraint ${attributes}(?: constant="([\\d.]+)")? id="[^"]+"/>`))
-  return found === null ? undefined : Number(found[1] ?? 0)
-}
-
-const nativeMark = nativeView('Mark')
-
-const pin = (first: string | undefined, attribute: string, second: string | undefined) =>
-  `firstItem="${first}" firstAttribute="${attribute}" secondItem="${second}" secondAttribute="${attribute}"`
-
-const pinned = (id: string | undefined, attribute: string) => constant(storyboard, pin(id, attribute, nativeMark.id))
-
-const nativeCell = (label: string) => {
-  const { id, body } = nativeView(label)
-  return {
-    left: pinned(id, 'left'),
-    top: pinned(id, 'top'),
-    width: constant(body, 'firstAttribute="width"'),
-    height: constant(body, 'firstAttribute="height"'),
-  }
-}
 
 describe('launch', () => {
   it('lets the page draw under the notch, shrinks it above the keyboard and never zooms it', () => {
@@ -102,7 +67,7 @@ describe('launch', () => {
     const body = html.slice(html.indexOf('<body>'))
     expect(body).toMatch(/<div id="launch" aria-hidden="true">[\s\S]*<\/div>\s*<div id="app"><\/div>/)
     expect(body.indexOf('id="launch"')).toBeLessThan(body.indexOf('id="app"'))
-    expect(layer('#launch')).toMatchObject({ position: 'fixed', inset: '0', display: 'grid', 'place-items': 'center' })
+    expect(layer('#launch')).toMatchObject({ position: 'fixed', inset: '0' })
     expect(Number(layer('#launch')['z-index'])).toBeGreaterThan(0)
   })
 
@@ -126,25 +91,17 @@ describe('launch', () => {
     expect(hex(ground?.[0] ?? '')).toBe(layer('#launch').background)
   })
 
-  it('centres the native mark on the whole view, not on the safe area', () => {
-    const root = storyboard.match(/<view key="view" [^>]*id="([^"]+)"/)?.[1]
-    for (const axis of ['centerX', 'centerY']) {
-      expect(constant(storyboard, pin(nativeMark.id, axis, root))).toBe(0)
-    }
-    const own = nativeMark.after.slice(nativeMark.after.indexOf('</subviews>'))
-    expect(constant(own, 'firstAttribute="width"')).toBe(parseFloat(layer('#launch .mark').width))
-    expect(constant(own, 'firstAttribute="height"')).toBe(parseFloat(layer('#launch .mark').height))
+  it('centres the mark on the large viewport, which the first frames of the WebView already use', () => {
+    const half = `${6 * UNIT}px`
+    expect(layer('#launch .mark')).toMatchObject({
+      position: 'absolute',
+      top: `calc(50lvh - ${half})`,
+      left: `calc(50% - ${half})`,
+    })
+    expect(layer('#launch')).not.toHaveProperty('place-items')
   })
 
-  it('draws the native mark with the cells and colours of the layer, without an image', () => {
-    for (const [label, name] of [['Top', 'top'], ['Side', 'side'], ['Cursor', 'cursor']]) {
-      expect(nativeCell(label)).toEqual(cellBox(layer(`#launch .${name}`)))
-    }
-    const colour = (label: string) =>
-      hex(nativeView(label).body.match(/<color key="backgroundColor"[^>]*\/>/)?.[0] ?? '')
-    expect(colour('Top')).toBe(layer('#launch .corner').background)
-    expect(colour('Side')).toBe(layer('#launch .corner').background)
-    expect(colour('Cursor')).toBe(layer('#launch .cursor').background)
-    expect(storyboard).not.toMatch(/<image|imageView/)
+  it('launches on the plain ground, leaving the mark to the layer alone', () => {
+    expect(storyboard).not.toMatch(/<subviews>|<image|imageView/)
   })
 })

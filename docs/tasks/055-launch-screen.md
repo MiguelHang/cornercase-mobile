@@ -13,8 +13,10 @@ parpadeo".
   parpadeo: qué se ve y cuándo (launch storyboard, WebView en blanco/negro, primer render, pantalla vacía hasta leer las
   máquinas o conectar…). La causa queda escrita en `design/look.md`.
 - [ ] CA2 — Desde que se toca el icono hasta la primera pantalla útil se ve una sola pantalla de carga continua: el
-  fondo de la app con el icono (o el logotipo) centrado, igual en el launch screen nativo y en la primera pintura de la
-  WebView, para que el paso de uno a otro no se note; nada de destellos de otro color ni saltos de posición.
+  fondo de la app, con el icono (o el logotipo) centrado desde la primera pintura de la WebView hasta que se va; nada
+  de destellos de otro color ni saltos de posición. Ajustado el 2026-11-13: en iOS el launch screen nativo es solo el
+  fondo, sin la marca, porque la WebView tarda 0,3–0,9 s en pintar tras él y la marca se apagaba y volvía a salir; una
+  marca que aparece una vez es mejor que una que parpadea (`design/look.md` › Launch).
 - [ ] CA3 — La pantalla de carga se va con un fundido corto cuando la app sabe qué enseñar (lista de máquinas leída y,
   si hay máquina activa, el primer estado de conexión), no por tiempo fijo; con Reduce Motion, sin fundido. Si tarda
   más de unos segundos, enseña la pantalla normal con su estado (no se queda colgada).

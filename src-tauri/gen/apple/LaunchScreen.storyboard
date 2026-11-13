@@ -13,53 +13,8 @@
                     <view key="view" contentMode="scaleToFill" id="5EZ-qb-Rvc">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <subviews>
-                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Mk0-aa-c01" userLabel="Mark">
-                                <rect key="frame" x="159" y="400" width="96" height="96"/>
-                                <subviews>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Mk1-tp-c02" userLabel="Top">
-                                        <rect key="frame" x="24" y="0.0" width="72" height="24"/>
-                                        <color key="backgroundColor" red="0.0" green="0.37254901960784315" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                        <constraints>
-                                            <constraint firstAttribute="width" constant="72" id="Mk1-tp-w01"/>
-                                            <constraint firstAttribute="height" constant="24" id="Mk1-tp-h01"/>
-                                        </constraints>
-                                    </view>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Mk2-sd-c03" userLabel="Side">
-                                        <rect key="frame" x="0.0" y="24" width="24" height="72"/>
-                                        <color key="backgroundColor" red="0.0" green="0.37254901960784315" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                        <constraints>
-                                            <constraint firstAttribute="width" constant="24" id="Mk2-sd-w01"/>
-                                            <constraint firstAttribute="height" constant="72" id="Mk2-sd-h01"/>
-                                        </constraints>
-                                    </view>
-                                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Mk3-cr-c04" userLabel="Cursor">
-                                        <rect key="frame" x="48" y="48" width="16" height="40"/>
-                                        <color key="backgroundColor" red="0.92549019607843142" green="0.93333333333333335" blue="0.94509803921568625" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                        <constraints>
-                                            <constraint firstAttribute="width" constant="16" id="Mk3-cr-w01"/>
-                                            <constraint firstAttribute="height" constant="40" id="Mk3-cr-h01"/>
-                                        </constraints>
-                                    </view>
-                                </subviews>
-                                <constraints>
-                                    <constraint firstAttribute="width" constant="96" id="Mk0-aa-w01"/>
-                                    <constraint firstAttribute="height" constant="96" id="Mk0-aa-h01"/>
-                                    <constraint firstItem="Mk1-tp-c02" firstAttribute="left" secondItem="Mk0-aa-c01" secondAttribute="left" constant="24" id="Mk1-tp-l01"/>
-                                    <constraint firstItem="Mk1-tp-c02" firstAttribute="top" secondItem="Mk0-aa-c01" secondAttribute="top" id="Mk1-tp-t01"/>
-                                    <constraint firstItem="Mk2-sd-c03" firstAttribute="left" secondItem="Mk0-aa-c01" secondAttribute="left" id="Mk2-sd-l01"/>
-                                    <constraint firstItem="Mk2-sd-c03" firstAttribute="top" secondItem="Mk0-aa-c01" secondAttribute="top" constant="24" id="Mk2-sd-t01"/>
-                                    <constraint firstItem="Mk3-cr-c04" firstAttribute="left" secondItem="Mk0-aa-c01" secondAttribute="left" constant="48" id="Mk3-cr-l01"/>
-                                    <constraint firstItem="Mk3-cr-c04" firstAttribute="top" secondItem="Mk0-aa-c01" secondAttribute="top" constant="48" id="Mk3-cr-t01"/>
-                                </constraints>
-                            </view>
-                        </subviews>
                         <viewLayoutGuide key="safeArea" id="vDu-zF-Fre"/>
                         <color key="backgroundColor" red="0.043137254901960784" green="0.047058823529411764" blue="0.054901960784313725" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                        <constraints>
-                            <constraint firstItem="Mk0-aa-c01" firstAttribute="centerX" secondItem="5EZ-qb-Rvc" secondAttribute="centerX" id="Mk0-aa-x01"/>
-                            <constraint firstItem="Mk0-aa-c01" firstAttribute="centerY" secondItem="5EZ-qb-Rvc" secondAttribute="centerY" id="Mk0-aa-y01"/>
-                        </constraints>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="Ief-a0-LHa" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
