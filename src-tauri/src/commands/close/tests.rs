@@ -2,7 +2,7 @@ use cornercase_core::cli::close::AgentClosing;
 use rstest::rstest;
 use serde_json::{Value, json};
 
-use super::closing;
+use super::{close_agent, close_agent_check, closing};
 use crate::commands::error::{CommandError, ErrorCode};
 use crate::test_util::{BOOT, queueing, written};
 
@@ -101,5 +101,25 @@ mod a_failure {
         let refused = refused.expect_err("an unreadable answer");
         assert_eq!(refused.code, ErrorCode::Json);
         assert!(refused.message.contains("line 1"));
+    }
+}
+
+mod the_commands {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn check_queues_the_check_and_returns_what_cornercase_answered() {
+        let (ipc, lines) = queueing(Some(printed(CHECK_SUBAGENT))).await;
+        let checked = close_agent_check(ipc.state(), 10, BOOT.to_owned()).await;
+        assert_eq!(written(&lines), [json!({ "args": CHECK })]);
+        assert_eq!(checked, Ok(read(CHECK_SUBAGENT)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn close_queues_the_close_and_returns_what_cornercase_answered() {
+        let (ipc, lines) = queueing(Some(printed(CLOSED))).await;
+        let closed = close_agent(ipc.state(), 10, BOOT.to_owned()).await;
+        assert_eq!(written(&lines), [json!({ "args": CLOSE })]);
+        assert_eq!(closed, Ok(read(CLOSED)));
     }
 }
