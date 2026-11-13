@@ -132,11 +132,17 @@
   }
 
   .turn {
-    translate: calc((7px + var(--inset-wide)) / 2);
+    position: relative;
+    left: calc((7px + var(--inset-wide)) / 2);
+  }
+
+  .turn path {
+    transform-box: view-box;
+    transform-origin: center;
     transition: transform var(--turn);
   }
 
-  .turn.open {
+  .turn.open path {
     transform: rotate(90deg);
   }
 
