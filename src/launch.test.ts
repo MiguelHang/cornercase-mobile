@@ -4,6 +4,40 @@ import infoPlist from '../src-tauri/gen/apple/cornercase-mobile_iOS/Info.plist?r
 import storyboard from '../src-tauri/gen/apple/LaunchScreen.storyboard?raw'
 import projectYml from '../src-tauri/gen/apple/project.yml?raw'
 import tauriConf from '../src-tauri/tauri.conf.json?raw'
+import markSource from './lib/ui/Mark.svelte?raw'
+import tokens from './lib/theme/tokens.css?raw'
+
+const UNIT = 8
+
+const declarations = (css: string, selector: string) =>
+  Object.fromEntries(
+    (css.match(new RegExp(`(?:^|\\s)${selector.replace('.', '\\.')} \\{([^}]*)\\}`))?.[1] ?? '')
+      .split(';')
+      .map((declaration) => declaration.trim().split(/:\s*/))
+      .filter(([property]) => property !== ''),
+  )
+
+const layerStyle = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+
+const layer = (selector: string) => declarations(layerStyle, selector)
+
+const atUnit = (value: string) => {
+  const units = value.match(/^calc\((\d+) \* var\(--unit\)\)$/)?.[1]
+  return units === undefined ? value : `${Number(units) * UNIT}px`
+}
+
+const markCell = (name: string) => {
+  const { left, top, width, height } = declarations(markSource, `.${name}`)
+  return { left: atUnit(left), top: atUnit(top), width: atUnit(width), height: atUnit(height) }
+}
+
+const token = (name: string) => tokens.match(new RegExp(`--${name}: (#[0-9a-f]+);`))?.[1]
+
+const hex = (color: string) =>
+  `#${['red', 'green', 'blue']
+    .map((channel) => Number(color.match(new RegExp(` ${channel}="([\\d.]+)"`))?.[1]))
+    .map((value) => Math.round(value * 255).toString(16).padStart(2, '0'))
+    .join('')}`
 
 describe('launch', () => {
   it('lets the page draw under the notch, shrinks it above the keyboard and never zooms it', () => {
@@ -27,5 +61,52 @@ describe('launch', () => {
   it('is dark in the project and in the generated Info.plist', () => {
     expect(projectYml).toContain('UIUserInterfaceStyle: Dark')
     expect(infoPlist).toMatch(/<key>UIUserInterfaceStyle<\/key>\s*<string>Dark<\/string>/)
+  })
+
+  it('covers the window with a layer of its own before the app mounts', () => {
+    const body = html.slice(html.indexOf('<body>'))
+    expect(body).toMatch(/<div id="launch" aria-hidden="true">[\s\S]*<\/div>\s*<div id="app"><\/div>/)
+    expect(body.indexOf('id="launch"')).toBeLessThan(body.indexOf('id="app"'))
+    expect(layer('#launch')).toMatchObject({ position: 'fixed', inset: '0' })
+    expect(Number(layer('#launch')['z-index'])).toBeGreaterThan(0)
+  })
+
+  it('paints the layer in the ground colour of the window', () => {
+    const conf = JSON.parse(tauriConf) as { app: { windows: { backgroundColor?: string }[] } }
+    expect(layer('#launch').background).toBe(conf.app.windows[0].backgroundColor)
+  })
+
+  it('draws the mark of Mark at a unit of eight, still and without a glow', () => {
+    expect(layer('#launch .mark')).toMatchObject({ width: `${12 * UNIT}px`, height: `${12 * UNIT}px` })
+    for (const name of ['top', 'side', 'cursor']) {
+      expect(layer(`#launch .${name}`)).toMatchObject(markCell(name))
+    }
+    expect(layer('#launch .corner').background).toBe(token('brand'))
+    expect(layer('#launch .cursor').background).toBe(token('text'))
+    expect(layerStyle).not.toMatch(/box-shadow|animation|transition/)
+  })
+
+  it('launches on the same ground as the layer', () => {
+    const ground = storyboard.match(/<viewLayoutGuide key="safeArea"[^>]*\/>\s*<color key="backgroundColor"[^>]*\/>/)
+    expect(hex(ground?.[0] ?? '')).toBe(layer('#launch').background)
+  })
+
+  it('centres the mark on the large viewport, which the first frames of the WebView already use', () => {
+    const half = `${6 * UNIT}px`
+    expect(layer('#launch .mark')).toMatchObject({
+      position: 'absolute',
+      top: `calc(50lvh - ${half})`,
+      left: `calc(50% - ${half})`,
+    })
+    expect(layer('#launch')).not.toHaveProperty('place-items')
+  })
+
+  it('falls back to the viewport height on WebViews without lvh', () => {
+    const half = `${6 * UNIT}px`
+    expect(layerStyle).toContain(`top: calc(50vh - ${half});\n        top: calc(50lvh - ${half});`)
+  })
+
+  it('launches on the plain ground, leaving the mark to the layer alone', () => {
+    expect(storyboard).not.toMatch(/<subviews>|<image|imageView/)
   })
 })

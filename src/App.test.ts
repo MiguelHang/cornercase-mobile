@@ -47,6 +47,17 @@ describe('App', () => {
   })
 })
 
+describe('App in Tauri, before the machines are listed', () => {
+  it('mounts no screen, only the toast stack, so the launch layer covers no empty screen', () => {
+    vi.stubGlobal('isTauri', true)
+    const body = render(App).body.replace(/<!--[^>]*-->/g, '')
+    vi.unstubAllGlobals()
+    expect(body).toMatch(/^<main> <div class="toasts svelte-[\w-]+" aria-live="polite" style="--below: 0px;"><\/div><\/main>$/)
+    expect(invoke).not.toHaveBeenCalled()
+    expect(listen).not.toHaveBeenCalled()
+  })
+})
+
 describe('App wiring', () => {
   const source = appSource.replace(/\s+/g, ' ')
 
@@ -60,7 +71,7 @@ describe('App wiring', () => {
 
   it('connects to the last machine asked for, and a refused connect becomes an error toast', () => {
     expect(source).toContain(
-      "const join = latestWins(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { toasts.failed(connected.error) } })",
+      "const join = latestWins(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { joinFailed = true toasts.failed(connected.error) } })",
     )
   })
 
@@ -72,12 +83,40 @@ describe('App wiring', () => {
   })
 
   it('reads the machines before the first screen, so saved machines never show the empty screen', () => {
-    expect(source).toContain('const known = remember(listed) show(screen(state, agents))')
+    expect(source).toContain('let listed = $state(!isTauri())')
+    expect(source).toContain('<main> {#if listed} {#if viewed !== undefined}')
+    expect(source).toContain('{/if} {/if} <ToastStack')
+    expect(source.match(/listed = true/g)).toHaveLength(2)
+  })
+
+  it('shows the machine it connects to before calling the list read, so the layer never leaves on a screen without it', () => {
+    expect(source).toContain(
+      'const known = remember(list) const first = firstToConnect(known, state) show(first === null ? screen(state, agents) : connecting(first)) listed = true if (first !== null) { await join(first) } }',
+    )
+  })
+
+  it('calls the list read however the load ends, so a failed load still leaves the screens and the toast', () => {
+    expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed).finally(() => (listed = true))')
+  })
+
+  it('takes the launch layer away once ready or after the cap, with the shared fade, and stops the cap on unmount', () => {
+    expect(source).toContain(
+      "$effect(() => { const leaving = exit(() => void dismiss(document.getElementById('launch'), prefersReducedMotion())) $effect(() => { const isReady = joinFailed || ready(listed, current) untrack(() => leaving.when(isReady)) }) return () => leaving.stop() })",
+    )
+    expect(source.match(/exit\(/g)).toHaveLength(1)
+    expect(source.match(/[^.]dismiss\(/g)).toHaveLength(1)
+  })
+
+  it('takes the launch layer away when the connect call fails, so its error toast does not wait under it', () => {
+    expect(source).toContain("if (connected.status === 'error') { joinFailed = true toasts.failed(connected.error) }")
+    expect(source.match(/joinFailed = true/g)).toHaveLength(1)
   })
 
   it('turns a failed machine list into an error toast and connects to nothing then', () => {
     expect(source).toContain("if (listed.status === 'error') { toasts.failed(listed.error) return { machines: [], active: null } }")
-    expect(source).toContain('const known = remember(listed) show(screen(state, agents)) const first = firstToConnect(known, state)')
+    expect(source).toContain(
+      'const known = remember(list) const first = firstToConnect(known, state) show(first === null ? screen(state, agents)',
+    )
   })
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
@@ -120,7 +159,7 @@ describe('App wiring', () => {
 
   it('loads the agents with the state, and never the session', () => {
     expect(source).toContain('commands.connectionState(), commands.agents(), ])')
-    expect(source).toContain('show(screen(state, agents))')
+    expect(source).toContain('screen(state, agents)')
     expect(source).not.toMatch(/session/i)
   })
 
@@ -386,7 +425,7 @@ describe('App wiring', () => {
     expect(source).toContain(
       "onmachines={() => router.go({ name: 'machines' })} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
     )
-    expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} <ToastStack')
+    expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} {/if} <ToastStack')
     expect(source.match(/translated\(shift\)/g)).toHaveLength(1)
   })
 

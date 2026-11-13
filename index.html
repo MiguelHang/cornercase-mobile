@@ -7,8 +7,62 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <title>cornercase</title>
+    <style>
+      #launch {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        background: #0b0c0e;
+      }
+
+      #launch .mark {
+        position: absolute;
+        top: calc(50vh - 48px);
+        top: calc(50lvh - 48px);
+        left: calc(50% - 48px);
+        width: 96px;
+        height: 96px;
+      }
+
+      #launch .cell {
+        position: absolute;
+      }
+
+      #launch .corner {
+        background: #005fff;
+      }
+
+      #launch .top {
+        left: 24px;
+        top: 0;
+        width: 72px;
+        height: 24px;
+      }
+
+      #launch .side {
+        left: 0;
+        top: 24px;
+        width: 24px;
+        height: 72px;
+      }
+
+      #launch .cursor {
+        left: 48px;
+        top: 48px;
+        width: 16px;
+        height: 40px;
+        background: #eceef1;
+      }
+    </style>
   </head>
   <body>
+    <div id="launch" aria-hidden="true">
+      <div class="mark">
+        <span class="cell corner top"></span>
+        <span class="cell corner side"></span>
+        <span class="cell cursor"></span>
+      </div>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
