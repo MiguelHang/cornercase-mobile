@@ -24,13 +24,13 @@ export type Ending = 'back' | 'settle' | 'tap' | 'none'
 
 type Sample = { x: number; at: number }
 
-const leans = ([dx, dy]: Point) => dx > LEAN * Math.abs(dy)
+export const leans = ([dx, dy]: Point) => dx > LEAN * Math.abs(dy)
 
 const still = ([dx, dy]: Point) => dx === 0 && dy === 0
 
-const decided = (moved: Point): EdgeState => {
+export const decided = (moved: Point, leaning = leans): EdgeState => {
   if (still(moved)) return 'pending'
-  if (!leans(moved)) return 'cancelled'
+  if (!leaning(moved)) return 'cancelled'
   return Math.hypot(...moved) >= CLAIM ? 'claimed' : 'pending'
 }
 
