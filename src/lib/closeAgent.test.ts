@@ -223,6 +223,18 @@ describe('CloseAgent', () => {
       expect(closing.offered(row(CHILD, 'working'))).toBe(false)
     })
 
+    it('tells the progress of each pane: checking while asked, none while confirming, closing for what it stops', async () => {
+      const answer = gate<Awaited<Reply>>()
+      const asking = closer(() => answer.promise).closing
+      const asked = asking.ask(row(PANE, 'working'))
+      expect([PANE, CHILD].map((pane) => asking.progress(pane))).toEqual(['checking', null])
+      answer.open(ok(CHECKED))
+      await asked
+      expect(asking.progress(PANE)).toBeNull()
+      const { closing } = await confirmed()
+      expect([PANE, CHILD, 30].map((pane) => closing.progress(pane))).toEqual(['closing', 'closing', null])
+    })
+
     it('ends once none of its rows is on the board', async () => {
       const { closing, onclosed, tell } = await confirmed()
       closing.seen([row(CHILD, 'working'), ...OTHERS])

@@ -71,6 +71,7 @@ const screen = (chat: Chat) =>
       chat,
       connection: { state: 'connected', route: 'ws://mac:7000' },
       agents: null,
+      closer: null,
       onfailed: () => {},
       ontoast: () => {},
       backTo: 'Agents',

@@ -540,3 +540,42 @@ describe('Router.settle', () => {
     expect(router.opened).toEqual({ machine: 1, pane: 7 })
   })
 })
+
+describe('Router.closed', () => {
+  const CHILD = { name: 'agent', machine: 1, pane: 8 } as const
+
+  it.each<[string, Route[]]>([
+    ['its screen', [AGENT]],
+    ['its terminal over its screen', [AGENT, TERMINAL]],
+    ["a child's screen over its parent's", [AGENT, CHILD]],
+  ])('goes back to the board from %s once the agent closes', (_, routes) => {
+    const router = routed(...routes)
+    router.closed(1, [8, 7])
+    expect(router.current).toEqual(HOME)
+    expect(router.below).toBeNull()
+    expect(router.opened).toBeNull()
+  })
+
+  it.each<[string, number, number[]]>([
+    ['another agent closes', 1, [9]],
+    ['an agent with its pane closes on another machine', 2, [7]],
+  ])('stays when %s', (_, machine, panes) => {
+    const router = routed(AGENT, TERMINAL)
+    router.closed(machine, panes)
+    expect(router.current).toEqual(TERMINAL)
+    expect(router.below).toEqual(AGENT)
+  })
+
+  it('stays on what was opened over the agent, which is not its screen', () => {
+    const router = routed(AGENT, CHANGES)
+    router.closed(1, [7])
+    expect(router.current).toEqual(CHANGES)
+  })
+
+  it('keeps the base it was on', () => {
+    const router = new Router(NO_MACHINES)
+    router.go(AGENT)
+    router.closed(1, [7])
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+})

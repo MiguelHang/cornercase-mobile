@@ -114,6 +114,13 @@ export class Router {
     this.#stack = emptied ? [base] : [base, ...above]
   }
 
+  closed(machine: number, panes: number[]) {
+    const shown = chatOf(this.current)
+    if (shown !== null && shown.machine === machine && panes.includes(shown.pane)) {
+      this.#stack = [this.#stack[0]]
+    }
+  }
+
   back() {
     if (this.#stack.length > 1) {
       this.#stack = this.#stack.slice(0, -1)

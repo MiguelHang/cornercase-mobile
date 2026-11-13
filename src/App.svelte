@@ -65,9 +65,9 @@
 
   const route = $derived(router.current)
   const shownMachine = $derived(current.machine)
-  const closer = $derived(
-    shownMachine === null ? null : new CloseAgent(commands, (toast) => toasts.push(toast), () => {}),
-  )
+  const closerOf = (machine: number) =>
+    new CloseAgent(commands, (toast) => toasts.push(toast), (panes) => router.closed(machine, panes))
+  const closer = $derived(shownMachine === null ? null : closerOf(shownMachine))
   const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')
   const opening = $derived(router.opened)
   const pane = $derived(opening?.pane ?? null)
@@ -154,7 +154,8 @@
     const { machine, agents } = current
     if (chat !== null) {
       const waiting = starting !== null
-      untrack(() => chat.see(machine, agents, waiting))
+      const closing = closer?.closing(chat.pane) ?? false
+      untrack(() => chat.see(machine, agents, waiting, closing))
     }
   })
 
@@ -456,6 +457,7 @@
             {chat}
             agents={current.agents}
             connection={current.connection}
+            {closer}
             {backTo}
             below={barHeight}
             {starting}

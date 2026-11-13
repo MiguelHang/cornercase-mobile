@@ -19,6 +19,8 @@ export type Closing =
   | { kind: 'rechecking'; plan: AgentClosing }
   | { kind: 'closing'; panes: number[] }
 
+export type Progress = 'checking' | 'closing' | null
+
 export type Confirmation = { title: string; lines: string[] }
 
 export const UNANSWERED_WAIT_MS = 15_000
@@ -96,6 +98,13 @@ export class CloseAgent {
 
   closing(pane: number) {
     return [...this.#states.values()].some((entry) => entry.kind === 'closing' && entry.panes.includes(pane))
+  }
+
+  progress(pane: number): Progress {
+    if (this.closing(pane)) {
+      return 'closing'
+    }
+    return this.#states.get(pane)?.kind === 'checking' ? 'checking' : null
   }
 
   offered(row: AgentRow) {

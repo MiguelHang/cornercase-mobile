@@ -149,12 +149,17 @@ describe('App wiring', () => {
   it('keeps one closer per shown machine, fed every listed board and never a list it does not have', () => {
     expect(source).toContain('const shownMachine = $derived(current.machine)')
     expect(source).toContain(
-      'const closer = $derived( shownMachine === null ? null : new CloseAgent(commands, (toast) => toasts.push(toast), () => {}), )',
+      'const closerOf = (machine: number) => new CloseAgent(commands, (toast) => toasts.push(toast), (panes) => router.closed(machine, panes)) const closer = $derived(shownMachine === null ? null : closerOf(shownMachine))',
     )
     expect(source).toContain(
       '$effect(() => { const { agents } = current if (closer !== null && agents !== null) { untrack(() => closer.seen(agents)) } })',
     )
     expect(source.match(/new CloseAgent\(/g)).toHaveLength(1)
+  })
+
+  it('goes back to the board once the agent shown, or its terminal, closes, before its chat could say it is gone', () => {
+    expect(source.indexOf('chat.see(machine, agents, waiting, closing)')).toBeLessThan(source.indexOf('closer.seen(agents)'))
+    expect(source).toContain('(panes) => router.closed(machine, panes)')
   })
 
   it('opens a chat for the tapped pane on its own machine, kept alive under its terminal and under Machines, and goes back from it', () => {
@@ -172,13 +177,13 @@ describe('App wiring', () => {
       'const asker: Asker = { open: commands.questionOpen, close: commands.questionClose, listen: (heard) => events.questionChanged.listen((event) => heard(event.payload)), }',
     )
     expect(source).toContain(
-      "<Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
+      "<Agent {chat} agents={current.agents} connection={current.connection} {closer} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} />",
     )
   })
 
   it('gives the chat every list of agents, and reads once its row is seen', () => {
     expect(source).toContain(
-      '$effect(() => { const { machine, agents } = current if (chat !== null) { const waiting = starting !== null untrack(() => chat.see(machine, agents, waiting)) } })',
+      '$effect(() => { const { machine, agents } = current if (chat !== null) { const waiting = starting !== null const closing = closer?.closing(chat.pane) ?? false untrack(() => chat.see(machine, agents, waiting, closing)) } })',
     )
     expect(source).toContain('const seen = $derived(chat?.row != null)')
     expect(source).toContain('$effect(() => { if (chat !== null && seen) { untrack(() => chat.refresh()) } })')
@@ -387,7 +392,7 @@ describe('App wiring', () => {
 
   it('shows a terminal of another machine as the gone agent', () => {
     expect(source).toContain(
-      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
+      "{:else if barred} {#if chat !== null} <Agent {chat} agents={current.agents} connection={current.connection} {closer} {backTo} below={barHeight} {starting} onback={goBack} onopen={open} onfailed={(message) => toasts.push({ level: 'error', message })} ontoast={(toast) => toasts.push(toast)} onterminal={terminal} onchanges={review} onfiles={browse} onstart={startIn} /> {/if} {:else if route.name === 'changes'}",
     )
   })
 })

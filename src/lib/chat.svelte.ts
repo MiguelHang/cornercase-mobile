@@ -212,15 +212,14 @@ export class Chat {
     return this.row !== null
   }
 
-  see(machine: number | null, agents: AgentRow[] | null, starting = false) {
+  see(machine: number | null, agents: AgentRow[] | null, starting = false, closing = false) {
     if (this.gone) {
       return
     }
     this.#starting ||= starting
     const elsewhere = machine !== this.machine
-    const row = agents === null || elsewhere ? null : (agents.find((agent) => agent.pane === this.pane) ?? null)
-    if (row === null && (elsewhere || this.#lost(agents))) {
-      this.leave()
+    const row = elsewhere ? null : this.#rowIn(agents)
+    if (row === null && this.#missing(elsewhere, agents, closing)) {
       return
     }
     this.#open(row)
@@ -519,6 +518,18 @@ export class Chat {
     }
     this.#leftOnTheMac ||= pasted
     return pasted ? { level: 'info', message: staysOnTheMac(this.row?.agent ?? 'the agent') } : null
+  }
+
+  #rowIn(agents: AgentRow[] | null) {
+    return agents?.find((agent) => agent.pane === this.pane) ?? null
+  }
+
+  #missing(elsewhere: boolean, agents: AgentRow[] | null, closing: boolean) {
+    if (elsewhere || (!closing && this.#lost(agents))) {
+      this.leave()
+      return true
+    }
+    return closing
   }
 
   #lost(agents: AgentRow[] | null) {

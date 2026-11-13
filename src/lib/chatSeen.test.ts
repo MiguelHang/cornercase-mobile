@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { AgentRow_Serialize as AgentRow } from './bindings'
 import { whileShown, type MarkReviewed } from './chat.svelte'
 import { FakePage, MACHINE, PANE, fakeMarker, fresh, refused, row, settle } from './chatFakes'
 
@@ -212,5 +213,35 @@ describe('Chat, the time of an arrival at done', () => {
     arrived(chat, '2026-11-10T10:00:00Z')
 
     expect(marked).toEqual([PANE])
+  })
+})
+
+describe('Chat, a pane the phone is closing', () => {
+  it.each<[string, AgentRow[] | null]>([
+    ['its row leaves the list', [row(3, 'done')]],
+    ['the agents stop being known', null],
+  ])('keeps its last row and is not gone when %s', (_, agents) => {
+    const { chat } = opened('working')
+    chat.see(MACHINE, agents, false, true)
+    expect([chat.gone, chat.row?.status]).toEqual([false, 'working'])
+  })
+
+  it('is gone once the list without its row comes while nothing closes it', () => {
+    const { chat } = opened('working')
+    chat.see(MACHINE, [row(3, 'done')], false, true)
+    chat.see(MACHINE, [row(3, 'done')])
+    expect([chat.gone, chat.row]).toEqual([true, null])
+  })
+
+  it('is gone when another machine becomes active, closing or not', () => {
+    const { chat } = opened('working')
+    chat.see(OTHER_MACHINE, [row(3, 'done')], false, true)
+    expect([chat.gone, chat.row]).toEqual([true, null])
+  })
+
+  it('follows its row while it is still listed', () => {
+    const { chat } = opened('working')
+    chat.see(MACHINE, [row(PANE, 'idle')], false, true)
+    expect([chat.gone, chat.row?.status]).toEqual([false, 'idle'])
   })
 })

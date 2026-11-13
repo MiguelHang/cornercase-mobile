@@ -103,13 +103,6 @@
 
   const opens = (row: Agent) => swiped?.pane === row.pane && closer?.offered(row) === true
 
-  const progressOf = (pane: number): 'checking' | 'closing' | null => {
-    if (closer?.closing(pane)) {
-      return 'closing'
-    }
-    return closer?.stateOf(pane)?.kind === 'checking' ? 'checking' : null
-  }
-
   const ask = (row: Agent) => {
     if (closer === null || !closer.offered(row)) {
       return
@@ -168,7 +161,7 @@
                 gesture={gestureOf(item.row)}
                 closable={closer?.offered(item.row) ?? false}
                 open={opens(item.row)}
-                progress={progressOf(item.row.pane)}
+                progress={closer?.progress(item.row.pane) ?? null}
                 {onopen}
                 onfold={fold}
                 onswipe={swipe}

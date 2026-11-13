@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { AgentRow_Serialize as Agent } from '../../lib/bindings'
   import { disclosureName, elapsed, label, place, statusName, type Row } from '../../lib/board'
+  import type { Progress } from '../../lib/closeAgent.svelte'
   import { OPEN_WIDTH, watchLongPress, watchRowSwipe, type RowGesture } from '../../lib/rowSwipe'
   import Hidden from '../../lib/ui/Hidden.svelte'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
@@ -26,7 +27,7 @@
     gesture: RowGesture | null
     closable: boolean
     open: boolean
-    progress: 'checking' | 'closing' | null
+    progress: Progress
     onopen: (pane: number) => void
     onfold: (pane: number) => void
     onswipe: (pane: number, open: boolean) => void

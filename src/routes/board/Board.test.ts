@@ -6,8 +6,8 @@ import type {
   ConnectionView_Serialize,
 } from '../../lib/bindings'
 import { boardSearch } from '../../lib/boardSearch.svelte'
-import { fakeClock, ok } from '../../lib/chatFakes'
-import { CloseAgent, type CloseCalls, type Closing } from '../../lib/closeAgent.svelte'
+import type { CloseAgent, Closing } from '../../lib/closeAgent.svelte'
+import { closerAt as closingAt } from '../../lib/closeFakes'
 import { folds } from '../../lib/folds.svelte'
 import hiddenSource from '../../lib/ui/Hidden.svelte?raw'
 import Board from './Board.svelte'
@@ -504,29 +504,7 @@ describe('Closing an agent from the board', () => {
     warning: null,
   }
 
-  const never = () => new Promise<never>(() => {})
-
-  const flushed = async () => {
-    for (let step = 0; step < 10; step += 1) await Promise.resolve()
-  }
-
-  const closerAt = async (kind: Closing['kind'] | 'idle', rows: Agent[] = BRANCH) => {
-    let checks = 0
-    const calls: CloseCalls = {
-      closeAgentCheck: () => {
-        checks += 1
-        return kind === 'checking' || (kind === 'rechecking' && checks > 1) ? never() : Promise.resolve(ok(PLAN))
-      },
-      closeAgent: never,
-    }
-    const closer = new CloseAgent(calls, () => {}, () => {}, fakeClock().clock)
-    closer.seen(rows)
-    if (kind !== 'idle') void closer.ask(rows[0])
-    await flushed()
-    if (kind === 'rechecking' || kind === 'closing') void closer.confirm(1)
-    await flushed()
-    return closer
-  }
+  const closerAt = (kind: Closing['kind'] | 'idle', rows: Agent[] = BRANCH) => closingAt(kind, rows, PLAN)
 
   const CLOSE = /<button class="close svelte-[\w-]+ eased" type="button" tabindex="-1" aria-hidden="true" style="width: 88px; --reveal: 0px;">\s*Close\s*<\/button>/g
 
