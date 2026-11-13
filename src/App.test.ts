@@ -71,7 +71,7 @@ describe('App wiring', () => {
 
   it('connects to the last machine asked for, and a refused connect becomes an error toast', () => {
     expect(source).toContain(
-      "const join = latestWins(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { toasts.failed(connected.error) } })",
+      "const join = latestWins(async (machine: number) => { show(connecting(machine)) const connected = await commands.connect(machine) if (connected.status === 'error') { joinFailed = true toasts.failed(connected.error) } })",
     )
   })
 
@@ -101,10 +101,15 @@ describe('App wiring', () => {
 
   it('takes the launch layer away once ready or after the cap, with the shared fade, and stops the cap on unmount', () => {
     expect(source).toContain(
-      "$effect(() => { const leaving = exit(() => void dismiss(document.getElementById('launch'), prefersReducedMotion())) $effect(() => { const isReady = ready(listed, current) untrack(() => leaving.when(isReady)) }) return () => leaving.stop() })",
+      "$effect(() => { const leaving = exit(() => void dismiss(document.getElementById('launch'), prefersReducedMotion())) $effect(() => { const isReady = joinFailed || ready(listed, current) untrack(() => leaving.when(isReady)) }) return () => leaving.stop() })",
     )
     expect(source.match(/exit\(/g)).toHaveLength(1)
     expect(source.match(/[^.]dismiss\(/g)).toHaveLength(1)
+  })
+
+  it('takes the launch layer away when the connect call fails, so its error toast does not wait under it', () => {
+    expect(source).toContain("if (connected.status === 'error') { joinFailed = true toasts.failed(connected.error) }")
+    expect(source.match(/joinFailed = true/g)).toHaveLength(1)
   })
 
   it('turns a failed machine list into an error toast and connects to nothing then', () => {

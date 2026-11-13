@@ -1,3 +1,4 @@
+import { quadIn } from 'svelte/easing'
 import { describe, expect, it, vi } from 'vitest'
 import type { ConnectionView_Serialize } from './bindings'
 import { screen, type Screen } from './connection'
@@ -70,7 +71,19 @@ describe('ready', () => {
   })
 })
 
+const bezier = (s: number, first: number, second: number) =>
+  3 * (1 - s) ** 2 * s * first + 3 * (1 - s) * s ** 2 * second + s ** 3
+
 describe('dismiss', () => {
+  it('fades with the curve of quadIn, the leave easing of Motion', () => {
+    const [x1, y1, x2, y2] = (LEAVE_EASING.match(/^cubic-bezier\((.*)\)$/)?.[1] ?? '').split(',').map(Number)
+    for (let step = 0; step <= 20; step += 1) {
+      const s = step / 20
+      const x = bezier(s, x1 ?? Number.NaN, x2 ?? Number.NaN)
+      expect(bezier(s, y1 ?? Number.NaN, y2 ?? Number.NaN)).toBeCloseTo(quadIn(x), 2)
+    }
+  })
+
   it('fades the layer out over the leave time, then removes it', async () => {
     const { layer, animate, removed } = fakeLayer()
     await dismiss(layer, false)

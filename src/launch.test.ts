@@ -101,6 +101,11 @@ describe('launch', () => {
     expect(layer('#launch')).not.toHaveProperty('place-items')
   })
 
+  it('falls back to the viewport height on WebViews without lvh', () => {
+    const half = `${6 * UNIT}px`
+    expect(layerStyle).toContain(`top: calc(50vh - ${half});\n        top: calc(50lvh - ${half});`)
+  })
+
   it('launches on the plain ground, leaving the mark to the layer alone', () => {
     expect(storyboard).not.toMatch(/<subviews>|<image|imageView/)
   })

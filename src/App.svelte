@@ -50,6 +50,7 @@
 
   let current = $state(idle)
   let listed = $state(!isTauri())
+  let joinFailed = $state(false)
   let machines = $state<MachineView_Serialize[]>([])
   let barHeight = $state(0)
   let launched = $state('')
@@ -150,7 +151,7 @@
   $effect(() => {
     const leaving = exit(() => void dismiss(document.getElementById('launch'), prefersReducedMotion()))
     $effect(() => {
-      const isReady = ready(listed, current)
+      const isReady = joinFailed || ready(listed, current)
       untrack(() => leaving.when(isReady))
     })
     return () => leaving.stop()
@@ -373,6 +374,7 @@
     show(connecting(machine))
     const connected = await commands.connect(machine)
     if (connected.status === 'error') {
+      joinFailed = true
       toasts.failed(connected.error)
     }
   })
