@@ -77,7 +77,7 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 051 | [Tablero: las filas aprovechan todo el ancho](tasks/051-board-full-width.md) (hecha; en el iPhone del usuario, pendiente) | 040 | ~80 |
 | 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) (hecha; en el iPhone del usuario, pendiente) | 045, 047 | ~250 |
 | 053 | [Partir por temas `design/starting-work.md`](tasks/053-split-starting-work.md) | 052 | ~0 (solo docs) |
-| 054 | [Tablero: el triangulito, entre el punto y el texto](tasks/054-board-triangle-offset.md) | 051 | ~20 |
+| 054 | [Tablero: el triangulito, entre el punto y el texto](tasks/054-board-triangle-offset.md) (hecha; en el iPhone del usuario, pendiente) | 051 | ~20 |
 | 055 | [Pantalla de carga al arrancar, sin parpadeo](tasks/055-launch-screen.md) | — | ~120 |
 | 056 | [Cerrar un agente desde el teléfono](tasks/056-close-agent.md) | 051 | ~250 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |

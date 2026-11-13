@@ -236,9 +236,23 @@ describe('Board', () => {
     expect(source.match(/<path /g)).toHaveLength(1)
     expect(source).toContain(`<path d="${TRIANGLE}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />`)
     expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
-    expect(source).toContain('.turn { transition: transform var(--turn); }')
-    expect(source).toContain('.turn.open { transform: rotate(90deg); }')
+    expect(source).toContain('.turn { position: relative; left: calc((7px + var(--inset-wide)) / 2); }')
+    expect(source).toContain('.turn path { transform-box: view-box; transform-origin: center; transition: transform var(--turn); }')
+    expect(source).toContain('.turn.open path { transform: rotate(90deg); }')
     expect(source).toContain('display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 44px; padding: 0; color: var(--soft); }')
+  })
+
+  it('moves the triangle halfway from the dot to the title with the tokens', () => {
+    const rule = flat(rowSource).match(/\.turn \{[^}]*\}/)?.[0]
+    expect(rule).toContain('position: relative; left: calc((7px + var(--inset-wide)) / 2);')
+    expect(rule).not.toMatch(/11\.5|11px|12px/)
+    expect(rowSource).not.toMatch(/translate/)
+  })
+
+  it('turns the drawing inside the triangle and never the triangle itself, whose frame would reach the title', () => {
+    const source = flat(rowSource)
+    expect(source).not.toMatch(/\.turn(\.open)? \{[^}]*transform/)
+    expect(source).toMatch(/\.turn\.open path \{ transform: rotate\(90deg\); \}/)
   })
 
   it('draws a triangle only on the rows with children', () => {
