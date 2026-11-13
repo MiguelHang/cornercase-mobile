@@ -28,13 +28,17 @@ export const UNANSWERED_WAIT_MS = 15_000
 export const CLOSE_UNANSWERED =
   'cornercase did not answer, so the agent may still close: look at the board before trying again.'
 
+export const CHECK_UNANSWERED = 'cornercase did not answer, so nothing was closed. Try again.'
+
 export const NOTHING_DELETED = 'Nothing is deleted from disk: the worktree and the branch stay.'
 
 export const FLOW_ENDS = 'Ends the flow run: its whole team closes'
 
 type Entry = Closing & { boot: string; ticket: number }
 
-type Answer = { ok: true; plan: AgentClosing } | { ok: false; code: ErrorCode | null; message: string }
+type Refusal = { ok: false; code: ErrorCode | null; message: string }
+
+type Answer = { ok: true; plan: AgentClosing } | Refusal
 
 const asked = async (call: () => ReturnType<CloseCalls['closeAgent']>): Promise<Answer> => {
   try {
@@ -126,7 +130,7 @@ export class CloseAgent {
       this.#states.set(pane, { kind: 'confirming', plan: answer.plan, boot, ticket })
       return
     }
-    this.#fail(pane, answer.message)
+    this.#refused(pane, answer)
   }
 
   cancel(pane: number) {
@@ -147,7 +151,7 @@ export class CloseAgent {
       return
     }
     if (!answer.ok) {
-      this.#fail(pane, answer.message)
+      this.#refused(pane, answer)
       return
     }
     if (grew(answer.plan, shown)) {
@@ -185,15 +189,26 @@ export class CloseAgent {
 
   #settle() {
     for (const [pane, entry] of this.#states) {
-      if (entry.kind === 'closing' && !entry.panes.some((listed) => this.#listed.includes(listed))) {
+      const panes = entry.kind === 'closing' ? entry.panes : [pane]
+      if (!panes.some((listed) => this.#listed.includes(listed))) {
         this.#states.delete(pane)
-        this.#onclosed(entry.panes)
+        this.#ended(entry)
       }
+    }
+  }
+
+  #ended(entry: Entry) {
+    if (entry.kind === 'closing') {
+      this.#onclosed(entry.panes)
     }
   }
 
   #holds(pane: number, ticket: number) {
     return this.#states.get(pane)?.ticket === ticket
+  }
+
+  #refused(pane: number, answer: Refusal) {
+    this.#fail(pane, answer.code === 'unanswered' ? CHECK_UNANSWERED : answer.message)
   }
 
   #fail(pane: number, message: string) {

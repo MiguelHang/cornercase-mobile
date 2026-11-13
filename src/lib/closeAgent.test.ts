@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AgentClosing_Serialize as AgentClosing, CommandError, PaneRef_Serialize as PaneRef } from './bindings'
 import { fakeClock, gate, ok, refused, row } from './chatFakes'
 import {
+  CHECK_UNANSWERED,
   CLOSE_UNANSWERED,
   CloseAgent,
   FLOW_ENDS,
@@ -63,6 +64,14 @@ const confirmed = async (made = closer()) => {
   return made
 }
 
+const rechecking = async () => {
+  const again = gate<Awaited<Reply>>()
+  const made = closer()
+  await made.closing.ask(row(PANE, 'working'))
+  made.calls.closeAgentCheck.mockImplementation(() => again.promise)
+  return { again, made, confirmed: made.closing.confirm(PANE) }
+}
+
 const REFUSALS: [string, CommandError][] = [
   ['a restarted server', { code: 'stale_boot', message: 'the server restarted' }],
   ['the reason cornercase gave', { code: 'failed', message: 'pane 10 runs no agent cornercase reads' }],
@@ -70,6 +79,8 @@ const REFUSALS: [string, CommandError][] = [
 ]
 
 const failure = (message: string) => ({ level: 'error', message })
+
+const LOST: CommandError = { code: 'unanswered', message: 'it may have been sent, but no answer came back' }
 
 describe('confirmationText', () => {
   it('names the agent and says nothing leaves the disk when it stops alone', () => {
@@ -162,6 +173,13 @@ describe('CloseAgent', () => {
       expect(tell.mock.calls).toEqual([[failure('IPC is gone')]])
     })
 
+    it('says nothing was closed when the check gets no answer', async () => {
+      const { closing, tell } = closer(() => replying(LOST))
+      await closing.ask(row(PANE, 'working'))
+      expect(closing.stateOf(PANE)).toBeUndefined()
+      expect(tell.mock.calls).toEqual([[failure(CHECK_UNANSWERED)]])
+    })
+
     it('forgets the confirmation when cancelled', async () => {
       const { closing, calls } = closer()
       await closing.ask(row(PANE, 'working'))
@@ -174,11 +192,7 @@ describe('CloseAgent', () => {
 
   describe('confirming', () => {
     it('checks again while it shows rechecking, then closes with the same boot', async () => {
-      const again = gate<Awaited<Reply>>()
-      const made = closer()
-      await made.closing.ask(row(PANE, 'working'))
-      made.calls.closeAgentCheck.mockImplementation(() => again.promise)
-      const confirmed = made.closing.confirm(PANE)
+      const { again, made, confirmed } = await rechecking()
       expect(made.closing.stateOf(PANE)).toEqual(expect.objectContaining({ kind: 'rechecking', plan: CHECKED }))
       again.open(ok(CHECKED))
       await confirmed
@@ -198,13 +212,16 @@ describe('CloseAgent', () => {
       expect(made.calls.closeAgent).not.toHaveBeenCalled()
     })
 
-    it('tells why the second check failed, and closes nothing', async () => {
+    it.each<[string, CommandError, string]>([
+      ['why it failed', { code: 'failed', message: 'project 9 is closing' }, 'project 9 is closing'],
+      ['that nothing was closed when no answer came', LOST, CHECK_UNANSWERED],
+    ])('tells %s on the second check, and closes nothing', async (_, error, message) => {
       const made = closer()
       await made.closing.ask(row(PANE, 'working'))
-      made.calls.closeAgentCheck.mockImplementation(() => replying({ code: 'failed', message: 'project 9 is closing' }))
+      made.calls.closeAgentCheck.mockImplementation(() => replying(error))
       await made.closing.confirm(PANE)
       expect(made.closing.stateOf(PANE)).toBeUndefined()
-      expect(made.tell.mock.calls).toEqual([[failure('project 9 is closing')]])
+      expect(made.tell.mock.calls).toEqual([[failure(message)]])
       expect(made.calls.closeAgent).not.toHaveBeenCalled()
     })
 
@@ -254,8 +271,8 @@ describe('CloseAgent', () => {
 
     it('ends when the command finishes after the rows went', async () => {
       const made = closer()
-      await made.closing.ask(row(PANE, 'working'))
       made.closing.seen(OTHERS)
+      await made.closing.ask(row(PANE, 'working'))
       await made.closing.confirm(PANE)
       expect(made.closing.stateOf(PANE)).toBeUndefined()
       expect(made.onclosed.mock.calls).toEqual([[[PANE, CHILD]]])
@@ -281,11 +298,45 @@ describe('CloseAgent', () => {
     })
   })
 
-  describe('a lost answer', () => {
-    const lost: CommandError = { code: 'unanswered', message: 'it may have been sent, but no answer came back' }
+  describe('a row that leaves the board', () => {
+    it('forgets a confirmation whose row left the board', async () => {
+      const { closing, tell, onclosed } = closer()
+      await closing.ask(row(PANE, 'working'))
+      closing.seen(OTHERS)
+      expect([closing.stateOf(PANE), closing.offered(row(PANE, 'working'))]).toEqual([undefined, true])
+      expect([tell.mock.calls, onclosed.mock.calls]).toEqual([[], []])
+    })
 
+    it('ignores a check answered after its row left', async () => {
+      const answer = gate<Awaited<Reply>>()
+      const { closing, tell } = closer(() => answer.promise)
+      const asked = closing.ask(row(PANE, 'working'))
+      closing.seen(OTHERS)
+      answer.open(refused('pane 10 runs no agent cornercase reads'))
+      await asked
+      expect([closing.stateOf(PANE), tell.mock.calls]).toEqual([undefined, []])
+    })
+
+    it('closes nothing when its row leaves during the second check', async () => {
+      const { again, made, confirmed } = await rechecking()
+      made.closing.seen(OTHERS)
+      again.open(ok(CHECKED))
+      await confirmed
+      expect(made.closing.stateOf(PANE)).toBeUndefined()
+      expect([made.calls.closeAgent.mock.calls, made.onclosed.mock.calls]).toEqual([[], []])
+    })
+
+    it('keeps what another row asks while one row leaves', async () => {
+      const { closing } = closer()
+      await closing.ask(row(30, 'idle'))
+      closing.seen(OTHERS)
+      expect(closing.stateOf(30)).toEqual(expect.objectContaining({ kind: 'confirming' }))
+    })
+  })
+
+  describe('a lost answer', () => {
     it('keeps closing until the wait ends, then says the agent may still close', async () => {
-      const { closing, tell, time } = await confirmed(closer(undefined, () => replying(lost)))
+      const { closing, tell, time } = await confirmed(closer(undefined, () => replying(LOST)))
       time.tick(UNANSWERED_WAIT_MS - 1)
       expect([closing.closing(PANE), tell.mock.calls]).toEqual([true, []])
       time.tick(1)
@@ -294,7 +345,7 @@ describe('CloseAgent', () => {
     })
 
     it('ends quietly when the rows go before the wait ends', async () => {
-      const { closing, tell, onclosed, time } = await confirmed(closer(undefined, () => replying(lost)))
+      const { closing, tell, onclosed, time } = await confirmed(closer(undefined, () => replying(LOST)))
       closing.seen(OTHERS)
       time.tick(UNANSWERED_WAIT_MS)
       expect(onclosed.mock.calls).toEqual([[[PANE, CHILD]]])

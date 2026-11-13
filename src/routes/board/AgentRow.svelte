@@ -48,7 +48,7 @@
       return watchRowSwipe(node, {
         open: () => open,
         ondrag: (next) => (dragged = closable ? next : null),
-        onsettle: (next) => onswipe(row.pane, next),
+        onsettle: (next) => onswipe(row.pane, closable && next),
       })
     }
     if (gesture === 'hold') {

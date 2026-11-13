@@ -99,12 +99,14 @@
     }
   })
 
-  const gestureOf = (row: Agent) => (closer === null || row.boot === '' ? null : gesture)
+  const closes = (row: Agent) => closer !== null && row.boot !== '' && connection.state === 'connected'
+
+  const gestureOf = (row: Agent) => (closes(row) ? gesture : null)
 
   const opens = (row: Agent) => swiped?.pane === row.pane && closer?.offered(row) === true
 
   const ask = (row: Agent) => {
-    if (closer === null || !closer.offered(row)) {
+    if (closer === null || !closes(row) || !closer.offered(row)) {
       return
     }
     if (gesture === 'hold') {

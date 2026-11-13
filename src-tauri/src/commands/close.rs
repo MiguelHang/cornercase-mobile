@@ -1,9 +1,8 @@
 use cornercase_core::cli::close::{self, AgentClosing};
-use cornercase_core::error::Error;
 use tauri::State;
 
 use crate::commands::error::CommandError;
-use crate::commands::reach::asked;
+use crate::commands::reach::{asked, json};
 use crate::state::AppState;
 
 #[tauri::command(async)]
@@ -33,11 +32,7 @@ pub(crate) async fn closing(
     check: bool,
 ) -> Result<AgentClosing, CommandError> {
     let output = asked(state, close::agent_args(pane, boot, check), None).await?;
-    parsed(&output)
-}
-
-fn parsed(output: &str) -> Result<AgentClosing, CommandError> {
-    serde_json::from_str(output).map_err(|error| CommandError::from(Error::Json(error.to_string())))
+    json(&output)
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager, Runtime, State};
 use tauri_plugin_photos::Photos;
 
 use crate::commands::error::CommandError;
-use crate::commands::reach::{asked, queue};
+use crate::commands::reach::{asked, json, queue};
 use crate::state::AppState;
 
 struct Image {
@@ -70,11 +70,7 @@ pub(crate) async fn paste_image(state: &AppState, pane: u64, id: u64) -> Result<
     let image = state.attached().get(pane, id).ok_or_else(CommandError::attached_gone)?;
     let output = asked(state, paste_file::args(pane, &image.name), Some(Stdin::Bytes(image.bytes))).await?;
     state.attached().discard(&[id]);
-    parsed(&output)
-}
-
-fn parsed(output: &str) -> Result<Pasted, CommandError> {
-    serde_json::from_str(output).map_err(|error| CommandError::from(Error::Json(error.to_string())))
+    json(&output)
 }
 
 async fn picked<P>(pick: P) -> Result<Option<Image>, CommandError>

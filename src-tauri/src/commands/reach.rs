@@ -3,6 +3,7 @@ use std::sync::Arc;
 use cornercase_core::error::Error;
 use cornercase_core::queue::{Outcome, Queue};
 use cornercase_core::transport::{Stdin, Transport};
+use serde::de::DeserializeOwned;
 
 use crate::commands::error::CommandError;
 use crate::state::AppState;
@@ -31,6 +32,10 @@ pub(crate) fn answered(outcome: Result<Outcome, Error>) -> Result<String, Comman
         Err(Error::Unanswered) => Err(CommandError::maybe_sent()),
         Err(error) => Err(CommandError::reason(&error)),
     }
+}
+
+pub(crate) fn json<T: DeserializeOwned>(output: &str) -> Result<T, CommandError> {
+    serde_json::from_str(output).map_err(|error| CommandError::from(Error::Json(error.to_string())))
 }
 
 #[cfg(test)]

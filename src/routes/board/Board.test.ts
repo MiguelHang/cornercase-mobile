@@ -525,13 +525,19 @@ describe('Closing an agent from the board', () => {
     expect(source).toContain('clip-path: inset(0 0 0 calc(100% - var(--reveal)));')
   })
 
-  it.each<[string, Agent[], boolean]>([
-    ['a row without a boot', BRANCH.map((agent) => ({ ...agent, boot: '' })), true],
-    ['a board without a closer', BRANCH, false],
-  ])('offers no Close on %s', async (_, rows, closing) => {
+  it.each<[string, Agent[], boolean, ConnectionView_Serialize]>([
+    ['a row without a boot', BRANCH.map((agent) => ({ ...agent, boot: '' })), true, CONNECTED],
+    ['a board without a closer', BRANCH, false, CONNECTED],
+    ['a board that is not connected', BRANCH, true, { state: 'offline' }],
+  ])('offers no Close on %s', async (_, rows, closing, connection) => {
     const closer = closing ? await closerAt('idle', rows) : null
-    expect(draw(rows, CONNECTED, 0, unfolded(61, 1, 2), closer)).not.toContain('class="close')
-    expect(flat(boardSource)).toContain("const gestureOf = (row: Agent) => (closer === null || row.boot === '' ? null : gesture)")
+    expect(draw(rows, connection, 0, unfolded(61, 1, 2), closer)).not.toContain('class="close')
+    const board = flat(boardSource)
+    expect(board).toContain(
+      "const closes = (row: Agent) => closer !== null && row.boot !== '' && connection.state === 'connected'",
+    )
+    expect(board).toContain('const gestureOf = (row: Agent) => (closes(row) ? gesture : null)')
+    expect(board).toContain('if (closer === null || !closes(row) || !closer.offered(row)) { return }')
   })
 
   it('says Closing… on the closed row and on the rows of what it stops, in place of their time', async () => {
@@ -600,7 +606,7 @@ describe('Closing an agent from the board', () => {
     const source = flat(rowSource)
     expect(source).toContain("if (gesture === 'swipe') { return watchRowSwipe(node, {")
     expect(source).toContain("if (gesture === 'hold') { return watchLongPress(node, () => onclose(row)) }")
-    expect(source).toContain('ondrag: (next) => (dragged = closable ? next : null), onsettle: (next) => onswipe(row.pane, next),')
+    expect(source).toContain('ondrag: (next) => (dragged = closable ? next : null), onsettle: (next) => onswipe(row.pane, closable && next),')
     const board = flat(boardSource)
     expect(board).toContain('const gesture = rowGesture(platform)')
     expect(board).toContain("if (gesture === 'hold') { void tap(haptics) } shut() void closer.ask(row)")
