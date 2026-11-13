@@ -94,7 +94,7 @@ export const offerText = (offer: Pick<Offer, 'saved' | 'why'>) => ({
   keep: offer.why === 'address' ? `Update the token of ${offer.saved}` : `Add its addresses to ${offer.saved}`,
 })
 
-const counted = (count: number, what: string) => `${count} ${what}${count === 1 ? '' : 's'}`
+export const counted = (count: number, what: string) => `${count} ${what}${count === 1 ? '' : 's'}`
 
 const mergeSummary = (merged: MergeView) => {
   const told = [
