@@ -1,14 +1,9 @@
 <script lang="ts">
-  import type { Attachment } from 'svelte/attachments'
   import type { Scanner } from '../scanner.svelte'
   import Button from './Button.svelte'
+  import { overPage } from './overPage'
 
   let { scanner }: { scanner: Scanner } = $props()
-
-  const overPage: Attachment<HTMLElement> = (node) => {
-    document.body.append(node)
-    return () => node.remove()
-  }
 </script>
 
 {#if scanner.state === 'scanning'}
