@@ -14,6 +14,8 @@ pub const CONTRACT: u32 = 1;
 
 const OLD_SERVER: &str = "has no `contract` command";
 const OLD_CLI: &str = "unrecognized subcommand 'contract'";
+const SINCE: &[(Kind, &str, &str)] =
+    &[(Kind::Feature, "cli-endpoint", "0.13.78"), (Kind::Operation, "app-routes", "0.13.78")];
 
 pub const REQUIRED: Required = Required {
     operations: &[
@@ -143,23 +145,33 @@ impl Missing {
     fn new(name: &str, kind: Kind, reason: Option<String>) -> Self {
         Self { name: name.to_owned(), kind, reason }
     }
+
+    pub fn since(&self) -> Option<&'static str> {
+        SINCE.iter().find(|(kind, name, _)| *kind == self.kind && *name == self.name).map(|(_, _, version)| *version)
+    }
 }
 
 pub fn missing(descriptor: &Descriptor) -> Vec<Missing> {
-    let operations = REQUIRED.operations.iter().filter_map(|name| missing_operation(descriptor, name));
-    let features = REQUIRED
-        .features
-        .iter()
-        .filter(|name| !descriptor.features.iter().any(|feature| feature == *name))
-        .map(|name| Missing::new(name, Kind::Feature, None));
-    let streams = REQUIRED
-        .streams
-        .iter()
-        .filter(|(name, version)| {
-            !descriptor.streams.iter().any(|stream| stream.name == *name && stream.version == *version)
-        })
-        .map(|(name, _)| Missing::new(name, Kind::Stream, None));
-    operations.chain(features).chain(streams).collect()
+    REQUIRED.missing(descriptor)
+}
+
+impl Required {
+    fn missing(&self, descriptor: &Descriptor) -> Vec<Missing> {
+        let operations = self.operations.iter().filter_map(|name| missing_operation(descriptor, name));
+        let features = self
+            .features
+            .iter()
+            .filter(|name| !descriptor.features.iter().any(|feature| feature == *name))
+            .map(|name| Missing::new(name, Kind::Feature, None));
+        let streams = self
+            .streams
+            .iter()
+            .filter(|(name, version)| {
+                !descriptor.streams.iter().any(|stream| stream.name == *name && stream.version == *version)
+            })
+            .map(|(name, _)| Missing::new(name, Kind::Stream, None));
+        operations.chain(features).chain(streams).collect()
+    }
 }
 
 fn missing_operation(descriptor: &Descriptor, name: &str) -> Option<Missing> {

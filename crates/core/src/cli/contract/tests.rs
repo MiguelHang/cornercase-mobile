@@ -239,6 +239,66 @@ mod missing {
     }
 }
 
+mod minimum_version {
+    use super::*;
+
+    const WITH_CORNERCASE: Required = Required {
+        operations: &["status", "app-routes"],
+        features: &["boot", "cli-endpoint"],
+        streams: &[("events", 1)],
+    };
+
+    fn versions(descriptor: &Value) -> Vec<(String, Option<&'static str>)> {
+        let descriptor = Descriptor::from_value(descriptor.clone()).expect("a descriptor");
+        WITH_CORNERCASE.missing(&descriptor).iter().map(|missing| (missing.name.clone(), missing.since())).collect()
+    }
+
+    fn named(pairs: &[(&str, Option<&'static str>)]) -> Vec<(String, Option<&'static str>)> {
+        pairs.iter().map(|(name, since)| ((*name).to_owned(), *since)).collect()
+    }
+
+    #[test]
+    fn names_the_version_that_brought_what_cornercase_lacks() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "status", "available": true }],
+            "features": ["boot"],
+            "streams": [{ "name": "events", "version": 1 }],
+        });
+        let expected = named(&[("app-routes", Some("0.13.78")), ("cli-endpoint", Some("0.13.78"))]);
+        assert_eq!(versions(&descriptor), expected);
+    }
+
+    #[test]
+    fn names_no_version_for_what_has_none_known() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "app-routes", "available": true }],
+            "features": ["cli-endpoint"],
+        });
+        assert_eq!(versions(&descriptor), named(&[("status", None), ("boot", None), ("events", None)]));
+    }
+
+    #[test]
+    fn names_the_version_of_an_operation_the_server_cannot_do_now() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "status", "available": true }, { "name": "app-routes", "available": false, "reason": "phone_app is off" }],
+            "features": ["boot", "cli-endpoint"],
+            "streams": [{ "name": "events", "version": 1 }],
+        });
+        assert_eq!(versions(&descriptor), named(&[("app-routes", Some("0.13.78"))]));
+    }
+
+    #[rstest]
+    #[case::the_endpoint_as_an_operation("cli-endpoint", Kind::Operation)]
+    #[case::the_routes_as_a_feature("app-routes", Kind::Feature)]
+    #[case::the_routes_as_a_stream("app-routes", Kind::Stream)]
+    fn knows_the_version_only_with_its_kind(#[case] name: &str, #[case] kind: Kind) {
+        assert_eq!(Missing::new(name, kind, None).since(), None);
+    }
+}
+
 mod outdated {
     use super::*;
 
