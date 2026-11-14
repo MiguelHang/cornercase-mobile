@@ -46,5 +46,7 @@ export const rowStatus = (
   elapsed = 0,
 ): RowStatus => (active === null ? probed(probe) : { ...status(active, machine.name, elapsed), failures: [] })
 
+const RESCANNABLE = new Set(['unauthorized', 'not_paired', 'no_token'])
+
 export const rescannable = (active: ConnectionView_Serialize | null, probe: Probe) =>
-  active === null ? probe.state === 'unauthorized' || probe.state === 'no_token' : active.state === 'unauthorized'
+  RESCANNABLE.has((active ?? probe).state)

@@ -5,6 +5,7 @@ import type {
   ConnectionState_Serialize,
   ConnectionView_Serialize,
   MachineList_Serialize,
+  MissingView_Serialize,
 } from './bindings'
 
 export type Screen = {
@@ -69,6 +70,26 @@ const connectedTo = (machineName: string, route: string) =>
 
 const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
 
+const release = (version: string) => version.split('.').map(Number)
+
+const later = (one: string, other: string) => {
+  const [mine, theirs] = [release(one), release(other)]
+  const differs = mine.findIndex((part, at) => part !== (theirs[at] ?? 0))
+  return differs === -1 ? false : mine[differs] > (theirs[differs] ?? 0)
+}
+
+const newest = (missing: MissingView_Serialize[]) =>
+  missing.reduce<string | null>(
+    (found, { since }) => (since !== null && (found === null || later(since, found)) ? since : found),
+    null,
+  )
+
+const lacking = (missing: MissingView_Serialize[]) => {
+  const since = newest(missing)
+  const names = missing.map(({ name }) => name).join(', ')
+  return `cornercase on the Mac lacks ${names}: update it${since === null ? '' : ` to ${since} or later`}`
+}
+
 type Failed = Exclude<ConnectionView_Serialize, { state: 'connecting' | 'connected' | 'retrying' }>
 
 const failure = (connection: Failed) => {
@@ -76,7 +97,7 @@ const failure = (connection: Failed) => {
     case 'none':
       return 'Not connected'
     case 'missing':
-      return `cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`
+      return lacking(connection.missing)
     case 'unauthorized':
       return "The bridge rejected this phone's token: scan its code again in Machines"
     case 'not_paired':

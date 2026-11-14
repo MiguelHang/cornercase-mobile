@@ -8,6 +8,8 @@ const CODE = 'ws://192.168.1.20:9000/?token=c3R1ZGlvLXNlY3JldA&also=100.101.102.
 
 const named = (name: string) => `${CODE}&name=${name}`
 
+const PAIRING = 'ws://192.168.1.20:47682/?code=4f9a0c1d2e3b&also=[fd7a:115c:a1e0::1]:47682&name=Studio'
+
 describe('checkUrl', () => {
   it.each<[string, string, string]>([
     ['nothing', '', form.EMPTY],
@@ -20,6 +22,8 @@ describe('checkUrl', () => {
     ['no token', 'ws://studio.lan:9000/', form.NO_TOKEN],
     ['an empty token', 'ws://studio.lan:9000/?token=', form.NO_TOKEN],
     ['another parameter', 'ws://studio.lan:9000/?tokens=abc', form.NO_TOKEN],
+    ['an empty pairing code', 'ws://studio.lan:47682/?code=&name=Studio', form.NO_TOKEN],
+    ['empty code and token', 'ws://studio.lan:47682/?code=&token=', form.NO_TOKEN],
   ])('refuses %s', (_, raw, error) => {
     expect(form.checkUrl(raw)).toEqual({ ok: false, error })
   })
@@ -35,6 +39,14 @@ describe('checkUrl', () => {
 
   it('accepts a machine code with more addresses and the name of the Mac, trimmed', () => {
     expect(form.checkUrl(` ${named('Studio')}\n`)).toEqual({ ok: true, url: named('Studio') })
+  })
+
+  it("accepts cornercase's pairing code, trimmed", () => {
+    expect(form.checkUrl(` ${PAIRING}\n`)).toEqual({ ok: true, url: PAIRING })
+  })
+
+  it('leaves a code with both a pairing code and a token to the app, which names what is wrong', () => {
+    expect(form.checkUrl('ws://studio.lan:47682/?code=4f9a&token=abc').ok).toBe(true)
   })
 
   it('accepts the scheme in capitals', () => {
@@ -87,6 +99,11 @@ describe('nameFor', () => {
   it('uses the host when another machine has the name of the code, whatever the case', () => {
     expect(form.nameFor('', named('Studio'), ['Desk', 'STUDIO'])).toBe('192.168.1.20')
     expect(form.nameFor('', named('Studio'), ['Desk'])).toBe('Studio')
+  })
+
+  it("takes the name or the host from cornercase's pairing code", () => {
+    expect(form.nameFor('', PAIRING)).toBe('Studio')
+    expect(form.nameFor('', PAIRING, ['studio'])).toBe('192.168.1.20')
   })
 })
 
@@ -200,7 +217,7 @@ describe('the texts of adding a machine', () => {
       'Paste the code the bridge prints',
       'The code starts with ws://',
       'This is not a machine code',
-      'The code has no token=: paste it whole',
+      'The code is cut short: paste it whole',
     ])
   })
 })
