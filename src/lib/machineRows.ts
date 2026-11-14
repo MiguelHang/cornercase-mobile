@@ -24,6 +24,8 @@ const probed = (probe: Probe): RowStatus => {
       return row(`Answers via ${routeAddress(probe.route)}`, 'done')
     case 'unauthorized':
       return row('Token rejected', 'failed')
+    case 'not_paired':
+      return row('Not paired', 'failed')
     case 'no_token':
       return row('No token: scan its code again', 'failed')
     case 'no_answer':

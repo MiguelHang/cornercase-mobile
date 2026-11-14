@@ -51,6 +51,7 @@ describe('rowStatus of another machine', () => {
       { text: 'Answers via studio.lan:9000', tone: 'done', pulsing: false },
     ],
     ['rejecting its token', { state: 'unauthorized' }, { text: 'Token rejected', tone: 'failed', pulsing: false }],
+    ['forgetting this phone', { state: 'not_paired' }, { text: 'Not paired', tone: 'failed', pulsing: false }],
     [
       'without a token',
       { state: 'no_token' },

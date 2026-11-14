@@ -88,9 +88,10 @@ mod a_connection {
     )]
     #[case::missing(
         Connection::Missing(vec![missing()]),
-        json!({ "state": "missing", "missing": [{ "name": "watch", "kind": "stream", "reason": null }] })
+        json!({ "state": "missing", "missing": [{ "name": "watch", "kind": "stream", "reason": null, "since": null }] })
     )]
     #[case::unauthorized(Connection::Unauthorized, json!({ "state": "unauthorized" }))]
+    #[case::not_paired(Connection::NotPaired, json!({ "state": "not_paired" }))]
     #[case::incompatible(
         Connection::Incompatible(Error::Outdated),
         json!({ "state": "incompatible", "error": { "code": "outdated", "message": Error::Outdated.to_string() } })
@@ -98,6 +99,24 @@ mod a_connection {
     #[case::offline(Connection::Offline, json!({ "state": "offline" }))]
     fn carries_its_label_and_its_fields(#[case] connection: Connection, #[case] expected: Value) {
         assert_eq!(json_of(&ConnectionView::from(&connection)), expected);
+    }
+
+    #[rstest]
+    #[case::the_cli_endpoint(Kind::Feature, "cli-endpoint")]
+    #[case::the_learned_routes(Kind::Operation, "app-routes")]
+    fn missing_names_the_version_that_brings_what_the_mac_lacks(#[case] kind: Kind, #[case] name: &str) {
+        let lacking = Missing { name: name.to_owned(), kind, reason: None };
+        let view = ConnectionView::from(&Connection::Missing(vec![lacking, missing()]));
+        assert_eq!(json_of(&view)["missing"][0]["since"], json!("0.13.78"));
+        assert_eq!(json_of(&view)["missing"][1]["since"], Value::Null);
+    }
+
+    #[test]
+    fn missing_keeps_the_reason_the_mac_gives() {
+        let disabled = Missing { name: "app-routes".to_owned(), kind: Kind::Operation, reason: Some("off".to_owned()) };
+        let view = ConnectionView::from(&Connection::Missing(vec![disabled]));
+        let expected = json!([{ "name": "app-routes", "kind": "operation", "reason": "off", "since": "0.13.78" }]);
+        assert_eq!(json_of(&view)["missing"], expected);
     }
 
     #[test]

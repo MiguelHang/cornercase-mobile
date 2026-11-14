@@ -58,7 +58,8 @@ describe('ready', () => {
     ['retrying', { state: 'retrying', in_ms: 1000, error: error('refused') }],
     ['offline', { state: 'offline' }],
     ['unauthorized', { state: 'unauthorized' }],
-    ['missing', { state: 'missing', missing: [{ name: 'watch', kind: 'stream', reason: null }] }],
+    ['not_paired', { state: 'not_paired' }],
+    ['missing', { state: 'missing', missing: [{ name: 'watch', kind: 'stream', reason: null, since: null }] }],
     ['incompatible', { state: 'incompatible', error: error('too new') }],
     ['none', { state: 'none' }],
   ])('is ready when the connection ends %s', (_, connection) => {

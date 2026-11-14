@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use cornercase_core::cli::contract::Missing;
+use cornercase_core::cli::contract::{Kind, Missing};
 use cornercase_core::cli::status::{Project, Workspace};
 use cornercase_core::machines::registry::{Machines, Merged};
 use cornercase_core::machines::route::Route;
@@ -47,9 +47,10 @@ pub(crate) enum ConnectionView {
         error: CommandError,
     },
     Missing {
-        missing: Vec<Missing>,
+        missing: Vec<MissingView>,
     },
     Unauthorized,
+    NotPaired,
     Incompatible {
         error: CommandError,
     },
@@ -57,10 +58,19 @@ pub(crate) enum ConnectionView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub(crate) struct MissingView {
+    pub(crate) name: String,
+    pub(crate) kind: Kind,
+    pub(crate) reason: Option<String>,
+    pub(crate) since: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub(crate) enum ProbeView {
     Answers { route: String },
     Unauthorized,
+    NotPaired,
     NoToken,
     NoAnswer { failures: Vec<RouteFailure> },
 }
@@ -183,10 +193,22 @@ impl From<&Connection> for ConnectionView {
             Connection::Connecting => Self::Connecting,
             Connection::Connected { route } => Self::Connected { route: route.to_string() },
             Connection::Retrying { r#in, error } => Self::Retrying { in_ms: millis(*r#in), error: error.into() },
-            Connection::Missing(missing) => Self::Missing { missing: missing.clone() },
-            Connection::Unauthorized | Connection::NotPaired => Self::Unauthorized,
+            Connection::Missing(missing) => Self::Missing { missing: missing.iter().map(MissingView::from).collect() },
+            Connection::Unauthorized => Self::Unauthorized,
+            Connection::NotPaired => Self::NotPaired,
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
             Connection::Offline => Self::Offline,
+        }
+    }
+}
+
+impl From<&Missing> for MissingView {
+    fn from(missing: &Missing) -> Self {
+        Self {
+            name: missing.name.clone(),
+            kind: missing.kind,
+            reason: missing.reason.clone(),
+            since: missing.since().map(ToOwned::to_owned),
         }
     }
 }

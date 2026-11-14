@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use cornercase_core::machines::pairing::PairError;
-use cornercase_core::machines::route::Token;
+use cornercase_core::machines::route::{Address, Token};
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 use rstest::rstest;
@@ -50,6 +50,10 @@ async fn with_the_laptop() -> Studio {
         .await
         .expect("the laptop route is added");
     studio
+}
+
+fn cli_route() -> Address {
+    paired_routes(PAIRING)[0].address().clone()
 }
 
 fn tokenless(studio: &Studio, address: &str) {
@@ -138,6 +142,14 @@ mod probing_a_machine {
     #[case::only_tokenless(
         PickError::AllFailed(vec![(route().address().clone(), Error::NoToken)]),
         ProbeView::NoToken
+    )]
+    #[case::forgotten_by_cornercase(
+        PickError::AllFailed(vec![(route().address().clone(), Error::NotPaired), (cli_route(), Error::Timeout)]),
+        ProbeView::NotPaired
+    )]
+    #[case::rejected_by_the_bridge_and_forgotten_by_cornercase(
+        PickError::AllFailed(vec![(route().address().clone(), Error::Unauthorized), (cli_route(), Error::NotPaired)]),
+        ProbeView::Unauthorized
     )]
     fn reads_a_failed_pick(#[case] error: PickError, #[case] expected: ProbeView) {
         assert_eq!(failed(error), expected);

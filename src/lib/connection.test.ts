@@ -9,8 +9,8 @@ const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://1
 const MISSING: ConnectionView_Serialize = {
   state: 'missing',
   missing: [
-    { name: 'watch', kind: 'stream', reason: null },
-    { name: 'input', kind: 'operation', reason: 'too old' },
+    { name: 'watch', kind: 'stream', reason: null, since: null },
+    { name: 'input', kind: 'operation', reason: 'too old', since: null },
   ],
 }
 const RUNNING: AgentRow_Serialize[] = [
@@ -75,6 +75,11 @@ describe('status', () => {
       'unauthorized',
       { state: 'unauthorized' },
       failing("The bridge rejected this phone's token: scan its code again in Machines"),
+    ],
+    [
+      'not_paired',
+      { state: 'not_paired' },
+      failing('This Mac no longer recognizes this phone: scan its code again in Machines'),
     ],
     ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
     ['offline', { state: 'offline' }, failing('No network')],

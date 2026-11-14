@@ -381,9 +381,9 @@ export type ConnectionState_Serialize = {
 
 export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
 
-export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Deserialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
-export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Serialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type Cursor = Cursor_Serialize | Cursor_Deserialize;
 
@@ -804,18 +804,20 @@ export type MergeView = {
 	skipped: string[],
 };
 
-export type Missing = Missing_Serialize | Missing_Deserialize;
+export type MissingView = MissingView_Serialize | MissingView_Deserialize;
 
-export type Missing_Deserialize = {
+export type MissingView_Deserialize = {
 	name: string,
 	kind: Kind,
 	reason?: string | null,
+	since?: string | null,
 };
 
-export type Missing_Serialize = {
+export type MissingView_Serialize = {
 	name: string,
 	kind: Kind,
 	reason: string | null,
+	since: string | null,
 };
 
 export type Mode = "uncommitted" | "commits" | "all";
@@ -966,7 +968,7 @@ export type PlaceInfo_Serialize = {
 	worktree: boolean,
 };
 
-export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "not_paired" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
 	id: number,
