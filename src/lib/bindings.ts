@@ -1049,7 +1049,7 @@ export type RouteFailure = {
 	error: CommandError,
 };
 
-export type RouteView = { kind: "bridge"; url: string; has_token: boolean };
+export type RouteView = { kind: "bridge"; url: string; has_token: boolean } | { kind: "cli"; url: string; has_token: boolean };
 
 export type Run = Run_Serialize | Run_Deserialize;
 

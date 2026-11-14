@@ -46,7 +46,7 @@ fn urls_asked(asked: &Asked) -> Vec<String> {
 fn urls(state: &AppState, id: MachineId) -> Vec<String> {
     let machines = list(state).expect("the machines load").machines;
     let machine = machines.into_iter().find(|machine| machine.id == id.0).expect("the machine is listed");
-    machine.routes.into_iter().map(|RouteView::Bridge { url, .. }| url).collect()
+    machine.routes.into_iter().map(|(RouteView::Bridge { url, .. } | RouteView::Cli { url, .. })| url).collect()
 }
 
 fn twice_connected(studio: &Studio) -> Vec<crate::events::ConnectionChanged> {

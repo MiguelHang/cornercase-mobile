@@ -1,4 +1,4 @@
-use super::route::{Address, BridgeUrl, Route, saved_address};
+use super::route::{Address, Route, RouteUrl, saved_address};
 use crate::protocol::BridgeRoutes;
 
 pub fn learned_routes(answer: &BridgeRoutes, winner: &Route) -> Vec<Route> {
@@ -9,7 +9,7 @@ pub fn learned_routes(answer: &BridgeRoutes, winner: &Route) -> Vec<Route> {
         .routes
         .iter()
         .filter_map(|route| saved_address(&Address { host: route.host.clone(), port: route.port }.to_string()))
-        .map(|address| Route::Bridge { url: BridgeUrl { address, token: Some(token.clone()) } })
+        .map(|address| Route::Bridge { url: RouteUrl { address, token: Some(token.clone()) } })
         .collect()
 }
 

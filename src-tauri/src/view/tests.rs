@@ -48,11 +48,13 @@ mod a_machine {
         assert!(!text.contains(r#""token""#) && !text.contains("?token="), "{text}");
     }
 
-    #[test]
-    fn says_a_route_whose_token_is_missing_has_none() {
+    #[rstest]
+    #[case::bridge("bridge")]
+    #[case::cli("cli")]
+    fn says_a_route_whose_token_is_missing_has_none(#[case] kind: &str) {
         let tokenless: Route =
-            serde_json::from_value(json!({ "kind": "bridge", "url": "ws://studio.lan:9000/" })).expect("a bare route");
-        let expected = json!({ "kind": "bridge", "url": "ws://studio.lan:9000/", "has_token": false });
+            serde_json::from_value(json!({ "kind": kind, "url": "ws://studio.lan:9000/" })).expect("a bare route");
+        let expected = json!({ "kind": kind, "url": "ws://studio.lan:9000/", "has_token": false });
         assert_eq!(json_of(&RouteView::from(&tokenless)), expected);
     }
 

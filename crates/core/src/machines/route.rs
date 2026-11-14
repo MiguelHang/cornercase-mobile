@@ -12,7 +12,8 @@ const DEFAULT_PORT: u16 = 80;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Route {
-    Bridge { url: BridgeUrl },
+    Bridge { url: RouteUrl },
+    Cli { url: RouteUrl },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -52,18 +53,17 @@ impl Route {
         let uri: Uri = text.trim().parse().map_err(|_| RouteError::NotAUrl)?;
         let address = address(&uri)?;
         let token = token(uri.query())?;
-        Ok(Self::Bridge { url: BridgeUrl { address, token: Some(token) } })
+        Ok(Self::Bridge { url: RouteUrl { address, token: Some(token) } })
     }
 
     pub fn address(&self) -> &Address {
-        match self {
-            Self::Bridge { url } => &url.address,
-        }
+        &self.url().address
     }
 
     pub fn connection_url(&self) -> Result<String, Error> {
         match self {
-            Self::Bridge { url } => url.connection_url(),
+            Self::Bridge { url } => url.bridge_url(),
+            Self::Cli { url } => Ok(format!("{}cli", url.address)),
         }
     }
 
@@ -72,38 +72,42 @@ impl Route {
     }
 
     pub(crate) fn token(&self) -> Option<&Token> {
-        match self {
-            Self::Bridge { url } => url.token.as_ref(),
-        }
+        self.url().token.as_ref()
     }
 
     pub(crate) fn set_token(&mut self, token: Option<Token>) {
         match self {
-            Self::Bridge { url } => url.token = token,
+            Self::Bridge { url } | Self::Cli { url } => url.token = token,
+        }
+    }
+
+    fn url(&self) -> &RouteUrl {
+        match self {
+            Self::Bridge { url } | Self::Cli { url } => url,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BridgeUrl {
+pub struct RouteUrl {
     pub(crate) address: Address,
     pub(crate) token: Option<Token>,
 }
 
-impl BridgeUrl {
-    fn connection_url(&self) -> Result<String, Error> {
+impl RouteUrl {
+    fn bridge_url(&self) -> Result<String, Error> {
         let token = self.token.as_ref().ok_or(Error::NoToken)?;
         Ok(format!("{}?token={}", self.address, token.0))
     }
 }
 
-impl Serialize for BridgeUrl {
+impl Serialize for RouteUrl {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.address.serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for BridgeUrl {
+impl<'de> Deserialize<'de> for RouteUrl {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         Ok(Self { address: Address::deserialize(deserializer)?, token: None })
     }

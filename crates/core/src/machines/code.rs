@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv6Addr};
 use tokio_tungstenite::tungstenite::http::Uri;
 
 use super::name::LONGEST_NAME;
-use super::route::{Address, BridgeUrl, Route, RouteError, Token, address, checked_token, token, values};
+use super::route::{Address, Route, RouteError, RouteUrl, Token, address, checked_token, token, values};
 
 const UNRESERVED: &[u8] = b"-._~";
 
@@ -70,7 +70,7 @@ impl MachineCode {
 
     fn route(&self, host: &str) -> Route {
         let address = Address { host: host.to_owned(), port: self.port };
-        Route::Bridge { url: BridgeUrl { address, token: Some(self.token.clone()) } }
+        Route::Bridge { url: RouteUrl { address, token: Some(self.token.clone()) } }
     }
 }
 
