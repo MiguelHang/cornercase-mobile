@@ -49,6 +49,7 @@ pub enum Connection {
     },
     Missing(Vec<Missing>),
     Unauthorized,
+    NotPaired,
     Incompatible(Error),
     Offline,
 }

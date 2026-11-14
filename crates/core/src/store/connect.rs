@@ -45,6 +45,9 @@ fn classify(error: PickError) -> Failure {
     if errors.contains(&Error::Outdated) {
         return Failure::Stop(Connection::Incompatible(Error::Outdated));
     }
+    if errors.contains(&Error::NotPaired) {
+        return Failure::Stop(Connection::NotPaired);
+    }
     match errors.into_iter().find(|error| !refused(error)) {
         Some(error) => Failure::Retry(error),
         None => Failure::Stop(Connection::Unauthorized),

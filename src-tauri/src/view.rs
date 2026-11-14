@@ -184,7 +184,7 @@ impl From<&Connection> for ConnectionView {
             Connection::Connected { route } => Self::Connected { route: route.to_string() },
             Connection::Retrying { r#in, error } => Self::Retrying { in_ms: millis(*r#in), error: error.into() },
             Connection::Missing(missing) => Self::Missing { missing: missing.clone() },
-            Connection::Unauthorized => Self::Unauthorized,
+            Connection::Unauthorized | Connection::NotPaired => Self::Unauthorized,
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
             Connection::Offline => Self::Offline,
         }
