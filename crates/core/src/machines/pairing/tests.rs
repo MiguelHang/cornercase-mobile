@@ -26,6 +26,7 @@ enum Mac {
     Answers(&'static str),
     AnswersLate(Duration),
     AnswersAndLeaves,
+    AnswersThenCloses(CloseCode),
     PingsThenAnswers,
     Holds,
 }
@@ -99,6 +100,7 @@ async fn answer(stream: TcpStream, mac: Mac, heads: mpsc::UnboundedSender<Head>)
             vec![Message::text(REPLY), close(CloseCode::Normal)]
         }
         Mac::AnswersAndLeaves => vec![Message::text(REPLY)],
+        Mac::AnswersThenCloses(code) => vec![Message::text(REPLY), close(code)],
         Mac::PingsThenAnswers => vec![Message::Ping(Vec::new().into()), Message::text(REPLY), close(CloseCode::Normal)],
         Mac::Refuses(_) | Mac::Holds => Vec::new(),
     };
@@ -201,6 +203,25 @@ mod pair {
         let server = Server::start(&["127.0.0.1"], vec![Mac::AnswersAndLeaves]).await;
         let expected = PairError::NoAnswer(vec![(server.address("127.0.0.1"), failure)]);
         assert_eq!(pair_with(&server.code(&[])).await, Err(expected));
+    }
+
+    #[rstest]
+    #[case::policy(CloseCode::Policy)]
+    #[case::error(CloseCode::Error)]
+    #[case::away(CloseCode::Away)]
+    #[tokio::test]
+    async fn keeps_no_secret_the_mac_closed_on_with_another_code(#[case] code: CloseCode) {
+        let failure = Error::Protocol("the Mac did not close the pairing after the secret".to_owned());
+        let server = Server::start(&["127.0.0.1"], vec![Mac::AnswersThenCloses(code)]).await;
+        let expected = PairError::NoAnswer(vec![(server.address("127.0.0.1"), failure)]);
+        assert_eq!(pair_with(&server.code(&[])).await, Err(expected));
+    }
+
+    #[tokio::test]
+    async fn keeps_no_secret_in_a_reply_past_its_size_limit() {
+        let reply: &'static str =
+            Box::leak(format!(r#"{{"secret":"4f2a91c0.{}"}}"#, "a".repeat(5000)).into_boxed_str());
+        assert!(matches!(paired(vec![Mac::Answers(reply)]).await, Err(PairError::NoAnswer(_))));
     }
 
     #[tokio::test]
