@@ -8,11 +8,11 @@ pub enum Error {
     Dropped,
     #[error("nothing listens to the command's output any more")]
     OutputClosed,
-    #[error("the bridge answered with HTTP {status}")]
+    #[error("the Mac answered with HTTP {status}")]
     Rejected { status: u16 },
-    #[error("the bridge did not answer in time")]
+    #[error("the Mac did not answer in time")]
     Timeout,
-    #[error("cannot reach the bridge: {0}")]
+    #[error("cannot reach the Mac: {0}")]
     Connect(String),
     #[error("the Mac sent an unexpected message: {0}")]
     Protocol(String),

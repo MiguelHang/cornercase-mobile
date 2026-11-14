@@ -40,6 +40,7 @@
 
   onMount(() => {
     void onchanged()
+    return () => void edit.leave()
   })
 
   untrack(() => {

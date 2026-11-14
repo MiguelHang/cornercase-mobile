@@ -37,6 +37,7 @@ const calls = (overrides: Partial<EditCalls> = {}) => ({
   machineRouteRemove: vi.fn(overrides.machineRouteRemove ?? done),
   machineRouteMove: vi.fn(overrides.machineRouteMove ?? done),
   machineRemove: vi.fn(overrides.machineRemove ?? done),
+  machineFormClosed: vi.fn(overrides.machineFormClosed ?? (() => Promise.resolve())),
 })
 
 const editor = (overrides: Partial<EditCalls> = {}, machine = studio()) => {
@@ -228,6 +229,17 @@ describe('EditMachine adding a route', () => {
     edit.urlError = NO_TOKEN
     edit.close()
     expect([edit.adding, edit.url, edit.urlError]).toEqual([false, '', null])
+  })
+})
+
+describe('EditMachine leaving', () => {
+  it('forgets the secret a code was traded for, which a merge that failed leaves behind', async () => {
+    const { edit, commands } = editor({ machineMerge: () => refused({ code: 'store', message: 'the Keychain refused' }) })
+    edit.open()
+    await edit.fill(URL_TEXT)
+    expect(commands.machineFormClosed).not.toHaveBeenCalled()
+    await edit.leave()
+    expect(commands.machineFormClosed).toHaveBeenCalledOnce()
   })
 })
 

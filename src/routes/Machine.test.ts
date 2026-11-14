@@ -24,6 +24,7 @@ const CALLS = {
   machineRouteRemove: done,
   machineRouteMove: done,
   machineRemove: done,
+  machineFormClosed: () => Promise.resolve(),
 }
 
 const nothing = () => Promise.resolve()
@@ -224,8 +225,8 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
   })
 
-  it('reloads the machines on opening, since the bridge may have told new routes', () => {
-    expect(script).toContain('onMount(() => { void onchanged() })')
+  it('reloads the machines on opening, since the bridge may have told new routes, and forgets a traded secret on leaving', () => {
+    expect(script).toContain('onMount(() => { void onchanged() return () => void edit.leave() })')
   })
 
   it('opens Add route once, on arriving to scan again', () => {

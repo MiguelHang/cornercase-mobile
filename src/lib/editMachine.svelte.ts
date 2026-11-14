@@ -5,7 +5,7 @@ import { checkName, checkUrl, routesText, type Field } from './machineForm'
 
 export type EditCalls = Pick<
   typeof commands,
-  'machineRename' | 'machineMerge' | 'machineRouteRemove' | 'machineRouteMove' | 'machineRemove'
+  'machineRename' | 'machineMerge' | 'machineRouteRemove' | 'machineRouteMove' | 'machineRemove' | 'machineFormClosed'
 >
 
 export class EditMachine {
@@ -76,6 +76,10 @@ export class EditMachine {
       this.url = ''
       this.urlError = null
     }
+  }
+
+  leave() {
+    return this.#calls.machineFormClosed()
   }
 
   async addRoute() {
