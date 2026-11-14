@@ -1,6 +1,6 @@
 # 058 — La app habla con el `/cli` de cornercase y empareja con su QR
 
-- Estado: en curso (falta el iPhone por la LAN y por Tailscale)
+- Estado: hecha
 - Depende de: 057 (hecha: cornercase 0.13.78)
 - Rama: `feat/058-cornercase-cli` · PR: `feat: talk to cornercase's own /cli and pair with its code`
 
@@ -19,7 +19,7 @@ su `/cli`.
   elección de ruta (035, 046) sigue igual.
 - [x] CA5 — Una app olvidada en Settings de cornercase ve "Este Mac ya no reconoce el teléfono" y la opción de volver a
   escanear.
-- [ ] CA6 — Fixtures de la versión de cornercase que traiga `/cli`; comprobación en vivo en el simulador y en el iPhone,
+- [x] CA6 — Fixtures de la versión de cornercase que traiga `/cli`; comprobación en vivo en el simulador y en el iPhone,
   por la LAN y por Tailscale.
   Hechos los fixtures (0.13.78) y el simulador el 2026-11-14 (`design/connection/machines.md` › Checked on 2026-11-14 for
   058); falta el iPhone.
