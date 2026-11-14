@@ -157,6 +157,19 @@ mod connection_url {
     }
 }
 
+mod bearer {
+    use super::*;
+
+    #[rstest]
+    #[case::of_the_bridge(bridge("mac.local", 8765, Some(TOKEN)), Ok(None))]
+    #[case::of_the_bridge_without_a_token(bridge("mac.local", 8765, None), Ok(None))]
+    #[case::of_cornercase(cli("mac.local", 7700, Some(SECRET)), Ok(Some(SECRET)))]
+    #[case::of_cornercase_without_a_secret(cli("mac.local", 7700, None), Err(Error::NoToken))]
+    fn is_the_secret_of_cornercase_alone(#[case] route: Route, #[case] expected: Result<Option<&str>, Error>) {
+        assert_eq!(route.bearer(), expected);
+    }
+}
+
 mod has_token {
     use super::*;
 

@@ -7,7 +7,10 @@ use futures_util::future::BoxFuture;
 use futures_util::stream::BoxStream;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Error as WebSocketError;
-use tokio_tungstenite::tungstenite::http::StatusCode;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::handshake::client::Request;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
+use tokio_tungstenite::tungstenite::http::{HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 
@@ -22,38 +25,62 @@ const LARGEST_ANSWER: usize = 7 * LONGEST_LINE;
 pub(crate) type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BridgeConfig {
+pub struct SocketConfig {
     pub connect_timeout: Duration,
     pub silence_timeout: Duration,
 }
 
-impl Default for BridgeConfig {
+impl Default for SocketConfig {
     fn default() -> Self {
         Self { connect_timeout: Duration::from_secs(3), silence_timeout: Duration::from_secs(45) }
     }
 }
 
-pub struct BridgeTransport {
+pub struct WebSocketTransport {
     url: String,
-    config: BridgeConfig,
+    bearer: Option<String>,
+    config: SocketConfig,
 }
 
-impl BridgeTransport {
-    pub fn new(url: String, config: BridgeConfig) -> Self {
-        Self { url, config }
+impl WebSocketTransport {
+    pub fn new(url: String, config: SocketConfig) -> Self {
+        Self { url, bearer: None, config }
+    }
+
+    #[must_use]
+    pub fn bearing(self, credential: String) -> Self {
+        Self { bearer: Some(credential), ..self }
     }
 
     pub(crate) async fn connect(&self) -> Result<Socket, Error> {
-        let upgrade = connect_async_with_config(self.url.as_str(), Some(websocket()), true);
+        let request = self.request()?;
+        let upgrade = connect_async_with_config(request, Some(websocket()), true);
         match tokio::time::timeout(self.config.connect_timeout, upgrade).await {
             Ok(Ok((socket, _))) => Ok(socket),
-            Ok(Err(error)) => Err(connect_error(error)),
+            Ok(Err(error)) => Err(self.refused(error)),
             Err(_) => Err(Error::Timeout),
+        }
+    }
+
+    fn request(&self) -> Result<Request, Error> {
+        let mut request = self.url.as_str().into_client_request().map_err(connect_error)?;
+        if let Some(credential) = &self.bearer {
+            let mut value = HeaderValue::from_str(&format!("Bearer {credential}")).map_err(|_| Error::NotPaired)?;
+            value.set_sensitive(true);
+            request.headers_mut().insert(AUTHORIZATION, value);
+        }
+        Ok(request)
+    }
+
+    fn refused(&self, error: WebSocketError) -> Error {
+        match (connect_error(error), &self.bearer) {
+            (Error::Rejected { status: 403 }, Some(_)) => Error::NotPaired,
+            (error, _) => error,
         }
     }
 }
 
-impl Transport for BridgeTransport {
+impl Transport for WebSocketTransport {
     fn run(
         &self,
         argv: Vec<String>,
@@ -64,9 +91,9 @@ impl Transport for BridgeTransport {
     }
 }
 
-impl fmt::Debug for BridgeTransport {
+impl fmt::Debug for WebSocketTransport {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_struct("BridgeTransport").field("config", &self.config).finish_non_exhaustive()
+        formatter.debug_struct("WebSocketTransport").field("config", &self.config).finish_non_exhaustive()
     }
 }
 

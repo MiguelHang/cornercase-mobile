@@ -4,11 +4,11 @@ use std::sync::Arc;
 use cornercase_core::board::AgentRow;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::pick::{PickConfig, bridge_transports};
+use cornercase_core::machines::pick::{PickConfig, websocket_transports};
 use cornercase_core::machines::route::Route;
 use cornercase_core::store::Store;
 use cornercase_core::transport::Transport;
-use cornercase_core::transport::bridge::BridgeConfig;
+use cornercase_core::transport::websocket::SocketConfig;
 use tauri::async_runtime::{self, JoinHandle};
 use tauri::{AppHandle, Runtime, State};
 
@@ -35,7 +35,7 @@ impl Launcher {
     }
 
     pub(crate) fn bridge() -> Self {
-        Self::new(bridge_transports(BridgeConfig::default()), async_runtime::spawn)
+        Self::new(websocket_transports(SocketConfig::default()), async_runtime::spawn)
     }
 
     pub(crate) fn transport(&self, route: &Route) -> Result<Arc<dyn Transport>, Error> {

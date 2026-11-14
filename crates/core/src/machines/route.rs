@@ -75,6 +75,13 @@ impl Route {
         }
     }
 
+    pub(crate) fn bearer(&self) -> Result<Option<&str>, Error> {
+        match self {
+            Self::Bridge { .. } => Ok(None),
+            Self::Cli { url } => url.token.as_ref().map(|secret| Some(secret.as_str())).ok_or(Error::NoToken),
+        }
+    }
+
     pub fn has_token(&self) -> bool {
         self.token().is_some()
     }

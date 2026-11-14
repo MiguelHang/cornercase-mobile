@@ -12,11 +12,11 @@ use cornercase_bridge::test_util::{
     HUNG, Served, TOKEN, TempDir, fake_cornercase, in_time, number_in, reaped, wait_until,
 };
 use cornercase_core::error::Error;
-use cornercase_core::machines::pick::{PickConfig, bridge_transports, pick_route};
+use cornercase_core::machines::pick::{PickConfig, pick_route, websocket_transports};
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::protocol::{LARGEST_MESSAGE, LONGEST_LINE};
-use cornercase_core::transport::bridge::{BridgeConfig, BridgeTransport};
+use cornercase_core::transport::websocket::{SocketConfig, WebSocketTransport};
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
 
 const DEADLINE: Duration = Duration::from_millis(200);
@@ -34,8 +34,8 @@ impl Bridge {
         Self { served, dir }
     }
 
-    fn transport(&self, token: &str) -> BridgeTransport {
-        BridgeTransport::new(self.served.url(&format!("/?token={token}")), BridgeConfig::default())
+    fn transport(&self, token: &str) -> WebSocketTransport {
+        WebSocketTransport::new(self.served.url(&format!("/?token={token}")), SocketConfig::default())
     }
 
     async fn started(&self) -> (JoinHandle<Result<Exit, Error>>, i32) {
@@ -139,7 +139,7 @@ mod run {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("a listener");
         let url = format!("ws://{}/?token={TOKEN}", listener.local_addr().expect("its address"));
         let transport =
-            BridgeTransport::new(url, BridgeConfig { connect_timeout: DEADLINE, ..BridgeConfig::default() });
+            WebSocketTransport::new(url, SocketConfig { connect_timeout: DEADLINE, ..SocketConfig::default() });
         let started = Instant::now();
         assert_eq!(run(&transport, Vec::new()).await, (Err(Error::Timeout), Vec::new()));
         let waited = started.elapsed();
@@ -176,7 +176,7 @@ mod pick_route {
             routes: vec![route(&closed), live.clone()],
             last_route: None,
         };
-        let factory = bridge_transports(BridgeConfig::default());
+        let factory = websocket_transports(SocketConfig::default());
         let picked = in_time(pick_route(&machine, factory, PickConfig::default())).await.expect("the live route wins");
         assert_eq!((picked.route, picked.contract), (live, json!({ "version": 1 })));
     }

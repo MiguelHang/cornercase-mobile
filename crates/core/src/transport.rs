@@ -10,9 +10,9 @@ use tokio::sync::mpsc;
 
 use crate::error::Error;
 
-pub mod bridge;
 #[cfg(any(test, feature = "test-util"))]
 pub mod fake;
+pub mod websocket;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stdin {
