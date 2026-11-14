@@ -93,6 +93,12 @@ describe('Machine', () => {
     expect(third).not.toContain('Connected')
   })
 
+  it('marks a route of cornercase without its secret', () => {
+    const machine = { ...studio(), routes: [{ kind: 'cli' as const, url: ROUTES[0], has_token: false }] }
+    const [only] = routes(screen(machine, null))
+    expect(only).toMatch(/<span class="mark failed svelte-[\w-]+">No secret<\/span>/)
+  })
+
   it('marks no route when the machine is not the one connected', () => {
     expect(screen(studio(), null)).not.toContain('Connected')
     expect(screen(studio(), { state: 'connecting' })).not.toContain('Connected')

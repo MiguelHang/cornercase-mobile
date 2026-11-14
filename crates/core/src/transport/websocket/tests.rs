@@ -26,6 +26,10 @@ const SECRET: &str = "4f2a91c0.9c1e2a7b5d0f";
 
 type Head = (String, Option<String>);
 
+async fn within<T>(work: impl Future<Output = T>) -> T {
+    tokio::time::timeout(Duration::from_secs(5), work).await.expect("it gets there within five seconds")
+}
+
 fn refusal(status: u16) -> WebSocketError {
     let response = http::Response::builder().status(status).body(None).expect("a response");
     WebSocketError::Http(Box::new(response))
@@ -69,7 +73,7 @@ async fn connect_with(path: &str, bearer: Option<&str>, answer: Option<u16>) -> 
         None => transport,
     };
     let connected = transport.connect().await;
-    (connected, receiver.await.expect("the head of the upgrade"))
+    (connected, within(receiver).await.expect("the head of the upgrade"))
 }
 
 async fn connect_to(answer: Option<u16>) -> Result<Socket, Error> {
@@ -145,7 +149,8 @@ mod connect {
     async fn refuses_a_secret_that_cannot_go_in_a_header() {
         let (url, _listener) = listener_at("/cli").await;
         let transport = WebSocketTransport::new(url, SocketConfig::default()).bearing("a\nb".to_owned());
-        assert_eq!(transport.connect().await.err(), Some(Error::NotPaired));
+        let refused = Some(Error::Secrets("the saved secret cannot go in a header".to_owned()));
+        assert_eq!(transport.connect().await.err(), refused);
     }
 
     #[tokio::test]
@@ -307,7 +312,7 @@ mod run {
         let stdin = stream::iter([Stdin::Text("one".to_owned()), Stdin::Bytes(vec![0, 255])]).boxed();
         let ended = transport.run(argv(), stdin, out).await;
         let outs = iter::from_fn(|| receiver.try_recv().ok()).collect();
-        (ended, outs, script.await.expect("the bridge's script"))
+        (ended, outs, within(script).await.expect("the bridge's script"))
     }
 
     #[tokio::test]
@@ -335,7 +340,7 @@ mod run {
         assert_eq!(ended, Ok(Exit { code: 0, stderr: String::new() }));
         assert_eq!(receiver.try_recv().ok(), Some(Out::Stdout("a".to_owned())));
         let expected = vec![sent(&ClientMessage::Argv(argv())), sent(&ClientMessage::Eof)];
-        assert_eq!(script.await.expect("the server's script"), (expected, true));
+        assert_eq!(within(script).await.expect("the server's script"), (expected, true));
     }
 
     #[tokio::test]
@@ -379,7 +384,7 @@ mod run {
         let (out, mut receiver) = listen(Some);
         assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::Dropped));
         assert_eq!(receiver.try_recv().ok(), Some(Out::Stdout("a".to_owned())));
-        script.await.expect("the bridge's script");
+        within(script).await.expect("the bridge's script");
     }
 
     #[rstest]
@@ -396,7 +401,7 @@ mod run {
         let (out, _receiver) = listen(Some);
         let ended = transport.run(argv(), stream::empty().boxed(), out).await;
         assert!(matches!(ended, Err(Error::Protocol(_))), "{ended:?}");
-        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+        assert!(within(script).await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
     fn silent_after(silence: Duration) -> SocketConfig {
@@ -415,7 +420,7 @@ mod run {
         let started = tokio::time::Instant::now();
         assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::Dropped));
         assert!(started.elapsed() >= silence, "it gave up after {:?}", started.elapsed());
-        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+        assert!(within(script).await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
     async fn ping(bridge: &mut Bridge, every: Duration, times: usize) {
@@ -438,7 +443,7 @@ mod run {
         let (out, _receiver) = listen(Some);
         let ended = transport.run(argv(), stream::empty().boxed(), out).await;
         assert_eq!(ended, Ok(Exit { code: 0, stderr: String::new() }));
-        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+        assert!(within(script).await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
     #[tokio::test]
@@ -452,7 +457,7 @@ mod run {
         let (out, receiver) = listen(Some);
         drop(receiver);
         assert_eq!(transport.run(argv(), stream::empty().boxed(), out).await, Err(Error::OutputClosed));
-        assert!(script.await.expect("the bridge's script"), "the client did not close cleanly");
+        assert!(within(script).await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
     #[tokio::test]
@@ -470,9 +475,6 @@ mod run {
             panic!("the run ended by itself");
         };
         drop(running);
-        tokio::time::timeout(Duration::from_secs(5), script)
-            .await
-            .expect("the bridge still has the connection")
-            .expect("the bridge's script");
+        within(script).await.expect("the bridge's script");
     }
 }

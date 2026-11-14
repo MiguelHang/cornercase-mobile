@@ -155,6 +155,10 @@ impl AppState {
         }
     }
 
+    pub(crate) fn forget_redeemed(&self) {
+        *self.redeemed_slot() = None;
+    }
+
     fn redeemed_slot(&self) -> MutexGuard<'_, Option<Redeemed>> {
         self.redeemed.lock().unwrap_or_else(PoisonError::into_inner)
     }

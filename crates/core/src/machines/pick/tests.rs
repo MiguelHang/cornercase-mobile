@@ -12,7 +12,7 @@ use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 
 use super::*;
 use crate::machines::MachineId;
-use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli, within};
 use crate::transport::fake::FakeTransport;
 use crate::transport::{Closed, Exit, Out};
 
@@ -357,7 +357,7 @@ mod websocket_transports {
         });
         let transport = websocket_transports(SocketConfig::default())(&route).expect("a transport");
         let _ = transport::output(transport.as_ref(), vec!["status".to_owned()]).await;
-        server.await.expect("the server")
+        within(server).await.expect("the server")
     }
 
     #[tokio::test]

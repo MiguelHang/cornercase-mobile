@@ -4,7 +4,7 @@ pub enum Error {
     Unauthorized,
     #[error("this Mac no longer recognizes this phone; scan its code again in Machines")]
     NotPaired,
-    #[error("the connection to the bridge dropped before the command finished")]
+    #[error("the connection to the Mac dropped before the command finished")]
     Dropped,
     #[error("nothing listens to the command's output any more")]
     OutputClosed,
@@ -14,7 +14,7 @@ pub enum Error {
     Timeout,
     #[error("cannot reach the bridge: {0}")]
     Connect(String),
-    #[error("the bridge sent an unexpected message: {0}")]
+    #[error("the Mac sent an unexpected message: {0}")]
     Protocol(String),
     #[error("the Mac sent a pairing secret that is not in the expected form")]
     MalformedSecret,

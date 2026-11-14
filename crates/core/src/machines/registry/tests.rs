@@ -382,6 +382,17 @@ mod merge {
     }
 
     #[test]
+    fn gives_the_new_secret_to_a_cornercase_route_the_code_left_out() {
+        let phone = Phone::new();
+        let id = phone.open().add("studio", &paired(&[LAN], SECRET)).expect("add the studio");
+        phone.open().learn(id, &paired(&[TAILNET], SECRET)).expect("learn the tailnet");
+        let result = phone.open().merge(id, &paired(&[LAN], NEW_SECRET));
+        assert_eq!(result, Ok(merged(&[], true, &[])));
+        assert_eq!(routes(&phone, id), paired(&[LAN, TAILNET], NEW_SECRET));
+        assert_eq!(phone.secret_at(id, &phone_address(TAILNET)).as_deref(), Some(NEW_SECRET));
+    }
+
+    #[test]
     fn writes_nothing_when_there_is_nothing_to_add() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();

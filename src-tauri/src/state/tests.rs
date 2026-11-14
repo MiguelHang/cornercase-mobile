@@ -256,6 +256,13 @@ mod the_redeemed_secret {
         state.used(&format!("{PAIRING} "));
         assert_eq!(state.secret_of(PAIRING), None);
     }
+
+    #[test]
+    fn is_forgotten_as_the_form_closes() {
+        let state = redeemed();
+        state.forget_redeemed();
+        assert_eq!(state.secret_of(PAIRING), None);
+    }
 }
 
 mod the_network {

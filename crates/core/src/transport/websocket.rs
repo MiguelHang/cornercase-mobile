@@ -65,7 +65,7 @@ impl WebSocketTransport {
     fn request(&self) -> Result<Request, Error> {
         let mut request = self.url.as_str().into_client_request().map_err(connect_error)?;
         if let Some(credential) = &self.bearer {
-            let mut value = HeaderValue::from_str(&format!("Bearer {credential}")).map_err(|_| Error::NotPaired)?;
+            let mut value = HeaderValue::from_str(&format!("Bearer {credential}")).map_err(|_| unfit_secret())?;
             value.set_sensitive(true);
             request.headers_mut().insert(AUTHORIZATION, value);
         }
@@ -99,6 +99,10 @@ impl fmt::Debug for WebSocketTransport {
 
 fn websocket() -> WebSocketConfig {
     WebSocketConfig::default().max_frame_size(Some(LARGEST_ANSWER)).max_message_size(Some(LARGEST_ANSWER))
+}
+
+fn unfit_secret() -> Error {
+    Error::Secrets("the saved secret cannot go in a header".to_owned())
 }
 
 pub(crate) fn connect_error(error: WebSocketError) -> Error {

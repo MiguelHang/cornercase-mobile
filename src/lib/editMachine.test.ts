@@ -1,7 +1,10 @@
+import { untrack } from 'svelte'
 import { describe, expect, it, vi } from 'vitest'
 import type { CommandError, MachineView_Serialize, MergeView } from './bindings'
 import { EditMachine, type EditCalls } from './editMachine.svelte'
 import { NAME_EMPTY, NAME_TAKEN, NO_TOKEN } from './machineForm'
+
+vi.mock('svelte', async (actual) => ({ ...(await actual<object>()), untrack: vi.fn((read: () => unknown) => read()) }))
 
 const URL_TEXT = 'ws://100.64.0.3:9000/?token=abc'
 
@@ -44,6 +47,15 @@ const editor = (overrides: Partial<EditCalls> = {}, machine = studio()) => {
   const edit = new EditMachine(commands, () => machine, onchanged, onremoved, tell)
   return { edit, commands, onchanged, onremoved, tell }
 }
+
+describe('EditMachine as a lazy default of its screen', () => {
+  it('reads the saved name without tracking the machine, so the reload on opening keeps the form', () => {
+    const machine = () => studio()
+    const edit = new EditMachine(calls(), machine, vi.fn(), vi.fn(), vi.fn())
+    expect(untrack).toHaveBeenCalledWith(machine)
+    expect(edit.name).toBe('Studio')
+  })
+})
 
 describe('EditMachine renaming', () => {
   it('starts from the saved name and holds a name left as it is', async () => {

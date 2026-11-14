@@ -130,7 +130,7 @@ mod adding_a_paired_code {
 
     fn refused(state: &AppState) {
         let error = add(state, DESK, "desk").expect_err("the code is refused");
-        assert_eq!(error.code, ErrorCode::NoToken);
+        assert_eq!(error.code, ErrorCode::PairingRefused);
         assert_eq!(names(state), ["studio"]);
     }
 
@@ -162,6 +162,15 @@ mod adding_a_paired_code {
         let desk = add(&studio.state, DESK, "desk").expect("the desk is added");
         remove(&studio.state, &Recorder::default(), desk).expect("the desk is removed");
         refused(&studio.state);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn forgets_the_secret_when_the_form_closes() {
+        let studio = Studio::new();
+        redeemed(&studio.state).await;
+        let ipc = Ipc::new(studio.state);
+        assert_eq!(ipc.invoke("machine_form_closed", serde_json::json!({})), Ok(serde_json::Value::Null));
+        refused(&ipc.state());
     }
 
     #[tokio::test(start_paused = true)]

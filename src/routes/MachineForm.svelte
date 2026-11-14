@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { AddMachine } from '../lib/addMachine.svelte'
   import { commands, events } from '../lib/bindings'
   import { placeholderName } from '../lib/machineForm'
@@ -25,6 +26,8 @@
     (machine) => onrouted(machine),
     (toast) => void events.toast.emit(toast),
   )
+
+  onMount(() => () => void form.close())
 
   const submit = (event: SubmitEvent) => {
     event.preventDefault()

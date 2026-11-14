@@ -9,6 +9,7 @@ export const commands = {
 	machineAdd: (code: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { code, name })),
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
 	machineRename: (id: number, name: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_rename", { id, name })),
+	machineFormClosed: () => __TAURI_INVOKE<void>("machine_form_closed"),
 	machineMerge: (id: number, code: string) => typedError<MergeView, CommandError>(__TAURI_INVOKE("machine_merge", { id, code })),
 	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
 	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),

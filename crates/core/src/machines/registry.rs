@@ -86,7 +86,8 @@ impl Machines {
     }
 
     pub fn merge(&mut self, id: MachineId, routes: &[Route]) -> Result<Merged, Error> {
-        let Sorted { new, changed, skipped } = self.sorted(id, routes.to_vec())?;
+        let Sorted { new, mut changed, skipped } = self.sorted(id, routes.to_vec())?;
+        changed.extend(self.with_new_secret(id, routes));
         let merged = Merged { added: addresses(&new), token_updated: !changed.is_empty(), skipped };
         let routes = [new, changed].concat();
         if !routes.is_empty() {
@@ -205,6 +206,24 @@ impl Machines {
             }
         }
         Ok(sorted)
+    }
+
+    fn with_new_secret(&self, id: MachineId, routes: &[Route]) -> Vec<Route> {
+        let secret = routes.iter().find(|route| matches!(route, Route::Cli { .. })).and_then(Route::token);
+        let (Some(secret), Some(machine)) = (secret, self.machine(id)) else {
+            return Vec::new();
+        };
+        machine
+            .routes
+            .iter()
+            .filter(|saved| matches!(saved, Route::Cli { .. }) && saved.token() != Some(secret))
+            .filter(|saved| routes.iter().all(|route| route.address() != saved.address()))
+            .map(|saved| {
+                let mut route = saved.clone();
+                route.set_token(Some(secret.clone()));
+                route
+            })
+            .collect()
     }
 
     fn write_tokens(&self, id: MachineId, routes: &[Route]) -> Result<(), Error> {

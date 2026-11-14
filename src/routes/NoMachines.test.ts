@@ -117,6 +117,10 @@ describe('MachineForm', () => {
     expect(script).toContain('event.preventDefault() void form.submit(taken)')
   })
 
+  it('forgets the secret a code was traded for as it goes away', () => {
+    expect(script).toContain('onMount(() => () => void form.close())')
+  })
+
   it('takes no names as taken unless told', () => {
     expect(script).toContain('let { taken = [],')
   })
@@ -201,6 +205,7 @@ describe('scanning a QR code', () => {
         machineAdd: add,
         machineMatch: () => Promise.resolve({ status: 'ok', data: { found: { kind: 'none' }, checked: true } }),
         machineMerge: () => Promise.resolve({ status: 'ok', data: { added: [], token_updated: false, skipped: [] } }),
+        machineFormClosed: () => Promise.resolve(),
       },
       onadded,
       () => {},

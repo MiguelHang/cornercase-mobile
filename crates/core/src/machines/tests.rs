@@ -12,6 +12,10 @@ pub(super) fn cli(host: &str, port: u16, secret: Option<&str>) -> Route {
     Route::Cli { url: url(host, port, secret) }
 }
 
+pub(super) async fn within<T>(work: impl Future<Output = T>) -> T {
+    tokio::time::timeout(std::time::Duration::from_secs(5), work).await.expect("it gets there within five seconds")
+}
+
 fn url(host: &str, port: u16, token: Option<&str>) -> RouteUrl {
     let address = Address { host: host.to_owned(), port };
     RouteUrl { address, token: token.map(|token| Token::new(token.to_owned())) }

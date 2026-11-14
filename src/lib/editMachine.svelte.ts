@@ -1,3 +1,4 @@
+import { untrack } from 'svelte'
 import { ERRORS, send, type Answer } from './addMachine.svelte'
 import type { Direction, MachineView_Serialize, MergeView, Toast, commands } from './bindings'
 import { checkName, checkUrl, routesText, type Field } from './machineForm'
@@ -34,7 +35,7 @@ export class EditMachine {
     this.#onchanged = onchanged
     this.#onremoved = onremoved
     this.#tell = tell
-    this.name = machine().name
+    this.name = untrack(machine).name
   }
 
   get unchanged() {

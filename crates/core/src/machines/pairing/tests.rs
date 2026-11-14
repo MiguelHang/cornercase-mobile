@@ -10,6 +10,7 @@ use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse,
 use tokio_tungstenite::tungstenite::http;
 
 use super::*;
+use crate::machines::tests::within;
 
 const CODE: &str = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 const SECRET: &str = "4f2a91c0.9c1e2a7b5d0f";
@@ -147,7 +148,7 @@ mod pair {
     async fn sends_the_code_in_the_query_and_the_app_in_the_user_agent() {
         let mut server = Server::start(&["127.0.0.1"], vec![Mac::Answers(REPLY)]).await;
         let _ = pair_with(&server.code(&[])).await;
-        let head = server.heads.recv().await.expect("the head of the upgrade");
+        let head = within(server.heads.recv()).await.expect("the head of the upgrade");
         assert_eq!(head, (format!("/?code={CODE}"), Some(AGENT.to_owned())));
     }
 

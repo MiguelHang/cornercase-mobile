@@ -29,6 +29,7 @@ const calls = (overrides: Partial<MachineCalls> = {}) => ({
   machineAdd: vi.fn(overrides.machineAdd ?? (() => added(1))),
   machineMatch: vi.fn(overrides.machineMatch ?? (() => matched({ kind: 'none' }))),
   machineMerge: vi.fn(overrides.machineMerge ?? (() => ok(MERGED))),
+  machineFormClosed: vi.fn(overrides.machineFormClosed ?? (() => Promise.resolve())),
 })
 
 const form = (overrides: Partial<MachineCalls> = {}, url = URL_TEXT, name = '') => {
@@ -326,6 +327,14 @@ describe('AddMachine offering the same machine', () => {
     await draft.addNew()
     expect([draft.offer, draft.held]).toEqual([null, false])
     expect([commands.machineMerge, commands.machineAdd].map((mock) => mock.mock.calls.length)).toEqual([0, 0])
+  })
+
+  it('keeps the secret on Back, for the same code sent again, and forgets it as the form closes', async () => {
+    const { draft, commands } = await offered('boot')
+    draft.back()
+    expect(commands.machineFormClosed).not.toHaveBeenCalled()
+    await draft.close()
+    expect(commands.machineFormClosed).toHaveBeenCalledOnce()
   })
 
   it('takes one choice at a time and holds Back while it runs', async () => {

@@ -147,9 +147,9 @@ mod probing_a_machine {
         PickError::AllFailed(vec![(route().address().clone(), Error::NotPaired), (cli_route(), Error::Timeout)]),
         ProbeView::NotPaired
     )]
-    #[case::rejected_by_the_bridge_and_forgotten_by_cornercase(
+    #[case::rejected_by_the_bridge_and_forgotten_by_cornercase_as_the_bar_says(
         PickError::AllFailed(vec![(route().address().clone(), Error::Unauthorized), (cli_route(), Error::NotPaired)]),
-        ProbeView::Unauthorized
+        ProbeView::NotPaired
     )]
     fn reads_a_failed_pick(#[case] error: PickError, #[case] expected: ProbeView) {
         assert_eq!(failed(error), expected);
