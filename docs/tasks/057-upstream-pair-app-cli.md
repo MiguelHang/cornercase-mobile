@@ -1,6 +1,6 @@
 # 057 — Upstream: el QR para emparejar la app y `/cli` en cornercase-terminal
 
-- Estado: pendiente (falta decidir quién la implementa: PR desde el fork `MiguelHang/cornercase-terminal` o solo issue)
+- Estado: pendiente · issue [usecornercase/cornercase-terminal#838](https://github.com/usecornercase/cornercase-terminal/issues/838), asignada al usuario, que la implementa en upstream como colaborador (decidido el 2026-11-14)
 - Depende de: — (comprobado contra upstream `main`, cornercase 0.13.72, el 2026-11-14)
 - Repo: cornercase-terminal (no este). Sustituye al borrador 01 de la 033 (`.harness/parked/t033/drafts/01-cli-endpoint.md`).
 
