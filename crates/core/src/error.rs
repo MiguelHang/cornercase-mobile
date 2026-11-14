@@ -2,6 +2,8 @@
 pub enum Error {
     #[error("the bridge refused the token")]
     Unauthorized,
+    #[error("this Mac no longer recognizes this phone; scan its code again in Machines")]
+    NotPaired,
     #[error("the connection to the bridge dropped before the command finished")]
     Dropped,
     #[error("nothing listens to the command's output any more")]
@@ -14,6 +16,14 @@ pub enum Error {
     Connect(String),
     #[error("the bridge sent an unexpected message: {0}")]
     Protocol(String),
+    #[error("the Mac sent a pairing secret that is not in the expected form")]
+    MalformedSecret,
+    #[error(
+        "the code no longer works (it lasts 10 minutes and works once): show another in cornercase's Settings › Remote"
+    )]
+    PairingRefused,
+    #[error("the Mac could not save the pairing; show another code in cornercase's Settings › Remote and scan it")]
+    PairingFailed,
     #[error("cornercase exited with code {code}: {stderr}")]
     Failed { code: i32, stderr: String },
     #[error("the cornercase server restarted since the command was prepared: {0}")]

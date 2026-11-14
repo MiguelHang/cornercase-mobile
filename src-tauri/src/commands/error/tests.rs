@@ -6,6 +6,8 @@ use serde_json::json;
 use super::*;
 
 const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
+const PAIRING_CODE: &str = "0123456789abcdef0123456789abcdef";
+const SECRET: &str = "9c1e2a7b.5d0f3c8e9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071";
 
 fn json_of(error: &CommandError) -> serde_json::Value {
     serde_json::to_value(error).expect("an error serializes")
@@ -16,12 +18,16 @@ mod from_a_core_error {
 
     #[rstest]
     #[case::unauthorized(Error::Unauthorized, "unauthorized")]
+    #[case::not_paired(Error::NotPaired, "not_paired")]
     #[case::dropped(Error::Dropped, "dropped")]
     #[case::output_closed(Error::OutputClosed, "output_closed")]
     #[case::rejected(Error::Rejected { status: 503 }, "rejected")]
     #[case::timeout(Error::Timeout, "timeout")]
     #[case::connect(Error::Connect("refused".into()), "connect")]
     #[case::protocol(Error::Protocol("a binary frame".into()), "protocol")]
+    #[case::malformed_secret(Error::MalformedSecret, "protocol")]
+    #[case::pairing_refused(Error::PairingRefused, "pairing_refused")]
+    #[case::pairing_failed(Error::PairingFailed, "pairing_failed")]
     #[case::failed(Error::Failed { code: 2, stderr: "no such pane".into() }, "failed")]
     #[case::stale_boot(Error::StaleBoot("boot 7".into()), "stale_boot")]
     #[case::stream_ended(Error::StreamEnded, "stream_ended")]
@@ -50,6 +56,22 @@ mod from_a_core_error {
     fn carries_its_code_and_its_message(#[case] error: Error, #[case] code: &str) {
         let message = error.to_string();
         assert_eq!(json_of(&CommandError::from(error)), json!({ "code": code, "message": message }));
+    }
+}
+
+mod of_pairing {
+    use super::*;
+
+    #[rstest]
+    #[case::not_paired(Error::NotPaired)]
+    #[case::malformed_secret(Error::MalformedSecret)]
+    #[case::pairing_refused(Error::PairingRefused)]
+    #[case::pairing_failed(Error::PairingFailed)]
+    fn never_says_the_code_or_the_secret(#[case] error: Error) {
+        let json = json_of(&CommandError::from(error));
+        let message = json["message"].as_str().expect("a message");
+        assert!(!message.contains(PAIRING_CODE), "{message}");
+        assert!(!message.contains(SECRET), "{message}");
     }
 }
 

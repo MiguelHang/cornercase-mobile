@@ -14,12 +14,15 @@ pub(crate) struct CommandError {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ErrorCode {
     Unauthorized,
+    NotPaired,
     Dropped,
     OutputClosed,
     Rejected,
     Timeout,
     Connect,
     Protocol,
+    PairingRefused,
+    PairingFailed,
     Failed,
     StaleBoot,
     StreamEnded,
@@ -153,12 +156,15 @@ impl From<RouteError> for CommandError {
 fn core_code(error: &Error) -> ErrorCode {
     match error {
         Error::Unauthorized => ErrorCode::Unauthorized,
+        Error::NotPaired => ErrorCode::NotPaired,
         Error::Dropped => ErrorCode::Dropped,
         Error::OutputClosed => ErrorCode::OutputClosed,
         Error::Rejected { .. } => ErrorCode::Rejected,
         Error::Timeout => ErrorCode::Timeout,
         Error::Connect(_) => ErrorCode::Connect,
-        Error::Protocol(_) => ErrorCode::Protocol,
+        Error::Protocol(_) | Error::MalformedSecret => ErrorCode::Protocol,
+        Error::PairingRefused => ErrorCode::PairingRefused,
+        Error::PairingFailed => ErrorCode::PairingFailed,
         Error::Failed { .. } => ErrorCode::Failed,
         Error::StaleBoot(_) => ErrorCode::StaleBoot,
         Error::StreamEnded => ErrorCode::StreamEnded,

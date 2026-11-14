@@ -7,6 +7,7 @@ mod display {
 
     #[rstest]
     #[case::unauthorized(Error::Unauthorized, "the bridge refused the token")]
+    #[case::not_paired(Error::NotPaired, "this Mac no longer recognizes this phone; scan its code again in Machines")]
     #[case::dropped(Error::Dropped, "the connection to the bridge dropped before the command finished")]
     #[case::output_closed(Error::OutputClosed, "nothing listens to the command's output any more")]
     #[case::rejected(Error::Rejected { status: 404 }, "the bridge answered with HTTP 404")]
@@ -15,6 +16,15 @@ mod display {
     #[case::protocol(
         Error::Protocol("a binary frame".to_owned()),
         "the bridge sent an unexpected message: a binary frame"
+    )]
+    #[case::malformed_secret(Error::MalformedSecret, "the Mac sent a pairing secret that is not in the expected form")]
+    #[case::pairing_refused(
+        Error::PairingRefused,
+        "the code no longer works (it lasts 10 minutes and works once): show another in cornercase's Settings › Remote"
+    )]
+    #[case::pairing_failed(
+        Error::PairingFailed,
+        "the Mac could not save the pairing; show another code in cornercase's Settings › Remote and scan it"
     )]
     #[case::failed(
         Error::Failed { code: 3, stderr: "no such project".to_owned() },
