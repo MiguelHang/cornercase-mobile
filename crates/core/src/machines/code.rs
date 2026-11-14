@@ -74,6 +74,17 @@ impl MachineCode {
         self.name.as_deref()
     }
 
+    pub(crate) fn pairing_code(&self) -> Option<&Token> {
+        match &self.credential {
+            Credential::Pairing(PairingCode(code)) => Some(code),
+            Credential::Token(_) => None,
+        }
+    }
+
+    pub(crate) fn addresses(&self) -> Vec<Address> {
+        self.hosts().map(|host| self.address(host)).collect()
+    }
+
     fn add_also(&mut self, host: String) {
         if self.hosts().all(|known| *known != host) {
             self.also.push(host);
@@ -85,8 +96,11 @@ impl MachineCode {
     }
 
     fn url(&self, host: &str, token: &Token) -> RouteUrl {
-        let address = Address { host: host.to_owned(), port: self.port };
-        RouteUrl { address, token: Some(token.clone()) }
+        RouteUrl { address: self.address(host), token: Some(token.clone()) }
+    }
+
+    fn address(&self, host: &str) -> Address {
+        Address { host: host.to_owned(), port: self.port }
     }
 }
 

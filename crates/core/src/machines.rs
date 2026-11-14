@@ -7,6 +7,7 @@ use self::route::{Address, Route};
 pub mod code;
 pub mod learned;
 pub(crate) mod name;
+pub mod pairing;
 pub mod pick;
 pub mod registry;
 pub mod route;

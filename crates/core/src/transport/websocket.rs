@@ -101,7 +101,7 @@ fn websocket() -> WebSocketConfig {
     WebSocketConfig::default().max_frame_size(Some(LARGEST_ANSWER)).max_message_size(Some(LARGEST_ANSWER))
 }
 
-fn connect_error(error: WebSocketError) -> Error {
+pub(crate) fn connect_error(error: WebSocketError) -> Error {
     match error {
         WebSocketError::Http(response) if response.status() == StatusCode::UNAUTHORIZED => Error::Unauthorized,
         WebSocketError::Http(response) => Error::Rejected { status: response.status().as_u16() },

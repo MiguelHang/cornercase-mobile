@@ -316,6 +316,24 @@ mod pairing_code {
     fn gives_routes_of_cornercase_from_a_bridge_code_too() {
         assert_eq!(code(LAN).cli_routes(&secret()), vec![cli(LAN, 8765, Some(SECRET))]);
     }
+
+    #[test]
+    fn hands_its_pairing_code_over() {
+        let read = read(&format!("ws://mac.local:47682/?code={PAIRING}"));
+        assert_eq!(read.pairing_code().map(Token::as_str), Some(PAIRING));
+    }
+
+    #[test]
+    fn has_no_pairing_code_in_a_bridge_code() {
+        assert_eq!(code(LAN).pairing_code(), None);
+    }
+
+    #[test]
+    fn gives_the_address_of_every_host_in_order() {
+        let read = read(&format!("ws://192.168.1.20:47682/?code={PAIRING}&also=fd7a:115c:a1e0::1&also=192.168.1.20"));
+        let address = |host: &str| Address { host: host.to_owned(), port: 47682 };
+        assert_eq!(read.addresses(), vec![address(LAN), address(TAILSCALE_V6)]);
+    }
 }
 
 mod old_app {
