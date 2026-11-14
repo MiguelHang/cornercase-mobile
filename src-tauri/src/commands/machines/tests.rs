@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
+use std::time::Duration;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
@@ -11,15 +12,18 @@ use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
 use rstest::rstest;
 use tauri::async_runtime::{self, JoinHandle};
+use tokio::time;
 
 use super::*;
 use crate::commands::connection::{Launcher, Task, start};
 use crate::commands::error::ErrorCode;
 use crate::commands::history;
+use crate::commands::probe::matching;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::Active;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, Ipc, Recorder, Studio, TOKEN, changed, heard, launcher, released, serving, settle, snapshot,
+    ADDRESS, BOOT, BRIDGE, Ipc, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, changed, contracted, heard, launcher,
+    pairing, released, serving, settle, snapshot,
 };
 use crate::view::{MachineView, RouteView};
 
@@ -110,6 +114,71 @@ mod adding_a_machine {
         assert_eq!(machines, [expected]);
         let json = serde_json::to_string(&machines).expect("the machines serialize");
         assert!(!json.contains(TOKEN), "{json}");
+    }
+}
+
+mod adding_a_paired_code {
+    use super::*;
+
+    const DESK: &str = "ws://desk.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0&also=100.64.0.9";
+    const DESK_ROUTES: [&str; 2] = ["ws://desk.lan:47682/", "ws://100.64.0.9:47682/"];
+
+    async fn redeemed(state: &AppState) {
+        let (launcher, _) = pairing(launcher(contracted(BOOT)).0, Ok(SECRET));
+        matching(state, &launcher, DESK, "desk").await.expect("the code is paired");
+    }
+
+    fn refused(state: &AppState) {
+        let error = add(state, DESK, "desk").expect_err("the code is refused");
+        assert_eq!(error.code, ErrorCode::PairingRefused);
+        assert_eq!(names(state), ["studio"]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn saves_its_routes_of_cornercase_with_the_secret_in_the_keychain_only() {
+        let studio = Studio::new();
+        redeemed(&studio.state).await;
+        let desk = add(&studio.state, DESK, "desk").expect("the desk is added");
+        let machines = list(&studio.reloaded()).expect("the machines load").machines;
+        let views = DESK_ROUTES.map(|url| RouteView::Cli { url: url.to_owned(), has_token: true });
+        assert_eq!(machines[1].routes, views);
+        for url in DESK_ROUTES {
+            let saved = studio.secrets.get(&format!("route/{}/{url}", desk.0)).expect("the keychain answers");
+            assert_eq!(saved.as_deref(), Some(SECRET.as_bytes()));
+        }
+        let file = fs::read_to_string(studio.dir.path().join("machines.json")).expect("read the machines file");
+        assert!(!file.contains(SECRET) && !file.contains(PAIRING_CODE), "{file}");
+    }
+
+    #[test]
+    fn refuses_a_code_it_did_not_pair() {
+        refused(&Studio::new().state);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn forgets_the_secret_once_it_is_used() {
+        let studio = Studio::new();
+        redeemed(&studio.state).await;
+        let desk = add(&studio.state, DESK, "desk").expect("the desk is added");
+        remove(&studio.state, &Recorder::default(), desk).expect("the desk is removed");
+        refused(&studio.state);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn forgets_the_secret_when_the_form_closes() {
+        let studio = Studio::new();
+        redeemed(&studio.state).await;
+        let ipc = Ipc::new(studio.state);
+        assert_eq!(ipc.invoke("machine_form_closed", serde_json::json!({})), Ok(serde_json::Value::Null));
+        refused(&ipc.state());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn refuses_a_code_whose_secret_expired() {
+        let studio = Studio::new();
+        redeemed(&studio.state).await;
+        time::advance(Duration::from_mins(10)).await;
+        refused(&studio.state);
     }
 }
 

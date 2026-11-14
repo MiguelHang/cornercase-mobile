@@ -2,17 +2,20 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use cornercase_core::error::Error;
 use cornercase_core::history::store::JsonFolderStore;
 use cornercase_core::identity::Identity;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::registry::Machines;
+use cornercase_core::machines::route::Token;
 use cornercase_core::machines::store::JsonFileStore;
 use cornercase_core::network::Network;
 use cornercase_core::secrets::Secrets;
 use cornercase_core::store::Store;
 use tauri::async_runtime::JoinHandle;
+use tokio::time::Instant;
 
 use crate::commands::error::CommandError;
 use crate::identity;
@@ -22,6 +25,7 @@ pub(crate) mod attached;
 
 const MACHINES_FILE: &str = "machines.json";
 const HISTORY_FOLDER: &str = "history";
+const REDEEMED_FOR: Duration = Duration::from_mins(10);
 
 pub(crate) struct AppState {
     machines: SharedMachines,
@@ -31,6 +35,13 @@ pub(crate) struct AppState {
     boots: Mutex<HashMap<MachineId, String>>,
     attached: AttachedImages,
     history: Mutex<Option<JsonFolderStore>>,
+    redeemed: Mutex<Option<Redeemed>>,
+}
+
+struct Redeemed {
+    code: String,
+    secret: Token,
+    until: Instant,
 }
 
 #[derive(Clone)]
@@ -70,6 +81,7 @@ impl AppState {
             boots: Mutex::new(HashMap::new()),
             attached: AttachedImages::default(),
             history: Mutex::new(None),
+            redeemed: Mutex::new(None),
         }
     }
 
@@ -121,6 +133,34 @@ impl AppState {
 
     pub(crate) fn history(&self) -> MutexGuard<'_, Option<JsonFolderStore>> {
         self.history.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub(crate) fn redeemed(&self, code: &str, secret: Token) {
+        let code = code.trim().to_owned();
+        *self.redeemed_slot() = Some(Redeemed { code, secret, until: Instant::now() + REDEEMED_FOR });
+    }
+
+    pub(crate) fn secret_of(&self, code: &str) -> Option<Token> {
+        let mut slot = self.redeemed_slot();
+        if slot.as_ref().is_some_and(|redeemed| redeemed.until <= Instant::now()) {
+            *slot = None;
+        }
+        slot.as_ref().filter(|redeemed| redeemed.code == code.trim()).map(|redeemed| redeemed.secret.clone())
+    }
+
+    pub(crate) fn used(&self, code: &str) {
+        let mut slot = self.redeemed_slot();
+        if slot.as_ref().is_some_and(|redeemed| redeemed.code == code.trim()) {
+            *slot = None;
+        }
+    }
+
+    pub(crate) fn forget_redeemed(&self) {
+        *self.redeemed_slot() = None;
+    }
+
+    fn redeemed_slot(&self) -> MutexGuard<'_, Option<Redeemed>> {
+        self.redeemed.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 

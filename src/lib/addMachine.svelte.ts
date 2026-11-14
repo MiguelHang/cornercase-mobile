@@ -2,7 +2,7 @@ import type { CommandError, MatchView, Toast, commands } from './bindings'
 import { checkName, checkUrl, fieldOf, mergedText, nameFor, type Field, type Offer } from './machineForm'
 import { messageOf } from './toasts'
 
-export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineMerge'>
+export type MachineCalls = Pick<typeof commands, 'machineAdd' | 'machineMatch' | 'machineMerge' | 'machineFormClosed'>
 
 export type Answer<T> = { status: 'ok'; data: T } | { status: 'error'; error: CommandError }
 
@@ -103,6 +103,10 @@ export class AddMachine {
     if (!this.busy) {
       this.offer = null
     }
+  }
+
+  close() {
+    return this.#calls.machineFormClosed()
   }
 
   async #matched(url: string, name: string, outcome: Outcome<MatchView>) {

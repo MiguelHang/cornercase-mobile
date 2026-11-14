@@ -9,7 +9,7 @@
 {#if scanner.state === 'scanning'}
   <div class="layer" {@attach overPage}>
     <div class="frame"></div>
-    <p class="hint">Point the camera at the QR code the bridge prints.</p>
+    <p class="hint">Point the camera at the QR code in cornercase › Settings › Remote › Phone app.</p>
     <Button tone="plain" onclick={() => void scanner.stop()}>Cancel</Button>
   </div>
 {:else if scanner.state === 'denied'}

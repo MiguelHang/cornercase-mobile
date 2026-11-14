@@ -51,10 +51,11 @@ describe('rowStatus of another machine', () => {
       { text: 'Answers via studio.lan:9000', tone: 'done', pulsing: false },
     ],
     ['rejecting its token', { state: 'unauthorized' }, { text: 'Token rejected', tone: 'failed', pulsing: false }],
+    ['forgetting this phone', { state: 'not_paired' }, { text: 'Not paired', tone: 'failed', pulsing: false }],
     [
       'without a token',
       { state: 'no_token' },
-      { text: 'No token: scan its code again', tone: 'failed', pulsing: false },
+      { text: 'No secret: scan its code again', tone: 'failed', pulsing: false },
     ],
     [
       'not answering',
@@ -98,6 +99,7 @@ describe('rescannable', () => {
   it.each<[string, Probe, boolean]>([
     ['a rejected token', { state: 'unauthorized' }, true],
     ['no token', { state: 'no_token' }, true],
+    ['a Mac that forgot this phone', { state: 'not_paired' }, true],
     ['an answer', { state: 'answers', route: 'ws://studio.lan:9000/' }, false],
     ['no answer', { state: 'no_answer', failures: [] }, false],
     ['a probe still running', CHECKING, false],
@@ -107,6 +109,7 @@ describe('rescannable', () => {
 
   it.each<[ConnectionView_Serialize, boolean]>([
     [{ state: 'unauthorized' }, true],
+    [{ state: 'not_paired' }, true],
     [{ state: 'connected', route: 'ws://studio.lan:9000/' }, false],
     [{ state: 'offline' }, false],
   ])('follows the connection of the active one, not its last probe (%o)', (connection, expected) => {

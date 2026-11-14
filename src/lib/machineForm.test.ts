@@ -8,6 +8,8 @@ const CODE = 'ws://192.168.1.20:9000/?token=c3R1ZGlvLXNlY3JldA&also=100.101.102.
 
 const named = (name: string) => `${CODE}&name=${name}`
 
+const PAIRING = 'ws://192.168.1.20:47682/?code=4f9a0c1d2e3b&also=[fd7a:115c:a1e0::1]:47682&name=Studio'
+
 describe('checkUrl', () => {
   it.each<[string, string, string]>([
     ['nothing', '', form.EMPTY],
@@ -20,6 +22,8 @@ describe('checkUrl', () => {
     ['no token', 'ws://studio.lan:9000/', form.NO_TOKEN],
     ['an empty token', 'ws://studio.lan:9000/?token=', form.NO_TOKEN],
     ['another parameter', 'ws://studio.lan:9000/?tokens=abc', form.NO_TOKEN],
+    ['an empty pairing code', 'ws://studio.lan:47682/?code=&name=Studio', form.NO_TOKEN],
+    ['empty code and token', 'ws://studio.lan:47682/?code=&token=', form.NO_TOKEN],
   ])('refuses %s', (_, raw, error) => {
     expect(form.checkUrl(raw)).toEqual({ ok: false, error })
   })
@@ -35,6 +39,14 @@ describe('checkUrl', () => {
 
   it('accepts a machine code with more addresses and the name of the Mac, trimmed', () => {
     expect(form.checkUrl(` ${named('Studio')}\n`)).toEqual({ ok: true, url: named('Studio') })
+  })
+
+  it("accepts cornercase's pairing code, trimmed", () => {
+    expect(form.checkUrl(` ${PAIRING}\n`)).toEqual({ ok: true, url: PAIRING })
+  })
+
+  it('leaves a code with both a pairing code and a token to the app, which names what is wrong', () => {
+    expect(form.checkUrl('ws://studio.lan:47682/?code=4f9a&token=abc').ok).toBe(true)
   })
 
   it('accepts the scheme in capitals', () => {
@@ -87,6 +99,11 @@ describe('nameFor', () => {
   it('uses the host when another machine has the name of the code, whatever the case', () => {
     expect(form.nameFor('', named('Studio'), ['Desk', 'STUDIO'])).toBe('192.168.1.20')
     expect(form.nameFor('', named('Studio'), ['Desk'])).toBe('Studio')
+  })
+
+  it("takes the name or the host from cornercase's pairing code", () => {
+    expect(form.nameFor('', PAIRING)).toBe('Studio')
+    expect(form.nameFor('', PAIRING, ['studio'])).toBe('192.168.1.20')
   })
 })
 
@@ -156,7 +173,7 @@ describe('checkName', () => {
 describe('offerText', () => {
   it.each<[SameWhy, string, string]>([
     ['address', 'Studio is already saved at this address.', 'Update the token of Studio'],
-    ['boot', 'This bridge is the one Studio answers from.', 'Add its addresses to Studio'],
+    ['boot', 'This code comes from the same Mac as Studio.', 'Add its addresses to Studio'],
     ['name', 'A machine is already called Studio.', 'Add its addresses to Studio'],
   ])('explains a match by %s and names the choice it keeps', (why, reason, keep) => {
     expect(form.offerText({ saved: 'Studio', why })).toEqual({ reason, keep })
@@ -191,16 +208,17 @@ describe('mergedText', () => {
 })
 
 describe('the texts of adding a machine', () => {
-  it('speak of the machine and its code, never of routes or URLs', () => {
+  it('speak of the machine and its code, never of routes, URLs or the bridge', () => {
     const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.UNCHECKED]
     const offers = (['address', 'boot', 'name'] as const).map((why) => form.offerText({ saved: 'Studio', why }))
     const all = [...texts, form.NEW_MACHINE, ...offers.flatMap(({ reason, keep }) => [reason, keep])]
     expect(all.filter((text) => /route|url/i.test(text))).toEqual([])
+    expect(all.filter((text) => /bridge/i.test(text))).toEqual([])
     expect([form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN]).toEqual([
-      'Paste the code the bridge prints',
+      'Paste the code from cornercase › Settings › Remote › Phone app',
       'The code starts with ws://',
       'This is not a machine code',
-      'The code has no token=: paste it whole',
+      'The code is cut short: paste it whole',
     ])
   })
 })

@@ -5,6 +5,7 @@ import type {
   ConnectionState_Serialize,
   ConnectionView_Serialize,
   MachineList_Serialize,
+  MissingView_Serialize,
 } from './bindings'
 
 export type Screen = {
@@ -69,23 +70,54 @@ const connectedTo = (machineName: string, route: string) =>
 
 const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
 
-export const status = (connection: ConnectionView_Serialize, machineName: string, elapsed = 0): Status => {
+const release = (version: string) => version.split('.').map(Number)
+
+const later = (one: string, other: string) => {
+  const [mine, theirs] = [release(one), release(other)]
+  const differs = mine.findIndex((part, at) => part !== (theirs[at] ?? 0))
+  return differs === -1 ? false : mine[differs] > (theirs[differs] ?? 0)
+}
+
+const newest = (missing: MissingView_Serialize[]) =>
+  missing.reduce<string | null>(
+    (found, { since }) => (since !== null && (found === null || later(since, found)) ? since : found),
+    null,
+  )
+
+const lacking = (missing: MissingView_Serialize[]) => {
+  const since = newest(missing)
+  const names = missing.map(({ name }) => name).join(', ')
+  return `cornercase on the Mac lacks ${names}: update it${since === null ? '' : ` to ${since} or later`}`
+}
+
+type Failed = Exclude<ConnectionView_Serialize, { state: 'connecting' | 'connected' | 'retrying' }>
+
+const failure = (connection: Failed) => {
   switch (connection.state) {
     case 'none':
-      return failed('Not connected')
+      return 'Not connected'
+    case 'missing':
+      return lacking(connection.missing)
+    case 'unauthorized':
+      return "The bridge rejected this phone's token: scan its code again in Machines"
+    case 'not_paired':
+      return 'This Mac no longer recognizes this phone: scan its code again in Machines'
+    case 'incompatible':
+      return `Incompatible: ${connection.error.message}`
+    case 'offline':
+      return 'No network'
+  }
+}
+
+export const status = (connection: ConnectionView_Serialize, machineName: string, elapsed = 0): Status => {
+  switch (connection.state) {
     case 'connecting':
       return { text: 'Connecting…', tone: 'working', pulsing: true }
     case 'connected':
       return { text: connectedTo(machineName, connection.route), tone: 'done', pulsing: false }
     case 'retrying':
       return { ...failed(`Retrying in ${retryLeft(connection.in_ms, elapsed)} s`), detail: connection.error.message }
-    case 'missing':
-      return failed(`cornercase on the Mac lacks ${connection.missing.map((missing) => missing.name).join(', ')}: update it`)
-    case 'unauthorized':
-      return failed("The bridge rejected this phone's token: scan its code again in Machines")
-    case 'incompatible':
-      return failed(`Incompatible: ${connection.error.message}`)
-    case 'offline':
-      return failed('No network')
+    default:
+      return failed(failure(connection))
   }
 }

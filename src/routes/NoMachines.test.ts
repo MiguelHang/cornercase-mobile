@@ -58,6 +58,12 @@ describe('NoMachines', () => {
     expect(body).not.toContain('Machine code')
   })
 
+  it('sends to Phone app in cornercase for the code, never to the bridge', () => {
+    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.')
+    const sources = [noMachinesSource, formSource, urlFieldSource, overlaySource]
+    expect(sources.filter((source) => /bridge/i.test(source))).toEqual([])
+  })
+
   it('swaps the button for the form inside the card, under the emblem, and back on Cancel', () => {
     const markup = flat(noMachinesSource)
     expect(markup).toContain(
@@ -111,6 +117,10 @@ describe('MachineForm', () => {
     expect(script).toContain('event.preventDefault() void form.submit(taken)')
   })
 
+  it('forgets the secret a code was traded for as it goes away', () => {
+    expect(script).toContain('onMount(() => () => void form.close())')
+  })
+
   it('takes no names as taken unless told', () => {
     expect(script).toContain('let { taken = [],')
   })
@@ -155,7 +165,7 @@ describe('the same machine offer', () => {
   it('says why, then offers the route first as the primary, a new machine and Back', () => {
     const body = shown(offer('boot'))
     expect(body).toMatch(/<div class="offer svelte-[\w-]+" role="group" aria-label="Same machine">/)
-    expect(body).toContain('This bridge is the one Studio answers from.')
+    expect(body).toContain('This code comes from the same Mac as Studio.')
     expect(button(body, 'Add its addresses to Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
     expect(button(body, 'Add as a new machine')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
     expect(button(body, 'Back')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
@@ -167,9 +177,9 @@ describe('the same machine offer', () => {
     expect(shown(offer('address'))).toContain('Update the token of Studio')
   })
 
-  it('warns when the bridge could not be asked', () => {
+  it('warns when the Mac could not be asked', () => {
     expect(shown(offer('name', false))).toMatch(
-      /<p class="note svelte-[\w-]+">The bridge did not answer, so it could not be asked which machine it is.<\/p>/,
+      /<p class="note svelte-[\w-]+">cornercase on the Mac did not answer, so it could not be asked which machine it is.<\/p>/,
     )
   })
 
@@ -195,6 +205,7 @@ describe('scanning a QR code', () => {
         machineAdd: add,
         machineMatch: () => Promise.resolve({ status: 'ok', data: { found: { kind: 'none' }, checked: true } }),
         machineMerge: () => Promise.resolve({ status: 'ok', data: { added: [], token_updated: false, skipped: [] } }),
+        machineFormClosed: () => Promise.resolve(),
       },
       onadded,
       () => {},
@@ -221,7 +232,7 @@ describe('scanning a QR code', () => {
   it('puts a frame and Cancel over the camera while it scans', async () => {
     const body = await overlay(camera('granted', () => new Promise(() => {})))
     expect(body).toMatch(/<div class="layer svelte-[\w-]+"><div class="frame svelte-[\w-]+"><\/div>/)
-    expect(body).toContain('Point the camera at the QR code the bridge prints.')
+    expect(body).toContain('Point the camera at the QR code in cornercase › Settings › Remote › Phone app.')
     expect(button(body, 'Cancel')?.slice(1)).toEqual([expect.stringMatching(/^button plain svelte-[\w-]+$/), 'button'])
   })
 

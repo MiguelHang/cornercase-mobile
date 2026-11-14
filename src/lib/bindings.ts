@@ -9,6 +9,7 @@ export const commands = {
 	machineAdd: (code: string, name: string) => typedError<number, CommandError>(__TAURI_INVOKE("machine_add", { code, name })),
 	machineRemove: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("machine_remove", { id })),
 	machineRename: (id: number, name: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_rename", { id, name })),
+	machineFormClosed: () => __TAURI_INVOKE<void>("machine_form_closed"),
 	machineMerge: (id: number, code: string) => typedError<MergeView, CommandError>(__TAURI_INVOKE("machine_merge", { id, code })),
 	machineRouteRemove: (id: number, url: string) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_remove", { id, url })),
 	machineRouteMove: (id: number, url: string, direction: Direction) => typedError<null, CommandError>(__TAURI_INVOKE("machine_route_move", { id, url, direction })),
@@ -381,9 +382,9 @@ export type ConnectionState_Serialize = {
 
 export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
 
-export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Deserialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Deserialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
-export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: Missing_Serialize[] } | { state: "unauthorized" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Serialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type Cursor = Cursor_Serialize | Cursor_Deserialize;
 
@@ -437,7 +438,7 @@ export type Entry_Serialize = {
 	status: Status_Serialize | null,
 };
 
-export type ErrorCode = "unauthorized" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "no_keys" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
+export type ErrorCode = "unauthorized" | "not_paired" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "pairing_refused" | "pairing_failed" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "no_keys" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_token" | "route_empty_token" | "route_token_twice" | "route_token_characters" | "route_empty_code" | "route_code_twice" | "route_token_and_code" | "route_code_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
 
 export type FileShown = FileShown_Serialize | FileShown_Deserialize;
 
@@ -804,18 +805,20 @@ export type MergeView = {
 	skipped: string[],
 };
 
-export type Missing = Missing_Serialize | Missing_Deserialize;
+export type MissingView = MissingView_Serialize | MissingView_Deserialize;
 
-export type Missing_Deserialize = {
+export type MissingView_Deserialize = {
 	name: string,
 	kind: Kind,
 	reason?: string | null,
+	since?: string | null,
 };
 
-export type Missing_Serialize = {
+export type MissingView_Serialize = {
 	name: string,
 	kind: Kind,
 	reason: string | null,
+	since: string | null,
 };
 
 export type Mode = "uncommitted" | "commits" | "all";
@@ -966,7 +969,7 @@ export type PlaceInfo_Serialize = {
 	worktree: boolean,
 };
 
-export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "not_paired" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
 	id: number,
@@ -1049,7 +1052,7 @@ export type RouteFailure = {
 	error: CommandError,
 };
 
-export type RouteView = { kind: "bridge"; url: string; has_token: boolean };
+export type RouteView = { kind: "bridge"; url: string; has_token: boolean } | { kind: "cli"; url: string; has_token: boolean };
 
 export type Run = Run_Serialize | Run_Deserialize;
 

@@ -1,11 +1,13 @@
 use cornercase_core::machines::code::MachineCode;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::route::{Address, Route};
 use rstest::rstest;
 use serde_json::json;
 
 use super::*;
 
 const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
+const PAIRING_CODE: &str = "0123456789abcdef0123456789abcdef";
+const SECRET: &str = "9c1e2a7b.5d0f3c8e9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071";
 
 fn json_of(error: &CommandError) -> serde_json::Value {
     serde_json::to_value(error).expect("an error serializes")
@@ -16,12 +18,16 @@ mod from_a_core_error {
 
     #[rstest]
     #[case::unauthorized(Error::Unauthorized, "unauthorized")]
+    #[case::not_paired(Error::NotPaired, "not_paired")]
     #[case::dropped(Error::Dropped, "dropped")]
     #[case::output_closed(Error::OutputClosed, "output_closed")]
     #[case::rejected(Error::Rejected { status: 503 }, "rejected")]
     #[case::timeout(Error::Timeout, "timeout")]
     #[case::connect(Error::Connect("refused".into()), "connect")]
     #[case::protocol(Error::Protocol("a binary frame".into()), "protocol")]
+    #[case::malformed_secret(Error::MalformedSecret, "protocol")]
+    #[case::pairing_refused(Error::PairingRefused, "pairing_refused")]
+    #[case::pairing_failed(Error::PairingFailed, "pairing_failed")]
     #[case::failed(Error::Failed { code: 2, stderr: "no such pane".into() }, "failed")]
     #[case::stale_boot(Error::StaleBoot("boot 7".into()), "stale_boot")]
     #[case::stream_ended(Error::StreamEnded, "stream_ended")]
@@ -53,6 +59,42 @@ mod from_a_core_error {
     }
 }
 
+mod of_pairing {
+    use super::*;
+
+    #[rstest]
+    #[case::not_paired(Error::NotPaired)]
+    #[case::malformed_secret(Error::MalformedSecret)]
+    #[case::pairing_refused(Error::PairingRefused)]
+    #[case::pairing_failed(Error::PairingFailed)]
+    fn never_says_the_code_or_the_secret(#[case] error: Error) {
+        let json = json_of(&CommandError::from(error));
+        let message = json["message"].as_str().expect("a message");
+        assert!(!message.contains(PAIRING_CODE), "{message}");
+        assert!(!message.contains(SECRET), "{message}");
+    }
+
+    #[rstest]
+    #[case::refused(PairError::Answered(Error::PairingRefused), "pairing_refused")]
+    #[case::failed(PairError::Answered(Error::PairingFailed), "pairing_failed")]
+    #[case::malformed(PairError::Answered(Error::MalformedSecret), "protocol")]
+    #[case::no_code(PairError::NoCode, "connect")]
+    fn carries_the_code_of_what_the_mac_answered(#[case] error: PairError, #[case] code: &str) {
+        let message = error.to_string();
+        assert_eq!(json_of(&CommandError::from(error)), json!({ "code": code, "message": message }));
+    }
+
+    #[test]
+    fn says_where_to_look_when_no_address_answered_without_naming_them() {
+        let unanswered = vec![(Address { host: "mac.lan".to_owned(), port: 47682 }, Error::Timeout)];
+        let json = json_of(&CommandError::from(PairError::NoAnswer(unanswered)));
+        let message = json["message"].as_str().expect("a message");
+        assert_eq!(json["code"], "connect");
+        assert!(message.contains("phone app"), "{message}");
+        assert!(!message.contains("mac.lan"), "{message}");
+    }
+}
+
 mod from_a_route_error {
     use super::*;
 
@@ -76,6 +118,10 @@ mod from_a_route_error {
     #[case::also_invalid("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=[::1]", "route_also_invalid")]
     #[case::name_encoding("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=%FF", "route_name_encoding")]
     #[case::name_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=a&name=b", "route_name_twice")]
+    #[case::empty_code("ws://studio.lan:9000/?code=", "route_empty_code")]
+    #[case::code_twice("ws://studio.lan:9000/?code=c0de&code=c0de", "route_code_twice")]
+    #[case::token_and_code("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&code=c0de", "route_token_and_code")]
+    #[case::code_characters("ws://studio.lan:9000/?code=C0DE", "route_code_characters")]
     fn carries_the_code_of_a_machine_code_error(#[case] text: &str, #[case] code: &str) {
         assert_carries(MachineCode::parse(text).expect_err("a code that does not parse"), code);
     }

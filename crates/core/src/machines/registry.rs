@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use super::code::MachineCode;
 use super::name::checked_name;
 use super::route::{Address, Route, Token};
 use super::same::{Same, same_machine};
@@ -71,10 +70,13 @@ impl Machines {
         same_machine(self.machines(), routes, name, probed_boot, seen_boots)
     }
 
-    pub fn add(&mut self, name: &str, code: &MachineCode) -> Result<MachineId, Error> {
+    pub fn add(&mut self, name: &str, routes: &[Route]) -> Result<MachineId, Error> {
+        if routes.is_empty() {
+            return Err(Error::NoToken);
+        }
         let name = checked_name(name, self.machines(), None)?;
         let id = MachineId(self.saved.next_id);
-        let routes = code.routes();
+        let routes = routes.to_vec();
         self.write_tokens(id, &routes)?;
         let mut saved = self.saved.clone();
         saved.next_id += 1;
@@ -83,8 +85,9 @@ impl Machines {
         Ok(id)
     }
 
-    pub fn merge(&mut self, id: MachineId, code: &MachineCode) -> Result<Merged, Error> {
-        let Sorted { new, changed, skipped } = self.sorted(id, code.routes())?;
+    pub fn merge(&mut self, id: MachineId, routes: &[Route]) -> Result<Merged, Error> {
+        let Sorted { new, mut changed, skipped } = self.sorted(id, routes.to_vec())?;
+        changed.extend(self.with_new_secret(id, routes));
         let merged = Merged { added: addresses(&new), token_updated: !changed.is_empty(), skipped };
         let routes = [new, changed].concat();
         if !routes.is_empty() {
@@ -203,6 +206,24 @@ impl Machines {
             }
         }
         Ok(sorted)
+    }
+
+    fn with_new_secret(&self, id: MachineId, routes: &[Route]) -> Vec<Route> {
+        let secret = routes.iter().find(|route| matches!(route, Route::Cli { .. })).and_then(Route::token);
+        let (Some(secret), Some(machine)) = (secret, self.machine(id)) else {
+            return Vec::new();
+        };
+        machine
+            .routes
+            .iter()
+            .filter(|saved| matches!(saved, Route::Cli { .. }) && saved.token() != Some(secret))
+            .filter(|saved| routes.iter().all(|route| route.address() != saved.address()))
+            .map(|saved| {
+                let mut route = saved.clone();
+                route.set_token(Some(secret.clone()));
+                route
+            })
+            .collect()
     }
 
     fn write_tokens(&self, id: MachineId, routes: &[Route]) -> Result<(), Error> {

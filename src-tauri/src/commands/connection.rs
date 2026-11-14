@@ -1,14 +1,17 @@
+use std::env;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use cornercase_core::board::AgentRow;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::pick::{PickConfig, bridge_transports};
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::code::MachineCode;
+use cornercase_core::machines::pairing::{PairConfig, PairError, pair};
+use cornercase_core::machines::pick::{PickConfig, websocket_transports};
+use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::store::Store;
 use cornercase_core::transport::Transport;
-use cornercase_core::transport::bridge::BridgeConfig;
+use cornercase_core::transport::websocket::SocketConfig;
 use tauri::async_runtime::{self, JoinHandle};
 use tauri::{AppHandle, Runtime, State};
 
@@ -18,11 +21,14 @@ use crate::state::{Active, AppState};
 use crate::view::ConnectionState;
 
 pub(crate) type Task = Pin<Box<dyn Future<Output = ()> + Send>>;
+pub(crate) type Pairing = Pin<Box<dyn Future<Output = Result<Token, PairError>> + Send>>;
 type Transports = dyn Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync;
+type Pairer = dyn Fn(MachineCode) -> Pairing + Send + Sync;
 
 #[derive(Clone)]
 pub(crate) struct Launcher {
     transports: Arc<Transports>,
+    pairer: Arc<Pairer>,
     spawn: fn(Task) -> JoinHandle<()>,
 }
 
@@ -31,23 +37,48 @@ impl Launcher {
         transports: impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> + Send + Sync + 'static,
         spawn: fn(Task) -> JoinHandle<()>,
     ) -> Self {
-        Self { transports: Arc::new(transports), spawn }
+        Self { transports: Arc::new(transports), pairer: Arc::new(paired), spawn }
     }
 
-    pub(crate) fn bridge() -> Self {
-        Self::new(bridge_transports(BridgeConfig::default()), async_runtime::spawn)
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn pairing(self, pairer: impl Fn(MachineCode) -> Pairing + Send + Sync + 'static) -> Self {
+        Self { pairer: Arc::new(pairer), ..self }
     }
 
     pub(crate) fn transport(&self, route: &Route) -> Result<Arc<dyn Transport>, Error> {
         (self.transports)(route)
     }
+
+    pub(crate) async fn pair(&self, code: &MachineCode) -> Result<Token, PairError> {
+        (self.pairer)(code.clone()).await
+    }
+}
+
+impl Default for Launcher {
+    fn default() -> Self {
+        Self::new(websocket_transports(SocketConfig::default()), async_runtime::spawn)
+    }
+}
+
+fn paired(code: MachineCode) -> Pairing {
+    Box::pin(async move { pair(&code, &user_agent(), PairConfig::default()).await })
+}
+
+pub(crate) fn user_agent() -> String {
+    let platform = match env::consts::OS {
+        "ios" => "iOS",
+        "android" => "Android",
+        other => other,
+    };
+    format!("cornercase-mobile/{} ({platform})", env!("CARGO_PKG_VERSION"))
 }
 
 #[tauri::command(async)]
 #[specta::specta]
 #[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
 pub(crate) fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, id: u64) -> Result<(), CommandError> {
-    switch_to(&state, app, &Launcher::bridge(), MachineId(id))
+    switch_to(&state, app, &Launcher::default(), MachineId(id))
 }
 
 #[tauri::command]

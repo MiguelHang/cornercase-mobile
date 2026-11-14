@@ -2,18 +2,28 @@
 pub enum Error {
     #[error("the bridge refused the token")]
     Unauthorized,
-    #[error("the connection to the bridge dropped before the command finished")]
+    #[error("this Mac no longer recognizes this phone; scan its code again in Machines")]
+    NotPaired,
+    #[error("the connection to the Mac dropped before the command finished")]
     Dropped,
     #[error("nothing listens to the command's output any more")]
     OutputClosed,
-    #[error("the bridge answered with HTTP {status}")]
+    #[error("the Mac answered with HTTP {status}")]
     Rejected { status: u16 },
-    #[error("the bridge did not answer in time")]
+    #[error("the Mac did not answer in time")]
     Timeout,
-    #[error("cannot reach the bridge: {0}")]
+    #[error("cannot reach the Mac: {0}")]
     Connect(String),
-    #[error("the bridge sent an unexpected message: {0}")]
+    #[error("the Mac sent an unexpected message: {0}")]
     Protocol(String),
+    #[error("the Mac sent a pairing secret that is not in the expected form")]
+    MalformedSecret,
+    #[error(
+        "the code no longer works (it lasts 10 minutes and works once): show another in cornercase's Settings › Remote"
+    )]
+    PairingRefused,
+    #[error("the Mac could not save the pairing; show another code in cornercase's Settings › Remote and scan it")]
+    PairingFailed,
     #[error("cornercase exited with code {code}: {stderr}")]
     Failed { code: i32, stderr: String },
     #[error("the cornercase server restarted since the command was prepared: {0}")]
@@ -46,7 +56,7 @@ pub enum Error {
     Store(String),
     #[error("the secret store failed: {0}")]
     Secrets(String),
-    #[error("the route has no saved token; scan the bridge's code again")]
+    #[error("the route has no saved secret; scan its code again in Machines")]
     NoToken,
     #[error("no saved machine has that id")]
     UnknownMachine,

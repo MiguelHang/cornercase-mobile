@@ -7,7 +7,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::machines::route::Address;
-use crate::machines::tests::{TOKEN, bridge};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 
 const SECRET_WORD: &str = "do-not-repeat-me";
 
@@ -44,6 +44,12 @@ fn studio(id: u64, token: Option<&str>) -> Machine {
         routes: vec![bridge("192.168.1.20", 8765, token), bridge("fd7a:115c:a1e0::1", 8765, token)],
         last_route: Some(Address { host: "fd7a:115c:a1e0::1".to_owned(), port: 8765 }),
     }
+}
+
+fn both_kinds(token: Option<&str>, secret: Option<&str>) -> Saved {
+    let routes = vec![bridge("192.168.1.20", 8765, token), cli("192.168.1.20", 7700, secret)];
+    let machine = Machine { routes, last_route: None, ..studio(5, None) };
+    Saved { next_id: 6, machines: vec![machine], active: Some(MachineId(5)) }
 }
 
 fn saved(next_id: u64) -> Saved {
@@ -100,6 +106,16 @@ mod load {
         assert!(!folder.text().contains(TOKEN), "{}", folder.text());
     }
 
+    #[test]
+    fn reads_routes_of_both_kinds_from_one_file_without_their_secrets() {
+        let folder = Folder::new();
+        folder.store().save(&both_kinds(Some(TOKEN), Some(SECRET))).expect("save");
+        assert_eq!(folder.store().load().expect("load"), both_kinds(None, None));
+        for secret in [TOKEN, SECRET] {
+            assert!(!folder.text().contains(secret), "{}", folder.text());
+        }
+    }
+
     #[rstest]
     #[case::not_json(format!("{{\"version\": 1, {SECRET_WORD}"), "is not JSON")]
     #[case::cut_short(r#"{"version": 1, "next_id": 0, "machines": ["#.to_owned(), "is not JSON")]
@@ -144,6 +160,18 @@ mod save {
         let written: serde_json::Value = serde_json::from_str(&folder.text()).expect("the file is JSON");
         let machine = serde_json::to_value(studio(0, None)).expect("serialize the machine");
         assert_eq!(written, serde_json::json!({ "version": 1, "next_id": 1, "machines": [machine], "active": 0 }));
+    }
+
+    #[test]
+    fn writes_each_route_with_its_kind() {
+        let folder = Folder::new();
+        folder.store().save(&both_kinds(Some(TOKEN), Some(SECRET))).expect("save");
+        let written: serde_json::Value = serde_json::from_str(&folder.text()).expect("the file is JSON");
+        let routes = serde_json::json!([
+            { "kind": "bridge", "url": "ws://192.168.1.20:8765/" },
+            { "kind": "cli", "url": "ws://192.168.1.20:7700/" },
+        ]);
+        assert_eq!(written["machines"][0]["routes"], routes);
     }
 
     #[test]

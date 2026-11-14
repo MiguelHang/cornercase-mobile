@@ -16,7 +16,7 @@ use crate::view::{MatchFound, MatchView, ProbeView, RouteFailure, SameWhy};
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn machine_probe(state: State<'_, AppState>, id: u64) -> Result<ProbeView, CommandError> {
-    probe(&state, &Launcher::bridge(), MachineId(id)).await
+    probe(&state, &Launcher::default(), MachineId(id)).await
 }
 
 #[tauri::command]
@@ -26,7 +26,7 @@ pub(crate) async fn machine_match(
     code: String,
     name: String,
 ) -> Result<MatchView, CommandError> {
-    matching(&state, &Launcher::bridge(), &code, &name).await
+    matching(&state, &Launcher::default(), &code, &name).await
 }
 
 pub(crate) async fn probe(state: &AppState, launcher: &Launcher, id: MachineId) -> Result<ProbeView, CommandError> {
@@ -44,7 +44,7 @@ pub(crate) async fn matching(
     code: &str,
     name: &str,
 ) -> Result<MatchView, CommandError> {
-    let routes = MachineCode::parse(code)?.routes();
+    let routes = paired_routes(state, launcher, code).await?;
     if let Some(found) = compare(state, &routes, name, None, |same| same.why != Why::Name)? {
         return Ok(MatchView { found, checked: true });
     }
@@ -54,6 +54,24 @@ pub(crate) async fn matching(
     let boot = picked.and_then(|picked| Descriptor::from_value(picked.contract).ok()).map(|found| found.boot().0);
     let found = compare(state, &routes, name, boot.as_deref(), |_| true)?.unwrap_or(MatchFound::None);
     Ok(MatchView { found, checked })
+}
+
+pub(crate) async fn paired_routes(
+    state: &AppState,
+    launcher: &Launcher,
+    text: &str,
+) -> Result<Vec<Route>, CommandError> {
+    let code = MachineCode::parse(text)?;
+    if !code.needs_pairing() {
+        return Ok(code.routes());
+    }
+    if let Some(secret) = state.secret_of(text) {
+        return Ok(code.cli_routes(&secret));
+    }
+    let secret = launcher.pair(&code).await?;
+    let routes = code.cli_routes(&secret);
+    state.redeemed(text, secret);
+    Ok(routes)
 }
 
 fn compare(
@@ -94,6 +112,9 @@ fn failed(error: PickError) -> ProbeView {
     let PickError::AllFailed(failures) = error else {
         return ProbeView::NoAnswer { failures: Vec::new() };
     };
+    if failures.iter().any(|(_, error)| *error == Error::NotPaired) {
+        return ProbeView::NotPaired;
+    }
     if failures.iter().any(|(_, error)| *error == Error::Unauthorized) {
         return ProbeView::Unauthorized;
     }

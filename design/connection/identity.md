@@ -1,6 +1,6 @@
 # Identity and secrets
 
-A topic of [Connection](../connection.md). The phone's identity, and where it and the routes' tokens are kept: the Keychain on iOS, the Keystore on Android, and how Android's tokens left the file 030 kept them in.
+A topic of [Connection](../connection.md). The phone's identity, the secret cornercase gives the device, and where they and the routes' tokens are kept: the Keychain on iOS, the Keystore on Android, and how Android's tokens left the file 030 kept them in.
 
 ## Identity
 
@@ -10,6 +10,9 @@ A topic of [Connection](../connection.md). The phone's identity, and where it an
   - **A saved seed that is not 32 bytes** is `Error::Identity`, which names neither its length nor its bytes, and is never overwritten: a new identity made without a word would silently break whatever was paired with the old one, just as a machines file that does not parse is never overwritten. If the system gives no random bytes, it is `Error::Random`, and nothing is saved. A failing `get` or `set` is the store's `Error::Secrets`; a failed `set` returns no identity, so nothing uses a key that was not saved.
   - **On start** (`src-tauri/src/identity.rs`, from Tauri's `setup` hook): one line on stderr, `cornercase-mobile: identity <fingerprint>` or `cornercase-mobile: no identity: <error>`, and the app starts either way, keeping the result for `identity_fingerprint`. Loading the machines is the only other work on start.
   - **No race**: `load_or_create` runs once, on start. Two calls at once on an empty store would each save a seed, the last write would win and the other caller would hold a key that is not saved; the app's state keeps that one `Identity` rather than calling it again.
+- **The device's secret** (058): pairing with cornercase's code gives the phone a secret of its own, `<id>.<64 hex>`, of which cornercase keeps only a SHA-256, in `apps.json`, and the `<id>` to list and forget the phone (Machines › Pairing with cornercase's code). It is kept as the bridge's token is, a `Token` in `Secrets` under `route/<machine id>/<address>` for each cornercase route of the machine, so the Keychain's `AfterFirstUnlockThisDeviceOnly` and Android's Keystore cover it with no code of their own, and it never reaches the WebView. One pairing, one secret, written once per route; pairing again replaces it on the routes of the new code.
+  - **Not the identity**: cornercase tells the phone by its secret, not by a key, so the Ed25519 identity stays unused, kept for iroh.
+  - **A backup on another phone, or a reinstall**: the restored phone lacks the secret (`ThisDeviceOnly`), so its routes fail with `NoToken` and `Scan again` pairs it as a new device, the old row staying on the Mac until it is forgotten there. On iOS a reinstall leaves the secrets in the Keychain as orphans, as it leaves the tokens (below).
 - **Two stores, loaded apart**: `AppState::load` takes the identity's store (`secrets::store`) and the routes' store (`secrets::routes`) separately, so a failing identity does not keep the machines from loading, and a broken tokens file does not cost the identity. iOS and Android pass the same store as both; Android passes its old file for the routes while their move fails (Android's route tokens, below).
 
 ## `Secrets` in the Keychain

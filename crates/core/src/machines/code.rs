@@ -4,7 +4,7 @@ use std::net::{IpAddr, Ipv6Addr};
 use tokio_tungstenite::tungstenite::http::Uri;
 
 use super::name::LONGEST_NAME;
-use super::route::{Address, BridgeUrl, Route, RouteError, Token, address, checked_token, token, values};
+use super::route::{Address, Route, RouteError, RouteUrl, Token, address, checked_token, token, values};
 
 const UNRESERVED: &[u8] = b"-._~";
 
@@ -13,17 +13,26 @@ pub struct MachineCode {
     first: String,
     also: Vec<String>,
     port: u16,
-    token: Token,
+    credential: Credential,
     name: Option<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Credential {
+    Token(Token),
+    Pairing(PairingCode),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PairingCode(Token);
 
 impl MachineCode {
     pub fn new(first: IpAddr, port: u16, token: &str) -> Result<Self, RouteError> {
         if port == 0 {
             return Err(RouteError::Port);
         }
-        let token = checked_token(token)?;
-        Ok(Self { first: first.to_string(), also: Vec::new(), port, token, name: None })
+        let credential = Credential::Token(checked_token(token)?);
+        Ok(Self { first: first.to_string(), also: Vec::new(), port, credential, name: None })
     }
 
     #[must_use]
@@ -43,7 +52,7 @@ impl MachineCode {
         let uri: Uri = text.trim().parse().map_err(|_| RouteError::NotAUrl)?;
         let Address { host, port } = address(&uri)?;
         let query = uri.query();
-        let mut code = Self { first: host, also: Vec::new(), port, token: token(query)?, name: name(query)? };
+        let mut code = Self { first: host, also: Vec::new(), port, credential: credential(query)?, name: name(query)? };
         for value in values(query, "also") {
             code.add_also(also(value)?);
         }
@@ -51,11 +60,33 @@ impl MachineCode {
     }
 
     pub fn routes(&self) -> Vec<Route> {
-        self.hosts().map(|host| self.route(host)).collect()
+        match &self.credential {
+            Credential::Token(token) => self.hosts().map(|host| Route::Bridge { url: self.url(host, token) }).collect(),
+            Credential::Pairing(_) => Vec::new(),
+        }
+    }
+
+    pub fn cli_routes(&self, secret: &Token) -> Vec<Route> {
+        self.hosts().map(|host| Route::Cli { url: self.url(host, secret) }).collect()
     }
 
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
+    }
+
+    pub fn needs_pairing(&self) -> bool {
+        self.pairing_code().is_some()
+    }
+
+    pub(crate) fn pairing_code(&self) -> Option<&Token> {
+        match &self.credential {
+            Credential::Pairing(PairingCode(code)) => Some(code),
+            Credential::Token(_) => None,
+        }
+    }
+
+    pub(crate) fn addresses(&self) -> Vec<Address> {
+        self.hosts().map(|host| self.address(host)).collect()
     }
 
     fn add_also(&mut self, host: String) {
@@ -68,16 +99,22 @@ impl MachineCode {
         std::iter::once(&self.first).chain(&self.also)
     }
 
-    fn route(&self, host: &str) -> Route {
-        let address = Address { host: host.to_owned(), port: self.port };
-        Route::Bridge { url: BridgeUrl { address, token: Some(self.token.clone()) } }
+    fn url(&self, host: &str, token: &Token) -> RouteUrl {
+        RouteUrl { address: self.address(host), token: Some(token.clone()) }
+    }
+
+    fn address(&self, host: &str) -> Address {
+        Address { host: host.to_owned(), port: self.port }
     }
 }
 
 impl fmt::Display for MachineCode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let first = Address { host: self.first.clone(), port: self.port };
-        write!(formatter, "{first}?token={}", self.token.as_str())?;
+        match &self.credential {
+            Credential::Token(token) => write!(formatter, "{first}?token={}", token.as_str())?,
+            Credential::Pairing(_) => write!(formatter, "{first}?code=redacted")?,
+        }
         for host in &self.also {
             write!(formatter, "&also={host}")?;
         }
@@ -85,6 +122,25 @@ impl fmt::Display for MachineCode {
             Some(name) => write!(formatter, "&name={}", encoded(name)),
             None => Ok(()),
         }
+    }
+}
+
+fn credential(query: Option<&str>) -> Result<Credential, RouteError> {
+    match values(query, "code").as_slice() {
+        [] => token(query).map(Credential::Token),
+        _ if !values(query, "token").is_empty() => Err(RouteError::TokenAndCode),
+        [value] => pairing_code(value).map(Credential::Pairing),
+        _ => Err(RouteError::CodeTwice),
+    }
+}
+
+fn pairing_code(value: &str) -> Result<PairingCode, RouteError> {
+    if value.is_empty() {
+        Err(RouteError::EmptyCode)
+    } else if value.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')) {
+        Ok(PairingCode(Token::new(value.to_owned())))
+    } else {
+        Err(RouteError::CodeCharacters)
     }
 }
 

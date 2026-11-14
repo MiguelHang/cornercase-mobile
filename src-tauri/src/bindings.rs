@@ -27,6 +27,7 @@ macro_rules! app_commands {
             machines::machine_add,
             machines::machine_remove::<Wry>,
             machines::machine_rename,
+            machines::machine_form_closed,
             routes::machine_merge::<Wry>,
             routes::machine_route_remove::<Wry>,
             routes::machine_route_move,

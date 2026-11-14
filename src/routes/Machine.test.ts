@@ -24,6 +24,7 @@ const CALLS = {
   machineRouteRemove: done,
   machineRouteMove: done,
   machineRemove: done,
+  machineFormClosed: () => Promise.resolve(),
 }
 
 const nothing = () => Promise.resolve()
@@ -91,6 +92,12 @@ describe('Machine', () => {
     expect(second).toMatch(/<span class="mark done svelte-[\w-]+">Connected<\/span>/)
     expect(third).toMatch(/<span class="mark failed svelte-[\w-]+">No token<\/span>/)
     expect(third).not.toContain('Connected')
+  })
+
+  it('marks a route of cornercase without its secret', () => {
+    const machine = { ...studio(), routes: [{ kind: 'cli' as const, url: ROUTES[0], has_token: false }] }
+    const [only] = routes(screen(machine, null))
+    expect(only).toMatch(/<span class="mark failed svelte-[\w-]+">No secret<\/span>/)
   })
 
   it('marks no route when the machine is not the one connected', () => {
@@ -181,12 +188,13 @@ describe('Machine', () => {
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)
     expect(body).toContain(
-      'Its routes and their tokens are removed from this phone. The Mac and its bridge are not touched.',
+      'Its routes and their secrets are removed from this phone. The Mac still lets it in until you forget it in cornercase › Settings › Remote › Phone app.',
     )
     expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Cancel/)
     expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)
     expect(body).not.toContain('Add route')
     expect(body).not.toContain('Delete machine')
+    expect(machineSource).not.toMatch(/bridge/i)
   })
 })
 
@@ -217,8 +225,8 @@ describe('Machine wiring', () => {
     expect(script).toContain('onclick={() => void edit.deleteMachine()}>Delete</Button>')
   })
 
-  it('reloads the machines on opening, since the bridge may have told new routes', () => {
-    expect(script).toContain('onMount(() => { void onchanged() })')
+  it('reloads the machines on opening, since the bridge may have told new routes, and forgets a traded secret on leaving', () => {
+    expect(script).toContain('onMount(() => { void onchanged() return () => void edit.leave() })')
   })
 
   it('opens Add route once, on arriving to scan again', () => {

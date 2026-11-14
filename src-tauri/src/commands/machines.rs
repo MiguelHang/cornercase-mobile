@@ -1,3 +1,4 @@
+use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
 use tauri::{AppHandle, Runtime, State};
@@ -40,13 +41,27 @@ pub(crate) fn machine_rename(state: State<'_, AppState>, id: u64, name: String) 
     rename(&state, MachineId(id), &name)
 }
 
+#[tauri::command]
+#[specta::specta]
+#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
+pub(crate) fn machine_form_closed(state: State<'_, AppState>) {
+    state.forget_redeemed();
+}
+
 pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
     state.machines(|machines| Ok(MachineList::from(&*machines)))
 }
 
 pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId, CommandError> {
-    let code = MachineCode::parse(code)?;
-    state.machines(|machines| machines.add(name, &code).map_err(CommandError::from))
+    let parsed = MachineCode::parse(code)?;
+    let routes = match state.secret_of(code) {
+        Some(secret) => parsed.cli_routes(&secret),
+        None if parsed.needs_pairing() => return Err(Error::PairingRefused.into()),
+        None => parsed.routes(),
+    };
+    let id = state.machines(|machines| machines.add(name, &routes).map_err(CommandError::from))?;
+    state.used(code);
+    Ok(id)
 }
 
 pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {

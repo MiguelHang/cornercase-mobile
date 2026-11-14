@@ -24,8 +24,10 @@ const probed = (probe: Probe): RowStatus => {
       return row(`Answers via ${routeAddress(probe.route)}`, 'done')
     case 'unauthorized':
       return row('Token rejected', 'failed')
+    case 'not_paired':
+      return row('Not paired', 'failed')
     case 'no_token':
-      return row('No token: scan its code again', 'failed')
+      return row('No secret: scan its code again', 'failed')
     case 'no_answer':
       return row(
         'No answer',
@@ -44,5 +46,7 @@ export const rowStatus = (
   elapsed = 0,
 ): RowStatus => (active === null ? probed(probe) : { ...status(active, machine.name, elapsed), failures: [] })
 
+const RESCANNABLE = new Set(['unauthorized', 'not_paired', 'no_token'])
+
 export const rescannable = (active: ConnectionView_Serialize | null, probe: Probe) =>
-  active === null ? probe.state === 'unauthorized' || probe.state === 'no_token' : active.state === 'unauthorized'
+  RESCANNABLE.has((active ?? probe).state)

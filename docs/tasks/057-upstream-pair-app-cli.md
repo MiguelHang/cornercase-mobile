@@ -1,6 +1,6 @@
 # 057 — Upstream: el QR para emparejar la app y `/cli` en cornercase-terminal
 
-- Estado: pendiente · issue [usecornercase/cornercase-terminal#838](https://github.com/usecornercase/cornercase-terminal/issues/838), asignada al usuario, que la implementa en upstream como colaborador (decidido el 2026-11-14)
+- Estado: hecha (en upstream: [#851](https://github.com/usecornercase/cornercase-terminal/pull/851), `e994b1cb`, publicada en cornercase 0.13.78 el 2026-11-14) · issue [usecornercase/cornercase-terminal#838](https://github.com/usecornercase/cornercase-terminal/issues/838), asignada al usuario, que la implementó en upstream como colaborador (decidido el 2026-11-14)
 - Depende de: — (comprobado contra upstream `main`, cornercase 0.13.72, el 2026-11-14)
 - Repo: cornercase-terminal (no este). Sustituye al borrador 01 de la 033 (`.harness/parked/t033/drafts/01-cli-endpoint.md`).
 
@@ -39,15 +39,29 @@ ahora)".
 6. **`cli-endpoint` en `contract --json`**.
 
 ## Criterios de aceptación (de upstream)
-- [ ] El QR de **phone app** y `config pair app --json` dan un código con las rutas de LAN y Tailscale; escanearlo con la
+- [x] El QR de **phone app** y `config pair app --json` dan un código con las rutas de LAN y Tailscale; escanearlo con la
   app la empareja y el diálogo lo dice.
-- [ ] `/cli` con el secreto de una app emparejada corre el argv y acaba con un único `{"exit": n}`; sin él, `403` y nada
+- [x] `/cli` con el secreto de una app emparejada corre el argv y acaba con un único `{"exit": n}`; sin él, `403` y nada
   corre.
-- [ ] Lo que no es `Kind::There`, la ventana, `start-server` y cualquier `--remote*` se rechazan con exit 2.
-- [ ] Cerrar, perder la conexión o 45 s de silencio matan el comando y su grupo; un cliente que no lee bloquea el
+- [x] Lo que no es `Kind::There`, la ventana, `start-server` y cualquier `--remote*` se rechazan con exit 2.
+- [x] Cerrar, perder la conexión o 45 s de silencio matan el comando y su grupo; un cliente que no lee bloquea el
   comando en vez de hacer crecer la memoria.
-- [ ] Olvidar una app en Settings cierra sus conexiones.
-- [ ] `contract --json` lista `cli-endpoint`.
+- [x] Olvidar una app en Settings cierra sus conexiones.
+- [x] `contract --json` lista `cli-endpoint`.
+
+Comprobados en upstream con sus tests (unitarios, del listener con un `cornercase` falso y e2e con el binario real); con la
+app de verdad, en la 058.
+
+## Lo que hizo upstream
+Del diseño de upstream (`design/phone-app.md`), lo que cambió respecto a lo pedido:
+- Interruptor propio, **Phone app** en Settings › Remote, apagado por defecto; puerto propio, `phone_app_port` 47682;
+  `apps.json` al lado de `browsers.json`, con un SHA-256 de cada secreto.
+- El código se canjea con un WebSocket a la dirección del código (`/?code=…`), no con un `POST`: `403` antes del upgrade
+  (no gasta el código), 1008 si otra conexión lo gastó, 1011 si no pudo guardar `apps.json`, y si no, `{"secret":
+  "<id>.<64 hex>"}` y cierre 1000. El nombre del teléfono en Settings es la `User-Agent` del canje.
+- El secreto va en `Authorization: Bearer <id>.<secret>`, nunca en la URL ni en los logs; sin él o olvidado, `403`.
+- Lee las interfaces cada 2 s y escucha en las direcciones nuevas sin volver a escanear.
+- Las rutas, con la operación `app-routes` (`config pair app --routes --json`), y `cli-endpoint` en `contract --json`.
 
 ## Riesgos
 - **`ws://` en la LAN**: el secreto viaja en claro por la wifi, igual que el token del bridge. Por Tailscale va cifrado

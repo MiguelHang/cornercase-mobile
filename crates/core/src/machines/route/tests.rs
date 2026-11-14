@@ -3,14 +3,15 @@ use std::collections::HashSet;
 use rstest::rstest;
 
 use super::*;
-use crate::machines::tests::{TOKEN, bridge};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 
 mod address {
     use super::*;
 
-    #[test]
-    fn is_the_routes_host_and_port() {
-        let route = bridge("mac.local", 8765, Some(TOKEN));
+    #[rstest]
+    #[case::bridge(bridge("mac.local", 8765, Some(TOKEN)))]
+    #[case::cli(cli("mac.local", 8765, Some(SECRET)))]
+    fn is_the_routes_host_and_port(#[case] route: Route) {
         assert_eq!(route.address(), &Address { host: "mac.local".to_owned(), port: 8765 });
     }
 
@@ -141,6 +142,32 @@ mod connection_url {
     fn needs_the_token() {
         assert_eq!(bridge("mac.local", 8765, None).connection_url(), Err(Error::NoToken));
     }
+
+    #[rstest]
+    #[case::ipv4("192.168.1.20", "ws://192.168.1.20:7700/cli")]
+    #[case::ipv6("fd7a:115c:a1e0::1", "ws://[fd7a:115c:a1e0::1]:7700/cli")]
+    #[case::name("mac.local", "ws://mac.local:7700/cli")]
+    fn of_cornercase_is_its_cli_path_without_the_secret(#[case] host: &str, #[case] url: &str) {
+        assert_eq!(cli(host, 7700, Some(SECRET)).connection_url(), Ok(url.to_owned()));
+    }
+
+    #[test]
+    fn of_cornercase_does_not_need_the_secret() {
+        assert_eq!(cli("mac.local", 7700, None).connection_url(), Ok("ws://mac.local:7700/cli".to_owned()));
+    }
+}
+
+mod bearer {
+    use super::*;
+
+    #[rstest]
+    #[case::of_the_bridge(bridge("mac.local", 8765, Some(TOKEN)), Ok(None))]
+    #[case::of_the_bridge_without_a_token(bridge("mac.local", 8765, None), Ok(None))]
+    #[case::of_cornercase(cli("mac.local", 7700, Some(SECRET)), Ok(Some(SECRET)))]
+    #[case::of_cornercase_without_a_secret(cli("mac.local", 7700, None), Err(Error::NoToken))]
+    fn is_the_secret_of_cornercase_alone(#[case] route: Route, #[case] expected: Result<Option<&str>, Error>) {
+        assert_eq!(route.bearer(), expected);
+    }
 }
 
 mod has_token {
@@ -152,16 +179,44 @@ mod has_token {
     fn says_whether_the_route_carries_its_token(#[case] token: Option<&str>, #[case] has: bool) {
         assert_eq!(bridge("mac.local", 8765, token).has_token(), has);
     }
+
+    #[rstest]
+    #[case::with_one(Some(SECRET), true)]
+    #[case::without_one(None, false)]
+    fn says_whether_a_cornercase_route_carries_its_secret(#[case] secret: Option<&str>, #[case] has: bool) {
+        assert_eq!(cli("mac.local", 7700, secret).has_token(), has);
+    }
+}
+
+mod set_token {
+    use super::*;
+
+    #[rstest]
+    #[case::bridge(bridge("mac.local", 8765, None), TOKEN)]
+    #[case::cli(cli("mac.local", 7700, None), SECRET)]
+    fn keeps_the_secret_whole(#[case] mut route: Route, #[case] secret: &str) {
+        route.set_token(Some(Token::new(secret.to_owned())));
+        assert_eq!(route.token().map(Token::as_str), Some(secret));
+    }
+
+    #[test]
+    fn keeps_the_kind_of_route() {
+        let mut route = cli("mac.local", 7700, None);
+        route.set_token(Some(Token::new(SECRET.to_owned())));
+        assert_eq!(route, cli("mac.local", 7700, Some(SECRET)));
+    }
 }
 
 mod debug {
     use super::*;
 
-    #[test]
-    fn leaves_the_token_out() {
-        let text = format!("{:?}", bridge("mac.local", 8765, Some(TOKEN)));
+    #[rstest]
+    #[case::bridge(bridge("mac.local", 8765, Some(TOKEN)), TOKEN)]
+    #[case::cli(cli("mac.local", 7700, Some(SECRET)), SECRET)]
+    fn leaves_the_token_out(#[case] route: Route, #[case] secret: &str) {
+        let text = format!("{route:?}");
         assert!(text.contains("mac.local"), "{text}");
-        assert!(!text.contains(TOKEN), "{text}");
+        assert!(!text.contains(secret), "{text}");
     }
 
     #[test]
@@ -175,10 +230,11 @@ mod debug {
 mod json {
     use super::*;
 
-    #[test]
-    fn is_the_kind_and_the_address_without_the_token() {
-        let text = serde_json::to_string(&bridge("mac.local", 8765, Some(TOKEN))).expect("serialize the route");
-        assert_eq!(text, r#"{"kind":"bridge","url":"ws://mac.local:8765/"}"#);
+    #[rstest]
+    #[case::bridge(bridge("mac.local", 8765, Some(TOKEN)), r#"{"kind":"bridge","url":"ws://mac.local:8765/"}"#)]
+    #[case::cli(cli("mac.local", 7700, Some(SECRET)), r#"{"kind":"cli","url":"ws://mac.local:7700/"}"#)]
+    fn is_the_kind_and_the_address_without_the_token(#[case] route: Route, #[case] json: &str) {
+        assert_eq!(serde_json::to_string(&route).expect("serialize the route"), json);
     }
 
     #[rstest]
@@ -192,6 +248,16 @@ mod json {
     }
 
     #[rstest]
+    #[case::ipv4("192.168.1.20")]
+    #[case::ipv6("fd7a:115c:a1e0::1")]
+    #[case::name("mac.local")]
+    fn reads_back_a_cornercase_route_without_its_secret(#[case] host: &str) {
+        let text = serde_json::to_string(&cli(host, 7700, Some(SECRET))).expect("serialize the route");
+        let read: Route = serde_json::from_str(&text).expect("read the route");
+        assert_eq!(read, cli(host, 7700, None));
+    }
+
+    #[rstest]
     #[case::token(r#""ws://mac.local:8765/?token=c2VjcmV0LXRva2Vu""#)]
     #[case::wss(r#""wss://mac.local:8765/""#)]
     #[case::path(r#""ws://mac.local:8765/other""#)]
@@ -200,10 +266,16 @@ mod json {
     #[case::empty_host(r#""ws://:8765/""#)]
     #[case::not_a_url(r#""not a url""#)]
     #[case::not_text("8765")]
-    fn refuses_what_is_not_a_bare_address(#[case] url: &str) {
-        let text = format!(r#"{{"kind":"bridge","url":{url}}}"#);
+    fn refuses_what_is_not_a_bare_address(#[case] url: &str, #[values("bridge", "cli")] kind: &str) {
+        let text = format!(r#"{{"kind":"{kind}","url":{url}}}"#);
         let error = serde_json::from_str::<Route>(&text).expect_err("refuse the route").to_string();
         assert!(!error.contains("mac.local"), "{error}");
         assert!(!error.contains(TOKEN), "{error}");
+    }
+
+    #[test]
+    fn refuses_an_unknown_kind() {
+        let text = r#"{"kind":"ssh","url":"ws://mac.local:7700/"}"#;
+        assert!(serde_json::from_str::<Route>(text).is_err());
     }
 }

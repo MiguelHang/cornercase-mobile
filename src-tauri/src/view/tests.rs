@@ -48,11 +48,13 @@ mod a_machine {
         assert!(!text.contains(r#""token""#) && !text.contains("?token="), "{text}");
     }
 
-    #[test]
-    fn says_a_route_whose_token_is_missing_has_none() {
+    #[rstest]
+    #[case::bridge("bridge")]
+    #[case::cli("cli")]
+    fn says_a_route_whose_token_is_missing_has_none(#[case] kind: &str) {
         let tokenless: Route =
-            serde_json::from_value(json!({ "kind": "bridge", "url": "ws://studio.lan:9000/" })).expect("a bare route");
-        let expected = json!({ "kind": "bridge", "url": "ws://studio.lan:9000/", "has_token": false });
+            serde_json::from_value(json!({ "kind": kind, "url": "ws://studio.lan:9000/" })).expect("a bare route");
+        let expected = json!({ "kind": kind, "url": "ws://studio.lan:9000/", "has_token": false });
         assert_eq!(json_of(&RouteView::from(&tokenless)), expected);
     }
 
@@ -81,14 +83,15 @@ mod a_connection {
         json!({
             "state": "retrying",
             "in_ms": 2_500,
-            "error": { "code": "timeout", "message": "the bridge did not answer in time" },
+            "error": { "code": "timeout", "message": "the Mac did not answer in time" },
         })
     )]
     #[case::missing(
         Connection::Missing(vec![missing()]),
-        json!({ "state": "missing", "missing": [{ "name": "watch", "kind": "stream", "reason": null }] })
+        json!({ "state": "missing", "missing": [{ "name": "watch", "kind": "stream", "reason": null, "since": null }] })
     )]
     #[case::unauthorized(Connection::Unauthorized, json!({ "state": "unauthorized" }))]
+    #[case::not_paired(Connection::NotPaired, json!({ "state": "not_paired" }))]
     #[case::incompatible(
         Connection::Incompatible(Error::Outdated),
         json!({ "state": "incompatible", "error": { "code": "outdated", "message": Error::Outdated.to_string() } })
@@ -96,6 +99,24 @@ mod a_connection {
     #[case::offline(Connection::Offline, json!({ "state": "offline" }))]
     fn carries_its_label_and_its_fields(#[case] connection: Connection, #[case] expected: Value) {
         assert_eq!(json_of(&ConnectionView::from(&connection)), expected);
+    }
+
+    #[rstest]
+    #[case::the_cli_endpoint(Kind::Feature, "cli-endpoint")]
+    #[case::the_learned_routes(Kind::Operation, "app-routes")]
+    fn missing_names_the_version_that_brings_what_the_mac_lacks(#[case] kind: Kind, #[case] name: &str) {
+        let lacking = Missing { name: name.to_owned(), kind, reason: None };
+        let view = ConnectionView::from(&Connection::Missing(vec![lacking, missing()]));
+        assert_eq!(json_of(&view)["missing"][0]["since"], json!("0.13.78"));
+        assert_eq!(json_of(&view)["missing"][1]["since"], Value::Null);
+    }
+
+    #[test]
+    fn missing_keeps_the_reason_the_mac_gives() {
+        let disabled = Missing { name: "app-routes".to_owned(), kind: Kind::Operation, reason: Some("off".to_owned()) };
+        let view = ConnectionView::from(&Connection::Missing(vec![disabled]));
+        let expected = json!([{ "name": "app-routes", "kind": "operation", "reason": "off", "since": "0.13.78" }]);
+        assert_eq!(json_of(&view)["missing"], expected);
     }
 
     #[test]

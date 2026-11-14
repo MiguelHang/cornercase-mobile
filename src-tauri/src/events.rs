@@ -9,14 +9,13 @@ use cornercase_core::cli::events::{Event as CliEvent, What};
 use cornercase_core::cli::surface::{Colours, Cursor, Modes, Size};
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::learned::learned_routes;
+use cornercase_core::machines::learned::ask_routes;
 use cornercase_core::machines::registry::Machines;
 use cornercase_core::machines::route::{Address, Route};
-use cornercase_core::protocol::{BRIDGE_ROUTES, BridgeRoutes};
 use cornercase_core::store::{Change, Changes, Connection, Store};
 use cornercase_core::terminal::grid::Line;
 use cornercase_core::terminal::question::{Card, Choice};
-use cornercase_core::transport::{self, Transport};
+use cornercase_core::transport::Transport;
 use serde::Serialize;
 use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
@@ -201,16 +200,16 @@ async fn learn(
     store: Store,
     machines: SharedMachines,
 ) {
-    let routes = match transport::json::<BridgeRoutes>(transport.as_ref(), vec![BRIDGE_ROUTES.to_owned()]).await {
-        Ok(answer) => learned_routes(&answer, &winner),
+    let routes = match ask_routes(transport.as_ref(), &winner).await {
+        Ok(routes) => routes,
         Err(error) => {
-            eprintln!("cornercase-mobile: the bridge did not tell its routes: {error}");
+            eprintln!("cornercase-mobile: the machine did not tell its routes: {error}");
             return;
         }
     };
     match machines.with(|all| all.learn(machine, &routes).map_err(CommandError::from)) {
         Ok(new) => store.learn(&new),
-        Err(error) => eprintln!("cornercase-mobile: the routes the bridge told were not saved: {}", error.message),
+        Err(error) => eprintln!("cornercase-mobile: the routes the machine told were not saved: {}", error.message),
     }
 }
 

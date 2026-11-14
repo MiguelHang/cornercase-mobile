@@ -11,7 +11,7 @@ use tokio::time::{self, Instant};
 use super::route::{Address, Route};
 use super::{Machine, Reach, reach};
 use crate::error::Error;
-use crate::transport::bridge::{BridgeConfig, BridgeTransport};
+use crate::transport::websocket::{SocketConfig, WebSocketTransport};
 use crate::transport::{self, Transport};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,9 +68,13 @@ where
     Ok(race.prefer(first, until).await)
 }
 
-pub fn bridge_transports(config: BridgeConfig) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> {
+pub fn websocket_transports(config: SocketConfig) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> {
     move |route| {
-        let transport: Arc<dyn Transport> = Arc::new(BridgeTransport::new(route.connection_url()?, config));
+        let socket = WebSocketTransport::new(route.connection_url()?, config);
+        let transport: Arc<dyn Transport> = match route.bearer()? {
+            Some(secret) => Arc::new(socket.bearing(secret.to_owned())),
+            None => Arc::new(socket),
+        };
         Ok(transport)
     }
 }

@@ -2,7 +2,7 @@ use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
-use crate::cli::contract::fixtures::REAL;
+use crate::cli::contract::fixtures::{BEFORE_THE_CLI, REAL};
 
 const NO_OPERATIONS: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/contract/no-operations.json"));
@@ -15,12 +15,12 @@ mod reading {
     use super::*;
 
     #[test]
-    fn reads_what_cornercase_0_13_19_says() {
+    fn reads_what_cornercase_0_13_78_says() {
         let descriptor = Descriptor::from_value(real()).expect("the real contract");
-        assert_eq!(descriptor.version, "0.13.19");
+        assert_eq!(descriptor.version, "0.13.78");
         assert_eq!(descriptor.contract, 1);
-        assert_eq!(descriptor.boot, "28715-1794075132409911000");
-        assert_eq!(descriptor.operations.len(), 124);
+        assert_eq!(descriptor.boot, "67494-1794686479475777000");
+        assert_eq!(descriptor.operations.len(), 138);
         let status = Operation { name: "status".to_owned(), available: true, reason: None };
         assert_eq!(descriptor.operations[0], status);
         assert!(descriptor.features.iter().any(|feature| feature == "boot"));
@@ -137,8 +137,17 @@ mod missing {
     }
 
     #[test]
-    fn nothing_is_missing_from_cornercase_0_13_19() {
+    fn nothing_is_missing_from_cornercase_0_13_78() {
         assert_eq!(missing(&Descriptor::from_value(real()).expect("the real contract")), []);
+    }
+
+    #[test]
+    fn cornercase_0_13_19_lacks_the_cli_and_its_routes_from_0_13_78() {
+        let descriptor: Descriptor = BEFORE_THE_CLI.parse().expect("the contract of 0.13.19");
+        let lacking = missing(&descriptor);
+        let expected = [one("app-routes", Kind::Operation, None), one("cli-endpoint", Kind::Feature, None)];
+        assert_eq!(lacking, expected);
+        assert!(lacking.iter().all(|missing| missing.since() == Some("0.13.78")), "{lacking:?}");
     }
 
     #[test]
@@ -195,12 +204,19 @@ mod missing {
         assert_eq!(missing(&descriptor), [one("close-agent", Kind::Operation, None)]);
     }
 
+    #[test]
+    fn reports_a_server_that_cannot_list_the_routes_of_its_phone_app() {
+        let descriptor = real_but(|value| unavailable(value, "app-routes", "the phone app is off"));
+        assert_eq!(missing(&descriptor), [one("app-routes", Kind::Operation, Some("the phone app is off"))]);
+    }
+
     #[rstest]
     #[case::views("views")]
     #[case::notices("notices")]
     #[case::accounts("accounts")]
     #[case::account_switch("account-switch")]
     #[case::close_agent_tabs("close-agent-tabs")]
+    #[case::cli_endpoint("cli-endpoint")]
     fn reports_a_feature_the_server_lacks(#[case] name: &str) {
         let descriptor = real_but(|value| without(value, "features", name));
         assert_eq!(missing(&descriptor), [one(name, Kind::Feature, None)]);
@@ -236,6 +252,66 @@ mod missing {
     #[case::stream(one("view", Kind::Stream, None), json!({ "name": "view", "kind": "stream", "reason": null }))]
     fn writes_its_name_kind_and_reason(#[case] missing: Missing, #[case] expected: Value) {
         assert_eq!(serde_json::to_value(missing).expect("JSON"), expected);
+    }
+}
+
+mod minimum_version {
+    use super::*;
+
+    const WITH_CORNERCASE: Required = Required {
+        operations: &["status", "app-routes"],
+        features: &["boot", "cli-endpoint"],
+        streams: &[("events", 1)],
+    };
+
+    fn versions(descriptor: &Value) -> Vec<(String, Option<&'static str>)> {
+        let descriptor = Descriptor::from_value(descriptor.clone()).expect("a descriptor");
+        WITH_CORNERCASE.missing(&descriptor).iter().map(|missing| (missing.name.clone(), missing.since())).collect()
+    }
+
+    fn named(pairs: &[(&str, Option<&'static str>)]) -> Vec<(String, Option<&'static str>)> {
+        pairs.iter().map(|(name, since)| ((*name).to_owned(), *since)).collect()
+    }
+
+    #[test]
+    fn names_the_version_that_brought_what_cornercase_lacks() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "status", "available": true }],
+            "features": ["boot"],
+            "streams": [{ "name": "events", "version": 1 }],
+        });
+        let expected = named(&[("app-routes", Some("0.13.78")), ("cli-endpoint", Some("0.13.78"))]);
+        assert_eq!(versions(&descriptor), expected);
+    }
+
+    #[test]
+    fn names_no_version_for_what_has_none_known() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "app-routes", "available": true }],
+            "features": ["cli-endpoint"],
+        });
+        assert_eq!(versions(&descriptor), named(&[("status", None), ("boot", None), ("events", None)]));
+    }
+
+    #[test]
+    fn names_the_version_of_an_operation_the_server_cannot_do_now() {
+        let descriptor = json!({
+            "contract": 1,
+            "operations": [{ "name": "status", "available": true }, { "name": "app-routes", "available": false, "reason": "phone_app is off" }],
+            "features": ["boot", "cli-endpoint"],
+            "streams": [{ "name": "events", "version": 1 }],
+        });
+        assert_eq!(versions(&descriptor), named(&[("app-routes", Some("0.13.78"))]));
+    }
+
+    #[rstest]
+    #[case::the_endpoint_as_an_operation("cli-endpoint", Kind::Operation)]
+    #[case::the_routes_as_a_feature("app-routes", Kind::Feature)]
+    #[case::the_routes_as_a_stream("app-routes", Kind::Stream)]
+    fn knows_the_version_only_with_its_kind(#[case] name: &str, #[case] kind: Kind) {
+        assert_eq!(Missing::new(name, kind, None).since(), None);
     }
 }
 

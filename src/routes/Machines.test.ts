@@ -168,6 +168,21 @@ describe('Machines', () => {
     expect((await withRejected()).map((row) => row.includes('Check again'))).toEqual([false, false, false, true])
   })
 
+  it('offers Scan again on the active one the Mac forgot, with the text of the bar', async () => {
+    const [active] = rows(await screen(loaded(FINGERPRINT), { state: 'not_paired' }))
+    expect(active).toMatch(scanAgain)
+    expect(active).toContain('This Mac no longer recognizes this phone: scan its code again in Machines')
+  })
+
+  it('offers Scan again, in the place of Check again, on another one the Mac forgot, saying it is not paired', async () => {
+    const probes = new Probes({ machineProbe: () => Promise.resolve({ status: 'ok', data: { state: 'not_paired' } }) })
+    await probes.check([2])
+    const [, forgotten] = rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes)))
+    expect(forgotten).toMatch(scanAgain)
+    expect(forgotten).toContain('Not paired')
+    expect(forgotten).not.toContain('Check again')
+  })
+
   it('offers adding a machine and shows no form yet', async () => {
     const body = await screen()
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
@@ -182,7 +197,7 @@ describe('Machines wiring', () => {
     expect(script).toContain('void probes.open( machines.map(({ id }) => id), active, ) void device.load()')
   })
 
-  it('reloads the machines on opening, since the bridge may have told new routes', () => {
+  it('reloads the machines on opening, since the Mac may have told new routes', () => {
     expect(script).toContain('onMount(() => { onrouted() void probes.open(')
     expect(script).toContain('$effect(() => { const now = active untrack(() => void probes.follow(now)) })')
   })
@@ -200,7 +215,7 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain('{/if} <Button tone="plain" onclick={onedit}>Edit</Button>')
   })
 
-  it('opens Add route on Scan again of a machine whose token is rejected or missing', () => {
+  it('opens Add route on Scan again of a machine whose token is rejected or missing, or that the Mac forgot', () => {
     expect(script).toContain('const connectionOf = (machine: MachineView_Serialize) => (machine.id === active ? connection : null)')
     expect(script).toContain('rejected={rescannable(connectionOf(machine), probes.of(machine.id))}')
     expect(script).toContain('onrescan={() => onrescan(machine.id)}')

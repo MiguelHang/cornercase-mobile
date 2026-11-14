@@ -62,6 +62,6 @@ mod descriptor {
     #[test]
     fn is_the_boot_the_server_says() {
         let descriptor: Descriptor = REAL.parse().expect("the real contract");
-        assert_eq!(descriptor.boot(), boot("28715-1794075132409911000"));
+        assert_eq!(descriptor.boot(), boot("67494-1794686479475777000"));
     }
 }

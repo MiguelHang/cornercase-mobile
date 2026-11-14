@@ -1,6 +1,5 @@
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::registry::{Direction, Machines};
 use cornercase_core::machines::route::{Address, Route};
 use cornercase_core::store::Connection;
@@ -8,20 +7,20 @@ use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::connection::{Launcher, start};
 use crate::commands::error::CommandError;
+use crate::commands::probe::paired_routes;
 use crate::events::Emit;
 use crate::state::AppState;
 use crate::view::MergeView;
 
-#[tauri::command(async)]
+#[tauri::command]
 #[specta::specta]
-#[expect(clippy::needless_pass_by_value, reason = "tauri hands a command its arguments by value")]
-pub(crate) fn machine_merge<R: Runtime>(
+pub(crate) async fn machine_merge<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     id: u64,
     code: String,
 ) -> Result<MergeView, CommandError> {
-    merge(&state, app, &Launcher::bridge(), MachineId(id), &code)
+    merge(&state, app, &Launcher::default(), MachineId(id), &code).await
 }
 
 #[tauri::command(async)]
@@ -33,7 +32,7 @@ pub(crate) fn machine_route_remove<R: Runtime>(
     id: u64,
     url: String,
 ) -> Result<(), CommandError> {
-    remove_route(&state, app, &Launcher::bridge(), MachineId(id), &url)
+    remove_route(&state, app, &Launcher::default(), MachineId(id), &url)
 }
 
 #[tauri::command(async)]
@@ -48,15 +47,16 @@ pub(crate) fn machine_route_move(
     move_route(&state, MachineId(id), &url, direction)
 }
 
-pub(crate) fn merge(
+pub(crate) async fn merge(
     state: &AppState,
     emit: impl Emit,
     launcher: &Launcher,
     id: MachineId,
     code: &str,
 ) -> Result<MergeView, CommandError> {
-    let code = MachineCode::parse(code)?;
-    let merged = state.machines(|machines| machines.merge(id, &code).map_err(CommandError::from))?;
+    let routes = paired_routes(state, launcher, code).await?;
+    let merged = state.machines(|machines| machines.merge(id, &routes).map_err(CommandError::from))?;
+    state.used(code);
     let changed = merged.token_updated || !merged.added.is_empty();
     if changed && connected_to(state, id).is_some() {
         start(state, emit, launcher, id)?;

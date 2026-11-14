@@ -1,11 +1,24 @@
-use super::route::{BridgeUrl, Token};
+use super::route::{RouteUrl, Token};
 use super::*;
 
 pub(super) const TOKEN: &str = "c2VjcmV0LXRva2Vu";
+pub(super) const SECRET: &str = "9c1e2a7b.5d0f3c8e9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071";
 
 pub(super) fn bridge(host: &str, port: u16, token: Option<&str>) -> Route {
+    Route::Bridge { url: url(host, port, token) }
+}
+
+pub(super) fn cli(host: &str, port: u16, secret: Option<&str>) -> Route {
+    Route::Cli { url: url(host, port, secret) }
+}
+
+pub(super) async fn within<T>(work: impl Future<Output = T>) -> T {
+    tokio::time::timeout(std::time::Duration::from_secs(5), work).await.expect("it gets there within five seconds")
+}
+
+fn url(host: &str, port: u16, token: Option<&str>) -> RouteUrl {
     let address = Address { host: host.to_owned(), port };
-    Route::Bridge { url: BridgeUrl { address, token: token.map(|token| Token::new(token.to_owned())) } }
+    RouteUrl { address, token: token.map(|token| Token::new(token.to_owned())) }
 }
 
 fn machine() -> Machine {

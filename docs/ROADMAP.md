@@ -97,14 +97,16 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 ## Hito 6 — Primera versión (0.1.0), sin bridge
 Decidido por el usuario el 2026-11-14: quitar el bridge con un QR para la app que enseña el propio cornercase (rutas de
 LAN y Tailscale, como el del bridge) y un `/cli` en cornercase; 0.1.0 por TestFlight y APK en GitHub Releases.
-Comprobado contra upstream `main` (cornercase 0.13.72): no hay `/cli`, y el QR del navegador abre la versión web.
+Comprobado contra upstream `main` (cornercase 0.13.72): no había `/cli`, y el QR del navegador abre la versión web. La 057
+está hecha: upstream lo publicó en cornercase 0.13.78 (#851, 2026-11-14), con el QR de **Phone app** en Settings ›
+Remote, el canje por un secreto del dispositivo y `/cli`.
 
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
-| 057 | [Upstream: el QR para emparejar la app y `/cli` en cornercase-terminal](tasks/057-upstream-pair-app-cli.md) ⚠ (#838 de upstream, la hace el usuario) | — (repo de upstream) | ~800 en upstream |
+| 057 | [Upstream: el QR para emparejar la app y `/cli` en cornercase-terminal](tasks/057-upstream-pair-app-cli.md) (#838 de upstream, hecha en #851: cornercase 0.13.78) | — (repo de upstream) | ~800 en upstream |
 | 058 | [La app habla con el `/cli` de cornercase y empareja con su QR](tasks/058-app-on-cornercase-cli.md) | 057 | ~450 |
 | 059 | [Quitar el bridge](tasks/059-remove-bridge.md) | 058 | ~−1.500 |
-| 060 | [Primera versión: 0.1.0 por TestFlight y APK](tasks/060-release-0.1.0.md) | 059, 057 publicada | ~300 (+ CI) |
+| 060 | [Primera versión: 0.1.0 por TestFlight y APK](tasks/060-release-0.1.0.md) | 059 (la 057 ya está publicada) | ~300 (+ CI) |
 | 061 | [Upstream: el servidor arrancado al iniciar sesión no encuentra los agentes](tasks/061-upstream-server-path.md) | — (issue) | — |
 
 ## Camino crítico

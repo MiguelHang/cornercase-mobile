@@ -1,5 +1,5 @@
 {
-  "boot": "28715-1794075132409911000",
+  "boot": "67494-1794686479475777000",
   "contract": 1,
   "features": [
     "boot",
@@ -43,7 +43,36 @@
     "queue-routines",
     "plugin-run-view",
     "open-code-workspace",
-    "machine-retry-at"
+    "machine-retry-at",
+    "flow-run-view",
+    "against-base",
+    "notice-subagent",
+    "mode-default",
+    "held-after-draft",
+    "flow-close-when-merged",
+    "fresh-branches",
+    "notice-messages",
+    "surface-wrapped",
+    "account-login-tab",
+    "config-agents",
+    "tunnels",
+    "tunnels-remembered",
+    "tunnel-hold",
+    "queue-results",
+    "agent-models",
+    "tunnel-orders",
+    "tunnel-reverse",
+    "flow-not-run",
+    "flow-stopped",
+    "flow-free-builds",
+    "machine-tunnels",
+    "tunnel-hold-ended",
+    "merged-builds",
+    "machine-boot",
+    "flow-exited",
+    "message-failed",
+    "bots",
+    "cli-endpoint"
   ],
   "streams": [
     {
@@ -85,7 +114,11 @@
     {
       "name": "config-pair",
       "version": 1
+    },
+    {
+      "name": "tunnel-orders",
+      "version": 1
     }
   ],
-  "version": "0.13.19"
+  "version": "0.13.78"
 }

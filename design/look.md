@@ -93,10 +93,10 @@ Topics, in `design/look/`:
 - **`Add machine`** opens the same inline form as the empty screen (Forms) in a card under the list. `This device` closes the screen, with the fingerprint in `--font-mono`.
 - **A machine's screen**:
   - The `Name` field and `Rename`, which rests until the name changes.
-  - **The routes, as information** (035): each its address and, in its state's colour, `Connected` on the one in use or `No token`, with no buttons. The user adds and picks a machine, and the race picks its route (Connection › Machines › Which route wins), so the routes stay in the background: the forms for adding speak of the machine and its code.
+  - **The routes, as information** (035): each its address and, in its state's colour, `Connected` on the one in use or `No token` (`No secret` on a route of cornercase, 058), with no buttons. The user adds and picks a machine, and the race picks its route (Connection › Machines › Which route wins), so the routes stay in the background: the forms for adding speak of the machine and its code.
   - **`Edit routes`**, a `details` closed by default, like a row's `Errors by route`: the routes again, each with 44 px buttons to move it up or down and to remove it, disabled at either end and on the last route, then `Add route` plain. Its form, `Scan or paste its code`, opens under the `details`, not in it, so `Scan again` shows it with `Edit routes` still closed.
   - Under them, `Delete machine`.
-- **Deleting asks first**, inline, in a card that takes the place of `Delete machine` (and hides `Add route`): the name, what is lost (its routes and their tokens on this phone, while the Mac and its bridge are not touched), then `Cancel` plain and `Delete` danger. Like the forms, it is part of the page rather than a dialog over it.
+- **Deleting asks first**, inline, in a card that takes the place of `Delete machine` (and hides `Add route`): the name, what is lost (its routes and their secrets on this phone, while the Mac still lets the phone in until it is forgotten in cornercase › Settings › Remote › Phone app), then `Cancel` plain and `Delete` danger. Like the forms, it is part of the page rather than a dialog over it.
 
 ## Scanning
 

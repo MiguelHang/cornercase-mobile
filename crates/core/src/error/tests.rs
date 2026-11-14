@@ -7,14 +7,24 @@ mod display {
 
     #[rstest]
     #[case::unauthorized(Error::Unauthorized, "the bridge refused the token")]
-    #[case::dropped(Error::Dropped, "the connection to the bridge dropped before the command finished")]
+    #[case::not_paired(Error::NotPaired, "this Mac no longer recognizes this phone; scan its code again in Machines")]
+    #[case::dropped(Error::Dropped, "the connection to the Mac dropped before the command finished")]
     #[case::output_closed(Error::OutputClosed, "nothing listens to the command's output any more")]
-    #[case::rejected(Error::Rejected { status: 404 }, "the bridge answered with HTTP 404")]
-    #[case::timeout(Error::Timeout, "the bridge did not answer in time")]
-    #[case::connect(Error::Connect("connection refused".to_owned()), "cannot reach the bridge: connection refused")]
+    #[case::rejected(Error::Rejected { status: 404 }, "the Mac answered with HTTP 404")]
+    #[case::timeout(Error::Timeout, "the Mac did not answer in time")]
+    #[case::connect(Error::Connect("connection refused".to_owned()), "cannot reach the Mac: connection refused")]
     #[case::protocol(
         Error::Protocol("a binary frame".to_owned()),
-        "the bridge sent an unexpected message: a binary frame"
+        "the Mac sent an unexpected message: a binary frame"
+    )]
+    #[case::malformed_secret(Error::MalformedSecret, "the Mac sent a pairing secret that is not in the expected form")]
+    #[case::pairing_refused(
+        Error::PairingRefused,
+        "the code no longer works (it lasts 10 minutes and works once): show another in cornercase's Settings › Remote"
+    )]
+    #[case::pairing_failed(
+        Error::PairingFailed,
+        "the Mac could not save the pairing; show another code in cornercase's Settings › Remote and scan it"
     )]
     #[case::failed(
         Error::Failed { code: 3, stderr: "no such project".to_owned() },
@@ -59,7 +69,7 @@ mod display {
         "cannot read or write the saved machines: permission denied"
     )]
     #[case::secrets(Error::Secrets("item not found".to_owned()), "the secret store failed: item not found")]
-    #[case::no_token(Error::NoToken, "the route has no saved token; scan the bridge's code again")]
+    #[case::no_token(Error::NoToken, "the route has no saved secret; scan its code again in Machines")]
     #[case::unknown_machine(Error::UnknownMachine, "no saved machine has that id")]
     #[case::unknown_route(Error::UnknownRoute, "the machine has no route at that address")]
     #[case::last_route(Error::LastRoute, "a machine keeps at least one route; remove the machine instead")]

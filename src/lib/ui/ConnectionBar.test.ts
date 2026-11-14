@@ -14,7 +14,7 @@ const RETRYING: ConnectionView_Serialize = {
 }
 const MISSING: ConnectionView_Serialize = {
   state: 'missing',
-  missing: [{ name: 'watch', kind: 'stream', reason: null }],
+  missing: [{ name: 'watch', kind: 'stream', reason: null, since: null }],
 }
 
 const bar = (connection: ConnectionView_Serialize) =>

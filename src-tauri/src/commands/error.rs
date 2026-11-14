@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use cornercase_core::error::Error;
+use cornercase_core::machines::pairing::PairError;
 use cornercase_core::machines::route::RouteError;
 use serde::Serialize;
 
@@ -14,12 +15,15 @@ pub(crate) struct CommandError {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ErrorCode {
     Unauthorized,
+    NotPaired,
     Dropped,
     OutputClosed,
     Rejected,
     Timeout,
     Connect,
     Protocol,
+    PairingRefused,
+    PairingFailed,
     Failed,
     StaleBoot,
     StreamEnded,
@@ -55,6 +59,10 @@ pub(crate) enum ErrorCode {
     RouteEmptyToken,
     RouteTokenTwice,
     RouteTokenCharacters,
+    RouteEmptyCode,
+    RouteCodeTwice,
+    RouteTokenAndCode,
+    RouteCodeCharacters,
     RouteAlsoEmpty,
     RouteAlsoInvalid,
     RouteNameEncoding,
@@ -144,6 +152,15 @@ impl From<Error> for CommandError {
     }
 }
 
+impl From<PairError> for CommandError {
+    fn from(error: PairError) -> Self {
+        match error {
+            PairError::Answered(error) => Self::from(error),
+            unanswered => Self::new(ErrorCode::Connect, unanswered),
+        }
+    }
+}
+
 impl From<RouteError> for CommandError {
     fn from(error: RouteError) -> Self {
         Self::new(route_code(error), error)
@@ -153,12 +170,15 @@ impl From<RouteError> for CommandError {
 fn core_code(error: &Error) -> ErrorCode {
     match error {
         Error::Unauthorized => ErrorCode::Unauthorized,
+        Error::NotPaired => ErrorCode::NotPaired,
         Error::Dropped => ErrorCode::Dropped,
         Error::OutputClosed => ErrorCode::OutputClosed,
         Error::Rejected { .. } => ErrorCode::Rejected,
         Error::Timeout => ErrorCode::Timeout,
         Error::Connect(_) => ErrorCode::Connect,
-        Error::Protocol(_) => ErrorCode::Protocol,
+        Error::Protocol(_) | Error::MalformedSecret => ErrorCode::Protocol,
+        Error::PairingRefused => ErrorCode::PairingRefused,
+        Error::PairingFailed => ErrorCode::PairingFailed,
         Error::Failed { .. } => ErrorCode::Failed,
         Error::StaleBoot(_) => ErrorCode::StaleBoot,
         Error::StreamEnded => ErrorCode::StreamEnded,
@@ -199,6 +219,10 @@ fn route_code(error: RouteError) -> ErrorCode {
         RouteError::EmptyToken => ErrorCode::RouteEmptyToken,
         RouteError::TokenTwice => ErrorCode::RouteTokenTwice,
         RouteError::TokenCharacters => ErrorCode::RouteTokenCharacters,
+        RouteError::EmptyCode => ErrorCode::RouteEmptyCode,
+        RouteError::CodeTwice => ErrorCode::RouteCodeTwice,
+        RouteError::TokenAndCode => ErrorCode::RouteTokenAndCode,
+        RouteError::CodeCharacters => ErrorCode::RouteCodeCharacters,
         RouteError::AlsoEmpty => ErrorCode::RouteAlsoEmpty,
         RouteError::AlsoInvalid => ErrorCode::RouteAlsoInvalid,
         RouteError::NameEncoding => ErrorCode::RouteNameEncoding,
