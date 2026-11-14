@@ -1,6 +1,6 @@
 # 055 — Pantalla de carga al arrancar, sin parpadeo
 
-- Estado: hecha
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: —
 - Rama: `feat/055-launch-screen` · PR: `feat: show a launch screen until the app is ready`
 

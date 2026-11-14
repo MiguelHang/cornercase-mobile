@@ -1,6 +1,6 @@
 # 054 — Tablero: el triangulito, entre el punto y el texto
 
-- Estado: hecha (en el iPhone del usuario, pendiente)
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 051
 - Rama: `feat/054-board-triangle-offset` · PR: `feat: move the board's fold triangle between the dot and the title`
 

@@ -1,6 +1,6 @@
 # 052 — Empezar: elegir cuenta (o perfil) al arrancar un agente o un flow
 
-- Estado: hecha
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 045, 047
 - Rama: `feat/052-start-account` · PR: `feat: choose the account an agent or a flow starts with`
 

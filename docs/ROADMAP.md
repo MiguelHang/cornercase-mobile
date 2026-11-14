@@ -71,15 +71,15 @@ El puente se usa ya desde el portátil (`websocat`) antes de que exista la app.
 | 045 | [Arrancar: sin workspaces nuevos y las issues sin un filtro de proyecto que no filtra](tasks/045-start-simpler.md) | 023, 024 | ~1.500 |
 | 046 | [Elegir la LAN cuando la LAN y Tailscale contestan](tasks/046-prefer-lan.md) | 035 | ~150 |
 | 047 | [Arrancar una issue con un flow](tasks/047-start-issue-with-flow.md) | 024, 045 | ~350 |
-| 048 | [El chat como conversación: historial en el móvil, y el de cornercase cuando exista](tasks/048-chat-history.md) (hecha; en el iPhone del usuario, pendiente) | 036, 041 | ~450 |
-| 049 | [El icono de la app](tasks/049-app-icon.md) (hecha; en el iPhone del usuario, pendiente) | 030 | ~50 (+ generados) |
+| 048 | [El chat como conversación: historial en el móvil, y el de cornercase cuando exista](tasks/048-chat-history.md) | 036, 041 | ~450 |
+| 049 | [El icono de la app](tasks/049-app-icon.md) | 030 | ~50 (+ generados) |
 | 050 | [Partir por temas los ficheros de `design/` de más de 40 KB](tasks/050-split-design-by-topic.md) | 043 | ~0 (solo docs) |
-| 051 | [Tablero: las filas aprovechan todo el ancho](tasks/051-board-full-width.md) (hecha; en el iPhone del usuario, pendiente) | 040 | ~80 |
-| 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) (hecha; en el iPhone del usuario, pendiente) | 045, 047 | ~250 |
+| 051 | [Tablero: las filas aprovechan todo el ancho](tasks/051-board-full-width.md) | 040 | ~80 |
+| 052 | [Empezar: elegir cuenta al arrancar un agente o un flow](tasks/052-start-account.md) | 045, 047 | ~250 |
 | 053 | [Partir por temas `design/starting-work.md`](tasks/053-split-starting-work.md) | 052 | ~0 (solo docs) |
-| 054 | [Tablero: el triangulito, entre el punto y el texto](tasks/054-board-triangle-offset.md) (hecha; en el iPhone del usuario, pendiente) | 051 | ~20 |
+| 054 | [Tablero: el triangulito, entre el punto y el texto](tasks/054-board-triangle-offset.md) | 051 | ~20 |
 | 055 | [Pantalla de carga al arrancar, sin parpadeo](tasks/055-launch-screen.md) | — | ~120 |
-| 056 | [Cerrar un agente desde el teléfono](tasks/056-close-agent.md) (hecha; en el iPhone del usuario, pendiente) | 051 | ~250 |
+| 056 | [Cerrar un agente desde el teléfono](tasks/056-close-agent.md) | 051 | ~250 |
 | 029 | [Verificación del MVP en un iPhone por Tailscale](tasks/029-mvp-check-iphone.md) | 015–028, 030–032 (se deja para el final; decidido el 2026-11-09) | ~150 (docs) |
 
 ## Hito 4 — Android
