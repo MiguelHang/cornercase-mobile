@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::hash::BuildHasher;
+use std::mem::discriminant;
 
 use super::name::folded;
-use super::route::{Address, Route};
+use super::route::{Address, Route, Token};
 use super::{Machine, MachineId, tailscale};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,23 +52,23 @@ fn already_saved(machines: &[Machine], routes: &[Route]) -> Option<Same> {
 }
 
 fn by_token(machines: &[Machine], routes: &[Route]) -> Option<Same> {
-    let tokens: Vec<_> = routes.iter().filter_map(Route::token).collect();
-    first(machines, Why::Token, |machine| {
-        machine.routes.iter().filter_map(Route::token).any(|token| tokens.contains(&token))
-    })
+    let tokens: Vec<_> = bridge_tokens(routes).collect();
+    first(machines, Why::Token, |machine| bridge_tokens(&machine.routes).any(|token| tokens.contains(&token)))
+}
+
+fn bridge_tokens(routes: &[Route]) -> impl Iterator<Item = &Token> {
+    routes.iter().filter(|route| matches!(route, Route::Bridge { .. })).filter_map(Route::token)
 }
 
 fn by_address(machines: &[Machine], routes: &[Route], why: Why, counts: impl Fn(&Address) -> bool) -> Option<Same> {
-    first(machines, why, |machine| {
-        routes.iter().map(Route::address).any(|address| counts(address) && has(machine, address))
-    })
+    first(machines, why, |machine| routes.iter().any(|route| counts(route.address()) && has(machine, route)))
 }
 
 fn by_all_addresses(machines: &[Machine], routes: &[Route]) -> Option<Same> {
     if routes.len() < 2 {
         return None;
     }
-    first(machines, Why::AllAddresses, |machine| routes.iter().all(|route| has(machine, route.address())))
+    first(machines, Why::AllAddresses, |machine| routes.iter().all(|route| has(machine, route)))
 }
 
 fn by_boot<S: BuildHasher>(
@@ -83,8 +84,16 @@ fn by_name(machines: &[Machine], name: &str) -> Option<Same> {
     first(machines, Why::Name, |machine| folded(&machine.name) == wanted)
 }
 
-fn has(machine: &Machine, address: &Address) -> bool {
-    machine.routes.iter().any(|saved| saved.address() == address)
+fn has(machine: &Machine, route: &Route) -> bool {
+    machine.routes.iter().any(|saved| same_place(saved, route))
+}
+
+fn same_place(saved: &Route, route: &Route) -> bool {
+    if discriminant(saved) == discriminant(route) {
+        saved.address() == route.address()
+    } else {
+        saved.address().host == route.address().host
+    }
 }
 
 fn first(machines: &[Machine], why: Why, matches: impl Fn(&Machine) -> bool) -> Option<Same> {

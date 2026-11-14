@@ -5,8 +5,9 @@ use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
+use crate::machines::code::MachineCode;
 use crate::machines::store::JsonFileStore;
-use crate::machines::tests::{TOKEN, bridge};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 use crate::secrets::memory::MemorySecrets;
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
@@ -14,6 +15,8 @@ const LAN: &str = "192.168.1.20";
 const TAILNET: &str = "fd7a:115c:a1e0::1";
 const GONE: &str = "10.0.0.9";
 const NEW_TAILNET: &str = "100.101.102.103";
+const PHONE_PORT: u16 = 47682;
+const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 struct Phone {
     dir: TempDir,
@@ -38,7 +41,11 @@ impl Phone {
     }
 
     fn secret(&self, id: MachineId, host: &str) -> Option<String> {
-        let value = self.secrets.get(&key(id, &address(host))).expect("read the secret");
+        self.secret_at(id, &address(host))
+    }
+
+    fn secret_at(&self, id: MachineId, address: &Address) -> Option<String> {
+        let value = self.secrets.get(&key(id, address)).expect("read the secret");
         value.map(|bytes| String::from_utf8(bytes).expect("a text secret"))
     }
 
@@ -76,14 +83,22 @@ fn route(host: &str, token: &str) -> Route {
     bridge(host, 8765, Some(token))
 }
 
-fn code(hosts: &[&str], token: &str) -> MachineCode {
+fn code(hosts: &[&str], token: &str) -> Vec<Route> {
     let (first, also) = hosts.split_first().expect("at least one host");
     let first = MachineCode::new(first.parse().expect("an ip"), 8765, token).expect("a machine code");
-    also.iter().fold(first, |code, host| code.with_also(host.parse().expect("an ip")))
+    also.iter().fold(first, |code, host| code.with_also(host.parse().expect("an ip"))).routes()
 }
 
 fn address(host: &str) -> Address {
     Address { host: host.to_owned(), port: 8765 }
+}
+
+fn paired(hosts: &[&str], secret: &str) -> Vec<Route> {
+    hosts.iter().map(|host| cli(host, PHONE_PORT, Some(secret))).collect()
+}
+
+fn phone_address(host: &str) -> Address {
+    Address { host: host.to_owned(), port: PHONE_PORT }
 }
 
 mod load {
@@ -208,6 +223,23 @@ mod add {
         assert_eq!(result, Err(Error::NameTaken));
         assert_eq!(phone.secret(MachineId(studio.0 + 1), LAN), None);
     }
+
+    #[test]
+    fn refuses_a_code_without_routes_such_as_one_not_paired_yet() {
+        let phone = Phone::new();
+        let (mut machines, _) = phone.studio();
+        let result = phone.unchanged(&mut machines, |machines| machines.add("laptop", &[]));
+        assert_eq!(result, Err(Error::NoToken));
+    }
+
+    #[test]
+    fn keeps_the_secret_of_cornercase_routes_out_of_the_file() {
+        let phone = Phone::new();
+        let id = phone.open().add("studio", &paired(&[LAN, TAILNET], SECRET)).expect("add");
+        assert_eq!(phone.open().machine(id).expect("the studio").routes, paired(&[LAN, TAILNET], SECRET));
+        assert_eq!(phone.secret_at(id, &phone_address(TAILNET)).as_deref(), Some(SECRET));
+        assert!(phone.text().contains(r#""kind": "cli""#) && !phone.text().contains(SECRET), "{}", phone.text());
+    }
 }
 
 mod rename {
@@ -322,6 +354,31 @@ mod merge {
         assert_eq!(routes(&phone, studio), [route(LAN, TOKEN), route(TAILNET, TOKEN), route(NEW_TAILNET, TOKEN)]);
         assert_eq!(routes(&phone, laptop), [route(GONE, NEW_TOKEN)]);
         assert_eq!((phone.secret(studio, GONE), phone.secret(laptop, GONE).as_deref()), (None, Some(NEW_TOKEN)));
+    }
+
+    #[test]
+    fn adds_the_cornercase_routes_of_the_same_mac_beside_its_bridge_routes() {
+        let phone = Phone::new();
+        let (mut machines, id) = phone.studio();
+        let result = machines.merge(id, &paired(&[LAN, TAILNET], SECRET));
+        let added = vec![phone_address(LAN), phone_address(TAILNET)];
+        assert_eq!(result, Ok(Merged { added, token_updated: false, skipped: Vec::new() }));
+        let bridge_routes = vec![route(LAN, TOKEN), route(TAILNET, TOKEN)];
+        assert_eq!(routes(&phone, id), [bridge_routes, paired(&[LAN, TAILNET], SECRET)].concat());
+        assert_eq!(
+            (phone.secret(id, LAN).as_deref(), phone.secret_at(id, &phone_address(LAN)).as_deref()),
+            (Some(TOKEN), Some(SECRET))
+        );
+    }
+
+    #[test]
+    fn replaces_the_secret_when_the_mac_is_paired_again() {
+        let phone = Phone::new();
+        let id = phone.open().add("studio", &paired(&[LAN, TAILNET], SECRET)).expect("add the studio");
+        let result = phone.open().merge(id, &paired(&[LAN, TAILNET], NEW_SECRET));
+        assert_eq!(result, Ok(merged(&[], true, &[])));
+        assert_eq!(routes(&phone, id), paired(&[LAN, TAILNET], NEW_SECRET));
+        assert_eq!(phone.secret_at(id, &phone_address(LAN)).as_deref(), Some(NEW_SECRET));
     }
 
     #[test]

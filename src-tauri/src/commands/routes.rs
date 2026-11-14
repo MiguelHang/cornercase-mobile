@@ -56,7 +56,7 @@ pub(crate) fn merge(
     code: &str,
 ) -> Result<MergeView, CommandError> {
     let code = MachineCode::parse(code)?;
-    let merged = state.machines(|machines| machines.merge(id, &code).map_err(CommandError::from))?;
+    let merged = state.machines(|machines| machines.merge(id, &code.routes()).map_err(CommandError::from))?;
     let changed = merged.token_updated || !merged.added.is_empty();
     if changed && connected_to(state, id).is_some() {
         start(state, emit, launcher, id)?;

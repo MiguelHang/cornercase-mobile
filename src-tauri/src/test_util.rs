@@ -166,7 +166,7 @@ impl Studio {
         let dir = TempDir::new();
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets.as_ref(), Arc::clone(&secrets));
-        let added = state.machines(|machines| machines.add("studio", &code()).map_err(CommandError::from));
+        let added = state.machines(|machines| machines.add("studio", &code().routes()).map_err(CommandError::from));
         Self { id: added.expect("the studio is added"), dir, secrets, state }
     }
 

@@ -1,7 +1,7 @@
 use rstest::rstest;
 
 use super::*;
-use crate::machines::tests::{TOKEN, bridge};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const OTHER_TOKEN: &str = "b3RoZXItdG9rZW4";
@@ -10,6 +10,8 @@ const TAILNET: &str = "fd7a:115c:a1e0::1";
 const GONE: &str = "10.0.0.9";
 const BOOT: &str = "2026-11-09T08:00:00Z";
 const NEW_TAILNET: &str = "100.101.102.103";
+const PHONE_PORT: u16 = 47682;
+const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 fn route(host: &str, token: &str) -> Route {
     bridge(host, 8765, Some(token))
@@ -34,6 +36,14 @@ fn same(machines: &[Machine], route: &Route, name: &str, probed: Option<&str>, b
 fn same_code(machines: &[Machine], hosts: &[&str], token: &str) -> Option<Same> {
     let routes: Vec<Route> = hosts.iter().map(|host| route(host, token)).collect();
     same_machine(machines, &routes, "new", None, &seen(&[]))
+}
+
+fn paired(hosts: &[&str], secret: &str) -> Vec<Route> {
+    hosts.iter().map(|host| cli(host, PHONE_PORT, Some(secret))).collect()
+}
+
+fn same_paired(machines: &[Machine], hosts: &[&str], secret: &str) -> Option<Same> {
+    same_machine(machines, &paired(hosts, secret), "new", None, &seen(&[]))
 }
 
 fn found(id: u64, why: Why) -> Same {
@@ -81,6 +91,47 @@ mod by_token {
     fn skips_saved_routes_without_a_token() {
         let machines = vec![machine(0, "Studio", vec![bridge(LAN, 8765, None)])];
         assert_eq!(same(&machines, &route(GONE, TOKEN), "new", None, &[]), None);
+    }
+
+    #[test]
+    fn never_matches_a_cornercase_secret_at_another_address() {
+        let machines = vec![machine(0, "Studio", paired(&[LAN], SECRET))];
+        assert_eq!(same_paired(&machines, &[GONE], SECRET), None);
+    }
+}
+
+mod cornercase_codes {
+    use super::*;
+
+    #[test]
+    fn merge_by_the_tailnet_host_of_a_bridge_route_on_another_port() {
+        assert_eq!(same_paired(&studio_and_laptop(), &[GONE, TAILNET], SECRET), Some(found(1, Why::Tailscale)));
+    }
+
+    #[test]
+    fn merge_when_every_host_is_a_bridge_route_of_the_machine() {
+        let machines = vec![machine(0, "Studio", vec![route(LAN, TOKEN), route(GONE, TOKEN)])];
+        assert_eq!(same_paired(&machines, &[GONE, LAN], SECRET), Some(found(0, Why::AllAddresses)));
+    }
+
+    #[test]
+    fn offer_a_single_lan_host_of_a_bridge_route() {
+        assert_eq!(same_paired(&studio_and_laptop(), &[LAN], SECRET), Some(found(0, Why::Address)));
+    }
+
+    #[test]
+    fn need_the_same_port_as_a_cornercase_route() {
+        let machines = vec![machine(0, "Studio", paired(&[LAN], SECRET))];
+        let same = same(&machines, &cli(LAN, 9000, Some(NEW_SECRET)), "new", None, &[]);
+        assert_eq!(same, None);
+    }
+
+    #[rstest]
+    #[case::with_the_same_secret(SECRET, Why::AlreadySaved)]
+    #[case::with_a_new_secret(NEW_SECRET, Why::Tailscale)]
+    fn paired_again_go_to_the_machine_paired_before(#[case] secret: &str, #[case] why: Why) {
+        let machines = vec![machine(0, "Studio", paired(&[LAN, TAILNET], SECRET))];
+        assert_eq!(same_paired(&machines, &[LAN, TAILNET], secret), Some(found(0, why)));
     }
 }
 
