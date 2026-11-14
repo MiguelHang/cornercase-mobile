@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use super::retry::answered;
 use super::streams::{self, fine, line, served, serving};
 use super::*;
-use crate::cli::contract::fixtures::REAL;
+use crate::cli::contract::fixtures::{BEFORE_THE_CLI, REAL};
 use crate::cli::contract::{Descriptor, Kind};
 use crate::cli::status::fixtures::WATCH;
 use crate::store::streams::STATUS;
@@ -70,6 +70,16 @@ mod the_contract {
         let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, contract(&without_notices()))], &asked);
         let notices = Missing { name: "notices".to_owned(), kind: Kind::Feature, reason: None };
         assert_eq!(settled(&store, driver).await, connections(Connection::Missing(vec![notices])));
+        assert_eq!(asked.all(), [format!("{LAN}: contract --json")]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_server_before_the_cli_stops_on_what_it_lacks() {
+        let asked = Asked::default();
+        let (store, driver) = store_on(vec![route(LAN)], vec![(LAN, contract(BEFORE_THE_CLI))], &asked);
+        let routes = Missing { name: "app-routes".to_owned(), kind: Kind::Operation, reason: None };
+        let endpoint = Missing { name: "cli-endpoint".to_owned(), kind: Kind::Feature, reason: None };
+        assert_eq!(settled(&store, driver).await, connections(Connection::Missing(vec![routes, endpoint])));
         assert_eq!(asked.all(), [format!("{LAN}: contract --json")]);
     }
 

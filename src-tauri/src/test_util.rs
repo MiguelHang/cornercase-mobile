@@ -48,7 +48,7 @@ pub(crate) const STATUS: &[&str] = &["status", "--follow", "--json"];
 pub(crate) const APP: &[&str] = &["status", "--app", "--follow", "--json"];
 const REQUESTS: &[&str] = &["requests", "--follow", "-"];
 const REAL_CONTRACT: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/contract/0.13.19.json"));
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/contract/0.13.78.json"));
 
 #[derive(Clone, Default)]
 pub(crate) struct Recorder(Arc<Mutex<Vec<Emitted>>>);

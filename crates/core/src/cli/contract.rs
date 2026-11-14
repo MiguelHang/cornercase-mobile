@@ -48,6 +48,7 @@ pub const REQUIRED: Required = Required {
         "flow-list",
         "flow-run",
         "close-agent",
+        "app-routes",
     ],
     features: &[
         "boot",
@@ -61,6 +62,7 @@ pub const REQUIRED: Required = Required {
         "accounts",
         "account-switch",
         "close-agent-tabs",
+        "cli-endpoint",
     ],
     streams: &[("events", 1), ("watch", 1), ("app", 1), ("surface", 1), ("view", 1), ("changes", 1), ("files", 1)],
 };
