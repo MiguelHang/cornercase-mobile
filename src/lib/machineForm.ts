@@ -8,7 +8,7 @@ export type Field = 'url' | 'name' | 'form'
 
 export type Offer = { url: string; name: string; machine: number; saved: string; why: SameWhy; checked: boolean }
 
-export const EMPTY = 'Paste the code the bridge prints'
+export const EMPTY = 'Paste the code from cornercase › Settings › Remote › Phone app'
 export const NO_SCHEME = 'The code starts with ws://'
 export const NOT_A_URL = 'This is not a machine code'
 export const NO_TOKEN = 'The code is cut short: paste it whole'
@@ -18,14 +18,14 @@ export const NAME_EMPTY = 'the name is empty'
 export const NAME_TOO_LONG = `the name is longer than ${LONGEST_NAME} characters`
 export const NAME_TAKEN = 'another machine already has that name'
 
-export const UNCHECKED = 'The bridge did not answer, so it could not be asked which machine it is.'
+export const UNCHECKED = 'cornercase on the Mac did not answer, so it could not be asked which machine it is.'
 export const NEW_MACHINE = 'Add as a new machine'
 
 const NAME = 'Name'
 
 const REASONS: Record<SameWhy, (saved: string) => string> = {
   address: (saved) => `${saved} is already saved at this address.`,
-  boot: (saved) => `This bridge is the one ${saved} answers from.`,
+  boot: (saved) => `This code comes from the same Mac as ${saved}.`,
   name: (saved) => `A machine is already called ${saved}.`,
 }
 

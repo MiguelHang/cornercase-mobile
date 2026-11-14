@@ -181,12 +181,13 @@ describe('Machine', () => {
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)
     expect(body).toContain(
-      'Its routes and their tokens are removed from this phone. The Mac and its bridge are not touched.',
+      'Its routes and their secrets are removed from this phone. The Mac still lets it in until you forget it in cornercase › Settings › Remote › Phone app.',
     )
     expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Cancel/)
     expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)
     expect(body).not.toContain('Add route')
     expect(body).not.toContain('Delete machine')
+    expect(machineSource).not.toMatch(/bridge/i)
   })
 })
 

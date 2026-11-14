@@ -69,7 +69,7 @@ mod display {
         "cannot read or write the saved machines: permission denied"
     )]
     #[case::secrets(Error::Secrets("item not found".to_owned()), "the secret store failed: item not found")]
-    #[case::no_token(Error::NoToken, "the route has no saved token; scan the bridge's code again")]
+    #[case::no_token(Error::NoToken, "the route has no saved secret; scan its code again in Machines")]
     #[case::unknown_machine(Error::UnknownMachine, "no saved machine has that id")]
     #[case::unknown_route(Error::UnknownRoute, "the machine has no route at that address")]
     #[case::last_route(Error::LastRoute, "a machine keeps at least one route; remove the machine instead")]

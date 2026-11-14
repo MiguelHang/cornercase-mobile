@@ -173,7 +173,7 @@ describe('checkName', () => {
 describe('offerText', () => {
   it.each<[SameWhy, string, string]>([
     ['address', 'Studio is already saved at this address.', 'Update the token of Studio'],
-    ['boot', 'This bridge is the one Studio answers from.', 'Add its addresses to Studio'],
+    ['boot', 'This code comes from the same Mac as Studio.', 'Add its addresses to Studio'],
     ['name', 'A machine is already called Studio.', 'Add its addresses to Studio'],
   ])('explains a match by %s and names the choice it keeps', (why, reason, keep) => {
     expect(form.offerText({ saved: 'Studio', why })).toEqual({ reason, keep })
@@ -208,13 +208,14 @@ describe('mergedText', () => {
 })
 
 describe('the texts of adding a machine', () => {
-  it('speak of the machine and its code, never of routes or URLs', () => {
+  it('speak of the machine and its code, never of routes, URLs or the bridge', () => {
     const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.UNCHECKED]
     const offers = (['address', 'boot', 'name'] as const).map((why) => form.offerText({ saved: 'Studio', why }))
     const all = [...texts, form.NEW_MACHINE, ...offers.flatMap(({ reason, keep }) => [reason, keep])]
     expect(all.filter((text) => /route|url/i.test(text))).toEqual([])
+    expect(all.filter((text) => /bridge/i.test(text))).toEqual([])
     expect([form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN]).toEqual([
-      'Paste the code the bridge prints',
+      'Paste the code from cornercase › Settings › Remote › Phone app',
       'The code starts with ws://',
       'This is not a machine code',
       'The code is cut short: paste it whole',

@@ -136,7 +136,7 @@
     <Glass>
       <div class="form">
         <h2 class="heading">Delete {machine.name}?</h2>
-        <p class="lost">Its routes and their tokens are removed from this phone. The Mac and its bridge are not touched.</p>
+        <p class="lost">Its routes and their secrets are removed from this phone. The Mac still lets it in until you forget it in cornercase › Settings › Remote › Phone app.</p>
         <div class="buttons">
           <Button tone="plain" resting={edit.busy} onclick={() => edit.keep()}>Cancel</Button>
           <Button tone="danger" busy={edit.busy} onclick={() => void edit.deleteMachine()}>Delete</Button>

@@ -56,7 +56,7 @@ pub enum Error {
     Store(String),
     #[error("the secret store failed: {0}")]
     Secrets(String),
-    #[error("the route has no saved token; scan the bridge's code again")]
+    #[error("the route has no saved secret; scan its code again in Machines")]
     NoToken,
     #[error("no saved machine has that id")]
     UnknownMachine,

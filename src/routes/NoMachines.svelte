@@ -13,7 +13,7 @@
 
   const LINES = [
     'A machine is a computer running cornercase whose agents you follow from here.',
-    'It needs the cornercase bridge running on your Mac, and the code it prints.',
+    'It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.',
   ]
 </script>
 
