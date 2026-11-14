@@ -1,6 +1,6 @@
 # 058 — La app habla con el `/cli` de cornercase y empareja con su QR
 
-- Estado: en curso (falta la comprobación en vivo)
+- Estado: en curso (falta el iPhone por la LAN y por Tailscale)
 - Depende de: 057 (hecha: cornercase 0.13.78)
 - Rama: `feat/058-cornercase-cli` · PR: `feat: talk to cornercase's own /cli and pair with its code`
 
@@ -21,6 +21,8 @@ su `/cli`.
   escanear.
 - [ ] CA6 — Fixtures de la versión de cornercase que traiga `/cli`; comprobación en vivo en el simulador y en el iPhone,
   por la LAN y por Tailscale.
+  Hechos los fixtures (0.13.78) y el simulador el 2026-11-14 (`design/connection/machines.md` › Checked on 2026-11-14 for
+  058); falta el iPhone.
 
 ## Decisiones
 Tomadas el 2026-11-14 con los valores por defecto propuestos:
