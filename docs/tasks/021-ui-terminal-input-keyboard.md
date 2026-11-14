@@ -1,6 +1,6 @@
 # 021 — Pantalla 3: terminal — entrada, teclas que faltan, desplazar y teclado del WebView ⚠
 
-- Estado: hecha, salvo la prueba en un iPhone (teclado en pantalla real, dictado, IME, pegar en release)
+- Estado: hecha (dictado comprobado en el iPhone del usuario el 2026-11-14; quedan el IME y pegar en release)
 - Depende de: 020
 - Riesgo: **alto** — teclado virtual de iOS sobre la WebView (foco, altura, IME), gestos.
 - Rama: `feat/021-terminal-input` · PR: `feat: type and scroll in a live terminal from the phone`
