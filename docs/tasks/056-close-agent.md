@@ -1,6 +1,6 @@
 # 056 — Cerrar un agente desde el teléfono
 
-- Estado: hecha (en el iPhone del usuario, pendiente)
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 051
 - Rama: `feat/056-close-agent` · PR: `feat: close an agent from the phone`
 

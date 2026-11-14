@@ -1,6 +1,6 @@
 # 048 — El chat como conversación: historial en el móvil, y el de cornercase cuando exista
 
-- Estado: hecha (en el iPhone del usuario, pendiente)
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 036, 041
 - Rama: `feat/048-chat-history` · PR: `feat: keep the chat's conversation on the phone`
 

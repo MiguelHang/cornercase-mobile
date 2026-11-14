@@ -1,6 +1,6 @@
 # 051 — Tablero: las filas aprovechan todo el ancho
 
-- Estado: hecha (en el iPhone del usuario, pendiente)
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 040
 - Rama: `feat/051-board-full-width` · PR: `feat: let the board's rows use the phone's full width`
 

@@ -1,6 +1,6 @@
 # 049 — El icono de la app
 
-- Estado: hecha (ver el icono en el iPhone del usuario queda pendiente)
+- Estado: hecha (comprobada en el iPhone del usuario el 2026-11-14)
 - Depende de: 030
 - Rama: `chore/049-app-icon` · PR: `chore: give the app cornercase's mark as its icon`
 
