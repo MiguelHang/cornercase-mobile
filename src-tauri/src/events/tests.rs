@@ -9,7 +9,7 @@ use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
-use cornercase_core::protocol::USAGE_EXIT;
+use cornercase_core::protocol::{BRIDGE_ROUTES, USAGE_EXIT};
 use cornercase_core::terminal::question::Choice;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;

@@ -96,6 +96,14 @@ impl Route {
         }
     }
 
+    pub(crate) fn at(&self, address: Address) -> Self {
+        let url = RouteUrl { address, token: self.token().cloned() };
+        match self {
+            Self::Bridge { .. } => Self::Bridge { url },
+            Self::Cli { .. } => Self::Cli { url },
+        }
+    }
+
     fn url(&self) -> &RouteUrl {
         match self {
             Self::Bridge { url } | Self::Cli { url } => url,

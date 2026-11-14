@@ -11,6 +11,7 @@ pub const LONGEST_LINE: usize = 16 << 20;
 pub const LINE_TOO_LONG: &str = "a line of output passed 16 MiB";
 pub const LARGEST_MESSAGE: usize = 1 << 20;
 pub const BRIDGE_ROUTES: &str = "--bridge-routes";
+pub const APP_ROUTES: &[&str] = &["config", "pair", "app", "--routes", "--json"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
