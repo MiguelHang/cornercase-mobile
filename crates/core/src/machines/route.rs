@@ -38,6 +38,14 @@ pub enum RouteError {
     TokenTwice,
     #[error("the code's token has characters other than letters, digits, - and _")]
     TokenCharacters,
+    #[error("the code's pairing code is empty")]
+    EmptyCode,
+    #[error("the code has more than one pairing code")]
+    CodeTwice,
+    #[error("the code has both a token and a pairing code")]
+    TokenAndCode,
+    #[error("the code's pairing code has characters other than 0-9 and a-f")]
+    CodeCharacters,
     #[error("the code has an empty also= address")]
     AlsoEmpty,
     #[error("an also= address of the code is not a host name or an IP address without brackets")]

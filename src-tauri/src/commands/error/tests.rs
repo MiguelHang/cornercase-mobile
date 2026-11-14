@@ -98,6 +98,10 @@ mod from_a_route_error {
     #[case::also_invalid("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=[::1]", "route_also_invalid")]
     #[case::name_encoding("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=%FF", "route_name_encoding")]
     #[case::name_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=a&name=b", "route_name_twice")]
+    #[case::empty_code("ws://studio.lan:9000/?code=", "route_empty_code")]
+    #[case::code_twice("ws://studio.lan:9000/?code=c0de&code=c0de", "route_code_twice")]
+    #[case::token_and_code("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&code=c0de", "route_token_and_code")]
+    #[case::code_characters("ws://studio.lan:9000/?code=C0DE", "route_code_characters")]
     fn carries_the_code_of_a_machine_code_error(#[case] text: &str, #[case] code: &str) {
         assert_carries(MachineCode::parse(text).expect_err("a code that does not parse"), code);
     }

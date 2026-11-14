@@ -1,11 +1,12 @@
 use rstest::rstest;
 
 use super::*;
-use crate::machines::tests::{TOKEN, bridge};
+use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 
 const LAN: &str = "192.168.1.20";
 const TAILSCALE: &str = "100.101.102.103";
 const TAILSCALE_V6: &str = "fd7a:115c:a1e0::1";
+const PAIRING: &str = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 
 fn ip(text: &str) -> IpAddr {
     text.parse().expect("an IP address")
@@ -220,6 +221,100 @@ mod parse {
     #[case::not_a_url("not a code", RouteError::NotAUrl)]
     fn refuses_what_a_route_url_refuses(#[case] text: &str, #[case] reason: RouteError) {
         assert_eq!(MachineCode::parse(text), Err(reason));
+    }
+}
+
+mod pairing_code {
+    use super::*;
+
+    fn secret() -> Token {
+        Token::new(SECRET.to_owned())
+    }
+
+    fn read(text: &str) -> MachineCode {
+        MachineCode::parse(text).expect("read the code")
+    }
+
+    #[test]
+    fn reads_every_route_and_the_name_of_cornercase_s_code() {
+        let read = read(concat!(
+            "ws://192.168.1.20:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+            "&also=192.168.64.1&also=fd7a:115c:a1e0::1&name=MacBook%20Pro%20de%20Miguel"
+        ));
+        let expected = vec![
+            cli(LAN, 47682, Some(SECRET)),
+            cli("192.168.64.1", 47682, Some(SECRET)),
+            cli(TAILSCALE_V6, 47682, Some(SECRET)),
+        ];
+        assert_eq!(read.cli_routes(&secret()), expected);
+        assert_eq!(read.name(), Some("MacBook Pro de Miguel"));
+    }
+
+    #[rstest]
+    #[case::ipv6_first("ws://[fd7a:115c:a1e0::1]:47682/?code=c", TAILSCALE_V6, 47682)]
+    #[case::no_name("ws://10.0.0.1:1/?code=c", "10.0.0.1", 1)]
+    fn reads_a_code_of_one_route(#[case] text: &str, #[case] host: &str, #[case] port: u16) {
+        let read = read(text);
+        assert_eq!(read.cli_routes(&secret()), vec![cli(host, port, Some(SECRET))]);
+        assert_eq!(read.name(), None);
+    }
+
+    #[test]
+    fn reads_the_longest_name_cornercase_writes() {
+        let read = read(&format!("ws://10.0.0.1:1/?code=c&name={}", "%C3%A9".repeat(64)));
+        assert_eq!(read.name(), Some("é".repeat(64).as_str()));
+    }
+
+    #[test]
+    fn reads_the_longest_code_cornercase_writes() {
+        let text = concat!(
+            "ws://192.168.100.200:65535/?code=cccccccccccccccccccccccccccccccc",
+            "&also=172.16.100.200&also=fd7a:115c:a1e0:ab12:4843:cd96:6234:5678&name=",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        );
+        let read = read(text);
+        assert_eq!(read.cli_routes(&secret()).len(), 3);
+        assert_eq!(read.name(), Some("x".repeat(64).as_str()));
+    }
+
+    #[test]
+    fn gives_no_route_of_the_bridge() {
+        assert_eq!(read(&format!("ws://mac.local:47682/?code={PAIRING}&also=10.0.0.2")).routes(), Vec::new());
+    }
+
+    #[rstest]
+    #[case::empty("code=", RouteError::EmptyCode)]
+    #[case::bare_key("code", RouteError::EmptyCode)]
+    #[case::twice(&format!("code={PAIRING}&code={PAIRING}"), RouteError::CodeTwice)]
+    #[case::token_first(&format!("token={TOKEN}&code={PAIRING}"), RouteError::TokenAndCode)]
+    #[case::token_after(&format!("code={PAIRING}&token={TOKEN}"), RouteError::TokenAndCode)]
+    #[case::token_and_an_empty_code(&format!("token={TOKEN}&code="), RouteError::TokenAndCode)]
+    #[case::upper_case(&format!("code={}", PAIRING.to_uppercase()), RouteError::CodeCharacters)]
+    #[case::not_hex(&format!("code={PAIRING}z"), RouteError::CodeCharacters)]
+    #[case::escaped(&format!("code={PAIRING}%41"), RouteError::CodeCharacters)]
+    #[case::base64url(&format!("code={PAIRING}-_"), RouteError::CodeCharacters)]
+    fn refuses_with_its_own_reason_and_without_the_code(#[case] pairs: &str, #[case] reason: RouteError) {
+        let refused = MachineCode::parse(&format!("ws://mac.local:47682/?{pairs}&also=10.0.0.2")).expect_err("refuse");
+        assert_eq!(refused, reason);
+        for text in [refused.to_string(), format!("{refused:?}")] {
+            assert!(!text.contains("mac"), "{text}");
+            assert!(!text.contains(PAIRING), "{text}");
+        }
+    }
+
+    #[test]
+    fn leaves_the_code_out_of_its_text() {
+        let read = read(&format!("ws://mac.local:47682/?code={PAIRING}&also=10.0.0.2&name=studio"));
+        for text in [read.to_string(), format!("{read:?}")] {
+            assert!(text.contains("studio"), "{text}");
+            assert!(!text.contains(PAIRING), "{text}");
+        }
+        assert_eq!(read.to_string(), "ws://mac.local:47682/?code=redacted&also=10.0.0.2&name=studio");
+    }
+
+    #[test]
+    fn gives_routes_of_cornercase_from_a_bridge_code_too() {
+        assert_eq!(code(LAN).cli_routes(&secret()), vec![cli(LAN, 8765, Some(SECRET))]);
     }
 }
 
