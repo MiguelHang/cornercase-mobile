@@ -7,7 +7,8 @@ use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::pairing::PairError;
+use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::secrets::Secrets;
 use cornercase_core::transport::fake::FakeTransport;
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
@@ -37,6 +38,10 @@ pub(crate) const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
 pub(crate) const BRIDGE: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
 pub(crate) const ADDRESS: &str = "ws://studio.lan:9000/";
 pub(crate) const BOOT: &str = "5151-1770000000";
+pub(crate) const PAIRING: &str = "ws://studio.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+pub(crate) const PAIRING_CODE: &str = "0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+pub(crate) const SECRET: &str = "4f2a91c0.9c1e2a7b5d0f";
+pub(crate) const CLI_ADDRESS: &str = "ws://studio.lan:47682/";
 pub(crate) const CONTRACT: &[&str] = &["contract", "--json"];
 pub(crate) const EVENTS: &[&str] = &["events", "--json", "--notices"];
 pub(crate) const STATUS: &[&str] = &["status", "--follow", "--json"];
@@ -225,6 +230,21 @@ pub(crate) fn launcher(fake: FakeTransport) -> (Launcher, Arc<FakeTransport>) {
     let held = Arc::clone(&transport);
     let launcher = Launcher::new(move |_: &Route| Ok(Arc::clone(&held) as Arc<dyn Transport>), spawned);
     (launcher, transport)
+}
+
+pub(crate) fn pairing(launcher: Launcher, answer: Result<&'static str, PairError>) -> (Launcher, Arc<AtomicUsize>) {
+    let pairings = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&pairings);
+    let launcher = launcher.pairing(move |_| {
+        counted.fetch_add(1, Ordering::SeqCst);
+        let answer = answer.clone().map(Token::fake);
+        Box::pin(async move { answer })
+    });
+    (launcher, pairings)
+}
+
+pub(crate) fn paired_routes(code: &str) -> Vec<Route> {
+    MachineCode::parse(code).expect("a pairing code").cli_routes(&Token::fake(SECRET))
 }
 
 pub(crate) fn spawned(task: Task) -> JoinHandle<()> {

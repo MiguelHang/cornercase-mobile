@@ -329,6 +329,12 @@ mod pairing_code {
     }
 
     #[test]
+    fn needs_pairing_only_with_a_pairing_code() {
+        assert!(read(&format!("ws://mac.local:47682/?code={PAIRING}")).needs_pairing());
+        assert!(!code(LAN).needs_pairing());
+    }
+
+    #[test]
     fn gives_the_address_of_every_host_in_order() {
         let read = read(&format!("ws://192.168.1.20:47682/?code={PAIRING}&also=fd7a:115c:a1e0::1&also=192.168.1.20"));
         let address = |host: &str| Address { host: host.to_owned(), port: 47682 };

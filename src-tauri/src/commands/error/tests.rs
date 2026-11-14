@@ -1,5 +1,5 @@
 use cornercase_core::machines::code::MachineCode;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::route::{Address, Route};
 use rstest::rstest;
 use serde_json::json;
 
@@ -72,6 +72,26 @@ mod of_pairing {
         let message = json["message"].as_str().expect("a message");
         assert!(!message.contains(PAIRING_CODE), "{message}");
         assert!(!message.contains(SECRET), "{message}");
+    }
+
+    #[rstest]
+    #[case::refused(PairError::Answered(Error::PairingRefused), "pairing_refused")]
+    #[case::failed(PairError::Answered(Error::PairingFailed), "pairing_failed")]
+    #[case::malformed(PairError::Answered(Error::MalformedSecret), "protocol")]
+    #[case::no_code(PairError::NoCode, "connect")]
+    fn carries_the_code_of_what_the_mac_answered(#[case] error: PairError, #[case] code: &str) {
+        let message = error.to_string();
+        assert_eq!(json_of(&CommandError::from(error)), json!({ "code": code, "message": message }));
+    }
+
+    #[test]
+    fn says_where_to_look_when_no_address_answered_without_naming_them() {
+        let unanswered = vec![(Address { host: "mac.lan".to_owned(), port: 47682 }, Error::Timeout)];
+        let json = json_of(&CommandError::from(PairError::NoAnswer(unanswered)));
+        let message = json["message"].as_str().expect("a message");
+        assert_eq!(json["code"], "connect");
+        assert!(message.contains("phone app"), "{message}");
+        assert!(!message.contains("mac.lan"), "{message}");
     }
 }
 

@@ -1,17 +1,35 @@
 use std::sync::Arc;
 
 use cornercase_core::machines::MachineId;
+use cornercase_core::machines::pairing::PairError;
 use cornercase_core::transport::fake::FakeTransport;
 
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::test_util::{
-    BOOT, Ipc, Recorder, Studio, changed, connected, launcher, released, serving, settle, snapshot,
+    BOOT, Ipc, Recorder, Studio, changed, code, connected, launcher, released, serving, settle, snapshot,
 };
 use crate::view::ConnectionView;
 
 fn first_snapshot() -> Vec<String> {
     vec![snapshot(BOOT, 7, "first")]
+}
+
+mod the_launcher {
+    use super::*;
+
+    #[test]
+    fn names_the_app_its_version_and_the_platform_to_the_mac() {
+        let agent = user_agent();
+        let version = env!("CARGO_PKG_VERSION");
+        assert!(agent.starts_with(&format!("cornercase-mobile/{version} (")), "{agent}");
+        assert!(agent.ends_with(')') && !agent.ends_with("()"), "{agent}");
+    }
+
+    #[tokio::test]
+    async fn pairs_no_code_of_the_bridge() {
+        assert_eq!(Launcher::default().pair(&code()).await, Err(PairError::NoCode));
+    }
 }
 
 mod connecting {

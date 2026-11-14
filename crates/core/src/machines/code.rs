@@ -74,6 +74,10 @@ impl MachineCode {
         self.name.as_deref()
     }
 
+    pub fn needs_pairing(&self) -> bool {
+        self.pairing_code().is_some()
+    }
+
     pub(crate) fn pairing_code(&self) -> Option<&Token> {
         match &self.credential {
             Credential::Pairing(PairingCode(code)) => Some(code),

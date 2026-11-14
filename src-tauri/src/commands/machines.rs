@@ -45,8 +45,11 @@ pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
 }
 
 pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId, CommandError> {
-    let code = MachineCode::parse(code)?;
-    state.machines(|machines| machines.add(name, &code.routes()).map_err(CommandError::from))
+    let parsed = MachineCode::parse(code)?;
+    let routes = state.secret_of(code).map_or_else(|| parsed.routes(), |secret| parsed.cli_routes(&secret));
+    let id = state.machines(|machines| machines.add(name, &routes).map_err(CommandError::from))?;
+    state.used(code);
+    Ok(id)
 }
 
 pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {

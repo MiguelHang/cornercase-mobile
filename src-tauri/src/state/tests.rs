@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::future;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::network::Kind;
 use cornercase_core::secrets::file::FileSecrets;
 use cornercase_core::transport::Transport;
@@ -15,7 +16,7 @@ use cornercase_core::transport::fake::FakeTransport;
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::secrets::{KeychainSecrets, mock_store, on_mock};
-use crate::test_util::{TOKEN, code, released, route};
+use crate::test_util::{PAIRING, SECRET, TOKEN, code, released, route};
 
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
@@ -198,6 +199,62 @@ mod the_attached_images {
         let state = folderless();
         let id = state.attached().store(7, "photo.jpg".to_owned(), vec![1]).expect("the image is stored");
         assert_eq!(state.attached().get(7, id).map(|image| image.bytes), Some(vec![1]));
+    }
+}
+
+mod the_redeemed_secret {
+    use tokio::time;
+
+    use super::*;
+
+    const DESK: &str = "ws://desk.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0";
+
+    fn redeemed() -> AppState {
+        let state = folderless();
+        state.redeemed(&format!(" {PAIRING}\n"), Token::fake(SECRET));
+        state
+    }
+
+    #[test]
+    fn is_kept_for_its_code_only() {
+        let state = redeemed();
+        assert_eq!(state.secret_of(PAIRING), Some(Token::fake(SECRET)));
+        assert_eq!(state.secret_of(&format!("  {PAIRING}")), Some(Token::fake(SECRET)));
+        assert_eq!(state.secret_of(DESK), None);
+    }
+
+    #[test]
+    fn gives_way_to_the_next_one() {
+        let state = redeemed();
+        state.redeemed(DESK, Token::fake("aa.bb"));
+        assert_eq!(state.secret_of(PAIRING), None);
+        assert_eq!(state.secret_of(DESK), Some(Token::fake("aa.bb")));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lasts_ten_minutes() {
+        let state = redeemed();
+        time::advance(Duration::from_mins(10) - Duration::from_millis(1)).await;
+        assert_eq!(state.secret_of(PAIRING), Some(Token::fake(SECRET)));
+        time::advance(Duration::from_millis(1)).await;
+        assert_eq!(state.secret_of(PAIRING), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_gone_once_expired_even_for_another_code() {
+        let state = redeemed();
+        time::advance(Duration::from_mins(10)).await;
+        state.secret_of(DESK);
+        assert!(state.redeemed.lock().unwrap_or_else(PoisonError::into_inner).is_none());
+    }
+
+    #[test]
+    fn is_forgotten_once_its_code_is_used() {
+        let state = redeemed();
+        state.used(DESK);
+        assert_eq!(state.secret_of(PAIRING), Some(Token::fake(SECRET)));
+        state.used(&format!("{PAIRING} "));
+        assert_eq!(state.secret_of(PAIRING), None);
     }
 }
 

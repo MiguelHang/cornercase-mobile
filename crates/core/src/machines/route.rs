@@ -249,6 +249,11 @@ impl Token {
     pub(crate) fn as_str(&self) -> &str {
         &self.0
     }
+
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn fake(value: &str) -> Self {
+        Self(value.to_owned())
+    }
 }
 
 impl fmt::Debug for Token {

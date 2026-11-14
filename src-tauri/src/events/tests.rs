@@ -9,7 +9,7 @@ use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
-use cornercase_core::protocol::{BRIDGE_ROUTES, USAGE_EXIT};
+use cornercase_core::protocol::{APP_ROUTES, BRIDGE_ROUTES, USAGE_EXIT};
 use cornercase_core::terminal::question::Choice;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
@@ -21,8 +21,8 @@ use super::*;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::AppState;
 use crate::test_util::{
-    APP, BOOT, CONTRACT, EVENTS, Ipc, Recorder, STATUS, Studio, TOKEN, changed, connected, contracted, heard, route,
-    serving, settle, snapshot,
+    APP, BOOT, CONTRACT, EVENTS, Ipc, PAIRING, PAIRING_CODE, Recorder, STATUS, Studio, TOKEN, changed, connected,
+    contracted, heard, paired_routes, route, serving, settle, snapshot,
 };
 
 const RESTARTED: &str = "5152-1770000100";
@@ -307,6 +307,22 @@ mod learning_the_routes {
             learn(studio.id, Arc::clone(&transport), route(), store.clone(), studio.state.shared_machines()).await;
         }
         assert_eq!(saved_routes(&studio), [route(), tailscale()]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn saves_the_addresses_a_mac_paired_with_cornercase_tells_with_its_secret() {
+        let studio = Studio::new();
+        let paired = paired_routes(PAIRING);
+        let merged = studio.state.machines(|machines| machines.merge(studio.id, &paired).map_err(CommandError::from));
+        merged.expect("the paired routes are merged");
+        let (store, _driver) = store_of(studio.id, serving(&[]));
+        let told =
+            json!({ "routes": [{ "host": LAN_HOST, "port": 47682 }, { "host": TAILSCALE_HOST, "port": 47682 }] });
+        let transport: Arc<dyn Transport> =
+            Arc::new(FakeTransport::default().answer(APP_ROUTES, &[&told.to_string()], &[], 0));
+        learn(studio.id, transport, paired[0].clone(), store, studio.state.shared_machines()).await;
+        let tailscale = paired_routes(&format!("ws://{TAILSCALE_HOST}:47682/?code={PAIRING_CODE}"));
+        assert_eq!(saved_routes(&studio), [vec![route()], paired, tailscale].concat());
     }
 
     #[rstest]

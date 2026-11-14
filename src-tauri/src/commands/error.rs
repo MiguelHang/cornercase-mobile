@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use cornercase_core::error::Error;
+use cornercase_core::machines::pairing::PairError;
 use cornercase_core::machines::route::RouteError;
 use serde::Serialize;
 
@@ -148,6 +149,15 @@ impl From<&Error> for CommandError {
 impl From<Error> for CommandError {
     fn from(error: Error) -> Self {
         Self::from(&error)
+    }
+}
+
+impl From<PairError> for CommandError {
+    fn from(error: PairError) -> Self {
+        match error {
+            PairError::Answered(error) => Self::from(error),
+            unanswered => Self::new(ErrorCode::Connect, unanswered),
+        }
     }
 }
 
