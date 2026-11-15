@@ -49,7 +49,7 @@ impl Machines {
         let forgotten = if dropped.is_empty() {
             Vec::new()
         } else {
-            forget(store.as_ref(), secrets.as_ref(), &mut saved, &dropped)?
+            forget(store.as_ref(), secrets.as_ref(), &mut saved, &dropped)
         };
         for machine in &mut saved.machines {
             fill_tokens(secrets.as_ref(), machine)?;
@@ -265,7 +265,7 @@ fn forget(
     secrets: &dyn Secrets,
     saved: &mut Saved,
     dropped: &[(MachineId, Address)],
-) -> Result<Vec<MachineId>, Error> {
+) -> Vec<MachineId> {
     let deleted = delete_orphans(secrets, saved, dropped);
     let forgotten: Vec<MachineId> =
         saved.machines.iter().filter(|machine| machine.routes.is_empty()).map(|machine| machine.id).collect();
@@ -274,9 +274,9 @@ fn forget(
         saved.active = None;
     }
     if deleted {
-        store.save(saved)?;
+        let _ = store.save(saved);
     }
-    Ok(forgotten)
+    forgotten
 }
 
 fn delete_orphans(secrets: &dyn Secrets, saved: &Saved, dropped: &[(MachineId, Address)]) -> bool {

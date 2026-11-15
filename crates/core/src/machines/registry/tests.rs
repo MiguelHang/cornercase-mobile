@@ -17,6 +17,18 @@ const NEW_TAILNET: &str = "100.101.102.103";
 const PHONE_PORT: u16 = 47682;
 const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
+struct Unwritable(JsonFileStore);
+
+impl MachineStore for Unwritable {
+    fn load(&self) -> Result<Loaded, Error> {
+        self.0.load()
+    }
+
+    fn save(&self, _: &Saved) -> Result<(), Error> {
+        Err(Error::Store("the disk is full".to_owned()))
+    }
+}
+
 struct Phone {
     dir: TempDir,
     secrets: Arc<MemorySecrets>,
@@ -229,6 +241,20 @@ mod load {
         phone.secrets.fail_writes(false);
         phone.load().expect("load again");
         assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
+        assert!(!phone.text().contains("bridge"), "{}", phone.text());
+    }
+
+    #[test]
+    fn loads_the_rest_and_drops_them_again_on_the_next_start_when_the_file_cannot_be_written() {
+        let phone = Phone::new();
+        with_bridges(&phone);
+        let unwritable = Box::new(Unwritable(JsonFileStore::new(phone.file())));
+        let (machines, forgotten) = Machines::load(unwritable, phone.secrets.clone()).expect("the machines load");
+        assert_eq!((machines.machines().len(), forgotten), (1, vec![MachineId(4)]));
+        assert_eq!(phone.text(), V1_WITH_BRIDGES);
+        assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
+        let (again, forgotten) = phone.load().expect("load again");
+        assert_eq!((again.machines().len(), forgotten), (1, vec![MachineId(4)]));
         assert!(!phone.text().contains("bridge"), "{}", phone.text());
     }
 }
