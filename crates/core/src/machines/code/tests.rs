@@ -137,9 +137,8 @@ mod parse {
     #[case::escaped(&format!("code={PAIRING}%41"), RouteError::CodeCharacters)]
     #[case::base64url(&format!("code={PAIRING}-_"), RouteError::CodeCharacters)]
     #[case::no_code("also=10.0.0.2", RouteError::NoCode)]
-    #[case::of_the_bridge(&format!("token={TOKEN}"), RouteError::BridgeCode)]
-    #[case::of_the_bridge_with_an_empty_token("token=", RouteError::BridgeCode)]
-    #[case::empty_code_beside_a_token("code=&token=abc", RouteError::BridgeCode)]
+    #[case::token_without_code(&format!("token={TOKEN}"), RouteError::NoCode)]
+    #[case::empty_code_beside_a_token("code=&token=abc", RouteError::EmptyCode)]
     fn refuses_a_bad_pairing_code_with_its_own_reason_and_without_the_code(
         #[case] pairs: &str,
         #[case] reason: RouteError,
@@ -191,15 +190,6 @@ mod parse {
     #[case::no_query("ws://mac.local:47682/", RouteError::NoCode)]
     fn refuses_what_is_not_a_code(#[case] text: &str, #[case] reason: RouteError) {
         assert_eq!(MachineCode::parse(text), Err(reason));
-    }
-
-    #[test]
-    fn tells_a_code_of_the_bridge_to_scan_the_one_of_cornercase() {
-        let refused = MachineCode::parse(&format!("ws://192.168.1.20:8765/?token={TOKEN}")).expect_err("refuse");
-        assert_eq!(
-            refused.to_string(),
-            "this is a code of the old bridge: scan the one in cornercase › Settings › Remote › Phone app"
-        );
     }
 }
 

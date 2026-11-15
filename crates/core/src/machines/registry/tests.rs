@@ -7,7 +7,7 @@ use super::*;
 use crate::machines::store::JsonFileStore;
 use crate::machines::tests::{SECRET, TOKEN, cli};
 use crate::secrets::memory::MemorySecrets;
-use crate::test_util::{TempDir, V1_WITH_BRIDGES};
+use crate::test_util::TempDir;
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const LAN: &str = "192.168.1.20";
@@ -16,18 +16,6 @@ const GONE: &str = "10.0.0.9";
 const NEW_TAILNET: &str = "100.101.102.103";
 const PHONE_PORT: u16 = 47682;
 const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
-
-struct Unwritable(JsonFileStore);
-
-impl MachineStore for Unwritable {
-    fn load(&self) -> Result<Loaded, Error> {
-        self.0.load()
-    }
-
-    fn save(&self, _: &Saved) -> Result<(), Error> {
-        Err(Error::Store("the disk is full".to_owned()))
-    }
-}
 
 struct Phone {
     dir: TempDir,
@@ -43,12 +31,8 @@ impl Phone {
         self.dir.path().join("machines.json")
     }
 
-    fn load(&self) -> Result<(Machines, Vec<MachineId>), Error> {
-        Machines::load(Box::new(JsonFileStore::new(self.file())), self.secrets.clone())
-    }
-
     fn open(&self) -> Machines {
-        self.load().expect("load the machines").0
+        Machines::load(Box::new(JsonFileStore::new(self.file())), self.secrets.clone()).expect("load the machines")
     }
 
     fn text(&self) -> String {
@@ -114,14 +98,6 @@ fn phone_address(host: &str) -> Address {
     Address { host: host.to_owned(), port: PHONE_PORT }
 }
 
-fn with_bridges(phone: &Phone) {
-    fs::write(phone.file(), V1_WITH_BRIDGES).expect("write the file of an older app");
-    let secrets = [(3, address(LAN), TOKEN), (3, phone_address(LAN), SECRET), (4, address(GONE), NEW_TOKEN)];
-    for (id, address, secret) in secrets {
-        phone.secrets.set(&key(MachineId(id), &address), secret.as_bytes()).expect("keep the secret");
-    }
-}
-
 mod load {
     use super::*;
 
@@ -173,89 +149,6 @@ mod load {
             [route(LAN, TOKEN), route(NEW_TAILNET, TOKEN)]
         );
         assert!(phone.text().contains(r#""version": 1"#), "{}", phone.text());
-    }
-
-    #[test]
-    fn drops_the_bridge_routes_with_their_secrets_and_forgets_a_machine_left_without_routes() {
-        let phone = Phone::new();
-        with_bridges(&phone);
-        let (machines, forgotten) = phone.load().expect("the file of an older app loads");
-        let studio = Machine {
-            id: MachineId(3),
-            name: "studio".to_owned(),
-            routes: vec![cli(LAN, PHONE_PORT, Some(SECRET))],
-            last_route: None,
-        };
-        assert_eq!((machines.machines(), forgotten), (std::slice::from_ref(&studio), vec![MachineId(4)]));
-        assert_eq!(machines.active(), Some(MachineId(3)));
-        assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
-        assert_eq!(phone.secret_at(MachineId(3), &phone_address(LAN)).as_deref(), Some(SECRET));
-        assert!(!phone.text().contains("bridge"), "{}", phone.text());
-        let (again, forgotten) = phone.load().expect("load again");
-        assert_eq!((again.machines(), forgotten), ([studio].as_slice(), Vec::new()));
-    }
-
-    #[test]
-    fn never_gives_the_id_of_a_forgotten_machine_again() {
-        let phone = Phone::new();
-        with_bridges(&phone);
-        let id = phone.open().add("laptop", &code(&[GONE], NEW_TOKEN)).expect("add the laptop");
-        assert_eq!(id, MachineId(5));
-    }
-
-    #[test]
-    fn leaves_a_file_without_bridge_routes_as_it_was() {
-        let phone = Phone::new();
-        let machine = r#"{"id": 0, "name": "studio", "routes": [{"kind": "cli", "url": "ws://192.168.1.20:8765/"}], "last_route": null}"#;
-        let text = format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#);
-        fs::write(phone.file(), &text).expect("write the file by hand");
-        let (_, forgotten) = phone.load().expect("load the machines");
-        assert_eq!((phone.text(), forgotten), (text, Vec::new()));
-    }
-
-    #[test]
-    fn keeps_the_secret_of_a_route_at_the_address_of_a_dropped_bridge_route() {
-        let phone = Phone::new();
-        let routes = r#"[{"kind": "bridge", "url": "ws://192.168.1.20:8765/"}, {"kind": "cli", "url": "ws://192.168.1.20:8765/"}]"#;
-        let machine = format!(r#"{{"id": 0, "name": "studio", "routes": {routes}, "last_route": null}}"#);
-        fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#))
-            .expect("write the file of an older app");
-        phone.secrets.set(&key(MachineId(0), &address(LAN)), SECRET.as_bytes()).expect("keep the secret");
-        let (machines, forgotten) = phone.load().expect("the file of an older app loads");
-        assert_eq!(
-            (machines.machines()[0].routes.clone(), forgotten),
-            (vec![cli(LAN, 8765, Some(SECRET))], Vec::new())
-        );
-        assert_eq!(phone.secret(MachineId(0), LAN).as_deref(), Some(SECRET));
-    }
-
-    #[test]
-    fn loads_the_rest_and_keeps_the_file_for_the_next_start_when_the_secrets_cannot_be_deleted() {
-        let phone = Phone::new();
-        with_bridges(&phone);
-        phone.secrets.fail_writes(true);
-        let (machines, forgotten) = phone.load().expect("the file of an older app loads");
-        assert_eq!((machines.machines().len(), forgotten), (1, vec![MachineId(4)]));
-        assert_eq!(phone.text(), V1_WITH_BRIDGES);
-        assert_eq!(phone.secret(MachineId(4), GONE).as_deref(), Some(NEW_TOKEN));
-        phone.secrets.fail_writes(false);
-        phone.load().expect("load again");
-        assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
-        assert!(!phone.text().contains("bridge"), "{}", phone.text());
-    }
-
-    #[test]
-    fn loads_the_rest_and_drops_them_again_on_the_next_start_when_the_file_cannot_be_written() {
-        let phone = Phone::new();
-        with_bridges(&phone);
-        let unwritable = Box::new(Unwritable(JsonFileStore::new(phone.file())));
-        let (machines, forgotten) = Machines::load(unwritable, phone.secrets.clone()).expect("the machines load");
-        assert_eq!((machines.machines().len(), forgotten), (1, vec![MachineId(4)]));
-        assert_eq!(phone.text(), V1_WITH_BRIDGES);
-        assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
-        let (again, forgotten) = phone.load().expect("load again");
-        assert_eq!((again.machines().len(), forgotten), (1, vec![MachineId(4)]));
-        assert!(!phone.text().contains("bridge"), "{}", phone.text());
     }
 }
 

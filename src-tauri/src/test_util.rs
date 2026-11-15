@@ -35,7 +35,6 @@ use crate::state::AppState;
 use crate::view::ConnectionView;
 
 pub(crate) const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
-pub(crate) const BRIDGE: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
 pub(crate) const ADDRESS: &str = "ws://studio.lan:9000/";
 pub(crate) const BOOT: &str = "5151-1770000000";
 pub(crate) const PAIRING: &str = "ws://studio.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0";

@@ -38,7 +38,6 @@ mod route_error {
             RouteError::Port,
             RouteError::Path,
             RouteError::NoCode,
-            RouteError::BridgeCode,
             RouteError::EmptyCode,
             RouteError::CodeTwice,
             RouteError::CodeCharacters,
@@ -151,7 +150,6 @@ mod json {
 
     #[rstest]
     #[case::ssh("ssh")]
-    #[case::of_the_old_bridge("bridge")]
     fn refuses_a_kind_other_than_cli(#[case] kind: &str) {
         let text = format!(r#"{{"kind":"{kind}","url":"ws://mac.local:7700/"}}"#);
         assert!(serde_json::from_str::<Route>(&text).is_err());

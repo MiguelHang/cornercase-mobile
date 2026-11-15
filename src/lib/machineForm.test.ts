@@ -22,10 +22,7 @@ describe('checkUrl', () => {
     ['no pairing code', 'ws://studio.lan:47682/', form.NO_CODE],
     ['another parameter', 'ws://studio.lan:47682/?codes=4f9a', form.NO_CODE],
     ['an empty pairing code', 'ws://studio.lan:47682/?code=&name=Studio', form.NO_CODE],
-    ['a code of the old bridge', 'ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA', form.BRIDGE_CODE],
-    ['a code of the old bridge with more addresses', 'ws://192.168.1.20:9000/?token=abc&also=10.0.0.2', form.BRIDGE_CODE],
-    ['a code of the old bridge with an empty token', 'ws://studio.lan:9000/?token=', form.BRIDGE_CODE],
-    ['an empty pairing code beside a token', 'ws://studio.lan:47682/?code=&token=abc', form.BRIDGE_CODE],
+    ['a token without a pairing code', 'ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA', form.NO_CODE],
   ])('refuses %s', (_, raw, error) => {
     expect(form.checkUrl(raw)).toEqual({ ok: false, error })
   })
@@ -53,10 +50,6 @@ describe('checkUrl', () => {
 
   it('accepts the scheme in capitals', () => {
     expect(form.checkUrl('WS://studio.lan:47682/?code=4f9a').ok).toBe(true)
-  })
-
-  it('names neither the address nor the token of a code of the old bridge', () => {
-    expect(form.BRIDGE_CODE).not.toMatch(/studio|c3R1ZGlvLXNlY3JldA|ws:/)
   })
 })
 
@@ -119,7 +112,6 @@ describe('placeholderName', () => {
     ['an IPv6 address', 'ws://[fd7a::1]:47682/?code=4f9a', '[fd7a::1]'],
     ['nothing yet', '', 'Name'],
     ['a URL without its pairing code', 'ws://studio.lan:47682/', 'Name'],
-    ['a code of the old bridge', 'ws://studio.lan:9000/?token=abc', 'Name'],
   ])('shows the host for %s', (_, url, shown) => {
     expect(form.placeholderName(url)).toBe(shown)
   })
@@ -136,7 +128,7 @@ describe('fieldOf', () => {
   it.each<[ErrorCode, form.Field]>([
     ['route_no_code', 'url'],
     ['route_scheme', 'url'],
-    ['route_bridge_code', 'url'],
+    ['route_empty_code', 'url'],
     ['name_empty', 'name'],
     ['name_too_long', 'name'],
     ['name_taken', 'name'],

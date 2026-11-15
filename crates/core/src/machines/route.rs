@@ -29,8 +29,6 @@ pub enum RouteError {
     Path,
     #[error("the code has no pairing code")]
     NoCode,
-    #[error("this is a code of the old bridge: scan the one in cornercase › Settings › Remote › Phone app")]
-    BridgeCode,
     #[error("the code's pairing code is empty")]
     EmptyCode,
     #[error("the code has more than one pairing code")]

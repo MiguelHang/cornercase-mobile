@@ -12,7 +12,6 @@ export const EMPTY = 'Paste the code from cornercase › Settings › Remote ›
 export const NO_SCHEME = 'The code starts with ws://'
 export const NOT_A_URL = 'This is not a machine code'
 export const NO_CODE = 'The code is cut short: paste it whole'
-export const BRIDGE_CODE = 'This is a code of the old bridge: scan the one in cornercase › Settings › Remote › Phone app'
 
 export const LONGEST_NAME = 64
 export const NAME_EMPTY = 'the name is empty'
@@ -52,10 +51,7 @@ export const checkUrl = (raw: string): Checked => {
   if (found === null) {
     return refused(NOT_A_URL)
   }
-  if (found.searchParams.get('code')) {
-    return { ok: true, url }
-  }
-  return refused(found.searchParams.has('token') ? BRIDGE_CODE : NO_CODE)
+  return found.searchParams.get('code') ? { ok: true, url } : refused(NO_CODE)
 }
 
 const folded = (name: string) => name.trim().toLowerCase()

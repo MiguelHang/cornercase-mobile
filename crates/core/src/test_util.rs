@@ -1,9 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub const V1_WITH_BRIDGES: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/machines/v1-bridge.json"));
-
 pub struct TempDir(PathBuf);
 
 impl TempDir {

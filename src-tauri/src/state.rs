@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
@@ -19,7 +18,6 @@ use tauri::async_runtime::JoinHandle;
 use tokio::time::Instant;
 
 use crate::commands::error::CommandError;
-use crate::commands::history;
 use crate::identity;
 use crate::state::attached::AttachedImages;
 
@@ -38,7 +36,6 @@ pub(crate) struct AppState {
     attached: AttachedImages,
     history: Mutex<Option<JsonFolderStore>>,
     redeemed: Mutex<Option<Redeemed>>,
-    forgotten: Vec<MachineId>,
 }
 
 struct Redeemed {
@@ -71,12 +68,10 @@ impl AppState {
         routes: Arc<dyn Secrets>,
     ) -> Self {
         let identity = identity::announce(identity);
-        let (machines, forgotten) = match data_dir {
-            Ok(folder) => match Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), routes) {
-                Ok((machines, forgotten)) => (Ok(machines), forgotten),
-                Err(error) => (Err(CommandError::machines_not_loaded(&error)), Vec::new()),
-            },
-            Err(reason) => (Err(CommandError::no_data_dir(reason)), Vec::new()),
+        let machines = match data_dir {
+            Ok(folder) => Machines::load(Box::new(JsonFileStore::new(folder.join(MACHINES_FILE))), routes)
+                .map_err(|error| CommandError::machines_not_loaded(&error)),
+            Err(reason) => Err(CommandError::no_data_dir(reason)),
         };
         Self {
             machines: SharedMachines(Arc::new(Mutex::new(machines))),
@@ -87,19 +82,11 @@ impl AppState {
             attached: AttachedImages::default(),
             history: Mutex::new(None),
             redeemed: Mutex::new(None),
-            forgotten,
         }
     }
 
     pub(crate) fn keeping_history(self, cache_dir: Option<PathBuf>) -> Self {
-        let history = cache_dir.map(|folder| JsonFolderStore::new(folder.join(HISTORY_FOLDER)));
-        let mut state = Self { history: Mutex::new(history), ..self };
-        for id in mem::take(&mut state.forgotten) {
-            if let Err(line) = history::forget(&state, id) {
-                eprintln!("{line}");
-            }
-        }
-        state
+        Self { history: Mutex::new(cache_dir.map(|folder| JsonFolderStore::new(folder.join(HISTORY_FOLDER)))), ..self }
     }
 
     pub(crate) fn machines<T>(

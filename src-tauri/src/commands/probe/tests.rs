@@ -16,8 +16,8 @@ use crate::commands::error::ErrorCode;
 use crate::commands::machines::list;
 use crate::commands::routes::merge;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, CONTRACT, Ipc, PAIRING, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, contracted, launcher,
-    paired_routes, pairing, route, serving, settle, snapshot,
+    ADDRESS, BOOT, CONTRACT, Ipc, PAIRING, PAIRING_CODE, Recorder, SECRET, Studio, contracted, launcher, paired_routes,
+    pairing, route, serving, settle, snapshot,
 };
 
 const LAPTOP: &str = "ws://laptop.lan:9000/?code=1a2b3c4d";
@@ -321,16 +321,6 @@ mod matching_a_pairing_code {
         assert_eq!(error.code, ErrorCode::PairingRefused);
         assert!(!error.message.contains(PAIRING_CODE), "{}", error.message);
         assert_eq!(studio.state.secret_of(DESK), None);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn refuses_a_code_of_the_bridge_without_pairing() {
-        let studio = Studio::new();
-        let (launcher, pairings) = pairing(answering(contracted(BOOT), Err(asleep())), Ok(SECRET));
-        let error = matching(&studio.state, &launcher, BRIDGE, "desk").await.expect_err("the code is refused");
-        assert_eq!(error.code, ErrorCode::RouteBridgeCode);
-        assert!(!error.message.contains(TOKEN) && !error.message.contains("studio.lan"), "{}", error.message);
-        assert_eq!(pairings.load(Ordering::SeqCst), 0);
     }
 }
 

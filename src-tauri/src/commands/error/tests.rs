@@ -108,7 +108,6 @@ mod from_a_route_error {
     #[case::name_encoding("ws://studio.lan:9000/?code=c0de&name=%FF", "route_name_encoding")]
     #[case::name_twice("ws://studio.lan:9000/?code=c0de&name=a&name=b", "route_name_twice")]
     #[case::no_code("ws://studio.lan:9000/?also=10.0.0.2", "route_no_code")]
-    #[case::bridge_code("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", "route_bridge_code")]
     #[case::empty_code("ws://studio.lan:9000/?code=", "route_empty_code")]
     #[case::code_twice("ws://studio.lan:9000/?code=c0de&code=c0de", "route_code_twice")]
     #[case::code_characters("ws://studio.lan:9000/?code=C0DE", "route_code_characters")]

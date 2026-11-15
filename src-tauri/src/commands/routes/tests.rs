@@ -15,8 +15,8 @@ use crate::commands::error::ErrorCode;
 use crate::commands::machines::{add, list};
 use crate::commands::probe::matching;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, CLI_ADDRESS, Ipc, PAIRING, Recorder, SECRET, Studio, changed, connected, pairing, route,
-    serving, settle, snapshot,
+    ADDRESS, BOOT, CLI_ADDRESS, Ipc, PAIRING, Recorder, SECRET, Studio, changed, connected, pairing, route, serving,
+    settle, snapshot,
 };
 use crate::view::{ConnectionView, RouteView};
 
@@ -155,7 +155,6 @@ mod adding_a_route {
 
     #[rstest]
     #[case::without_a_code("ws://laptop.lan:9000/", 0, ErrorCode::RouteNoCode)]
-    #[case::of_the_bridge(BRIDGE, 0, ErrorCode::RouteBridgeCode)]
     #[case::to_an_unknown_machine(LAPTOP, 99, ErrorCode::UnknownMachine)]
     #[tokio::test(start_paused = true)]
     async fn says_why_it_did_not(#[case] url: &str, #[case] id: u64, #[case] code: ErrorCode) {

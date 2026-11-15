@@ -22,8 +22,8 @@ use crate::commands::probe::matching;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::Active;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, Ipc, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, changed, contracted, heard, launcher,
-    pairing, released, serving, settle, snapshot,
+    ADDRESS, BOOT, Ipc, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, changed, contracted, heard, launcher, pairing,
+    released, serving, settle, snapshot,
 };
 use crate::view::{MachineView, RouteView};
 
@@ -72,7 +72,6 @@ mod adding_a_machine {
     #[case::not_a_url("studio.lan c3R1ZGlvLXNlY3JldA", ErrorCode::RouteNotAUrl)]
     #[case::plain_http("http://studio.lan:9000/?code=0f1e2d3c", ErrorCode::RouteScheme)]
     #[case::no_code("ws://studio.lan:9000/", ErrorCode::RouteNoCode)]
-    #[case::of_the_bridge(BRIDGE, ErrorCode::RouteBridgeCode)]
     fn says_what_is_wrong_with_the_url_without_repeating_it(#[case] url: &str, #[case] code: ErrorCode) {
         let studio = Studio::new();
         let error = add(&studio.state, url, "laptop").expect_err("the url is refused");

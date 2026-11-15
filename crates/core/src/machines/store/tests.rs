@@ -7,7 +7,7 @@ use rstest::rstest;
 use super::*;
 use crate::machines::route::Address;
 use crate::machines::tests::{SECRET, cli};
-use crate::test_util::{TempDir, V1_WITH_BRIDGES};
+use crate::test_util::TempDir;
 
 const SECRET_WORD: &str = "do-not-repeat-me";
 
@@ -50,10 +50,6 @@ fn saved(next_id: u64) -> Saved {
     Saved { next_id, machines: (0..next_id).map(|id| studio(id, None)).collect(), active: None }
 }
 
-fn whole(saved: Saved) -> Loaded {
-    Loaded { saved, dropped: Vec::new() }
-}
-
 fn store_error<T: Debug>(result: Result<T, Error>) -> String {
     match result {
         Err(Error::Store(message)) => message,
@@ -67,7 +63,7 @@ mod load {
     #[test]
     fn gives_an_empty_list_when_the_file_does_not_exist() {
         let folder = Folder::new();
-        assert_eq!(folder.store().load().expect("load"), Loaded::default());
+        assert_eq!(folder.store().load().expect("load"), Saved::default());
         assert!(!folder.file().exists());
     }
 
@@ -75,7 +71,7 @@ mod load {
     fn reads_back_what_was_saved() {
         let folder = Folder::new();
         folder.store().save(&saved(2)).expect("save");
-        assert_eq!(folder.store().load().expect("load"), whole(saved(2)));
+        assert_eq!(folder.store().load().expect("load"), saved(2));
     }
 
     #[test]
@@ -83,7 +79,7 @@ mod load {
         let folder = Folder::new();
         let with_active = Saved { active: Some(MachineId(1)), ..saved(2) };
         folder.store().save(&with_active).expect("save");
-        assert_eq!(folder.store().load().expect("load"), whole(with_active));
+        assert_eq!(folder.store().load().expect("load"), with_active);
     }
 
     #[test]
@@ -91,7 +87,7 @@ mod load {
         let folder = Folder::new();
         let machine = serde_json::to_string(&studio(0, None)).expect("serialize the machine");
         folder.write(&format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#));
-        assert_eq!(folder.store().load().expect("load"), whole(saved(1)));
+        assert_eq!(folder.store().load().expect("load"), saved(1));
     }
 
     #[test]
@@ -100,28 +96,8 @@ mod load {
         let with_secrets = Saved { next_id: 4, machines: vec![studio(3, Some(SECRET))], active: None };
         folder.store().save(&with_secrets).expect("save");
         let without = Saved { next_id: 4, machines: vec![studio(3, None)], active: None };
-        assert_eq!(folder.store().load().expect("load"), whole(without));
+        assert_eq!(folder.store().load().expect("load"), without);
         assert!(!folder.text().contains(SECRET), "{}", folder.text());
-    }
-
-    #[test]
-    fn drops_the_bridge_routes_of_a_version_1_file_and_says_which() {
-        let folder = Folder::new();
-        folder.write(V1_WITH_BRIDGES);
-        let studio = Machine {
-            id: MachineId(3),
-            name: "studio".to_owned(),
-            routes: vec![cli("192.168.1.20", 47682, None)],
-            last_route: None,
-        };
-        let laptop = Machine { id: MachineId(4), name: "laptop".to_owned(), routes: Vec::new(), last_route: None };
-        let dropped = vec![
-            (MachineId(3), Address { host: "192.168.1.20".to_owned(), port: 8765 }),
-            (MachineId(4), Address { host: "10.0.0.9".to_owned(), port: 8765 }),
-        ];
-        let saved = Saved { next_id: 5, machines: vec![studio, laptop], active: Some(MachineId(4)) };
-        assert_eq!(folder.store().load().expect("load"), Loaded { saved, dropped });
-        assert_eq!(folder.text(), V1_WITH_BRIDGES);
     }
 
     #[rstest]
@@ -189,7 +165,7 @@ mod save {
         let folder = Folder::new();
         folder.store().save(&saved(1)).expect("save the first");
         folder.store().save(&saved(3)).expect("save the second");
-        assert_eq!(folder.store().load().expect("load"), whole(saved(3)));
+        assert_eq!(folder.store().load().expect("load"), saved(3));
         let names: Vec<_> = fs::read_dir(folder.dir.path())
             .expect("list the folder")
             .map(|entry| entry.expect("an entry").file_name())
@@ -202,7 +178,7 @@ mod save {
         let dir = TempDir::new();
         let store = JsonFileStore::new(dir.path().join("app").join("data").join("machines.json"));
         store.save(&saved(1)).expect("save");
-        assert_eq!(store.load().expect("load"), whole(saved(1)));
+        assert_eq!(store.load().expect("load"), saved(1));
     }
 
     #[test]

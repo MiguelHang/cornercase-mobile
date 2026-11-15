@@ -57,9 +57,7 @@ impl MachineCode {
 }
 
 fn pairing_code(query: Option<&str>) -> Result<Token, RouteError> {
-    let bridge = !values(query, "token").is_empty();
     match values(query, "code").as_slice() {
-        [] | [""] if bridge => Err(RouteError::BridgeCode),
         [] => Err(RouteError::NoCode),
         [value] => checked_code(value),
         _ => Err(RouteError::CodeTwice),
