@@ -1,6 +1,6 @@
 # 059 — Quitar el bridge
 
-- Estado: en curso
+- Estado: hecha
 - Depende de: 058
 - Rama: `chore/059-remove-bridge` · PR: `chore: remove the development bridge`
 
@@ -13,4 +13,4 @@ Borrar `bridge/` y lo que solo existía por él, una vez que la app vive del `/c
 - [x] CA2 — Lo de `crates/core` que solo usaba el bridge (su lado del protocolo, la lista permitida, `--bridge-routes`)
   se borra; lo que comparte con `/cli` se queda.
 - [x] CA3 — `docs/` y `design/` sin instrucciones de arrancar el bridge; `design/bridge.md` resumido como historia.
-- [ ] CA4 — `hx check full` en verde.
+- [x] CA4 — `hx check full` en verde.
