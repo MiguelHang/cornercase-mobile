@@ -128,6 +128,13 @@ export const icons = {
     { kind: 'path', d: 'm21 21-4.34-4.34' },
     { kind: 'circle', cx: 11, cy: 11, r: 8 },
   ],
+  'image-plus': [
+    { kind: 'path', d: 'M16 5h6' },
+    { kind: 'path', d: 'M19 2v6' },
+    { kind: 'path', d: 'M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5' },
+    { kind: 'path', d: 'm21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21' },
+    { kind: 'circle', cx: 9, cy: 9, r: 2 },
+  ],
   image: [
     { kind: 'rect', x: 3, y: 3, width: 18, height: 18, rx: 2 },
     { kind: 'circle', cx: 9, cy: 9, r: 2 },

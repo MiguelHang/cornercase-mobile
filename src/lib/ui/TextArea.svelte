@@ -100,6 +100,6 @@
   }
 
   .area::placeholder {
-    color: var(--faint);
+    color: var(--muted);
   }
 </style>

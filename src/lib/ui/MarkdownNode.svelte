@@ -1,4 +1,6 @@
 <script lang="ts">
+  import * as opener from '@tauri-apps/plugin-opener'
+  import { follow } from '../links'
   import type { Align, Cell, Node } from '../markdown'
   import MarkdownNode from './MarkdownNode.svelte'
 
@@ -39,6 +41,16 @@
   <strong>{@render all(node.children)}</strong>
 {:else if node.type === 'delete'}
   <del>{@render all(node.children)}</del>
+{:else if node.type === 'link'}
+  {@const url = node.url}
+  <a
+    class="link"
+    href={url}
+    onclick={(event) => {
+      event.preventDefault()
+      void follow(opener, url)
+    }}>{@render all(node.children)}</a
+  >
 {:else if node.type === 'blockquote'}
   <blockquote class="block quote">{@render all(node.children)}</blockquote>
 {:else if node.type === 'heading'}
@@ -91,6 +103,15 @@
     font-size: 16px;
     font-weight: 600;
     line-height: 1.35;
+  }
+
+  .link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    overflow-wrap: anywhere;
+    -webkit-touch-callout: none;
   }
 
   .quote {

@@ -73,38 +73,43 @@ describe('firstToConnect', () => {
 })
 
 describe('status', () => {
-  const failing = (text: string): connection.Status => ({ text, tone: 'failed', pulsing: false })
+  const failing = (text: string, detail?: string): connection.Status =>
+    detail === undefined ? { text, tone: 'failed', pulsing: false } : { text, detail, tone: 'failed', pulsing: false }
 
   it.each<[string, ConnectionView_Serialize, connection.Status]>([
     ['none', { state: 'none' }, failing('Not connected')],
     ['connecting', { state: 'connecting' }, { text: 'Connecting…', tone: 'working', pulsing: true }],
     ['connected', CONNECTED, { text: 'MacBook · via 127.0.0.1:7000', tone: 'done', pulsing: false }],
-    ['retrying', RETRYING, { ...failing('Retrying in 2 s'), detail: 'timed out' }],
-    ['missing', MISSING, failing('cornercase on the Mac lacks watch, input: update it')],
+    ['retrying', RETRYING, failing('Retrying in 2 s', 'timed out')],
+    ['missing', MISSING, failing('Update cornercase on the Mac', 'It lacks watch, input')],
     [
       'missing the /cli',
       LACKS_THE_CLI,
-      failing('cornercase on the Mac lacks app-routes, cli-endpoint: update it to 0.13.78 or later'),
+      failing('Update cornercase on the Mac to 0.13.78 or later', 'It lacks app-routes, cli-endpoint'),
     ],
     [
       'not_paired',
       { state: 'not_paired' },
-      failing('This Mac no longer recognizes this phone: scan its code again in Machines'),
+      failing('This Mac no longer recognizes this phone', 'Scan its code again in Machines'),
     ],
-    ['incompatible', { state: 'incompatible', error: error('too new') }, failing('Incompatible: too new')],
+    [
+      'incompatible',
+      { state: 'incompatible', error: error('too new') },
+      failing('Incompatible with cornercase on the Mac', 'too new'),
+    ],
     ['offline', { state: 'offline' }, failing('No network')],
   ])('shows %s', (_, view, shown) => {
     expect(connection.status(view, 'MacBook')).toEqual(shown)
   })
 
   it.each<[string, (string | null)[], string]>([
-    ['the newest release', ['0.13.78', '0.14.2', '0.13.9'], 'update it to 0.14.2 or later'],
-    ['a release by its numbers, not its text', ['0.9.1', '0.10.0'], 'update it to 0.10.0 or later'],
-    ['the release of whatever has one', [null, '0.13.78'], 'update it to 0.13.78 or later'],
-    ['no release when none is known', [null, null], 'update it'],
+    ['the newest release', ['0.13.78', '0.14.2', '0.13.9'], ' to 0.14.2 or later'],
+    ['a release by its numbers, not its text', ['0.9.1', '0.10.0'], ' to 0.10.0 or later'],
+    ['the release of whatever has one', [null, '0.13.78'], ' to 0.13.78 or later'],
+    ['no release when none is known', [null, null], ''],
   ])('names %s that brings what is missing', (_, releases, told) => {
     const missing = releases.map((since, at) => lacks(`op-${at}`, 'operation', since))
-    expect(connection.status({ state: 'missing', missing }, 'MacBook').text).toMatch(new RegExp(`: ${told}$`))
+    expect(connection.status({ state: 'missing', missing }, 'MacBook').text).toMatch(new RegExp(`Mac${told}$`))
   })
 
   it('shows the route alone while the machine has no name', () => {
@@ -117,8 +122,12 @@ describe('status', () => {
 
   it('sends the user to scan the code again only when the Mac no longer takes this phone', () => {
     const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
-    expect(views.map((view) => connection.status(view, 'MacBook').text).filter((text) => /scan/i.test(text))).toEqual([])
-    expect(connection.status({ state: 'not_paired' }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
+    const told = (view: ConnectionView_Serialize) => {
+      const shown = connection.status(view, 'MacBook')
+      return `${shown.text} ${shown.detail ?? ''}`
+    }
+    expect(views.map(told).filter((text) => /scan/i.test(text))).toEqual([])
+    expect(connection.status({ state: 'not_paired' }, 'MacBook').detail).toBe('Scan its code again in Machines')
   })
 })
 

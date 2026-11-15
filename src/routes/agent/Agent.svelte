@@ -4,6 +4,7 @@
   import { label } from '../../lib/board'
   import { whileShown, type Chat } from '../../lib/chat.svelte'
   import type { CloseAgent } from '../../lib/closeAgent.svelte'
+  import { dropped, followKeys, KeyboardTop } from '../../lib/keyboardTop.svelte'
   import { Keyboard } from '../../lib/terminal/keyboard.svelte'
   import CloseConfirm from '../../lib/ui/CloseConfirm.svelte'
   import Mark from '../../lib/ui/Mark.svelte'
@@ -53,9 +54,13 @@
   let now = $state(untrack(() => chat.now()))
 
   const keyboard = new Keyboard(globalThis)
+  const keys = new KeyboardTop()
   const seen = $derived(keyboard.covered ? keyboard.height : null)
+  const drop = $derived(seen === null ? 0 : dropped(seen, keys.top))
 
   $effect(() => keyboard.watch())
+  $effect(() => keys.watch(globalThis))
+  $effect(() => followKeys(document.documentElement))
 
   $effect(() => {
     const told = chat
@@ -127,8 +132,11 @@
     {#key row.pane}
       <Subagents {row} agents={agents ?? []} {onopen} />
     {/key}
-    <Thread {chat} {now} boxed={seen !== null} />
-    <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />
+    <Thread {chat} {now} boxed={seen !== null} {drop} />
+    <Composer {chat} agent={row.agent} {below} {seen} {drop} {onfailed} {ontoast} />
+    {#if seen !== null}
+      <div class="floor" style:transform={drop > 0 ? `translateY(${drop}px)` : undefined}></div>
+    {/if}
     {#if asking !== null}
       {@const pane = row.pane}
       <CloseConfirm
@@ -160,6 +168,17 @@
     padding-top: calc(env(safe-area-inset-top) + var(--below) + var(--inset));
     padding-right: calc(env(safe-area-inset-right) + var(--inset-wide));
     padding-left: calc(env(safe-area-inset-left) + var(--inset-wide));
+  }
+
+  .floor {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: 100vh;
+    background: var(--glass);
+    pointer-events: none;
+    will-change: transform;
   }
 
   .waiting {

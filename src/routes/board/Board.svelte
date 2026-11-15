@@ -134,9 +134,9 @@
 </script>
 
 <section class="board" style:--below="{below}px">
-  <h1 class="spoken">Agents</h1>
-  <div class="actions">
-    <Button resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>
+  <div class="heading">
+    <h1 class="title">Agents</h1>
+    <Button compact resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>
   </div>
   {#if agents === null}
     <div class="waiting">
@@ -198,10 +198,22 @@
     padding: calc(var(--below) + var(--inset)) var(--inset-wide) var(--inset-wide);
   }
 
-  .actions {
+  .heading {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap);
     margin-bottom: var(--inset);
+  }
+
+  .title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .find {

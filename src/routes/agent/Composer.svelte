@@ -13,6 +13,7 @@
     agent,
     below = 0,
     seen = null,
+    drop = 0,
     onfailed,
     ontoast,
   }: {
@@ -20,6 +21,7 @@
     agent: string
     below?: number
     seen?: number | null
+    drop?: number
     onfailed: (reason: string) => void
     ontoast: (toast: Toast) => void
   } = $props()
@@ -59,8 +61,10 @@
 <div
   class="composer"
   class:keyboard={seen !== null}
+  class:leaving={drop > 0}
   style:--below="{below}px"
   style:--seen={seen === null ? undefined : `${seen}px`}
+  style:transform={drop > 0 ? `translateY(${drop}px)` : undefined}
 >
   {#if chat.question !== null}
     <Question
@@ -91,7 +95,7 @@
       {#if attaching}
         <Spinner />
       {:else}
-        <Icon name="plus" size={22} />
+        <Icon name="image-plus" size={22} />
       {/if}
     </button>
     <button
@@ -151,6 +155,11 @@
   .keyboard {
     margin-bottom: calc(-1 * var(--inset-wide));
     padding-bottom: var(--inset-wide);
+    will-change: transform;
+  }
+
+  .leaving :global(textarea) {
+    caret-color: transparent;
   }
 
   .note {

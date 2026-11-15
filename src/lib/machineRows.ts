@@ -25,7 +25,7 @@ const probed = (probe: Probe): RowStatus => {
     case 'not_paired':
       return row('Not paired', 'failed')
     case 'no_token':
-      return row('No secret: scan its code again', 'failed')
+      return row('No secret', 'failed')
     case 'no_answer':
       return row(
         'No answer',

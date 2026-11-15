@@ -1,0 +1,20 @@
+[package]
+name = "tauri-plugin-keyboard"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+links = "tauri-plugin-keyboard"
+
+[build-dependencies]
+tauri-plugin = { version = "2.7", features = ["build"] }
+
+[dependencies]
+tauri = "2.12"
+
+[dev-dependencies]
+tauri = { version = "2.12", features = ["test"] }
+
+[lints]
+workspace = true

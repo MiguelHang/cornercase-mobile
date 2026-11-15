@@ -8,7 +8,7 @@ import composerSource from './Composer.svelte?raw'
 import thumbnailsSource from './Thumbnails.svelte?raw'
 
 const draw = (chat: Chat) =>
-  render(Composer, { props: { chat, agent: 'claude', onfailed: () => {}, ontoast: () => {} } }).body.replace(/<!--[^>]*-->/g, '')
+  render(Composer, { props: { ...placed(), chat } }).body.replace(/<!--[^>]*-->/g, '')
 
 const button = (body: string, name: string) =>
   body.match(new RegExp(`<button class="([^"]*)" type="button" aria-label="${name}"([^>]*)>(.*?)</button>`))
@@ -26,11 +26,20 @@ const keyLabels = (body: string) =>
     (found) => found[1],
   )
 
+const IMAGE_PLUS = '<path d="M16 5h6"></path><path d="M19 2v6"></path>'
 const PLUS = '<path d="M5 12h14"></path><path d="M12 5v14"></path>'
 
 const ARROW_UP = '<path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path>'
 
 const done = (draft = '') => chatWith({ ...ROW, status: 'done' }, draft)
+
+const placed = (where: { below?: number; seen?: number; drop?: number } = {}) => ({
+  chat: done(),
+  agent: 'claude',
+  onfailed: () => {},
+  ontoast: () => {},
+  ...where,
+})
 
 const withChips = (draft = '', chips: Chip[] = CHIPS) => {
   const chat = done(draft)
@@ -209,25 +218,26 @@ describe('Composer, its keys', () => {
 })
 
 describe('Composer, its attachments', () => {
-  it('offers attaching an image first in the capsule, as a plus named for every reader', () => {
+  it('offers attaching an image first in the capsule, as a picture with a plus named for every reader', () => {
     const found = attachButton(draw(done()))
     expect(found?.[1]).toMatch(/^icon svelte-[\w-]+$/)
     expect(found?.[2]).not.toContain('disabled')
-    expect(found?.[3]).toContain(PLUS)
+    expect(found?.[3]).toContain(IMAGE_PLUS)
+    expect(found?.[3]).not.toContain(PLUS)
   })
 
   it('offers it while the agent is asking, as the image only waits on the phone until the next send', () => {
     expect(attachButton(draw(chatWith(ROW)))?.[2]).not.toContain('disabled')
   })
 
-  it('shows the attaching under way with a spinner in place of the plus, taking no second tap', () => {
+  it('shows the attaching under way with a spinner in place of its icon, taking no second tap', () => {
     const chat = done()
     void chat.attach()
     const found = attachButton(draw(chat))
     expect(found?.[2]).toContain('disabled=""')
     expect(found?.[2]).toContain('aria-busy="true"')
     expect(found?.[3]).toContain('class="spinner')
-    expect(found?.[3]).not.toContain(PLUS)
+    expect(found?.[3]).not.toContain(IMAGE_PLUS)
   })
 
   it('takes no more images once four are kept', () => {
@@ -310,7 +320,7 @@ describe('Composer, its place', () => {
       'max-height: calc(var(--seen, 100dvh) - env(safe-area-inset-top) - var(--below) - var(--over-composer)); overflow-y: auto;',
     )
     expect(flat(composerSource)).toContain('--over-composer: 132px;')
-    expect(render(Composer, { props: { chat: done(), agent: 'claude', below: 52, onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
+    expect(render(Composer, { props: placed({ below: 52 }) }).body).toMatch(
       /<div class="composer svelte-[\w-]+" style="--below: 52px;">/,
     )
   })
@@ -319,16 +329,28 @@ describe('Composer, its place', () => {
     expect(flat(composerSource)).toContain(
       'margin: 0 calc(-1 * var(--inset-wide)) calc(-1 * var(--inset-wide) - env(safe-area-inset-bottom)); padding: var(--gap) var(--inset-wide) calc(var(--inset-wide) + env(safe-area-inset-bottom));',
     )
-    expect(render(Composer, { props: { chat: done(), agent: 'claude', onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
+    expect(render(Composer, { props: placed() }).body).toMatch(
       /<div class="composer svelte-[\w-]+" style="--below: 0px;">/,
     )
+  })
+
+  it('rides down on the keys by a transform while a finger takes them down, so nothing else moves', () => {
+    expect(render(Composer, { props: placed({ seen: 420, drop: 190 }) }).body).toContain('transform: translateY(190px);')
+    expect(render(Composer, { props: placed({ seen: 420, drop: 190 }) }).body).toMatch(/class="composer svelte-[\w-]+ keyboard leaving"/)
+    expect(render(Composer, { props: placed({ seen: 420 }) }).body).not.toContain('transform')
+    expect(flat(composerSource)).toContain('padding-bottom: var(--inset-wide); will-change: transform; }')
+  })
+
+  it('hides the caret while it rides down, since iOS draws it over the page and leaves it behind', () => {
+    expect(flat(composerSource)).toContain('.leaving :global(textarea) { caret-color: transparent; }')
+    expect(render(Composer, { props: placed({ seen: 420 }) }).body).not.toContain('leaving')
   })
 
   it('sits right on the phone keyboard while it is open, with no gap for the safe area, within the height left', () => {
     const source = flat(composerSource)
     expect(source).not.toContain('new Keyboard(')
-    expect(source).toContain('.keyboard { margin-bottom: calc(-1 * var(--inset-wide)); padding-bottom: var(--inset-wide); }')
-    expect(render(Composer, { props: { chat: done(), agent: 'claude', seen: 420, onfailed: () => {}, ontoast: () => {} } }).body).toMatch(
+    expect(source).toContain('.keyboard { margin-bottom: calc(-1 * var(--inset-wide)); padding-bottom: var(--inset-wide); will-change: transform; }')
+    expect(render(Composer, { props: placed({ seen: 420 }) }).body).toMatch(
       /<div class="composer svelte-[\w-]+ keyboard" style="--below: 0px; --seen: 420px;">/,
     )
   })

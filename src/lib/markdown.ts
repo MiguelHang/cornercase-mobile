@@ -1,6 +1,7 @@
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { gfm } from 'micromark-extension-gfm'
+import { opensOut } from './links'
 
 type Source = ReturnType<typeof fromMarkdown>['children'][number]
 
@@ -21,6 +22,7 @@ export type Node =
   | { type: 'break' | 'thematicBreak' }
   | { type: 'paragraph' | 'emphasis' | 'strong' | 'delete' | 'blockquote'; children: Node[] }
   | { type: 'heading'; depth: number; children: Node[] }
+  | { type: 'link'; url: string; children: Node[] }
   | { type: 'list'; ordered: boolean; start: number | null; children: Item[] }
   | { type: 'table'; align: Align[]; children: Row[] }
 
@@ -71,7 +73,7 @@ const INLINE: Handlers = {
   emphasis: formatted,
   strong: formatted,
   delete: formatted,
-  link: (node) => inlines(node.children),
+  link: (node) => (opensOut(node.url) ? [{ type: 'link', url: node.url, children: inlines(node.children) }] : inlines(node.children)),
   linkReference: (node) => inlines(node.children),
 }
 

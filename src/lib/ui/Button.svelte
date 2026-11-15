@@ -5,6 +5,7 @@
   let {
     tone = 'primary',
     type = 'button',
+    quiet = false,
     resting = false,
     busy = false,
     compact = false,
@@ -16,6 +17,7 @@
   }: {
     tone?: 'primary' | 'plain' | 'danger'
     type?: 'button' | 'submit'
+    quiet?: boolean
     resting?: boolean
     busy?: boolean
     compact?: boolean
@@ -29,6 +31,7 @@
 
 <button
   class="button {tone}"
+  class:quiet
   class:compact
   class:current
   class:resting
@@ -70,7 +73,7 @@
 
   .primary {
     border: 1px solid rgb(43 123 255 / 0.7);
-    background: linear-gradient(180deg, var(--brand-light), var(--brand));
+    background: linear-gradient(180deg, var(--brand), var(--brand-hover));
     box-shadow: 0 0 10px rgb(0 95 255 / 0.28);
     color: var(--on-brand);
     font-weight: 500;
@@ -108,6 +111,17 @@
     background: color-mix(in srgb, var(--failed) 18%, transparent);
   }
 
+  .quiet {
+    margin-left: calc(-1 * var(--inset));
+    padding: 0 var(--inset);
+    border-color: transparent;
+    background: none;
+  }
+
+  .quiet:not(.resting):active {
+    border-color: transparent;
+  }
+
   .resting {
     opacity: 0.4;
     pointer-events: none;
@@ -115,5 +129,15 @@
 
   .busy {
     pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .button {
+      transition: transform var(--pop) cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    .button:not(.resting):active {
+      transform: scale(0.97);
+    }
   }
 </style>

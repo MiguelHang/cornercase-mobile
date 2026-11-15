@@ -110,7 +110,7 @@
   }
 
   .query::placeholder {
-    color: var(--faint);
+    color: var(--muted);
   }
 
   .cancel {

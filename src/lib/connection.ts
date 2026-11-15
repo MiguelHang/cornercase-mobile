@@ -68,7 +68,8 @@ export const retryLeft = (in_ms: number, elapsed: number) => Math.max(1, seconds
 const connectedTo = (machineName: string, route: string) =>
   machineName ? `${machineName} · via ${routeAddress(route)}` : `via ${routeAddress(route)}`
 
-const failed = (text: string): Status => ({ text, tone: 'failed', pulsing: false })
+const failed = (text: string, detail?: string): Status =>
+  detail === undefined ? { text, tone: 'failed', pulsing: false } : { text, detail, tone: 'failed', pulsing: false }
 
 const release = (version: string) => version.split('.').map(Number)
 
@@ -84,26 +85,33 @@ const newest = (missing: MissingView_Serialize[]) =>
     null,
   )
 
-const lacking = (missing: MissingView_Serialize[]) => {
+type Told = { text: string; detail?: string }
+
+const SCAN_AGAIN = 'Scan its code again in Machines'
+
+const lacking = (missing: MissingView_Serialize[]): Told => {
   const since = newest(missing)
   const names = missing.map(({ name }) => name).join(', ')
-  return `cornercase on the Mac lacks ${names}: update it${since === null ? '' : ` to ${since} or later`}`
+  return {
+    text: `Update cornercase on the Mac${since === null ? '' : ` to ${since} or later`}`,
+    detail: `It lacks ${names}`,
+  }
 }
 
 type Failed = Exclude<ConnectionView_Serialize, { state: 'connecting' | 'connected' | 'retrying' }>
 
-const failure = (connection: Failed) => {
+const failure = (connection: Failed): Told => {
   switch (connection.state) {
     case 'none':
-      return 'Not connected'
+      return { text: 'Not connected' }
     case 'missing':
       return lacking(connection.missing)
     case 'not_paired':
-      return 'This Mac no longer recognizes this phone: scan its code again in Machines'
+      return { text: 'This Mac no longer recognizes this phone', detail: SCAN_AGAIN }
     case 'incompatible':
-      return `Incompatible: ${connection.error.message}`
+      return { text: 'Incompatible with cornercase on the Mac', detail: connection.error.message }
     case 'offline':
-      return 'No network'
+      return { text: 'No network' }
   }
 }
 
@@ -114,8 +122,10 @@ export const status = (connection: ConnectionView_Serialize, machineName: string
     case 'connected':
       return { text: connectedTo(machineName, connection.route), tone: 'done', pulsing: false }
     case 'retrying':
-      return { ...failed(`Retrying in ${retryLeft(connection.in_ms, elapsed)} s`), detail: connection.error.message }
-    default:
-      return failed(failure(connection))
+      return failed(`Retrying in ${retryLeft(connection.in_ms, elapsed)} s`, connection.error.message)
+    default: {
+      const told = failure(connection)
+      return failed(told.text, told.detail)
+    }
   }
 }
