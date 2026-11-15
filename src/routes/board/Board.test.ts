@@ -102,7 +102,7 @@ describe('Board', () => {
   })
 
   it('keeps the mark still without a list once it stops connecting', () => {
-    expect(draw(null, { state: 'unauthorized' })).not.toContain('pulsing')
+    expect(draw(null, { state: 'not_paired' })).not.toContain('pulsing')
   })
 
   it('heads the sections in their order and leaves the empty ones out', () => {
@@ -184,7 +184,7 @@ describe('Board', () => {
   it.each<ConnectionView_Serialize>([
     { state: 'connecting' },
     { state: 'none' },
-    { state: 'unauthorized' },
+    { state: 'not_paired' },
   ])('holds Start while the connection is $state', (connection) => {
     const button = draw([], connection).match(START)
     expect(button?.[1]).toBe(' resting')

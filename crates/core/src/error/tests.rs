@@ -6,7 +6,6 @@ mod display {
     use super::*;
 
     #[rstest]
-    #[case::unauthorized(Error::Unauthorized, "the bridge refused the token")]
     #[case::not_paired(Error::NotPaired, "this Mac no longer recognizes this phone; scan its code again in Machines")]
     #[case::dropped(Error::Dropped, "the connection to the Mac dropped before the command finished")]
     #[case::output_closed(Error::OutputClosed, "nothing listens to the command's output any more")]

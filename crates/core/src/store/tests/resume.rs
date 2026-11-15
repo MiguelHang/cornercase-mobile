@@ -129,7 +129,7 @@ mod resuming {
 
     #[rstest]
     #[case::missing_something(contract(&without_notices()), notices())]
-    #[case::unauthorized(refusing(Error::Unauthorized), Connection::Unauthorized)]
+    #[case::not_paired(refusing(Error::NotPaired), Connection::NotPaired)]
     #[case::incompatible(
         contract(r#"{"contract":2}"#),
         Connection::Incompatible(Error::ContractTooNew { server: 2, app: 1 })

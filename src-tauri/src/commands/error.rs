@@ -14,7 +14,6 @@ pub(crate) struct CommandError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ErrorCode {
-    Unauthorized,
     NotPaired,
     Dropped,
     OutputClosed,
@@ -166,7 +165,6 @@ impl From<RouteError> for CommandError {
 
 fn core_code(error: &Error) -> ErrorCode {
     match error {
-        Error::Unauthorized => ErrorCode::Unauthorized,
         Error::NotPaired => ErrorCode::NotPaired,
         Error::Dropped => ErrorCode::Dropped,
         Error::OutputClosed => ErrorCode::OutputClosed,

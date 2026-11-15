@@ -74,8 +74,8 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 
 const scanAgain = /<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Scan again/
 
-const withRejected = async () => {
-  const views: Record<number, ProbeView> = { 2: { state: 'unauthorized' }, 3: { state: 'no_token' }, 4: PROBED[2] }
+const withRescannable = async () => {
+  const views: Record<number, ProbeView> = { 2: { state: 'not_paired' }, 3: { state: 'no_token' }, 4: PROBED[2] }
   const probes = new Probes({ machineProbe: (id) => Promise.resolve({ status: 'ok', data: views[id] }) })
   await probes.check([2, 3, 4])
   return rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes)))
@@ -152,20 +152,18 @@ describe('Machines', () => {
     }
   })
 
-  it('offers Scan again on the active one while the bridge rejects its token, and on no row that answers', async () => {
-    const [active, ...others] = rows(await screen(loaded(FINGERPRINT), { state: 'unauthorized' }))
-    expect(active).toMatch(scanAgain)
-    expect(active).toContain("The bridge rejected this phone's token: scan its code again in Machines")
+  it('offers Scan again on no other row while the active one is not paired, and on no row that answers', async () => {
+    const [, ...others] = rows(await screen(loaded(FINGERPRINT), { state: 'not_paired' }))
     expect(others.filter((row) => scanAgain.test(row))).toEqual([])
     expect(rows(await screen()).filter((row) => scanAgain.test(row))).toEqual([])
   })
 
-  it('offers Scan again on the others whose probe says their token is rejected or missing', async () => {
-    expect((await withRejected()).map((row) => scanAgain.test(row))).toEqual([false, true, true, false])
+  it('offers Scan again on the others whose probe says they are not paired or have no secret', async () => {
+    expect((await withRescannable()).map((row) => scanAgain.test(row))).toEqual([false, true, true, false])
   })
 
-  it('puts Scan again in the place of Check again on a row whose token is rejected or missing', async () => {
-    expect((await withRejected()).map((row) => row.includes('Check again'))).toEqual([false, false, false, true])
+  it('puts Scan again in the place of Check again on a row that is not paired or has no secret', async () => {
+    expect((await withRescannable()).map((row) => row.includes('Check again'))).toEqual([false, false, false, true])
   })
 
   it('offers Scan again on the active one the Mac forgot, with the text of the bar', async () => {

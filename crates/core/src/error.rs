@@ -1,7 +1,5 @@
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
-    #[error("the bridge refused the token")]
-    Unauthorized,
     #[error("this Mac no longer recognizes this phone; scan its code again in Machines")]
     NotPaired,
     #[error("the connection to the Mac dropped before the command finished")]

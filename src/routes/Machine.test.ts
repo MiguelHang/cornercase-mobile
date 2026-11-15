@@ -156,7 +156,7 @@ describe('Machine', () => {
       props: {
         machine: studio(),
         taken: [],
-        connection: { state: 'unauthorized' },
+        connection: { state: 'not_paired' },
         backTo: 'Machines',
         onback: () => {},
         onchanged: nothing,

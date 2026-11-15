@@ -96,7 +96,7 @@ mod connect {
 
     #[rstest]
     #[case::forbidden(403, Error::NotPaired)]
-    #[case::unauthorized(401, Error::Unauthorized)]
+    #[case::a_401(401, Error::Rejected { status: 401 })]
     #[case::not_found(404, Error::Rejected { status: 404 })]
     #[case::unavailable(503, Error::Rejected { status: 503 })]
     #[tokio::test]
@@ -131,7 +131,7 @@ mod connect_error {
     use super::*;
 
     #[rstest]
-    #[case::unauthorized(refusal(401), Error::Unauthorized)]
+    #[case::a_401(refusal(401), Error::Rejected { status: 401 })]
     #[case::not_found(refusal(404), Error::Rejected { status: 404 })]
     #[case::os_error(
         WebSocketError::Io(io::Error::from_raw_os_error(1)),

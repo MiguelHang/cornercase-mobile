@@ -122,7 +122,7 @@ mod fail {
     use super::*;
 
     #[rstest]
-    #[case::unauthorized(Error::Unauthorized)]
+    #[case::not_paired(Error::NotPaired)]
     #[case::dropped(Error::Dropped)]
     #[case::timeout(Error::Timeout)]
     #[case::rejected(Error::Rejected { status: 403 })]

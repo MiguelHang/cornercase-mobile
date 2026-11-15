@@ -17,7 +17,6 @@ mod from_a_core_error {
     use super::*;
 
     #[rstest]
-    #[case::unauthorized(Error::Unauthorized, "unauthorized")]
     #[case::not_paired(Error::NotPaired, "not_paired")]
     #[case::dropped(Error::Dropped, "dropped")]
     #[case::output_closed(Error::OutputClosed, "output_closed")]

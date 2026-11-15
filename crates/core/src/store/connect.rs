@@ -39,7 +39,7 @@ where
 
 fn classify(error: PickError) -> Failure {
     let PickError::AllFailed(failures) = error else {
-        return Failure::Stop(Connection::Unauthorized);
+        return Failure::Stop(Connection::NotPaired);
     };
     let errors: Vec<Error> = failures.into_iter().map(|(_, error)| contract::outdated(error)).collect();
     if errors.contains(&Error::Outdated) {
@@ -48,12 +48,8 @@ fn classify(error: PickError) -> Failure {
     if errors.contains(&Error::NotPaired) {
         return Failure::Stop(Connection::NotPaired);
     }
-    match errors.into_iter().find(|error| !refused(error)) {
+    match errors.into_iter().find(|error| *error != Error::NoToken) {
         Some(error) => Failure::Retry(error),
-        None => Failure::Stop(Connection::Unauthorized),
+        None => Failure::Stop(Connection::NotPaired),
     }
-}
-
-fn refused(error: &Error) -> bool {
-    matches!(error, Error::Unauthorized | Error::NoToken)
 }

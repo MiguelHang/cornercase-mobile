@@ -112,9 +112,6 @@ fn failed(error: PickError) -> ProbeView {
     if failures.iter().any(|(_, error)| *error == Error::NotPaired) {
         return ProbeView::NotPaired;
     }
-    if failures.iter().any(|(_, error)| *error == Error::Unauthorized) {
-        return ProbeView::Unauthorized;
-    }
     if failures.iter().all(|(_, error)| *error == Error::NoToken) {
         return ProbeView::NoToken;
     }

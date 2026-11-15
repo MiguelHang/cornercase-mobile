@@ -9,8 +9,8 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Error as WebSocketError;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::handshake::client::Request;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
-use tokio_tungstenite::tungstenite::http::{HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 
@@ -100,7 +100,6 @@ fn unfit_secret() -> Error {
 
 pub(crate) fn connect_error(error: WebSocketError) -> Error {
     match error {
-        WebSocketError::Http(response) if response.status() == StatusCode::UNAUTHORIZED => Error::Unauthorized,
         WebSocketError::Http(response) => Error::Rejected { status: response.status().as_u16() },
         WebSocketError::Io(error) => Error::Connect(network_error(&error)),
         WebSocketError::Url(_) | WebSocketError::HttpFormat(_) => Error::Connect("not a ws:// address".to_owned()),

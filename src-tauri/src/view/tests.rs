@@ -83,7 +83,6 @@ mod a_connection {
         Connection::Missing(vec![missing()]),
         json!({ "state": "missing", "missing": [{ "name": "watch", "kind": "stream", "reason": null, "since": null }] })
     )]
-    #[case::unauthorized(Connection::Unauthorized, json!({ "state": "unauthorized" }))]
     #[case::not_paired(Connection::NotPaired, json!({ "state": "not_paired" }))]
     #[case::incompatible(
         Connection::Incompatible(Error::Outdated),
@@ -129,8 +128,8 @@ mod the_connection_state {
 
     #[test]
     fn of_a_machine_carries_its_id_and_connection() {
-        let state = ConnectionState::of(MachineId(7), &Connection::Unauthorized);
-        assert_eq!(json_of(&state), json!({ "machine": 7, "connection": { "state": "unauthorized" } }));
+        let state = ConnectionState::of(MachineId(7), &Connection::NotPaired);
+        assert_eq!(json_of(&state), json!({ "machine": 7, "connection": { "state": "not_paired" } }));
     }
 }
 

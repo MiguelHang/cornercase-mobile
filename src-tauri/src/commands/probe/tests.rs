@@ -112,14 +112,6 @@ mod probing_a_machine {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_the_token_was_rejected_when_any_route_refuses_it() {
-        let studio = with_the_laptop().await;
-        let launcher = answering(refusing(Error::Unauthorized), Err(asleep()));
-        let view = probe(&studio.state, &launcher, studio.id).await.expect("probed");
-        assert_eq!(view, ProbeView::Unauthorized);
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn says_it_has_no_token_when_no_route_has_one() {
         let studio = Studio::new();
         tokenless(&studio, ADDRESS);
@@ -153,10 +145,6 @@ mod probing_a_machine {
     )]
     #[case::forgotten_by_cornercase(
         PickError::AllFailed(vec![(route().address().clone(), Error::NotPaired), (cli_route(), Error::Timeout)]),
-        ProbeView::NotPaired
-    )]
-    #[case::rejected_by_the_bridge_and_forgotten_by_cornercase_as_the_bar_says(
-        PickError::AllFailed(vec![(route().address().clone(), Error::Unauthorized), (cli_route(), Error::NotPaired)]),
         ProbeView::NotPaired
     )]
     fn reads_a_failed_pick(#[case] error: PickError, #[case] expected: ProbeView) {

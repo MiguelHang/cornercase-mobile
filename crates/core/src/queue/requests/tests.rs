@@ -249,7 +249,6 @@ mod ask {
     }
 
     #[rstest]
-    #[case::unauthorized(Error::Unauthorized)]
     #[case::rejected(Error::Rejected { status: 503 })]
     #[case::timeout(Error::Timeout)]
     #[case::unreachable(Error::Connect("connection refused".to_owned()))]

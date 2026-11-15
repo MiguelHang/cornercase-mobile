@@ -48,7 +48,6 @@ pub(crate) enum ConnectionView {
     Missing {
         missing: Vec<MissingView>,
     },
-    Unauthorized,
     NotPaired,
     Incompatible {
         error: CommandError,
@@ -68,7 +67,6 @@ pub(crate) struct MissingView {
 #[serde(tag = "state", rename_all = "snake_case")]
 pub(crate) enum ProbeView {
     Answers { route: String },
-    Unauthorized,
     NotPaired,
     NoToken,
     NoAnswer { failures: Vec<RouteFailure> },
@@ -189,7 +187,6 @@ impl From<&Connection> for ConnectionView {
             Connection::Connected { route } => Self::Connected { route: route.to_string() },
             Connection::Retrying { r#in, error } => Self::Retrying { in_ms: millis(*r#in), error: error.into() },
             Connection::Missing(missing) => Self::Missing { missing: missing.iter().map(MissingView::from).collect() },
-            Connection::Unauthorized => Self::Unauthorized,
             Connection::NotPaired => Self::NotPaired,
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
             Connection::Offline => Self::Offline,

@@ -382,9 +382,9 @@ export type ConnectionState_Serialize = {
 
 export type ConnectionView = ConnectionView_Serialize | ConnectionView_Deserialize;
 
-export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Deserialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Deserialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Deserialize[] } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
-export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Serialize[] } | { state: "unauthorized" } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
+export type ConnectionView_Serialize = { state: "none" } | { state: "connecting" } | { state: "connected"; route: string } | { state: "retrying"; in_ms: number; error: CommandError } | { state: "missing"; missing: MissingView_Serialize[] } | { state: "not_paired" } | { state: "incompatible"; error: CommandError } | { state: "offline" };
 
 export type Cursor = Cursor_Serialize | Cursor_Deserialize;
 
@@ -438,7 +438,7 @@ export type Entry_Serialize = {
 	status: Status_Serialize | null,
 };
 
-export type ErrorCode = "unauthorized" | "not_paired" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "pairing_refused" | "pairing_failed" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "no_keys" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_code" | "route_bridge_code" | "route_empty_code" | "route_code_twice" | "route_code_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
+export type ErrorCode = "not_paired" | "dropped" | "output_closed" | "rejected" | "timeout" | "connect" | "protocol" | "pairing_refused" | "pairing_failed" | "failed" | "stale_boot" | "stream_ended" | "outdated" | "contract_too_new" | "unanswered" | "settle_timeout" | "input_rejected" | "unknown_key" | "no_keys" | "image_empty" | "image_too_large" | "picker" | "json" | "store" | "secrets" | "no_token" | "unknown_machine" | "unknown_route" | "last_route" | "name_empty" | "name_too_long" | "name_taken" | "identity" | "random" | "route_not_a_url" | "route_scheme" | "route_user_info" | "route_no_host" | "route_port" | "route_path" | "route_no_code" | "route_bridge_code" | "route_empty_code" | "route_code_twice" | "route_code_characters" | "route_also_empty" | "route_also_invalid" | "route_name_encoding" | "route_name_twice" | "no_data_dir" | "machines_not_loaded" | "no_identity" | "not_connected" | "not_sent" | "no_digest" | "too_large_here" | "attached_full" | "attached_gone";
 
 export type FileShown = FileShown_Serialize | FileShown_Deserialize;
 
@@ -969,7 +969,7 @@ export type PlaceInfo_Serialize = {
 	worktree: boolean,
 };
 
-export type ProbeView = { state: "answers"; route: string } | { state: "unauthorized" } | { state: "not_paired" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
+export type ProbeView = { state: "answers"; route: string } | { state: "not_paired" } | { state: "no_token" } | { state: "no_answer"; failures: RouteFailure[] };
 
 export type ProjectChoice = {
 	id: number,

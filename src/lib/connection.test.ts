@@ -87,11 +87,6 @@ describe('status', () => {
       failing('cornercase on the Mac lacks app-routes, cli-endpoint: update it to 0.13.78 or later'),
     ],
     [
-      'unauthorized',
-      { state: 'unauthorized' },
-      failing("The bridge rejected this phone's token: scan its code again in Machines"),
-    ],
-    [
       'not_paired',
       { state: 'not_paired' },
       failing('This Mac no longer recognizes this phone: scan its code again in Machines'),
@@ -123,9 +118,7 @@ describe('status', () => {
   it('sends the user to scan the code again only when the Mac no longer takes this phone', () => {
     const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
     expect(views.map((view) => connection.status(view, 'MacBook').text).filter((text) => /scan/i.test(text))).toEqual([])
-    for (const state of ['unauthorized', 'not_paired'] as const) {
-      expect(connection.status({ state }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
-    }
+    expect(connection.status({ state: 'not_paired' }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
   })
 })
 

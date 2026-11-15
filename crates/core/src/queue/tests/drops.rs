@@ -93,7 +93,6 @@ mod requests {
     #[rstest]
     #[case::unreachable(Err(Error::Connect("connection refused".to_owned())), 3)]
     #[case::an_old_cli(Ok(exit(2, NO_REQUESTS_COMMAND)), 1)]
-    #[case::refused_by_the_bridge(Ok(exit(2, "`requests` is not allowed through the bridge")), 1)]
     #[tokio::test]
     async fn tries_the_process_again_unless_the_cli_lacks_it(#[case] end: End, #[case] tries: usize) {
         let starts = Starts::default();

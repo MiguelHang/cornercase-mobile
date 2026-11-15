@@ -192,8 +192,8 @@ mod json {
 
     #[tokio::test]
     async fn passes_the_transport_error_on() {
-        let fake = FakeTransport::default().fail(&["contract", "--json"], Error::Unauthorized);
-        assert_eq!(contract(&fake).await, Err(Error::Unauthorized));
+        let fake = FakeTransport::default().fail(&["contract", "--json"], Error::NotPaired);
+        assert_eq!(contract(&fake).await, Err(Error::NotPaired));
     }
 
     #[rstest]

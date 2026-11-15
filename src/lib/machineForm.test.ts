@@ -142,7 +142,7 @@ describe('fieldOf', () => {
     ['name_taken', 'name'],
     ['connect', 'form'],
     ['store', 'form'],
-    ['unauthorized', 'form'],
+    ['not_paired', 'form'],
   ])('puts %s under the %s', (code, field) => {
     expect(form.fieldOf({ code, message: 'refused' })).toBe(field)
   })
