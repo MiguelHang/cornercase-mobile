@@ -74,7 +74,7 @@ pnpm test                                         # vitest
   - Paste a machine's code into the emulator's form, or type it with `adb shell "input text '<piece>'"`, 16
     characters at a time: longer text gets cut.
 - **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest, the two files of
-  `res/xml/`, `MainActivity.kt` (the keyboard's insets) and the launch's resources (`values/colors.xml`,
+  `res/xml/`, `proguard-rules.pro` (R8 and ML Kit), `MainActivity.kt` (the keyboard's insets) and the launch's resources (`values/colors.xml`,
   `values/themes.xml`, `values-v31/themes.xml`, `drawable/launch_mark.xml`; `values-night/themes.xml` deleted) are
   changed by hand. `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
 
