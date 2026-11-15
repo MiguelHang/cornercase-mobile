@@ -103,10 +103,16 @@ struct Bearer(String);
 
 impl Callback for Bearer {
     fn on_request(self, request: &Request, response: Response) -> Result<Response, ErrorResponse> {
-        if request.headers().get(AUTHORIZATION).is_some_and(|value| value.as_bytes() == self.0.as_bytes()) {
+        if request.uri().path() != CLI {
+            Err(refusal(StatusCode::NOT_FOUND))
+        } else if request.headers().get(AUTHORIZATION).is_some_and(|value| value.as_bytes() == self.0.as_bytes()) {
             Ok(response)
         } else {
-            Err(http::Response::builder().status(StatusCode::FORBIDDEN).body(None).expect("a refusal"))
+            Err(refusal(StatusCode::FORBIDDEN))
         }
     }
+}
+
+fn refusal(status: StatusCode) -> ErrorResponse {
+    http::Response::builder().status(status).body(None).expect("a refusal")
 }

@@ -109,7 +109,7 @@ describe('AddMachine', () => {
 
   it.each([
     ['empty', '', EMPTY],
-    ['without its token', 'ws://studio.lan:9000/', NO_CODE],
+    ['without its pairing code', 'ws://studio.lan:9000/', NO_CODE],
   ])('puts the problem of a URL %s under it without sending it', async (_, url, error) => {
     const { draft, commands } = form({}, url)
     await draft.submit()

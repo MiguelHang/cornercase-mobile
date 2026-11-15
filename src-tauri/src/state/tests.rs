@@ -9,7 +9,7 @@ use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::network::Kind;
 use cornercase_core::secrets::file::FileSecrets;
-use cornercase_core::test_util::TempDir;
+use cornercase_core::test_util::{TempDir, V1_WITH_BRIDGES};
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 
@@ -20,8 +20,6 @@ use crate::test_util::{PAIRING, SECRET, TOKEN, released, route};
 
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
-const V1_WITH_BRIDGES: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/machines/v1-bridge.json"));
 const LAPTOP_BRIDGE_KEY: &str = "route/4/ws://10.0.0.9:8765/";
 
 fn keychain() -> Arc<dyn Secrets> {

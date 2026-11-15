@@ -139,6 +139,7 @@ mod parse {
     #[case::no_code("also=10.0.0.2", RouteError::NoCode)]
     #[case::of_the_bridge(&format!("token={TOKEN}"), RouteError::BridgeCode)]
     #[case::of_the_bridge_with_an_empty_token("token=", RouteError::BridgeCode)]
+    #[case::empty_code_beside_a_token("code=&token=abc", RouteError::BridgeCode)]
     fn refuses_a_bad_pairing_code_with_its_own_reason_and_without_the_code(
         #[case] pairs: &str,
         #[case] reason: RouteError,
@@ -197,7 +198,7 @@ mod parse {
         let refused = MachineCode::parse(&format!("ws://192.168.1.20:8765/?token={TOKEN}")).expect_err("refuse");
         assert_eq!(
             refused.to_string(),
-            "this is a code of the old bridge: scan the one in cornercase's Settings › Remote › Phone app"
+            "this is a code of the old bridge: scan the one in cornercase › Settings › Remote › Phone app"
         );
     }
 }

@@ -266,19 +266,25 @@ fn forget(
     saved: &mut Saved,
     dropped: &[(MachineId, Address)],
 ) -> Result<Vec<MachineId>, Error> {
-    for (id, address) in dropped {
-        if !saved.machines.iter().any(|machine| machine.id == *id && position(&machine.routes, address).is_ok()) {
-            secrets.delete(&key(*id, address))?;
-        }
-    }
+    let deleted = delete_orphans(secrets, saved, dropped);
     let forgotten: Vec<MachineId> =
         saved.machines.iter().filter(|machine| machine.routes.is_empty()).map(|machine| machine.id).collect();
     saved.machines.retain(|machine| !machine.routes.is_empty());
     if saved.active.is_some_and(|id| forgotten.contains(&id)) {
         saved.active = None;
     }
-    store.save(saved)?;
+    if deleted {
+        store.save(saved)?;
+    }
     Ok(forgotten)
+}
+
+fn delete_orphans(secrets: &dyn Secrets, saved: &Saved, dropped: &[(MachineId, Address)]) -> bool {
+    let kept = |id: MachineId, address: &Address| {
+        saved.machines.iter().any(|machine| machine.id == id && position(&machine.routes, address).is_ok())
+    };
+    let orphans = dropped.iter().filter(|(id, address)| !kept(*id, address));
+    orphans.fold(true, |deleted, (id, address)| secrets.delete(&key(*id, address)).is_ok() && deleted)
 }
 
 fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error> {

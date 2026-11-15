@@ -160,6 +160,14 @@ mod run {
     }
 
     #[tokio::test]
+    async fn is_not_found_on_another_path() {
+        let (url, _script) = answering(fail).await;
+        let elsewhere = url.replace(CLI, "/");
+        let refused = (Err(Error::Rejected { status: 404 }), Vec::new());
+        assert_eq!(run(&transport(elsewhere, SECRET), Vec::new()).await, refused);
+    }
+
+    #[tokio::test]
     async fn drops_when_the_server_stops_in_the_middle() {
         let (served, running) = started().await;
         served.abort();

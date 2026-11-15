@@ -7,7 +7,7 @@ use super::*;
 use crate::machines::store::JsonFileStore;
 use crate::machines::tests::{SECRET, TOKEN, cli};
 use crate::secrets::memory::MemorySecrets;
-use crate::test_util::TempDir;
+use crate::test_util::{TempDir, V1_WITH_BRIDGES};
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const LAN: &str = "192.168.1.20";
@@ -16,8 +16,6 @@ const GONE: &str = "10.0.0.9";
 const NEW_TAILNET: &str = "100.101.102.103";
 const PHONE_PORT: u16 = 47682;
 const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
-const V1_WITH_BRIDGES: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/machines/v1-bridge.json"));
 
 struct Phone {
     dir: TempDir,
@@ -220,12 +218,18 @@ mod load {
     }
 
     #[test]
-    fn keeps_the_file_with_its_bridge_routes_when_their_secrets_cannot_be_deleted() {
+    fn loads_the_rest_and_keeps_the_file_for_the_next_start_when_the_secrets_cannot_be_deleted() {
         let phone = Phone::new();
         with_bridges(&phone);
         phone.secrets.fail_writes(true);
-        assert!(matches!(phone.load(), Err(Error::Secrets(_))));
+        let (machines, forgotten) = phone.load().expect("the file of an older app loads");
+        assert_eq!((machines.machines().len(), forgotten), (1, vec![MachineId(4)]));
         assert_eq!(phone.text(), V1_WITH_BRIDGES);
+        assert_eq!(phone.secret(MachineId(4), GONE).as_deref(), Some(NEW_TOKEN));
+        phone.secrets.fail_writes(false);
+        phone.load().expect("load again");
+        assert_eq!((phone.secret(MachineId(3), LAN), phone.secret(MachineId(4), GONE)), (None, None));
+        assert!(!phone.text().contains("bridge"), "{}", phone.text());
     }
 }
 

@@ -7,11 +7,9 @@ use rstest::rstest;
 use super::*;
 use crate::machines::route::Address;
 use crate::machines::tests::{SECRET, cli};
-use crate::test_util::TempDir;
+use crate::test_util::{TempDir, V1_WITH_BRIDGES};
 
 const SECRET_WORD: &str = "do-not-repeat-me";
-const V1_WITH_BRIDGES: &str =
-    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/machines/v1-bridge.json"));
 
 struct Folder {
     dir: TempDir,
