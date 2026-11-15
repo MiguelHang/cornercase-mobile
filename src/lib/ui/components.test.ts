@@ -301,7 +301,7 @@ describe('Field', () => {
   })
 
   it('points its input at the error it shows', () => {
-    const body = field({ label: 'Bridge URL', error: 'Start it with ws://' })
+    const body = field({ label: 'Machine code', error: 'Start it with ws://' })
     const id = body.match(/<p class="error svelte-[\w-]+" id="([\w-]+)">Start it with ws:\/\/<\/p>/)?.[1]
     expect(input(body)).toContain(`aria-invalid="true" aria-describedby="${id}"`)
   })
@@ -313,7 +313,7 @@ describe('Field', () => {
   })
 
   it('stops iOS from correcting a URL', () => {
-    expect(input(field({ label: 'Bridge URL', url: true }))).toContain(
+    expect(input(field({ label: 'Machine code', url: true }))).toContain(
       'autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="url"',
     )
   })

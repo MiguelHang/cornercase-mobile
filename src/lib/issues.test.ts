@@ -148,7 +148,7 @@ describe('IssuesState trackers', () => {
   it.each<[string, () => Promise<Answer<Sources>>, string]>([
     ['the reason cornercase gives', () => refusal('not a project'), 'not a project'],
     ['that cornercase did not answer', () => refusal('lost', 'unanswered'), CHOICES_UNANSWERED],
-    ['what the call threw', () => Promise.reject(new Error('bridge down')), 'bridge down'],
+    ['what the call threw', () => Promise.reject(new Error('Mac down')), 'Mac down'],
   ])('says %s when the trackers cannot be read', async (_, answer, reason) => {
     const calls = fakes()
     calls.issueSources.mockImplementation(answer)
@@ -594,7 +594,7 @@ describe('IssueState reading', () => {
   it.each<[string, () => Promise<Answer<ReadIssue>>, string]>([
     ['the reason cornercase gives', () => refusal('there is no issue #41'), 'there is no issue #41'],
     ['that cornercase did not answer', () => refusal('lost', 'unanswered'), CHOICES_UNANSWERED],
-    ['what the call threw', () => Promise.reject(new Error('bridge down')), 'bridge down'],
+    ['what the call threw', () => Promise.reject(new Error('Mac down')), 'Mac down'],
   ])('says %s when the issue cannot be read', async (_, answer, reason) => {
     const { state } = await shown(reader(answer))
     expect(state.reading).toEqual({ kind: 'failed', reason })

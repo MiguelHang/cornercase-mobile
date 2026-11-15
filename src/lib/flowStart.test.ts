@@ -194,9 +194,9 @@ describe('FlowStart, when the list cannot be read', () => {
   })
 
   it('says why a call threw', async () => {
-    const { flows } = made(() => Promise.reject(new Error('the bridge is gone')))
+    const { flows } = made(() => Promise.reject(new Error('the Mac is gone')))
     await flows.read(8, 'boot-1')
-    expect(flows.flows).toEqual({ kind: 'failed', reason: 'the bridge is gone' })
+    expect(flows.flows).toEqual({ kind: 'failed', reason: 'the Mac is gone' })
   })
 
   it('tries again after a failure', async () => {

@@ -253,7 +253,7 @@ mod ask {
     #[case::timeout(Error::Timeout)]
     #[case::unreachable(Error::Connect("connection refused".to_owned()))]
     #[tokio::test]
-    async fn leaves_the_line_unsent_when_the_bridge_cannot_be_reached(#[case] error: Error) {
+    async fn leaves_the_line_unsent_when_the_mac_cannot_be_reached(#[case] error: Error) {
         let mut requests = ending(Err(error), true);
         assert_eq!(requests.ask(&line(&words(&["status"]), None)).await, Asked::Unsent);
     }

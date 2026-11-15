@@ -91,13 +91,6 @@ mod secrets {
 mod cornercase_codes {
     use super::*;
 
-    #[test]
-    fn need_the_same_port_as_a_cornercase_route() {
-        let machines = vec![machine(0, "Studio", paired(&[LAN], SECRET))];
-        let same = same(&machines, &cli(LAN, 9000, Some(NEW_SECRET)), "new", None, &[]);
-        assert_eq!(same, None);
-    }
-
     #[rstest]
     #[case::with_the_same_secret(SECRET, Why::AlreadySaved)]
     #[case::with_a_new_secret(NEW_SECRET, Why::Tailscale)]

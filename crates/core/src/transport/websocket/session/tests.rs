@@ -52,7 +52,7 @@ mod messages {
 mod heard {
     use super::*;
 
-    const NOT_THE_BRIDGES: &str = "not one `stdout`, `stderr` or `exit` with a value of its type";
+    const NOT_A_SERVER_MESSAGE: &str = "not one `stdout`, `stderr` or `exit` with a value of its type";
 
     fn unexpected(what: &str) -> Result<Option<ServerMessage>, Error> {
         Err(Error::Protocol(what.to_owned()))
@@ -62,10 +62,10 @@ mod heard {
     #[case::stdout(r#"{"stdout":"one"}"#, Ok(Some(ServerMessage::Stdout("one".to_owned()))))]
     #[case::stderr(r#"{"stderr":"two"}"#, Ok(Some(ServerMessage::Stderr("two".to_owned()))))]
     #[case::exit(r#"{"exit":3}"#, Ok(Some(ServerMessage::Exit(3))))]
-    #[case::not_json("secret", unexpected(NOT_THE_BRIDGES))]
-    #[case::unknown_key(r#"{"secret":"x"}"#, unexpected(NOT_THE_BRIDGES))]
-    #[case::wrong_type(r#"{"exit":"secret"}"#, unexpected(NOT_THE_BRIDGES))]
-    #[case::two_keys(r#"{"exit":0,"stdout":"secret"}"#, unexpected(NOT_THE_BRIDGES))]
+    #[case::not_json("secret", unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::unknown_key(r#"{"secret":"x"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::wrong_type(r#"{"exit":"secret"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::two_keys(r#"{"exit":0,"stdout":"secret"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
     fn translates_each_text(#[case] text: &str, #[case] expected: Result<Option<ServerMessage>, Error>) {
         assert_eq!(heard(Some(Ok(Message::text(text)))), expected);
     }

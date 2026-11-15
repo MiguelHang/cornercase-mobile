@@ -555,7 +555,7 @@ describe('FilesState, reading a file', () => {
     expect(files.file).toEqual({ path: 'b.md', reading: { kind: 'shown', shown: shownRead('b.md') } })
   })
 
-  it('keeps a text too large for the phone as the bridge said it', async () => {
+  it('keeps a text too large for the phone as the app said it', async () => {
     const shown: FileShown = { shown: 'too_large_here', bytes: 3_000_000, lines: 40_000 }
     const { files } = await browsing(fromTree(TREE), {
       read: () => Promise.resolve({ status: 'ok', data: shown }),
@@ -564,7 +564,7 @@ describe('FilesState, reading a file', () => {
     expect(files.file?.reading).toEqual({ kind: 'shown', shown })
   })
 
-  it('says a file past the line of the bridge is too large for the phone, without an error', async () => {
+  it('says a file past the longest line is too large for the phone, without an error', async () => {
     const message = 'Too large to show on the phone'
     const { files, tell } = await browsing(fromTree(TREE), {
       read: () => refusal(message, 'too_large_here'),

@@ -329,7 +329,7 @@ mod learning_the_routes {
     #[case::not_json(serving(&[snapshot(BOOT, 7, "first")]).answer(APP_ROUTES, &["usage"], &[], 0))]
     #[case::unanswered(serving(&[snapshot(BOOT, 7, "first")]))]
     #[tokio::test(start_paused = true)]
-    async fn stays_quiet_with_a_bridge_that_does_not_know_the_request(#[case] fake: FakeTransport) {
+    async fn stays_quiet_with_a_cornercase_that_does_not_know_the_request(#[case] fake: FakeTransport) {
         let studio = Studio::new();
         let recorder = watched(studio.id, fake, studio.state.shared_machines());
         settle().await;
@@ -342,7 +342,7 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn keeps_forwarding_while_the_bridge_has_not_told_them() {
+    async fn keeps_forwarding_while_cornercase_has_not_told_them() {
         let studio = Studio::new();
         let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "waiting")]).open(APP_ROUTES, &[]);
         let recorder = watched(studio.id, fake, studio.state.shared_machines());
