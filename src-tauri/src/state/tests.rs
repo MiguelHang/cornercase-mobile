@@ -4,12 +4,12 @@ use std::future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::network::Kind;
 use cornercase_core::secrets::file::FileSecrets;
+use cornercase_core::test_util::TempDir;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 

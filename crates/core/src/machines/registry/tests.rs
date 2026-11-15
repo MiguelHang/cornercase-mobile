@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
@@ -9,6 +8,7 @@ use crate::machines::code::MachineCode;
 use crate::machines::store::JsonFileStore;
 use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 use crate::secrets::memory::MemorySecrets;
+use crate::test_util::TempDir;
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const LAN: &str = "192.168.1.20";

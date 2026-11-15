@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::cli::paste_file::{self, Kind, MAX_IMAGE_BYTES, Pasted, Picked};
 use cornercase_core::error::Error;
+use cornercase_core::test_util::TempDir;
 use cornercase_core::transport::fake::FakeTransport;
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin};
 use futures_util::stream::BoxStream;

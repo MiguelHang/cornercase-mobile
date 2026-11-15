@@ -2,12 +2,12 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
 use crate::machines::route::Address;
 use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
+use crate::test_util::TempDir;
 
 const SECRET_WORD: &str = "do-not-repeat-me";
 

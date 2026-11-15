@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use cornercase_bridge::test_util::TempDir;
+use cornercase_core::test_util::TempDir;
 use specta_typescript::Typescript;
 
 use super::*;

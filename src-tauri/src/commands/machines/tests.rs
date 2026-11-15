@@ -5,11 +5,11 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::history::HistoryEntry;
 use cornercase_core::machines::route::Route;
 use cornercase_core::secrets::Secrets;
+use cornercase_core::test_util::TempDir;
 use rstest::rstest;
 use tauri::async_runtime::{self, JoinHandle};
 use tokio::time;

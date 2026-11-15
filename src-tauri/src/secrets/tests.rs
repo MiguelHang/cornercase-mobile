@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::secrets::hex::encoded;
+use cornercase_core::test_util::TempDir;
 use rstest::rstest;
 
 use super::keychain::Modifiers;

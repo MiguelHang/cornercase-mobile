@@ -3,13 +3,13 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::pairing::PairError;
 use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::secrets::Secrets;
+use cornercase_core::test_util::TempDir;
 use cornercase_core::transport::fake::FakeTransport;
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
 use futures_util::stream::BoxStream;

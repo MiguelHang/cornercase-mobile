@@ -2,10 +2,10 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
+use crate::test_util::TempDir;
 
 const KEY: &str = "route/1/100.64.0.1:8787";
 const SECRET_WORD: &str = "do-not-repeat-me";
