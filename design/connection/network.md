@@ -66,7 +66,7 @@ A topic of [Connection](../connection.md). The app notices when the phone change
   - It drops the streams, or abandons the attempt in progress.
   - Like `Retrying`, it keeps the last session and app.
   - It starts no timer and does not move the backoff, so nothing is spent on a network that is not there.
-  - `offline()` reaches it from any state, `Retrying` and the stopped ones (`Missing`, `Unauthorized`, `Incompatible`) included.
+  - `offline()` reaches it from any state, `Retrying` and the stopped ones (`Missing`, `NotPaired`, `Incompatible`) included.
   - `online()` tries at once, with the backoff back at 1 s.
 - **`connect` with the network down** makes the new `Store` and calls `offline()` before its first attempt. Calls queued before an attempt starts are read first, so switching machines without a network tries nothing.
 - **The return to the foreground while offline tries once** (the task's P3).

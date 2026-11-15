@@ -33,7 +33,8 @@ App móvil (iOS + Android) en Tauri 2. Es un cliente del servidor de cornercase 
 - Orca (`stablyai/orca`: la app móvil en `mobile/`).
 
 ## Fase 0 — puente de desarrollo (`bridge/`)
-Binario Rust en el workspace que corre en el Mac. Solo para desarrollo.
+Binario Rust en el workspace que corre en el Mac. Solo para desarrollo. Retirado en 059: desde 058 la app habla con
+el `/cli` de cornercase, que sirve este protocolo (`design/bridge.md`).
 
 - WebSocket ↔ `cornercase <args>`. **Una conexión WebSocket por comando.**
 - Protocolo (JSON, un objeto por mensaje):
@@ -113,10 +114,10 @@ Binario Rust en el workspace que corre en el Mac. Solo para desarrollo.
 - **Svelte 5 + Vite + TypeScript** en el WebView: bundle pequeño, runes y transiciones integradas
   para el cristal y las animaciones de gpui. pnpm.
 - Workspace Cargo: `crates/core` (lógica pura y testeable: transporte, protocolo, Store, tipos del
-  CLI, máquinas y rutas), `src-tauri` (comandos y eventos de Tauri, almacenamiento de claves) y
-  `bridge/` (binario del puente).
+  CLI, máquinas y rutas), `src-tauri` (comandos y eventos de Tauri, almacenamiento de claves) y,
+  hasta 059, `bridge/` (binario del puente).
 - Red: tokio + tokio-tungstenite. Claves: ed25519-dalek. Tipos hacia TS: tauri-specta.
-  QR: el plugin oficial `barcode-scanner` en la app y un crate de QR para la terminal en el puente.
+  QR: el plugin oficial `barcode-scanner` en la app y, hasta 059, un crate de QR para la terminal en el puente.
 - Plataforma: **primero iOS** (simulador y iPhone); Android en una tarea propia (Keystore, teclado).
 - CI: GitHub Actions en Linux en cada PR: fmt, clippy y tests de Rust; svelte-check, lint y vitest.
   Sin compilaciones móviles en CI.
