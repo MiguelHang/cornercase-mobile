@@ -6,7 +6,7 @@ import { CHECKING, rescannable, rowStatus, type Probe } from './machineRows'
 const MACHINE: MachineView_Serialize = {
   id: 2,
   name: 'Studio',
-  routes: [{ kind: 'bridge', url: 'ws://studio.lan:9000/', has_token: true }],
+  routes: [{ kind: 'cli', url: 'ws://studio.lan:9000/', has_token: true }],
   last_route: null,
 }
 
@@ -17,10 +17,10 @@ const shown = (probe: Probe) => {
 
 describe('rowStatus of the active machine', () => {
   it.each<ConnectionView_Serialize>([
-    { state: 'connected', route: 'ws://studio.lan:9000/?token=abc' },
+    { state: 'connected', route: 'ws://studio.lan:9000/' },
     { state: 'connecting' },
     { state: 'offline' },
-    { state: 'unauthorized' },
+    { state: 'not_paired' },
   ])('says what the bar says while $state, whatever the probe', (connection) => {
     expect(rowStatus(MACHINE, connection, { state: 'no_token' })).toEqual({
       ...status(connection, 'Studio'),
@@ -47,13 +47,12 @@ describe('rowStatus of another machine', () => {
     ['checking', CHECKING, { text: 'Checking…', tone: 'working', pulsing: true }],
     [
       'answering',
-      { state: 'answers', route: 'ws://studio.lan:9000/?token=abc' },
+      { state: 'answers', route: 'ws://studio.lan:9000/' },
       { text: 'Answers via studio.lan:9000', tone: 'done', pulsing: false },
     ],
-    ['rejecting its token', { state: 'unauthorized' }, { text: 'Token rejected', tone: 'failed', pulsing: false }],
     ['forgetting this phone', { state: 'not_paired' }, { text: 'Not paired', tone: 'failed', pulsing: false }],
     [
-      'without a token',
+      'without a secret',
       { state: 'no_token' },
       { text: 'No secret: scan its code again', tone: 'failed', pulsing: false },
     ],
@@ -70,8 +69,8 @@ describe('rowStatus of another machine', () => {
     const probe: Probe = {
       state: 'no_answer',
       failures: [
-        { route: 'ws://studio.lan:9000/?token=abc', error: { code: 'timeout', message: 'timed out' } },
-        { route: 'ws://100.64.0.2:9000/?token=abc', error: { code: 'connect', message: 'refused' } },
+        { route: 'ws://studio.lan:9000/', error: { code: 'timeout', message: 'timed out' } },
+        { route: 'ws://100.64.0.2:9000/', error: { code: 'connect', message: 'refused' } },
       ],
     }
     expect(rowStatus(MACHINE, null, probe).failures).toEqual([
@@ -97,8 +96,7 @@ describe('rowStatus of another machine', () => {
 
 describe('rescannable', () => {
   it.each<[string, Probe, boolean]>([
-    ['a rejected token', { state: 'unauthorized' }, true],
-    ['no token', { state: 'no_token' }, true],
+    ['no secret', { state: 'no_token' }, true],
     ['a Mac that forgot this phone', { state: 'not_paired' }, true],
     ['an answer', { state: 'answers', route: 'ws://studio.lan:9000/' }, false],
     ['no answer', { state: 'no_answer', failures: [] }, false],
@@ -108,7 +106,6 @@ describe('rescannable', () => {
   })
 
   it.each<[ConnectionView_Serialize, boolean]>([
-    [{ state: 'unauthorized' }, true],
     [{ state: 'not_paired' }, true],
     [{ state: 'connected', route: 'ws://studio.lan:9000/' }, false],
     [{ state: 'offline' }, false],

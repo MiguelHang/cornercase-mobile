@@ -209,20 +209,16 @@ impl Machines {
     }
 
     fn with_new_secret(&self, id: MachineId, routes: &[Route]) -> Vec<Route> {
-        let secret = routes.iter().find(|route| matches!(route, Route::Cli { .. })).and_then(Route::token);
+        let secret = routes.first().and_then(Route::token);
         let (Some(secret), Some(machine)) = (secret, self.machine(id)) else {
             return Vec::new();
         };
         machine
             .routes
             .iter()
-            .filter(|saved| matches!(saved, Route::Cli { .. }) && saved.token() != Some(secret))
+            .filter(|saved| saved.token() != Some(secret))
             .filter(|saved| routes.iter().all(|route| route.address() != saved.address()))
-            .map(|saved| {
-                let mut route = saved.clone();
-                route.set_token(Some(secret.clone()));
-                route
-            })
+            .map(|saved| Route::cli(saved.address().clone(), Some(secret.clone())))
             .collect()
     }
 
@@ -262,7 +258,8 @@ impl fmt::Debug for Machines {
 fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error> {
     for route in &mut machine.routes {
         let value = secrets.get(&key(machine.id, route.address()))?;
-        route.set_token(value.and_then(|bytes| String::from_utf8(bytes).ok()).map(Token::new));
+        *route =
+            Route::cli(route.address().clone(), value.and_then(|bytes| String::from_utf8(bytes).ok()).map(Token::new));
     }
     Ok(())
 }

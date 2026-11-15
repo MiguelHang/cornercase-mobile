@@ -98,8 +98,6 @@ const failure = (connection: Failed) => {
       return 'Not connected'
     case 'missing':
       return lacking(connection.missing)
-    case 'unauthorized':
-      return "The bridge rejected this phone's token: scan its code again in Machines"
     case 'not_paired':
       return 'This Mac no longer recognizes this phone: scan its code again in Machines'
     case 'incompatible':

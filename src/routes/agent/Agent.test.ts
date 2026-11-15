@@ -401,7 +401,7 @@ describe('Agent, without its row', () => {
   })
 
   it('keeps the mark still without a list once it stops connecting', () => {
-    const body = draw(chatWith(null), 0, { state: 'unauthorized' })
+    const body = draw(chatWith(null), 0, { state: 'not_paired' })
     expect(body).toMatch(/<span class="cell cursor svelte-[\w-]+"><\/span>/)
     expect(body).not.toContain('no longer running')
   })
@@ -464,7 +464,7 @@ describe('Agent, without its row', () => {
   it.each<ConnectionView_Serialize>([
     { state: 'connecting' },
     { state: 'none' },
-    { state: 'unauthorized' },
+    { state: 'not_paired' },
   ])('holds New agent while the connection is $state', (connection) => {
     expect(draw(chatWith(ROW), 0, connection).match(NEW_AGENT)?.[1]).toBe(' disabled=""')
   })

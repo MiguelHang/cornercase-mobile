@@ -1,10 +1,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
-
 use super::*;
 use crate::history::SendState;
+use crate::test_util::TempDir;
 
 const BOOT: &str = "1731250000-4242";
 const OTHER_BOOT: &str = "1731260000-777";

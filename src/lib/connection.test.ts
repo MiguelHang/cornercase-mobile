@@ -87,11 +87,6 @@ describe('status', () => {
       failing('cornercase on the Mac lacks app-routes, cli-endpoint: update it to 0.13.78 or later'),
     ],
     [
-      'unauthorized',
-      { state: 'unauthorized' },
-      failing("The bridge rejected this phone's token: scan its code again in Machines"),
-    ],
-    [
       'not_paired',
       { state: 'not_paired' },
       failing('This Mac no longer recognizes this phone: scan its code again in Machines'),
@@ -123,19 +118,17 @@ describe('status', () => {
   it('sends the user to scan the code again only when the Mac no longer takes this phone', () => {
     const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
     expect(views.map((view) => connection.status(view, 'MacBook').text).filter((text) => /scan/i.test(text))).toEqual([])
-    for (const state of ['unauthorized', 'not_paired'] as const) {
-      expect(connection.status({ state }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
-    }
+    expect(connection.status({ state: 'not_paired' }, 'MacBook').text).toMatch(/scan its code again in Machines$/)
   })
 })
 
 describe('routeAddress', () => {
   it.each([
-    ['ws://192.168.1.20:7000/?token=secret', '192.168.1.20:7000'],
-    ['wss://mac.tail1234.ts.net:7443/bridge?token=secret', 'mac.tail1234.ts.net:7443'],
-    ['wss://mac.local/?token=secret', 'mac.local'],
-    ['ws://[fe80::1]:7000/?token=secret', '[fe80::1]:7000'],
-    ['not a route?token=secret', 'not a route'],
+    ['ws://192.168.1.20:7000/', '192.168.1.20:7000'],
+    ['wss://mac.tail1234.ts.net:7443/cli', 'mac.tail1234.ts.net:7443'],
+    ['wss://mac.local/', 'mac.local'],
+    ['ws://[fe80::1]:7000/', '[fe80::1]:7000'],
+    ['not a route?code=c0de', 'not a route'],
   ])('shows %s as %s', (route, address) => {
     expect(connection.routeAddress(route)).toBe(address)
   })

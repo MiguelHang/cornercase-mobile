@@ -42,7 +42,6 @@ mod ask {
     #[rstest]
     #[case::not_scripted(None)]
     #[case::unreachable(Some(Err(Error::Connect("connection refused".to_owned()))))]
-    #[case::unauthorized(Some(Err(Error::Unauthorized)))]
     #[case::an_old_cli(Some(Ok(exit(2, NO_REQUESTS_COMMAND))))]
     #[tokio::test]
     async fn runs_the_command_once_when_the_process_does_not_start(#[case] end: Option<End>) {

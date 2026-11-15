@@ -5,11 +5,11 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::history::HistoryEntry;
-use cornercase_core::machines::route::Route;
+use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::secrets::Secrets;
+use cornercase_core::test_util::TempDir;
 use rstest::rstest;
 use tauri::async_runtime::{self, JoinHandle};
 use tokio::time;
@@ -22,14 +22,13 @@ use crate::commands::probe::matching;
 use crate::secrets::{mock_store, on_mock};
 use crate::state::Active;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, Ipc, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, changed, contracted, heard, launcher,
-    pairing, released, serving, settle, snapshot,
+    ADDRESS, BOOT, Ipc, PAIRING_CODE, Recorder, SECRET, Studio, TOKEN, changed, contracted, heard, launcher, pairing,
+    released, serving, settle, snapshot,
 };
 use crate::view::{MachineView, RouteView};
 
-const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
-const LAPTOP_CODE: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA&also=100.101.102.103&name=Laptop";
-const LAPTOP_TOKEN: &str = "bGFwdG9wLXNlY3JldA";
+const LAPTOP: &str = "ws://laptop.lan:47682/?code=9c8b7a6d5e4f30211203f4e5d6c7b8a9";
+const LAPTOP_SECRET: &str = "7e3d2c1b.a0f9e8d7c6b5";
 
 static GATE: Mutex<Option<(Sender<()>, Receiver<()>)>> = Mutex::new(None);
 
@@ -41,6 +40,11 @@ fn gated(task: Task) -> JoinHandle<()> {
         go.recv().expect("the test lets the connect go on");
     }
     async_runtime::spawn(async {})
+}
+
+fn add_laptop(state: &AppState) -> MachineId {
+    state.redeemed(LAPTOP, Token::fake(LAPTOP_SECRET));
+    add(state, LAPTOP, "laptop").expect("the laptop is added")
 }
 
 fn names(state: &AppState) -> Vec<String> {
@@ -66,8 +70,8 @@ mod adding_a_machine {
 
     #[rstest]
     #[case::not_a_url("studio.lan c3R1ZGlvLXNlY3JldA", ErrorCode::RouteNotAUrl)]
-    #[case::plain_http("http://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", ErrorCode::RouteScheme)]
-    #[case::no_token("ws://studio.lan:9000/", ErrorCode::RouteNoToken)]
+    #[case::plain_http("http://studio.lan:9000/?code=0f1e2d3c", ErrorCode::RouteScheme)]
+    #[case::no_code("ws://studio.lan:9000/", ErrorCode::RouteNoCode)]
     fn says_what_is_wrong_with_the_url_without_repeating_it(#[case] url: &str, #[case] code: ErrorCode) {
         let studio = Studio::new();
         let error = add(&studio.state, url, "laptop").expect_err("the url is refused");
@@ -82,23 +86,9 @@ mod adding_a_machine {
         fs::write(dir.path().join("machines.json"), "{ not json").expect("write the machines file");
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets.as_ref(), Arc::clone(&secrets));
-        let error = add(&state, BRIDGE, "studio").expect_err("the machines are not loaded");
+        state.redeemed(LAPTOP, Token::fake(LAPTOP_SECRET));
+        let error = add(&state, LAPTOP, "laptop").expect_err("the machines are not loaded");
         assert_eq!(error.code, ErrorCode::MachinesNotLoaded);
-    }
-
-    #[test]
-    fn saves_every_route_of_a_code_under_one_machine_with_its_token() {
-        let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP_CODE, "laptop").expect("the laptop is added");
-        let machines = list(&studio.reloaded()).expect("the machines load").machines;
-        let routes = ["ws://laptop.lan:9000/", "ws://100.101.102.103:9000/"];
-        let views = routes.map(|url| RouteView::Bridge { url: url.to_owned(), has_token: true });
-        assert_eq!(names(&studio.state), ["studio", "laptop"]);
-        assert_eq!(machines[1].routes, views);
-        for url in routes {
-            let saved = studio.secrets.get(&format!("route/{}/{url}", laptop.0)).expect("the keychain answers");
-            assert_eq!(saved.as_deref(), Some(LAPTOP_TOKEN.as_bytes()));
-        }
     }
 
     #[test]
@@ -108,12 +98,12 @@ mod adding_a_machine {
         let expected = MachineView {
             id: studio.id.0,
             name: "studio".to_owned(),
-            routes: vec![RouteView::Bridge { url: ADDRESS.to_owned(), has_token: true }],
+            routes: vec![RouteView::Cli { url: ADDRESS.to_owned(), has_token: true }],
             last_route: None,
         };
         assert_eq!(machines, [expected]);
         let json = serde_json::to_string(&machines).expect("the machines serialize");
-        assert!(!json.contains(TOKEN), "{json}");
+        assert!(!json.contains(SECRET), "{json}");
     }
 }
 
@@ -192,7 +182,7 @@ mod listing_the_machines {
     #[test]
     fn names_the_saved_active_machine() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&studio.state);
         studio.state.machines(|machines| machines.activate(laptop).map_err(CommandError::from)).expect("activated");
         assert_eq!(active(&studio.reloaded()), Some(laptop.0));
     }
@@ -200,7 +190,7 @@ mod listing_the_machines {
     #[test]
     fn names_the_first_machine_while_none_was_activated() {
         let studio = Studio::new();
-        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        add_laptop(&studio.state);
         assert_eq!(active(&studio.state), Some(studio.id.0));
     }
 
@@ -236,7 +226,7 @@ mod renaming_a_machine {
     #[case::unknown("mini", 99, ErrorCode::UnknownMachine)]
     fn says_why_it_did_not(#[case] name: &str, #[case] id: u64, #[case] code: ErrorCode) {
         let studio = Studio::new();
-        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        add_laptop(&studio.state);
         let id = if id == 0 { studio.id } else { MachineId(id) };
         let error = rename(&studio.state, id, name).expect_err("refused");
         assert_eq!(error.code, code);
@@ -265,7 +255,7 @@ mod removing_a_machine {
     #[tokio::test(start_paused = true)]
     async fn keeps_the_store_of_another_machine() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&studio.state);
         let recorder = Recorder::default();
         let (launcher, _) = launcher(serving(&[snapshot(BOOT, 7, "first")]));
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connected");
@@ -299,7 +289,7 @@ mod removing_a_machine {
     #[test]
     fn forgets_its_history_and_keeps_the_others() {
         let (dir, state, studio) = keeping_history(Studio::new());
-        let laptop = add(&state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&state);
         said(&state, studio);
         said(&state, laptop);
         remove(&state, &Recorder::default(), studio).expect("removed");
@@ -347,7 +337,9 @@ mod over_ipc {
     #[test]
     fn adds_a_machine_and_answers_its_id() {
         let studio = Studio::new();
-        let ipc = Ipc::new(studio.reloaded());
+        let state = studio.reloaded();
+        state.redeemed(LAPTOP, Token::fake(LAPTOP_SECRET));
+        let ipc = Ipc::new(state);
         let id = ipc.invoke("machine_add", json!({ "code": LAPTOP, "name": "laptop" })).expect("the machine is added");
         assert_eq!(names(&ipc.state()), ["studio", "laptop"]);
         assert_eq!(list(&ipc.state()).expect("the machines load").machines[1].id, id.as_u64().expect("an id"));
@@ -368,7 +360,7 @@ mod over_ipc {
         let studio = Studio::new();
         let ipc = Ipc::new(studio.reloaded());
         let refused = ipc.invoke("machine_add", json!({ "code": "ws://laptop.lan:9000/", "name": "laptop" }));
-        assert_eq!(refused.expect_err("the url is refused")["code"], "route_no_token");
+        assert_eq!(refused.expect_err("the url is refused")["code"], "route_no_code");
     }
 
     #[tokio::test(start_paused = true)]

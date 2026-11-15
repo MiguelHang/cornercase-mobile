@@ -36,8 +36,6 @@ impl Default for PairConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PairError {
-    #[error("the machine code has no pairing code of cornercase")]
-    NoCode,
     #[error(transparent)]
     Answered(Error),
     #[error(
@@ -54,7 +52,7 @@ struct Reply {
 type Attempt = BoxFuture<'static, (usize, Result<Token, Error>)>;
 
 pub async fn pair(code: &MachineCode, user_agent: &str, config: PairConfig) -> Result<Token, PairError> {
-    let pairing = code.pairing_code().ok_or(PairError::NoCode)?;
+    let pairing = code.pairing_code();
     let addresses = code.addresses();
     let deadline = Instant::now() + config.deadline;
     let mut racing: FuturesUnordered<Attempt> = addresses

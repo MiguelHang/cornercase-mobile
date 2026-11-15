@@ -11,7 +11,6 @@ use crate::transport::{Exit, Stdin, Transport, listen, only_stdout};
 
 const NO_REQUESTS: &str = "unrecognized subcommand 'requests'";
 const NO_FOLLOW: &str = "unexpected argument '--follow'";
-const NOT_ALLOWED: &str = "is not allowed through the bridge";
 
 pub(crate) type End = Result<Exit, Error>;
 
@@ -96,7 +95,7 @@ impl Follow {
 }
 
 pub(crate) fn absent(exit: &Exit) -> bool {
-    exit.code == USAGE_EXIT && [NO_REQUESTS, NO_FOLLOW, NOT_ALLOWED].iter().any(|refusal| exit.stderr.contains(refusal))
+    exit.code == USAGE_EXIT && [NO_REQUESTS, NO_FOLLOW].iter().any(|refusal| exit.stderr.contains(refusal))
 }
 
 pub(crate) fn stopped(end: &End, ended: &str) -> Error {
@@ -109,7 +108,7 @@ pub(crate) fn stopped(end: &End, ended: &str) -> Error {
 }
 
 fn unopened(error: &Error) -> bool {
-    matches!(error, Error::Unauthorized | Error::Rejected { .. } | Error::Timeout | Error::Connect(_))
+    matches!(error, Error::Rejected { .. } | Error::Timeout | Error::Connect(_))
 }
 
 #[cfg(test)]

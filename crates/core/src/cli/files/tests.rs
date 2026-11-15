@@ -297,7 +297,7 @@ mod a_partial_answer {
 
     #[tokio::test]
     async fn passes_the_transport_error_on() {
-        let fake = FakeTransport::default().fail(&LIST, Error::Unauthorized);
-        assert_eq!(listed(&fake).await, Err(Error::Unauthorized));
+        let fake = FakeTransport::default().fail(&LIST, Error::NotPaired);
+        assert_eq!(listed(&fake).await, Err(Error::NotPaired));
     }
 }

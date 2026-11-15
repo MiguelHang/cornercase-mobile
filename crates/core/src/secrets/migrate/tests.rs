@@ -2,11 +2,11 @@ use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
 use crate::secrets::memory::MemorySecrets;
+use crate::test_util::TempDir;
 
 const ROUTE: &str = "route/1/100.64.0.1:8787";
 const IDENTITY: &str = "identity/ed25519";

@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use cornercase_core::machines::MachineId;
-use cornercase_core::machines::pairing::PairError;
 use cornercase_core::transport::fake::FakeTransport;
 
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::test_util::{
-    BOOT, Ipc, Recorder, Studio, changed, code, connected, launcher, released, serving, settle, snapshot,
+    BOOT, Ipc, Recorder, SECRET, Studio, changed, connected, launcher, released, serving, settle, snapshot,
 };
 use crate::view::ConnectionView;
 
@@ -24,11 +23,6 @@ mod the_launcher {
         let version = env!("CARGO_PKG_VERSION");
         assert!(agent.starts_with(&format!("cornercase-mobile/{version} (")), "{agent}");
         assert!(agent.ends_with(')') && !agent.ends_with("()"), "{agent}");
-    }
-
-    #[tokio::test]
-    async fn pairs_no_code_of_the_bridge() {
-        assert_eq!(Launcher::default().pair(&code()).await, Err(PairError::NoCode));
     }
 }
 
@@ -78,7 +72,12 @@ mod switching {
     use super::*;
     use crate::commands::machines::add;
 
-    const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+    const LAPTOP: &str = "ws://laptop.lan:47682/?code=1a2b3c4d";
+
+    fn add_laptop(studio: &Studio) -> MachineId {
+        studio.state.redeemed(LAPTOP, Token::fake(SECRET));
+        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added")
+    }
 
     fn saved_active(studio: &Studio) -> Option<MachineId> {
         studio.reloaded().machines(|machines| Ok(machines.active())).expect("the machines load")
@@ -87,7 +86,7 @@ mod switching {
     #[tokio::test(start_paused = true)]
     async fn saves_the_machine_it_connects_to() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&studio);
         let (launcher, _) = launcher(serving(&first_snapshot()));
         switch_to(&studio.state, Recorder::default(), &launcher, laptop).expect("connected");
         assert_eq!(saved_active(&studio), Some(laptop));
@@ -97,7 +96,7 @@ mod switching {
     #[tokio::test(start_paused = true)]
     async fn says_the_machine_is_unknown_and_keeps_the_saved_one() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&studio);
         let (launcher, _) = launcher(serving(&first_snapshot()));
         switch_to(&studio.state, Recorder::default(), &launcher, laptop).expect("connected");
         let error = switch_to(&studio.state, Recorder::default(), &launcher, MachineId(99)).expect_err("unknown");

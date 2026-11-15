@@ -2,12 +2,12 @@ use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
 use crate::machines::route::Address;
-use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
+use crate::machines::tests::{SECRET, cli};
+use crate::test_util::TempDir;
 
 const SECRET_WORD: &str = "do-not-repeat-me";
 
@@ -41,15 +41,9 @@ fn studio(id: u64, token: Option<&str>) -> Machine {
     Machine {
         id: MachineId(id),
         name: "studio".to_owned(),
-        routes: vec![bridge("192.168.1.20", 8765, token), bridge("fd7a:115c:a1e0::1", 8765, token)],
+        routes: vec![cli("192.168.1.20", 8765, token), cli("fd7a:115c:a1e0::1", 8765, token)],
         last_route: Some(Address { host: "fd7a:115c:a1e0::1".to_owned(), port: 8765 }),
     }
-}
-
-fn both_kinds(token: Option<&str>, secret: Option<&str>) -> Saved {
-    let routes = vec![bridge("192.168.1.20", 8765, token), cli("192.168.1.20", 7700, secret)];
-    let machine = Machine { routes, last_route: None, ..studio(5, None) };
-    Saved { next_id: 6, machines: vec![machine], active: Some(MachineId(5)) }
 }
 
 fn saved(next_id: u64) -> Saved {
@@ -97,23 +91,13 @@ mod load {
     }
 
     #[test]
-    fn reads_the_routes_without_their_tokens() {
+    fn reads_the_routes_without_their_secrets() {
         let folder = Folder::new();
-        let with_tokens = Saved { next_id: 4, machines: vec![studio(3, Some(TOKEN))], active: None };
-        folder.store().save(&with_tokens).expect("save");
+        let with_secrets = Saved { next_id: 4, machines: vec![studio(3, Some(SECRET))], active: None };
+        folder.store().save(&with_secrets).expect("save");
         let without = Saved { next_id: 4, machines: vec![studio(3, None)], active: None };
         assert_eq!(folder.store().load().expect("load"), without);
-        assert!(!folder.text().contains(TOKEN), "{}", folder.text());
-    }
-
-    #[test]
-    fn reads_routes_of_both_kinds_from_one_file_without_their_secrets() {
-        let folder = Folder::new();
-        folder.store().save(&both_kinds(Some(TOKEN), Some(SECRET))).expect("save");
-        assert_eq!(folder.store().load().expect("load"), both_kinds(None, None));
-        for secret in [TOKEN, SECRET] {
-            assert!(!folder.text().contains(secret), "{}", folder.text());
-        }
+        assert!(!folder.text().contains(SECRET), "{}", folder.text());
     }
 
     #[rstest]
@@ -124,7 +108,7 @@ mod load {
         "does not hold the expected fields"
     )]
     #[case::bad_route(
-        format!(r#"{{"version": 1, "next_id": 1, "machines": [{{"id": 0, "name": "a", "routes": [{{"kind": "bridge", "url": "{SECRET_WORD}"}}], "last_route": null}}]}}"#),
+        format!(r#"{{"version": 1, "next_id": 1, "machines": [{{"id": 0, "name": "a", "routes": [{{"kind": "cli", "url": "{SECRET_WORD}"}}], "last_route": null}}]}}"#),
         "does not hold the expected fields"
     )]
     #[case::no_version(format!(r#"{{"next_id": 0, "machines": [], "{SECRET_WORD}": 1}}"#), "does not hold the expected fields")]
@@ -138,7 +122,6 @@ mod load {
         let message = store_error(folder.store().load());
         assert!(message.contains(reason), "{message}");
         assert!(!message.contains(SECRET_WORD), "{message}");
-        assert!(!message.contains("bridge"), "{message}");
         assert_eq!(folder.text(), text);
     }
 
@@ -165,11 +148,14 @@ mod save {
     #[test]
     fn writes_each_route_with_its_kind() {
         let folder = Folder::new();
-        folder.store().save(&both_kinds(Some(TOKEN), Some(SECRET))).expect("save");
+        folder
+            .store()
+            .save(&Saved { next_id: 4, machines: vec![studio(3, Some(SECRET))], active: None })
+            .expect("save");
         let written: serde_json::Value = serde_json::from_str(&folder.text()).expect("the file is JSON");
         let routes = serde_json::json!([
-            { "kind": "bridge", "url": "ws://192.168.1.20:8765/" },
-            { "kind": "cli", "url": "ws://192.168.1.20:7700/" },
+            { "kind": "cli", "url": "ws://192.168.1.20:8765/" },
+            { "kind": "cli", "url": "ws://[fd7a:115c:a1e0::1]:8765/" },
         ]);
         assert_eq!(written["machines"][0]["routes"], routes);
     }

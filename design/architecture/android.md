@@ -1,6 +1,6 @@
 # Android
 
-A topic of [Architecture](../architecture.md). The same app on Android (030): the Gradle project `tauri android init` writes, what was changed in it by hand and why (the keyboard's insets, 032, included), how the Keystore keeps the secrets (031), where the emulator finds Vite and the bridge, and what was checked live. What the secrets are, and how the route tokens left the file 030 kept them in, is in `design/connection/identity.md`.
+A topic of [Architecture](../architecture.md). The same app on Android (030): the Gradle project `tauri android init` writes, what was changed in it by hand and why (the keyboard's insets, 032, included), how the Keystore keeps the secrets (031), where the emulator finds Vite and the Mac, and what was checked live. What the secrets are, and how the route tokens left the file 030 kept them in, is in `design/connection/identity.md`.
 
 ## The project
 
@@ -24,8 +24,8 @@ What Android shows between the tap on the icon and the WebView's launch layer (0
 
 - **`network_security_config.xml`**: `base-config cleartextTrafficPermitted="false"`, and cleartext only to `localhost` and `127.0.0.1` (Vite, below) and to `ts.net` with its subdomains (Tailscale's MagicDNS names). The `ts.net` entry only matters to the WebView, which reaches nothing there today (below); it is kept so a MagicDNS dev host would load. Nothing allows cleartext everywhere, in debug or in release. Rejected: `cleartextTrafficPermitted="true"` in `base-config`, the quick way to make `android dev` work.
 - **No IP ranges**: a `<domain>` is a host name, and an IP address matches only whole, so "the private ranges and Tailscale's" cannot be written in that file. Listing the Macs' addresses one by one would break on the next DHCP lease.
-- **The file does not govern `ws://`**: Android's `NetworkSecurityPolicy` is applied by the Java stacks and the WebView, not by native sockets, and the bridge's WebSocket is opened by tokio-tungstenite in Rust (All networking in Rust). What it guards is the WebView, whose CSP already lets it reach nothing but the app and Tauri's IPC (A strict CSP).
-- **The boundary is the bridge**: it listens only on the Mac's private LAN and Tailscale addresses, never on a public one (`design/bridge.md` › Which addresses), and its token travels only there. A guard in Rust that refuses `ws://` routes outside those ranges would make the phone hold the line too; it is a feature of its own, left for a task apart.
+- **The file does not govern `ws://`**: Android's `NetworkSecurityPolicy` is applied by the Java stacks and the WebView, not by native sockets, and the WebSocket to cornercase's `/cli` is opened by tokio-tungstenite in Rust (All networking in Rust). What it guards is the WebView, whose CSP already lets it reach nothing but the app and Tauri's IPC (A strict CSP).
+- **The boundary is cornercase's `/cli`**: it listens only on the Mac's private LAN and Tailscale addresses, never on a public one (upstream's `design/phone-app.md` › Where it listens), and the phone's secret travels only there. A guard in Rust that refuses `ws://` routes outside those ranges would make the phone hold the line too; it is a feature of its own, left for a task apart.
 - **`usesCleartextTraffic` is kept as the template wrote it** (`${usesCleartextTraffic}`, `true` in debug): from API 24 a `networkSecurityConfig` makes Android ignore it, so the file above decides in both builds. `debug-overrides` cannot help: it only takes trust anchors, not cleartext.
 
 ## Backups
@@ -47,7 +47,7 @@ How the secrets plugin (`src-tauri/plugins/secrets/android/`, `design/architectu
 ## Running it
 
 - **Vite through `adb reverse`**: `pnpm tauri android dev` publishes port 1420 on the device with `adb reverse` and loads `http://localhost:1420/`, without `TAURI_DEV_HOST` (CLI 2.12.4), so `localhost` in the network security config is enough and hot reload works. The CLI leaves the `adb reverse` behind when it stops.
-- **The emulator reaches the bridge** at the Mac's LAN address (through the emulator's outgoing NAT) or its Tailscale address, which are the ones the bridge prints. Not `10.0.2.2`, the Mac's loopback seen from the emulator: the bridge only listens there with `--loopback`, and then prints `127.0.0.1`, which in the emulator is the emulator itself. The code goes into the form by `adb shell input text` (cut into short pieces, below) or the emulator's clipboard, not scanned.
+- **The emulator reaches the Mac** at its LAN address (through the emulator's outgoing NAT) or its Tailscale address, which are the ones cornercase's code holds. Not `10.0.2.2`, the Mac's loopback seen from the emulator: cornercase does not listen on loopback, and a `127.0.0.1` in a code is, in the emulator, the emulator itself. The code goes into the form by `adb shell input text` (cut into short pieces, below) or the emulator's clipboard, not scanned.
 
 ## Versions
 

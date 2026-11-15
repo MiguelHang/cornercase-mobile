@@ -29,7 +29,6 @@ pub(crate) struct MachineList {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum RouteView {
-    Bridge { url: String, has_token: bool },
     Cli { url: String, has_token: bool },
 }
 
@@ -49,7 +48,6 @@ pub(crate) enum ConnectionView {
     Missing {
         missing: Vec<MissingView>,
     },
-    Unauthorized,
     NotPaired,
     Incompatible {
         error: CommandError,
@@ -69,7 +67,6 @@ pub(crate) struct MissingView {
 #[serde(tag = "state", rename_all = "snake_case")]
 pub(crate) enum ProbeView {
     Answers { route: String },
-    Unauthorized,
     NotPaired,
     NoToken,
     NoAnswer { failures: Vec<RouteFailure> },
@@ -169,11 +166,7 @@ impl From<&Machines> for MachineList {
 
 impl From<&Route> for RouteView {
     fn from(route: &Route) -> Self {
-        let (url, has_token) = (route.address().to_string(), route.has_token());
-        match route {
-            Route::Bridge { .. } => Self::Bridge { url, has_token },
-            Route::Cli { .. } => Self::Cli { url, has_token },
-        }
+        Self::Cli { url: route.address().to_string(), has_token: route.has_token() }
     }
 }
 
@@ -194,7 +187,6 @@ impl From<&Connection> for ConnectionView {
             Connection::Connected { route } => Self::Connected { route: route.to_string() },
             Connection::Retrying { r#in, error } => Self::Retrying { in_ms: millis(*r#in), error: error.into() },
             Connection::Missing(missing) => Self::Missing { missing: missing.iter().map(MissingView::from).collect() },
-            Connection::Unauthorized => Self::Unauthorized,
             Connection::NotPaired => Self::NotPaired,
             Connection::Incompatible(error) => Self::Incompatible { error: error.into() },
             Connection::Offline => Self::Offline,

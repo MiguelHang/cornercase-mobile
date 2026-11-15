@@ -4,7 +4,7 @@ use rstest::rstest;
 use tokio_tungstenite::tungstenite::error::CapacityError;
 
 use super::*;
-use crate::protocol::{Input, next_message};
+use crate::transport::fake::cli::request;
 
 fn bytes(length: usize) -> Vec<u8> {
     (0..=u8::MAX).cycle().take(length).collect()
@@ -28,10 +28,10 @@ mod messages {
         assert_eq!(texts.len(), count);
         assert!(texts.iter().all(|text| text.len() <= LARGEST_MESSAGE), "a message passed 1 MiB");
         let mut joined = Vec::new();
-        for text in &texts {
-            match next_message(text).expect("a message the bridge reads") {
-                Input::Bytes(piece) => joined.extend(piece),
-                other => panic!("not bytes: {other:?}"),
+        for input in request(&texts).stdin {
+            match input {
+                Stdin::Bytes(piece) => joined.extend(piece),
+                Stdin::Text(text) => panic!("not bytes: {text:?}"),
             }
         }
         assert_eq!(joined, bytes(length));
@@ -52,21 +52,21 @@ mod messages {
 mod heard {
     use super::*;
 
-    const NOT_THE_BRIDGES: &str = "not one `stdout`, `stderr` or `exit` with a value of its type";
+    const NOT_A_SERVER_MESSAGE: &str = "not one `stdout`, `stderr` or `exit` with a value of its type";
 
-    fn unexpected(what: &str) -> Result<Option<BridgeMessage>, Error> {
+    fn unexpected(what: &str) -> Result<Option<ServerMessage>, Error> {
         Err(Error::Protocol(what.to_owned()))
     }
 
     #[rstest]
-    #[case::stdout(r#"{"stdout":"one"}"#, Ok(Some(BridgeMessage::Stdout("one".to_owned()))))]
-    #[case::stderr(r#"{"stderr":"two"}"#, Ok(Some(BridgeMessage::Stderr("two".to_owned()))))]
-    #[case::exit(r#"{"exit":3}"#, Ok(Some(BridgeMessage::Exit(3))))]
-    #[case::not_json("secret", unexpected(NOT_THE_BRIDGES))]
-    #[case::unknown_key(r#"{"secret":"x"}"#, unexpected(NOT_THE_BRIDGES))]
-    #[case::wrong_type(r#"{"exit":"secret"}"#, unexpected(NOT_THE_BRIDGES))]
-    #[case::two_keys(r#"{"exit":0,"stdout":"secret"}"#, unexpected(NOT_THE_BRIDGES))]
-    fn translates_each_text(#[case] text: &str, #[case] expected: Result<Option<BridgeMessage>, Error>) {
+    #[case::stdout(r#"{"stdout":"one"}"#, Ok(Some(ServerMessage::Stdout("one".to_owned()))))]
+    #[case::stderr(r#"{"stderr":"two"}"#, Ok(Some(ServerMessage::Stderr("two".to_owned()))))]
+    #[case::exit(r#"{"exit":3}"#, Ok(Some(ServerMessage::Exit(3))))]
+    #[case::not_json("secret", unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::unknown_key(r#"{"secret":"x"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::wrong_type(r#"{"exit":"secret"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
+    #[case::two_keys(r#"{"exit":0,"stdout":"secret"}"#, unexpected(NOT_A_SERVER_MESSAGE))]
+    fn translates_each_text(#[case] text: &str, #[case] expected: Result<Option<ServerMessage>, Error>) {
         assert_eq!(heard(Some(Ok(Message::text(text)))), expected);
     }
 
@@ -75,7 +75,7 @@ mod heard {
     #[case::pong(Message::Pong(Vec::new().into()), Ok(None))]
     #[case::close(Message::Close(None), Err(Error::Dropped))]
     #[case::binary(Message::binary(br#"{"exit":0}"#.to_vec()), unexpected("a binary frame"))]
-    fn translates_each_frame(#[case] message: Message, #[case] expected: Result<Option<BridgeMessage>, Error>) {
+    fn translates_each_frame(#[case] message: Message, #[case] expected: Result<Option<ServerMessage>, Error>) {
         assert_eq!(heard(Some(Ok(message))), expected);
     }
 
@@ -100,7 +100,7 @@ mod heard {
         unexpected("WebSocket protocol error: Received a masked frame from server")
     )]
     #[case::bad_text(WebSocketError::Utf8("bad".to_owned()), unexpected("UTF-8 encoding error: bad"))]
-    fn translates_each_failure(#[case] error: WebSocketError, #[case] expected: Result<Option<BridgeMessage>, Error>) {
+    fn translates_each_failure(#[case] error: WebSocketError, #[case] expected: Result<Option<ServerMessage>, Error>) {
         assert_eq!(heard(Some(Err(error))), expected);
     }
 }

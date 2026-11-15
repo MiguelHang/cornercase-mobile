@@ -3,13 +3,13 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::pairing::PairError;
 use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::secrets::Secrets;
+use cornercase_core::test_util::TempDir;
 use cornercase_core::transport::fake::FakeTransport;
 use cornercase_core::transport::{Closed, Exit, Out, OutSink, Stdin, Transport};
 use futures_util::stream::BoxStream;
@@ -35,7 +35,6 @@ use crate::state::AppState;
 use crate::view::ConnectionView;
 
 pub(crate) const TOKEN: &str = "c3R1ZGlvLXNlY3JldA";
-pub(crate) const BRIDGE: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
 pub(crate) const ADDRESS: &str = "ws://studio.lan:9000/";
 pub(crate) const BOOT: &str = "5151-1770000000";
 pub(crate) const PAIRING: &str = "ws://studio.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0";
@@ -171,7 +170,7 @@ impl Studio {
         let dir = TempDir::new();
         let secrets: Arc<dyn Secrets> = Arc::new(on_mock(mock_store()));
         let state = AppState::load(Ok::<_, &str>(dir.path().to_path_buf()), secrets.as_ref(), Arc::clone(&secrets));
-        let added = state.machines(|machines| machines.add("studio", &code().routes()).map_err(CommandError::from));
+        let added = state.machines(|machines| machines.add("studio", &[route()]).map_err(CommandError::from));
         Self { id: added.expect("the studio is added"), dir, secrets, state }
     }
 
@@ -180,12 +179,8 @@ impl Studio {
     }
 }
 
-pub(crate) fn code() -> MachineCode {
-    MachineCode::parse(BRIDGE).expect("a bridge code")
-}
-
 pub(crate) fn route() -> Route {
-    Route::parse(BRIDGE).expect("a bridge url")
+    paired_routes(&format!("{ADDRESS}?code={PAIRING_CODE}")).remove(0)
 }
 
 pub(crate) fn snapshot(boot: &str, revision: u64, version: &str) -> String {

@@ -47,9 +47,9 @@ describe('Probes', () => {
     calls.machineProbe.mockImplementation(() => pending.promise)
     const again = made.check([2])
     expect(made.of(2)).toEqual({ state: 'checking' })
-    pending.open({ state: 'unauthorized' })
+    pending.open({ state: 'not_paired' })
     await again
-    expect([made.of(2), calls.machineProbe.mock.calls.length]).toEqual([{ state: 'unauthorized' }, 2])
+    expect([made.of(2), calls.machineProbe.mock.calls.length]).toEqual([{ state: 'not_paired' }, 2])
   })
 
   it('does not probe again a machine still being checked', async () => {

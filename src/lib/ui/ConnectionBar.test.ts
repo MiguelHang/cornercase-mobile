@@ -25,13 +25,13 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 describe('ConnectionBar', () => {
   it.each<[string, ConnectionView_Serialize, string, Tone]>([
     ['connecting', { state: 'connecting' }, 'Connecting…', 'working'],
-    ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/?token=abc' }, 'MacBook · via 192.168.1.20:7000', 'done'],
+    ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
     ['missing', MISSING, 'cornercase on the Mac lacks watch: update it', 'failed'],
     [
-      'unauthorized',
-      { state: 'unauthorized' },
-      "The bridge rejected this phone's token: scan its code again in Machines",
+      'not_paired',
+      { state: 'not_paired' },
+      'This Mac no longer recognizes this phone: scan its code again in Machines',
       'failed',
     ],
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
@@ -71,7 +71,7 @@ describe('ConnectionBar', () => {
     expect(bar(RETRYING)).toMatch(/<span class="line detail svelte-[\w-]+">timed out<\/span>/)
   })
 
-  it.each<ConnectionView_Serialize>([{ state: 'connecting' }, MISSING, { state: 'unauthorized' }])(
+  it.each<ConnectionView_Serialize>([{ state: 'connecting' }, MISSING, { state: 'not_paired' }])(
     'reads its text aloud as shown when $state',
     (connection) => {
       const body = bar(connection)

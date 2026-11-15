@@ -83,7 +83,7 @@
               <span class="mark done">Connected</span>
             {/if}
             {#if !route.has_token}
-              <span class="mark failed">{route.kind === 'cli' ? 'No secret' : 'No token'}</span>
+              <span class="mark failed">No secret</span>
             {/if}
           </span>
         </li>

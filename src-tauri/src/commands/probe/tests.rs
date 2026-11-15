@@ -16,24 +16,32 @@ use crate::commands::error::ErrorCode;
 use crate::commands::machines::list;
 use crate::commands::routes::merge;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, CONTRACT, Ipc, PAIRING, PAIRING_CODE, Recorder, SECRET, Studio, contracted, launcher,
-    paired_routes, pairing, route, serving, settle, snapshot,
+    ADDRESS, BOOT, CONTRACT, Ipc, PAIRING, PAIRING_CODE, Recorder, SECRET, Studio, contracted, launcher, paired_routes,
+    pairing, route, serving, settle, snapshot,
 };
 
-const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+const LAPTOP: &str = "ws://laptop.lan:9000/?code=1a2b3c4d";
 const LAPTOP_ADDRESS: &str = "ws://laptop.lan:9000/";
+const STUDIO: &str = "ws://studio.lan:9000/?code=5e6f7a8b";
 const PROBED: &str = "6262-1770000999";
-const TAILSCALE: &str = "ws://100.101.102.103:9000/?token=c3R1ZGlvLXNlY3JldA";
+const TAILSCALE: &str = "ws://100.101.102.103:9000/?code=3a4b5c6d";
+const NEW_SECRET: &str = "7d3e.8a9b0c";
+const OTHER_SECRET: &str = "2c4e.6a8b0d";
 
 fn answering(studio: FakeTransport, laptop: Result<FakeTransport, Error>) -> Launcher {
+    answering_paired(studio, laptop, NEW_SECRET)
+}
+
+fn answering_paired(studio: FakeTransport, laptop: Result<FakeTransport, Error>, secret: &'static str) -> Launcher {
     let studio: Arc<dyn Transport> = Arc::new(studio);
     let laptop = laptop.map(|fake| Arc::new(fake) as Arc<dyn Transport>);
-    Launcher::new(
+    let launcher = Launcher::new(
         move |route: &Route| {
-            if route.connection_url()? == LAPTOP { laptop.clone() } else { Ok(Arc::clone(&studio)) }
+            if route.address().to_string() == LAPTOP_ADDRESS { laptop.clone() } else { Ok(Arc::clone(&studio)) }
         },
         |task| JoinHandle::Tokio(tokio::spawn(task)),
-    )
+    );
+    pairing(launcher, Ok(secret)).0
 }
 
 fn refusing(error: Error) -> FakeTransport {
@@ -104,14 +112,6 @@ mod probing_a_machine {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_the_token_was_rejected_when_any_route_refuses_it() {
-        let studio = with_the_laptop().await;
-        let launcher = answering(refusing(Error::Unauthorized), Err(asleep()));
-        let view = probe(&studio.state, &launcher, studio.id).await.expect("probed");
-        assert_eq!(view, ProbeView::Unauthorized);
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn says_it_has_no_token_when_no_route_has_one() {
         let studio = Studio::new();
         tokenless(&studio, ADDRESS);
@@ -147,10 +147,6 @@ mod probing_a_machine {
         PickError::AllFailed(vec![(route().address().clone(), Error::NotPaired), (cli_route(), Error::Timeout)]),
         ProbeView::NotPaired
     )]
-    #[case::rejected_by_the_bridge_and_forgotten_by_cornercase_as_the_bar_says(
-        PickError::AllFailed(vec![(route().address().clone(), Error::Unauthorized), (cli_route(), Error::NotPaired)]),
-        ProbeView::NotPaired
-    )]
     fn reads_a_failed_pick(#[case] error: PickError, #[case] expected: ProbeView) {
         assert_eq!(failed(error), expected);
     }
@@ -168,12 +164,8 @@ mod matching_a_url {
     use super::*;
 
     #[rstest]
-    #[case::by_address("ws://studio.lan:9000/?token=bmV3LXNlY3JldA", "desk", SameWhy::Address)]
-    #[case::by_one_lan_address_of_a_code(
-        "ws://studio.lan:9000/?token=bmV3LXNlY3JldA&also=desk.lan",
-        "desk",
-        SameWhy::Address
-    )]
+    #[case::by_address(STUDIO, "desk", SameWhy::Address)]
+    #[case::by_one_lan_address_of_a_code("ws://studio.lan:9000/?code=5e6f7a8b&also=desk.lan", "desk", SameWhy::Address)]
     #[case::by_name(LAPTOP, " Studio ", SameWhy::Name)]
     #[tokio::test(start_paused = true)]
     async fn finds_the_same_machine(#[case] url: &str, #[case] name: &str, #[case] why: SameWhy) {
@@ -220,24 +212,26 @@ mod matching_a_url {
     #[tokio::test(start_paused = true)]
     async fn answers_an_address_without_asking_the_url() {
         let studio = Studio::new();
-        let url = "ws://studio.lan:9000/?token=bmV3LXNlY3JldA";
-        let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), url, "desk").await;
+        let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), STUDIO, "desk").await;
         assert_eq!(view, MatchView { found: same(&studio, SameWhy::Address), checked: true });
     }
 
     #[rstest]
-    #[case::already_saved(BRIDGE)]
-    #[case::by_token("ws://studio.tail:9000/?token=c3R1ZGlvLXNlY3JldA")]
-    #[case::by_a_tailscale_address("ws://100.101.102.103:9000/?token=bmV3LXNlY3JldA")]
-    #[case::by_every_address_of_the_code("ws://studio.lan:9000/?token=bmV3LXNlY3JldA&also=laptop.lan")]
+    #[case::already_saved(STUDIO, NEW_SECRET)]
+    #[case::by_a_tailscale_address(TAILSCALE, OTHER_SECRET)]
+    #[case::by_every_address_of_the_code("ws://studio.lan:9000/?code=5e6f7a8b&also=laptop.lan", OTHER_SECRET)]
     #[tokio::test(start_paused = true)]
-    async fn merges_into_the_machine_it_surely_is_without_asking_the_url(#[case] code: &str) {
+    async fn merges_into_the_machine_it_surely_is_without_asking_the_url(
+        #[case] code: &str,
+        #[case] secret: &'static str,
+    ) {
         let studio = with_the_laptop().await;
         let launcher = answering(contracted(BOOT), Err(asleep()));
         merge(&studio.state, Recorder::default(), &launcher, studio.id, TAILSCALE)
             .await
             .expect("the tailscale route is added");
-        let view = matched(&studio, &answering(refusing(asleep()), Err(asleep())), code, "desk").await;
+        let asking = answering_paired(refusing(asleep()), Err(asleep()), secret);
+        let view = matched(&studio, &asking, code, "desk").await;
         let found = MatchFound::Merge { machine: studio.id.0, name: "studio".to_owned() };
         assert_eq!(view, MatchView { found, checked: true });
     }
@@ -262,7 +256,7 @@ mod matching_a_url {
     async fn refuses_a_url_that_is_not_a_route() {
         let studio = Studio::new();
         let launcher = answering(contracted(BOOT), Err(asleep()));
-        let result = matching(&studio.state, &launcher, "http://laptop.lan:9000/?token=eA", "desk").await;
+        let result = matching(&studio.state, &launcher, "http://laptop.lan:9000/?code=0f1e", "desk").await;
         assert_eq!(result.map_err(|error| error.code), Err(ErrorCode::RouteScheme));
     }
 }
@@ -271,7 +265,6 @@ mod matching_a_pairing_code {
     use super::*;
 
     const DESK: &str = "ws://desk.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0";
-    const BY_TAILSCALE: &str = "ws://studio.lan:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0&also=100.101.102.103";
 
     type Asked = Arc<Mutex<Vec<Route>>>;
 
@@ -298,26 +291,6 @@ mod matching_a_pairing_code {
         assert_eq!(view, MatchView { found: MatchFound::None, checked: true });
         assert_eq!(pairings.load(Ordering::SeqCst), 1);
         assert_eq!(*asked.lock().unwrap_or_else(PoisonError::into_inner), paired_routes(DESK));
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn finds_the_mac_saved_with_routes_of_the_bridge_by_its_host() {
-        let studio = Studio::new();
-        let (launcher, _) = pairing(answering(refusing(asleep()), Err(asleep())), Ok(SECRET));
-        let view = matched(&studio, &launcher, PAIRING, "desk").await;
-        assert_eq!(view, MatchView { found: same(&studio, SameWhy::Address), checked: true });
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn merges_into_the_mac_saved_with_routes_of_the_bridge() {
-        let studio = Studio::new();
-        merge(&studio.state, Recorder::default(), &answering(contracted(BOOT), Err(asleep())), studio.id, TAILSCALE)
-            .await
-            .expect("the tailscale route is added");
-        let (launcher, _) = pairing(answering(refusing(asleep()), Err(asleep())), Ok(SECRET));
-        let view = matched(&studio, &launcher, BY_TAILSCALE, "desk").await;
-        let found = MatchFound::Merge { machine: studio.id.0, name: "studio".to_owned() };
-        assert_eq!(view, MatchView { found, checked: true });
     }
 
     #[tokio::test(start_paused = true)]
@@ -348,15 +321,6 @@ mod matching_a_pairing_code {
         assert_eq!(error.code, ErrorCode::PairingRefused);
         assert!(!error.message.contains(PAIRING_CODE), "{}", error.message);
         assert_eq!(studio.state.secret_of(DESK), None);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn never_pairs_a_code_of_the_bridge() {
-        let studio = Studio::new();
-        let (launcher, pairings) = pairing(answering(contracted(BOOT), Err(asleep())), Ok(SECRET));
-        matched(&studio, &launcher, LAPTOP, "desk").await;
-        assert_eq!(pairings.load(Ordering::SeqCst), 0);
-        assert_eq!(studio.state.secret_of(LAPTOP), None);
     }
 }
 
@@ -401,10 +365,10 @@ mod over_ipc {
     }
 
     #[test]
-    fn refuses_to_match_a_url_without_a_token() {
+    fn refuses_to_match_a_url_without_a_code() {
         let ipc = Ipc::new(Studio::new().state);
-        let answer = ipc.invoke("machine_match", json!({ "code": ADDRESS, "name": "desk" })).expect_err("no token");
-        assert_eq!(answer["code"], "route_no_token");
+        let answer = ipc.invoke("machine_match", json!({ "code": ADDRESS, "name": "desk" })).expect_err("no code");
+        assert_eq!(answer["code"], "route_no_code");
     }
 
     #[test]

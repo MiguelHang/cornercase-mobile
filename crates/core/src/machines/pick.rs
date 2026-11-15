@@ -70,11 +70,9 @@ where
 
 pub fn websocket_transports(config: SocketConfig) -> impl Fn(&Route) -> Result<Arc<dyn Transport>, Error> {
     move |route| {
-        let socket = WebSocketTransport::new(route.connection_url()?, config);
-        let transport: Arc<dyn Transport> = match route.bearer()? {
-            Some(secret) => Arc::new(socket.bearing(secret.to_owned())),
-            None => Arc::new(socket),
-        };
+        let secret = route.token().ok_or(Error::NoToken)?;
+        let transport: Arc<dyn Transport> =
+            Arc::new(WebSocketTransport::new(route.connection_url(), secret.as_str().to_owned(), config));
         Ok(transport)
     }
 }

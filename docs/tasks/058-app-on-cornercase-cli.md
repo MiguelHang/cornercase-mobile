@@ -22,7 +22,7 @@ su `/cli`.
 - [x] CA6 — Fixtures de la versión de cornercase que traiga `/cli`; comprobación en vivo en el simulador y en el iPhone,
   por la LAN y por Tailscale.
   Hechos los fixtures (0.13.78) y el simulador el 2026-11-14 (`design/connection/machines.md` › Checked on 2026-11-14 for
-  058); falta el iPhone.
+  058). El iPhone, el 2026-11-15: el usuario la comprobó en el suyo contra su cornercase 0.13.78 y funciona.
 
 ## Decisiones
 Tomadas el 2026-11-14 con los valores por defecto propuestos:

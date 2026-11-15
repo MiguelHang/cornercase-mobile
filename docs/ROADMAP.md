@@ -104,8 +104,8 @@ Remote, el canje por un secreto del dispositivo y `/cli`.
 | # | Tarea | Depende de | Tamaño |
 |---|---|---|---|
 | 057 | [Upstream: el QR para emparejar la app y `/cli` en cornercase-terminal](tasks/057-upstream-pair-app-cli.md) (#838 de upstream, hecha en #851: cornercase 0.13.78) | — (repo de upstream) | ~800 en upstream |
-| 058 | [La app habla con el `/cli` de cornercase y empareja con su QR](tasks/058-app-on-cornercase-cli.md) | 057 | ~450 |
-| 059 | [Quitar el bridge](tasks/059-remove-bridge.md) | 058 | ~−1.500 |
+| 058 | [La app habla con el `/cli` de cornercase y empareja con su QR](tasks/058-app-on-cornercase-cli.md) (hecha; en el iPhone, el 2026-11-15 con cornercase 0.13.78) | 057 | ~450 |
+| 059 | [Quitar el bridge](tasks/059-remove-bridge.md) (en curso) | 058 | ~−1.500 |
 | 060 | [Primera versión: 0.1.0 por TestFlight y APK](tasks/060-release-0.1.0.md) | 059 (la 057 ya está publicada) | ~300 (+ CI) |
 | 061 | [Upstream: el servidor arrancado al iniciar sesión no encuentra los agentes](tasks/061-upstream-server-path.md) | — (issue) | — |
 

@@ -4,19 +4,19 @@ use std::future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::{Route, Token};
 use cornercase_core::network::Kind;
 use cornercase_core::secrets::file::FileSecrets;
+use cornercase_core::test_util::TempDir;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
 
 use super::*;
 use crate::commands::error::ErrorCode;
 use crate::secrets::{KeychainSecrets, mock_store, on_mock};
-use crate::test_util::{PAIRING, SECRET, TOKEN, code, released, route};
+use crate::test_util::{PAIRING, SECRET, TOKEN, released, route};
 
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
@@ -42,7 +42,7 @@ fn folderless() -> AppState {
 }
 
 fn add_studio(state: &AppState) -> Result<MachineId, CommandError> {
-    state.machines(|machines| machines.add("studio", &code().routes()).map_err(CommandError::from))
+    state.machines(|machines| machines.add("studio", &[route()]).map_err(CommandError::from))
 }
 
 fn saved_file(dir: &TempDir) -> String {
@@ -96,7 +96,7 @@ mod loading_the_machines {
         let dir = TempDir::new();
         let state = loaded(&dir, keychain());
         let shared = state.shared_machines();
-        shared.with(|machines| machines.add("studio", &code().routes()).map_err(CommandError::from)).expect("added");
+        shared.with(|machines| machines.add("studio", &[route()]).map_err(CommandError::from)).expect("added");
         assert_eq!(state.machines(|machines| Ok(machines.machines().len())), Ok(1));
     }
 

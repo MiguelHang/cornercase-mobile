@@ -13,4 +13,6 @@ pub mod queue;
 pub mod secrets;
 pub mod store;
 pub mod terminal;
+#[cfg(any(test, feature = "test-util"))]
+pub mod test_util;
 pub mod transport;

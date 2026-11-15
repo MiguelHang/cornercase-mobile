@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 
 use super::Socket;
 use crate::error::Error;
-use crate::protocol::{BridgeMessage, ClientMessage, LARGEST_MESSAGE};
+use crate::protocol::{ClientMessage, LARGEST_MESSAGE, ServerMessage};
 use crate::transport::{Closed, Exit, Out, OutSink, StderrTail, Stdin};
 
 const CLOSING: Duration = Duration::from_millis(500);
@@ -71,9 +71,9 @@ async fn read(stream: &mut Incoming, mut out: OutSink, silence: Duration) -> Res
     loop {
         let message = timeout(silence, stream.next()).await.map_err(|_| Error::Dropped)?;
         let line = match heard(message)? {
-            Some(BridgeMessage::Exit(code)) => return Ok(Exit { code, stderr: tail.finish() }),
-            Some(BridgeMessage::Stdout(line)) => Out::Stdout(line),
-            Some(BridgeMessage::Stderr(line)) => {
+            Some(ServerMessage::Exit(code)) => return Ok(Exit { code, stderr: tail.finish() }),
+            Some(ServerMessage::Stdout(line)) => Out::Stdout(line),
+            Some(ServerMessage::Stderr(line)) => {
                 tail.push(&line);
                 Out::Stderr(line)
             }
@@ -83,7 +83,7 @@ async fn read(stream: &mut Incoming, mut out: OutSink, silence: Duration) -> Res
     }
 }
 
-fn heard(message: Option<Result<Message, WebSocketError>>) -> Result<Option<BridgeMessage>, Error> {
+fn heard(message: Option<Result<Message, WebSocketError>>) -> Result<Option<ServerMessage>, Error> {
     match message {
         Some(Ok(Message::Text(text))) => parse(&text).map(Some),
         Some(Ok(Message::Binary(_))) => Err(Error::Protocol("a binary frame".to_owned())),
@@ -93,7 +93,7 @@ fn heard(message: Option<Result<Message, WebSocketError>>) -> Result<Option<Brid
     }
 }
 
-fn parse(text: &str) -> Result<BridgeMessage, Error> {
+fn parse(text: &str) -> Result<ServerMessage, Error> {
     serde_json::from_str(text)
         .map_err(|_| Error::Protocol("not one `stdout`, `stderr` or `exit` with a value of its type".to_owned()))
 }

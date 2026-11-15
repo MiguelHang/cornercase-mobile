@@ -13,7 +13,7 @@ use crate::cli::contract::fixtures::REAL;
 use crate::cli::status::fixtures::WATCH;
 use crate::error::Error;
 use crate::machines::pick::PickConfig;
-use crate::machines::route::Route;
+use crate::machines::route::{Address, Route, Token};
 use crate::machines::{Machine, MachineId};
 use crate::store::Store;
 use crate::transport::fake::FakeTransport;
@@ -130,7 +130,8 @@ impl<T: Send + 'static> Watched<T> {
         F: Future<Output = ()> + Send + 'static,
     {
         let (transport, launched) = mac.fake().launched();
-        let studio = Route::parse("ws://studio.local:8765/?token=c2VjcmV0").expect("a bridge url");
+        let address = Address { host: "studio.local".to_owned(), port: 8765 };
+        let studio = Route::cli(address, Some(Token::new("4f2a91c0.9c1e2a7b5d0f".to_owned())));
         let machine = Machine { id: MachineId(1), name: "studio".to_owned(), routes: vec![studio], last_route: None };
         let (store, driver) = Store::new(machine, move |_: &Route| Ok(transport.clone()), PickConfig::default());
         tokio::spawn(driver);

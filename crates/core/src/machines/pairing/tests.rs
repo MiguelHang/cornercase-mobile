@@ -241,12 +241,6 @@ mod pair {
     }
 
     #[tokio::test]
-    async fn refuses_a_code_of_the_bridge() {
-        let code = MachineCode::parse("ws://127.0.0.1:7777/?token=c2VjcmV0LXRva2Vu").expect("a bridge code");
-        assert_eq!(pair_with(&code).await, Err(PairError::NoCode));
-    }
-
-    #[tokio::test]
     async fn refuses_an_app_name_that_cannot_go_in_a_header() {
         let server = Server::start(&["127.0.0.1"], Vec::new()).await;
         let refused = pair(&server.code(&[]), "cornercase-mobile\n", PairConfig::default()).await;

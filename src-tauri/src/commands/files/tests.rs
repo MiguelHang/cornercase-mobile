@@ -83,7 +83,7 @@ mod reading_a_file {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_a_file_past_the_bridge_line_is_too_large_for_the_phone() {
+    async fn says_a_file_past_the_longest_line_is_too_large_for_the_phone() {
         let refused = reading(("", &format!("{LINE_TOO_LONG}\n"), 2)).await;
         assert_eq!(refused, Err(json!({ "code": "too_large_here", "message": "Too large to show on the phone" })));
     }

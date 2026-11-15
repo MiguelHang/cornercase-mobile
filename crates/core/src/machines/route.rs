@@ -5,14 +5,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tokio_tungstenite::tungstenite::http::Uri;
 use tokio_tungstenite::tungstenite::http::uri::Authority;
 
-use crate::error::Error;
-
 const DEFAULT_PORT: u16 = 80;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Route {
-    Bridge { url: RouteUrl },
     Cli { url: RouteUrl },
 }
 
@@ -30,20 +27,12 @@ pub enum RouteError {
     Port,
     #[error("the code's path is not /")]
     Path,
-    #[error("the code has no token")]
-    NoToken,
-    #[error("the code's token is empty")]
-    EmptyToken,
-    #[error("the code has more than one token")]
-    TokenTwice,
-    #[error("the code's token has characters other than letters, digits, - and _")]
-    TokenCharacters,
+    #[error("the code has no pairing code")]
+    NoCode,
     #[error("the code's pairing code is empty")]
     EmptyCode,
     #[error("the code has more than one pairing code")]
     CodeTwice,
-    #[error("the code has both a token and a pairing code")]
-    TokenAndCode,
     #[error("the code's pairing code has characters other than 0-9 and a-f")]
     CodeCharacters,
     #[error("the code has an empty also= address")]
@@ -57,29 +46,17 @@ pub enum RouteError {
 }
 
 impl Route {
-    pub fn parse(text: &str) -> Result<Self, RouteError> {
-        let uri: Uri = text.trim().parse().map_err(|_| RouteError::NotAUrl)?;
-        let address = address(&uri)?;
-        let token = token(uri.query())?;
-        Ok(Self::Bridge { url: RouteUrl { address, token: Some(token) } })
+    pub(crate) fn cli(address: Address, token: Option<Token>) -> Self {
+        Self::Cli { url: RouteUrl { address, token } }
     }
 
     pub fn address(&self) -> &Address {
-        &self.url().address
+        let Self::Cli { url } = self;
+        &url.address
     }
 
-    pub fn connection_url(&self) -> Result<String, Error> {
-        match self {
-            Self::Bridge { url } => url.bridge_url(),
-            Self::Cli { url } => Ok(format!("{}cli", url.address)),
-        }
-    }
-
-    pub(crate) fn bearer(&self) -> Result<Option<&str>, Error> {
-        match self {
-            Self::Bridge { .. } => Ok(None),
-            Self::Cli { url } => url.token.as_ref().map(|secret| Some(secret.as_str())).ok_or(Error::NoToken),
-        }
+    pub fn connection_url(&self) -> String {
+        format!("{}cli", self.address())
     }
 
     pub fn has_token(&self) -> bool {
@@ -87,27 +64,8 @@ impl Route {
     }
 
     pub(crate) fn token(&self) -> Option<&Token> {
-        self.url().token.as_ref()
-    }
-
-    pub(crate) fn set_token(&mut self, token: Option<Token>) {
-        match self {
-            Self::Bridge { url } | Self::Cli { url } => url.token = token,
-        }
-    }
-
-    pub(crate) fn at(&self, address: Address) -> Self {
-        let url = RouteUrl { address, token: self.token().cloned() };
-        match self {
-            Self::Bridge { .. } => Self::Bridge { url },
-            Self::Cli { .. } => Self::Cli { url },
-        }
-    }
-
-    fn url(&self) -> &RouteUrl {
-        match self {
-            Self::Bridge { url } | Self::Cli { url } => url,
-        }
+        let Self::Cli { url } = self;
+        url.token.as_ref()
     }
 }
 
@@ -115,13 +73,6 @@ impl Route {
 pub struct RouteUrl {
     pub(crate) address: Address,
     pub(crate) token: Option<Token>,
-}
-
-impl RouteUrl {
-    fn bridge_url(&self) -> Result<String, Error> {
-        let token = self.token.as_ref().ok_or(Error::NoToken)?;
-        Ok(format!("{}?token={}", self.address, token.0))
-    }
 }
 
 impl Serialize for RouteUrl {
@@ -204,24 +155,6 @@ fn path(uri: &Uri) -> Result<(), RouteError> {
     if path == "/" { Ok(()) } else { Err(RouteError::Path) }
 }
 
-pub(super) fn token(query: Option<&str>) -> Result<Token, RouteError> {
-    match values(query, "token").as_slice() {
-        [] => Err(RouteError::NoToken),
-        [value] => checked_token(value),
-        _ => Err(RouteError::TokenTwice),
-    }
-}
-
-pub(super) fn checked_token(value: &str) -> Result<Token, RouteError> {
-    if value.is_empty() {
-        Err(RouteError::EmptyToken)
-    } else if base64url(value) {
-        Ok(Token(value.to_owned()))
-    } else {
-        Err(RouteError::TokenCharacters)
-    }
-}
-
 pub(super) fn values<'a>(query: Option<&'a str>, key: &str) -> Vec<&'a str> {
     let pairs = query.unwrap_or_default().split('&');
     pairs.filter_map(|pair| value(pair, key)).collect()
@@ -232,10 +165,6 @@ fn value<'a>(pair: &'a str, key: &str) -> Option<&'a str> {
         Some((name, value)) => (name == key).then_some(value),
         None => (pair == key).then_some(""),
     }
-}
-
-fn base64url(text: &str) -> bool {
-    text.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 #[derive(Clone, PartialEq, Eq)]

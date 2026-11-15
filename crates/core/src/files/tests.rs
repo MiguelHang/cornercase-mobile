@@ -4,10 +4,10 @@ use std::io::ErrorKind;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
-use cornercase_bridge::test_util::TempDir;
 use rstest::rstest;
 
 use super::*;
+use crate::test_util::TempDir;
 
 struct Folder {
     dir: TempDir,

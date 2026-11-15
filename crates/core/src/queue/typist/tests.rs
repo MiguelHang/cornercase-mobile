@@ -325,7 +325,7 @@ mod ended {
 
     #[rstest]
     #[case::an_old_cli(Ok(exit(2, NO_FOLLOW_FLAG)), Typed::Absent(vec![]), vec![])]
-    #[case::unreachable(Err(Error::Unauthorized), Typed::Unsent(vec![]), vec![])]
+    #[case::unreachable(Err(Error::Timeout), Typed::Unsent(vec![]), vec![])]
     #[case::crashed(Ok(exit(1, NO_SERVER)), Typed::Gone, vec![crashed(1, "Error: no cornercase server is running")])]
     #[tokio::test]
     async fn says_how_the_typist_ended_while_idle(#[case] end: End, #[case] typed: Typed, #[case] told: Vec<Error>) {

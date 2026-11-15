@@ -14,7 +14,6 @@ pub(crate) struct CommandError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ErrorCode {
-    Unauthorized,
     NotPaired,
     Dropped,
     OutputClosed,
@@ -55,13 +54,9 @@ pub(crate) enum ErrorCode {
     RouteNoHost,
     RoutePort,
     RoutePath,
-    RouteNoToken,
-    RouteEmptyToken,
-    RouteTokenTwice,
-    RouteTokenCharacters,
+    RouteNoCode,
     RouteEmptyCode,
     RouteCodeTwice,
-    RouteTokenAndCode,
     RouteCodeCharacters,
     RouteAlsoEmpty,
     RouteAlsoInvalid,
@@ -156,7 +151,7 @@ impl From<PairError> for CommandError {
     fn from(error: PairError) -> Self {
         match error {
             PairError::Answered(error) => Self::from(error),
-            unanswered => Self::new(ErrorCode::Connect, unanswered),
+            unanswered @ PairError::NoAnswer(_) => Self::new(ErrorCode::Connect, unanswered),
         }
     }
 }
@@ -169,7 +164,6 @@ impl From<RouteError> for CommandError {
 
 fn core_code(error: &Error) -> ErrorCode {
     match error {
-        Error::Unauthorized => ErrorCode::Unauthorized,
         Error::NotPaired => ErrorCode::NotPaired,
         Error::Dropped => ErrorCode::Dropped,
         Error::OutputClosed => ErrorCode::OutputClosed,
@@ -215,13 +209,9 @@ fn route_code(error: RouteError) -> ErrorCode {
         RouteError::NoHost => ErrorCode::RouteNoHost,
         RouteError::Port => ErrorCode::RoutePort,
         RouteError::Path => ErrorCode::RoutePath,
-        RouteError::NoToken => ErrorCode::RouteNoToken,
-        RouteError::EmptyToken => ErrorCode::RouteEmptyToken,
-        RouteError::TokenTwice => ErrorCode::RouteTokenTwice,
-        RouteError::TokenCharacters => ErrorCode::RouteTokenCharacters,
+        RouteError::NoCode => ErrorCode::RouteNoCode,
         RouteError::EmptyCode => ErrorCode::RouteEmptyCode,
         RouteError::CodeTwice => ErrorCode::RouteCodeTwice,
-        RouteError::TokenAndCode => ErrorCode::RouteTokenAndCode,
         RouteError::CodeCharacters => ErrorCode::RouteCodeCharacters,
         RouteError::AlsoEmpty => ErrorCode::RouteAlsoEmpty,
         RouteError::AlsoInvalid => ErrorCode::RouteAlsoInvalid,

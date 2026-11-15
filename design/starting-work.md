@@ -12,7 +12,7 @@ Topics, in `design/starting-work/`:
 
 ## No workspace without an agent
 
-- **Task 023's `Workspace` action, `new-workspace --project <id> [--worktree] --json -- <name>`, left in 045**, with its form, its command, its `Workspace <name> created` toast and its line in `contract::REQUIRED`. A workspace without an agent has no row, and the phone opens a workspace only through an agent's row (the terminal needs the row; `Changes` and `Files` sit in the agent's header), so what it made could not be seen or used from the phone, as the user found on his iPhone (029, 2026-11-10). An agent is now started in a workspace that is open already (`start --workspace`) or in its own worktree. The bridge's allowlist keeps `new-workspace`, since it mirrors upstream's commands, not the app's (Bridge).
+- **Task 023's `Workspace` action, `new-workspace --project <id> [--worktree] --json -- <name>`, left in 045**, with its form, its command, its `Workspace <name> created` toast and its line in `contract::REQUIRED`. A workspace without an agent has no row, and the phone opens a workspace only through an agent's row (the terminal needs the row; `Changes` and `Files` sit in the agent's header), so what it made could not be seen or used from the phone, as the user found on his iPhone (029, 2026-11-10). An agent is now started in a workspace that is open already (`start --workspace`) or in its own worktree. `/cli` still runs `new-workspace`: what it allows follows upstream's commands, not the app's.
 
 ## The screen
 

@@ -2,8 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use cornercase_bridge::test_util::TempDir;
 use cornercase_core::history::SendState;
+use cornercase_core::test_util::TempDir;
 use serde_json::{Value, json};
 
 use super::*;

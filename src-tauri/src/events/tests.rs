@@ -9,7 +9,7 @@ use cornercase_core::cli::surface::{Colours, Modes, Size};
 use cornercase_core::machines::Machine;
 use cornercase_core::machines::pick::PickConfig;
 use cornercase_core::machines::route::Route;
-use cornercase_core::protocol::{APP_ROUTES, BRIDGE_ROUTES, USAGE_EXIT};
+use cornercase_core::protocol::{APP_ROUTES, USAGE_EXIT};
 use cornercase_core::terminal::question::Choice;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::fake::FakeTransport;
@@ -28,7 +28,6 @@ use crate::test_util::{
 const RESTARTED: &str = "5152-1770000100";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
 const HEARD: &str = "2026-10-16T09:30:00.123Z";
-const ROUTES: &[&str] = &[BRIDGE_ROUTES];
 const LAN_HOST: &str = "studio.lan";
 const TAILSCALE_HOST: &str = "100.101.102.103";
 const TAILSCALE: &str = "ws://100.101.102.103:9000/";
@@ -111,11 +110,11 @@ fn watching(id: MachineId, fake: FakeTransport, machines: SharedMachines) -> (St
 
 fn telling(fake: FakeTransport, hosts: &[&str]) -> FakeTransport {
     let routes: Vec<Value> = hosts.iter().map(|host| json!({ "host": host, "port": 9000 })).collect();
-    fake.answer(ROUTES, &[&json!({ "routes": routes }).to_string()], &[], 0)
+    fake.answer(APP_ROUTES, &[&json!({ "routes": routes }).to_string()], &[], 0)
 }
 
 fn tailscale() -> Route {
-    Route::parse(&format!("{TAILSCALE}?token={TOKEN}")).expect("a tailscale url")
+    paired_routes(&format!("{TAILSCALE}?code={PAIRING_CODE}")).remove(0)
 }
 
 fn saved_routes(studio: &Studio) -> Vec<Route> {
@@ -298,7 +297,7 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn adds_an_address_once_however_often_the_bridge_tells_it() {
+    async fn adds_an_address_once_however_often_the_mac_tells_it() {
         let studio = Studio::new();
         let (store, _driver) = store_of(studio.id, serving(&[]));
         let transport: Arc<dyn Transport> =
@@ -326,11 +325,11 @@ mod learning_the_routes {
     }
 
     #[rstest]
-    #[case::refused(serving(&[snapshot(BOOT, 7, "first")]).answer(ROUTES, &[], &["not allowed: --bridge-routes"], USAGE_EXIT))]
-    #[case::not_json(serving(&[snapshot(BOOT, 7, "first")]).answer(ROUTES, &["usage"], &[], 0))]
+    #[case::refused(serving(&[snapshot(BOOT, 7, "first")]).answer(APP_ROUTES, &[], &["unknown operation app-routes"], USAGE_EXIT))]
+    #[case::not_json(serving(&[snapshot(BOOT, 7, "first")]).answer(APP_ROUTES, &["usage"], &[], 0))]
     #[case::unanswered(serving(&[snapshot(BOOT, 7, "first")]))]
     #[tokio::test(start_paused = true)]
-    async fn stays_quiet_with_a_bridge_that_does_not_know_the_request(#[case] fake: FakeTransport) {
+    async fn stays_quiet_with_a_cornercase_that_does_not_know_the_request(#[case] fake: FakeTransport) {
         let studio = Studio::new();
         let recorder = watched(studio.id, fake, studio.state.shared_machines());
         settle().await;
@@ -343,9 +342,9 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn keeps_forwarding_while_the_bridge_has_not_told_them() {
+    async fn keeps_forwarding_while_cornercase_has_not_told_them() {
         let studio = Studio::new();
-        let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "waiting")]).open(ROUTES, &[]);
+        let fake = one_by_one(&[with_claude(7, "working"), with_claude(8, "waiting")]).open(APP_ROUTES, &[]);
         let recorder = watched(studio.id, fake, studio.state.shared_machines());
         settle().await;
         assert_eq!(rows(&recorder), [Some(claude("working", None)), Some(claude("waiting", None))]);

@@ -8,6 +8,8 @@ use futures_util::{SinkExt, stream};
 use super::{Closed, Exit, Out, OutSink, StderrTail, Stdin, Transport};
 use crate::error::Error;
 
+pub mod cli;
+
 type Script = Box<dyn Fn(BoxStream<'static, Stdin>, OutSink) -> BoxFuture<'static, Result<Exit, Error>> + Send + Sync>;
 
 #[derive(Default)]

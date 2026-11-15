@@ -9,8 +9,8 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Error as WebSocketError;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::handshake::client::Request;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
-use tokio_tungstenite::tungstenite::http::{HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 
@@ -38,18 +38,13 @@ impl Default for SocketConfig {
 
 pub struct WebSocketTransport {
     url: String,
-    bearer: Option<String>,
+    secret: String,
     config: SocketConfig,
 }
 
 impl WebSocketTransport {
-    pub fn new(url: String, config: SocketConfig) -> Self {
-        Self { url, bearer: None, config }
-    }
-
-    #[must_use]
-    pub fn bearing(self, credential: String) -> Self {
-        Self { bearer: Some(credential), ..self }
+    pub fn new(url: String, secret: String, config: SocketConfig) -> Self {
+        Self { url, secret, config }
     }
 
     pub(crate) async fn connect(&self) -> Result<Socket, Error> {
@@ -57,26 +52,17 @@ impl WebSocketTransport {
         let upgrade = connect_async_with_config(request, Some(websocket()), true);
         match tokio::time::timeout(self.config.connect_timeout, upgrade).await {
             Ok(Ok((socket, _))) => Ok(socket),
-            Ok(Err(error)) => Err(self.refused(error)),
+            Ok(Err(error)) => Err(refused(error)),
             Err(_) => Err(Error::Timeout),
         }
     }
 
     fn request(&self) -> Result<Request, Error> {
         let mut request = self.url.as_str().into_client_request().map_err(connect_error)?;
-        if let Some(credential) = &self.bearer {
-            let mut value = HeaderValue::from_str(&format!("Bearer {credential}")).map_err(|_| unfit_secret())?;
-            value.set_sensitive(true);
-            request.headers_mut().insert(AUTHORIZATION, value);
-        }
+        let mut value = HeaderValue::from_str(&format!("Bearer {}", self.secret)).map_err(|_| unfit_secret())?;
+        value.set_sensitive(true);
+        request.headers_mut().insert(AUTHORIZATION, value);
         Ok(request)
-    }
-
-    fn refused(&self, error: WebSocketError) -> Error {
-        match (connect_error(error), &self.bearer) {
-            (Error::Rejected { status: 403 }, Some(_)) => Error::NotPaired,
-            (error, _) => error,
-        }
     }
 }
 
@@ -101,13 +87,19 @@ fn websocket() -> WebSocketConfig {
     WebSocketConfig::default().max_frame_size(Some(LARGEST_ANSWER)).max_message_size(Some(LARGEST_ANSWER))
 }
 
+fn refused(error: WebSocketError) -> Error {
+    match connect_error(error) {
+        Error::Rejected { status: 403 } => Error::NotPaired,
+        error => error,
+    }
+}
+
 fn unfit_secret() -> Error {
     Error::Secrets("the saved secret cannot go in a header".to_owned())
 }
 
 pub(crate) fn connect_error(error: WebSocketError) -> Error {
     match error {
-        WebSocketError::Http(response) if response.status() == StatusCode::UNAUTHORIZED => Error::Unauthorized,
         WebSocketError::Http(response) => Error::Rejected { status: response.status().as_u16() },
         WebSocketError::Io(error) => Error::Connect(network_error(&error)),
         WebSocketError::Url(_) | WebSocketError::HttpFormat(_) => Error::Connect("not a ws:// address".to_owned()),

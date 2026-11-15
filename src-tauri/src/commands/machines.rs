@@ -54,11 +54,8 @@ pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
 
 pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId, CommandError> {
     let parsed = MachineCode::parse(code)?;
-    let routes = match state.secret_of(code) {
-        Some(secret) => parsed.cli_routes(&secret),
-        None if parsed.needs_pairing() => return Err(Error::PairingRefused.into()),
-        None => parsed.routes(),
-    };
+    let secret = state.secret_of(code).ok_or(Error::PairingRefused)?;
+    let routes = parsed.cli_routes(&secret);
     let id = state.machines(|machines| machines.add(name, &routes).map_err(CommandError::from))?;
     state.used(code);
     Ok(id)

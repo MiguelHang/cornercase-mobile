@@ -1,7 +1,7 @@
 use rstest::rstest;
 
 use super::*;
-use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
+use crate::machines::tests::{SECRET, TOKEN, cli};
 
 const NEW_TOKEN: &str = "bmV3LXRva2Vu";
 const OTHER_TOKEN: &str = "b3RoZXItdG9rZW4";
@@ -14,7 +14,7 @@ const PHONE_PORT: u16 = 47682;
 const NEW_SECRET: &str = "3b7d9e1f.a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
 
 fn route(host: &str, token: &str) -> Route {
-    bridge(host, 8765, Some(token))
+    cli(host, 8765, Some(token))
 }
 
 fn machine(id: u64, name: &str, routes: Vec<Route>) -> Machine {
@@ -67,34 +67,22 @@ mod by_address {
 
     #[test]
     fn offers_to_update_a_saved_route_whose_token_is_missing() {
-        let machines = vec![machine(0, "Studio", vec![bridge(LAN, 8765, None)])];
+        let machines = vec![machine(0, "Studio", vec![cli(LAN, 8765, None)])];
         assert_eq!(same(&machines, &route(LAN, TOKEN), "new", None, &[]), Some(found(0, Why::Address)));
     }
 
     #[test]
     fn needs_the_same_port() {
-        let same = same(&studio_and_laptop(), &bridge(LAN, 9000, Some(OTHER_TOKEN)), "new", None, &[]);
+        let same = same(&studio_and_laptop(), &cli(LAN, 9000, Some(OTHER_TOKEN)), "new", None, &[]);
         assert_eq!(same, None);
     }
 }
 
-mod by_token {
+mod secrets {
     use super::*;
 
     #[test]
-    fn finds_the_machine_whose_route_has_the_same_token_at_another_address() {
-        let same = same(&studio_and_laptop(), &route(GONE, NEW_TOKEN), "new", None, &[]);
-        assert_eq!(same, Some(found(1, Why::Token)));
-    }
-
-    #[test]
-    fn skips_saved_routes_without_a_token() {
-        let machines = vec![machine(0, "Studio", vec![bridge(LAN, 8765, None)])];
-        assert_eq!(same(&machines, &route(GONE, TOKEN), "new", None, &[]), None);
-    }
-
-    #[test]
-    fn never_matches_a_cornercase_secret_at_another_address() {
+    fn never_match_a_machine_at_another_address() {
         let machines = vec![machine(0, "Studio", paired(&[LAN], SECRET))];
         assert_eq!(same_paired(&machines, &[GONE], SECRET), None);
     }
@@ -102,29 +90,6 @@ mod by_token {
 
 mod cornercase_codes {
     use super::*;
-
-    #[test]
-    fn merge_by_the_tailnet_host_of_a_bridge_route_on_another_port() {
-        assert_eq!(same_paired(&studio_and_laptop(), &[GONE, TAILNET], SECRET), Some(found(1, Why::Tailscale)));
-    }
-
-    #[test]
-    fn merge_when_every_host_is_a_bridge_route_of_the_machine() {
-        let machines = vec![machine(0, "Studio", vec![route(LAN, TOKEN), route(GONE, TOKEN)])];
-        assert_eq!(same_paired(&machines, &[GONE, LAN], SECRET), Some(found(0, Why::AllAddresses)));
-    }
-
-    #[test]
-    fn offer_a_single_lan_host_of_a_bridge_route() {
-        assert_eq!(same_paired(&studio_and_laptop(), &[LAN], SECRET), Some(found(0, Why::Address)));
-    }
-
-    #[test]
-    fn need_the_same_port_as_a_cornercase_route() {
-        let machines = vec![machine(0, "Studio", paired(&[LAN], SECRET))];
-        let same = same(&machines, &cli(LAN, 9000, Some(NEW_SECRET)), "new", None, &[]);
-        assert_eq!(same, None);
-    }
 
     #[rstest]
     #[case::with_the_same_secret(SECRET, Why::AlreadySaved)]
@@ -187,25 +152,12 @@ mod codes {
     }
 
     #[test]
-    fn merge_by_the_token_when_the_machine_misses_a_route() {
-        assert_eq!(same_code(&studio_and_laptop(), &[LAN, NEW_TAILNET], TOKEN), Some(found(0, Why::Token)));
-    }
-
-    #[test]
-    fn whose_routes_are_saved_as_two_machines_go_to_the_first_with_the_token() {
-        let machines =
-            vec![machine(0, "Studio", vec![route(LAN, TOKEN)]), machine(1, "Tailnet", vec![route(TAILNET, TOKEN)])];
-        assert_eq!(same_code(&machines, &[TAILNET, LAN], TOKEN), Some(found(0, Why::Token)));
-    }
-
-    #[test]
     fn without_routes_match_no_saved_route() {
         assert_eq!(same_code(&studio_and_laptop(), &[], TOKEN), None);
     }
 
     #[rstest]
     #[case::already_saved(Why::AlreadySaved, true)]
-    #[case::token(Why::Token, true)]
     #[case::tailscale(Why::Tailscale, true)]
     #[case::all_addresses(Why::AllAddresses, true)]
     #[case::address(Why::Address, false)]
@@ -261,9 +213,13 @@ mod priority {
     use super::*;
 
     #[rstest]
-    #[case::the_token_before_the_address(route(LAN, NEW_TOKEN), "new", None, Some(found(1, Why::Token)))]
-    #[case::the_token_before_the_boot(route(GONE, NEW_TOKEN), "new", Some(BOOT), Some(found(1, Why::Token)))]
-    #[case::the_token_before_the_name(route(GONE, NEW_TOKEN), "Studio", None, Some(found(1, Why::Token)))]
+    #[case::the_address_before_the_boot(
+        route(LAN, OTHER_TOKEN),
+        "new",
+        Some("laptop-boot"),
+        Some(found(0, Why::Address))
+    )]
+    #[case::the_address_before_the_name(route(LAN, OTHER_TOKEN), "laptop", None, Some(found(0, Why::Address)))]
     #[case::the_boot_before_the_name(
         route(GONE, OTHER_TOKEN),
         "Studio",
@@ -285,12 +241,12 @@ mod ties {
     use super::*;
 
     #[test]
-    fn take_the_first_machine_with_the_same_token() {
+    fn take_the_first_machine_at_the_same_address() {
         let machines = vec![
             machine(4, "Studio", vec![route(LAN, TOKEN)]),
-            machine(2, "laptop", vec![route(TAILNET, NEW_TOKEN), route(GONE, TOKEN)]),
+            machine(2, "laptop", vec![route(TAILNET, NEW_TOKEN), route(LAN, OTHER_TOKEN)]),
         ];
-        assert_eq!(same(&machines, &route("studio.local", TOKEN), "new", None, &[]), Some(found(4, Why::Token)));
+        assert_eq!(same(&machines, &route(LAN, NEW_TOKEN), "new", None, &[]), Some(found(4, Why::Address)));
     }
 
     #[test]

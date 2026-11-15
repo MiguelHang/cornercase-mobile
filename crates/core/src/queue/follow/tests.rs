@@ -22,7 +22,6 @@ mod absent {
     #[rstest]
     #[case::no_requests_command(exit(2, NO_REQUESTS_COMMAND))]
     #[case::no_follow(exit(2, NO_FOLLOW_FLAG))]
-    #[case::refused_by_the_bridge(exit(2, "`requests` is not allowed through the bridge"))]
     fn is_a_cli_that_does_not_know_the_command(#[case] exit: Exit) {
         assert!(absent(&exit));
     }

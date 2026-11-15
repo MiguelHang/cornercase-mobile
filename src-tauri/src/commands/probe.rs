@@ -62,9 +62,6 @@ pub(crate) async fn paired_routes(
     text: &str,
 ) -> Result<Vec<Route>, CommandError> {
     let code = MachineCode::parse(text)?;
-    if !code.needs_pairing() {
-        return Ok(code.routes());
-    }
     if let Some(secret) = state.secret_of(text) {
         return Ok(code.cli_routes(&secret));
     }
@@ -114,9 +111,6 @@ fn failed(error: PickError) -> ProbeView {
     };
     if failures.iter().any(|(_, error)| *error == Error::NotPaired) {
         return ProbeView::NotPaired;
-    }
-    if failures.iter().any(|(_, error)| *error == Error::Unauthorized) {
-        return ProbeView::Unauthorized;
     }
     if failures.iter().all(|(_, error)| *error == Error::NoToken) {
         return ProbeView::NoToken;

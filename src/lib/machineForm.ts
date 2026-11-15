@@ -11,7 +11,7 @@ export type Offer = { url: string; name: string; machine: number; saved: string;
 export const EMPTY = 'Paste the code from cornercase › Settings › Remote › Phone app'
 export const NO_SCHEME = 'The code starts with ws://'
 export const NOT_A_URL = 'This is not a machine code'
-export const NO_TOKEN = 'The code is cut short: paste it whole'
+export const NO_CODE = 'The code is cut short: paste it whole'
 
 export const LONGEST_NAME = 64
 export const NAME_EMPTY = 'the name is empty'
@@ -39,8 +39,6 @@ const parsed = (url: string) => {
 
 const refused = (error: string): Checked => ({ ok: false, error })
 
-const SECRETS = ['code', 'token']
-
 export const checkUrl = (raw: string): Checked => {
   const url = raw.trim()
   if (url === '') {
@@ -53,7 +51,7 @@ export const checkUrl = (raw: string): Checked => {
   if (found === null) {
     return refused(NOT_A_URL)
   }
-  return SECRETS.some((key) => found.searchParams.get(key)) ? { ok: true, url } : refused(NO_TOKEN)
+  return found.searchParams.get('code') ? { ok: true, url } : refused(NO_CODE)
 }
 
 const folded = (name: string) => name.trim().toLowerCase()
