@@ -68,15 +68,15 @@ const unfolded = (machine: number, ...panes: number[]) => {
   return machine
 }
 
-const START = /<button class="button primary svelte-[\w-]+( resting)?" type="button"([^>]*)>(?:<!--[^>]*-->| )*Start</
+const START = /<button class="button primary svelte-[\w-]+ compact( resting)?" type="button"([^>]*)>(?:<!--[^>]*-->| )*Start</
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
-const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="(\w+)"[^]*?<\/svg>(?:<!--[^>]*-->)*<\/span> <svg class="turn svelte-[\w-]+( open)?" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="--turn: (\d+)ms;"><path d="([^"]+)"/g
+const FOLD = /<button class="fold svelte-[\w-]+" type="button" aria-label="([^"]+)" aria-expanded="(true|false)"><span class="face svelte-[\w-]+" aria-hidden="true">(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="(\w+)"[^]*?<\/svg>(?:<!--[^>]*-->)*<\/span> <svg class="turn svelte-[\w-]+( open)?" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="--turn: (\d+)ms;"><path d="([^"]+)"/g
 
 const disclosures = (body: string) => [...body.matchAll(FOLD)].map((m) => m.slice(1))
 
-const TRIANGLE = 'M6.5 5v14l11-7z'
+const CHEVRON = 'm9 18 6-6-6-6'
 
 const sections = (body: string) => [...body.matchAll(/<h2 class="section svelte-[\w-]+">(\w+)<\/h2>/g)].map((m) => m[1])
 
@@ -168,8 +168,10 @@ describe('Board', () => {
     expect(rowSource).not.toMatch(/setInterval|setTimeout/)
   })
 
-  it.each([null, [], [at(1, 'waiting')]])('heads the screen with an h1 only a screen reader reads, for %o', (agents) => {
-    expect(draw(agents)).toContain('<h1 class="spoken">Agents</h1>')
+  it.each([null, [], [at(1, 'waiting')]])('heads the screen with a visible h1 beside Start, for %o', (agents) => {
+    const body = draw(agents)
+    expect(body).toMatch(/<div class="heading svelte-[\w-]+"><h1 class="title svelte-[\w-]+">Agents<\/h1>/)
+    expect(body.indexOf('>Agents</h1>')).toBeLessThan(body.indexOf('>Start<'))
   })
 
   it.each([[], null, [at(1, 'working')]])('offers starting new work once connected, for %o', (agents) => {
@@ -177,7 +179,7 @@ describe('Board', () => {
     expect(button?.[1]).toBeUndefined()
     expect(button?.[2]).not.toContain('disabled')
     expect(flat(boardSource)).toContain(
-      "<Button resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>",
+      "<Button compact resting={connection.state !== 'connected'} onclick={onstart}>Start</Button>",
     )
   })
 
@@ -208,15 +210,15 @@ describe('Board', () => {
     expect(body).toMatch(/<span class="hidden svelte-[\w-]+">\+2<\/span>/)
     expect(body).toMatch(/role="img" aria-label="2 subagents hidden, at least one waiting"><span class="marks svelte-[\w-]+" aria-hidden="true">/)
     expect(body).toMatch(/aria-label="Waiting" width="10" height="10"/)
-    expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', 'Working', undefined, '180', TRIANGLE]])
+    expect(disclosures(body)).toEqual([['Show 2 subagents', 'false', 'Working', undefined, '180', CHEVRON]])
   })
 
   it('unfolds the branches the board keeps for its machine and boot', () => {
     const machine = unfolded(20, 1)
     expect(titles(draw(BRANCH, CONNECTED, 0, machine))).toEqual(['Lead', 'Ask'])
     expect(disclosures(draw(BRANCH, CONNECTED, 0, machine))).toEqual([
-      ['Hide 2 subagents', 'true', 'Working', ' open', '180', TRIANGLE],
-      ['Show 1 subagent', 'false', 'Waiting', undefined, '180', TRIANGLE],
+      ['Hide 2 subagents', 'true', 'Working', ' open', '180', CHEVRON],
+      ['Show 1 subagent', 'false', 'Waiting', undefined, '180', CHEVRON],
     ])
     expect(titles(draw(BRANCH, CONNECTED, 0, unfolded(21, 1, 2)))).toEqual(['Lead', 'Ask', 'Dig'])
     expect(titles(draw(BRANCH, CONNECTED, 0, 22))).toEqual(['Lead'])
@@ -230,7 +232,7 @@ describe('Board', () => {
     expect(body.indexOf('</button>', fold)).toBeLessThan(body.indexOf('<button class="row'))
     expect(body).not.toContain('class="lead')
     expect(flat(rowSource)).toContain('onclick={() => onfold(row.pane)} ontouchstart={() => {}} >')
-    expect(rowSource).not.toMatch(/\.lead|chevron/)
+    expect(rowSource).not.toMatch(/\.lead|<Icon/)
     expect(flat(boardSource)).toContain('{onopen} onfold={fold}')
     expect(flat(boardSource)).toContain('if (machine !== null) { folds.toggle(machine, boot, pane) }')
   })
@@ -241,32 +243,33 @@ describe('Board', () => {
     expect(fold).not.toContain('onopen')
   })
 
-  it('turns the triangle a quarter in the time of ENTER_MS', () => {
+  it("turns Lucide's chevron a quarter in the time of ENTER_MS", () => {
     const source = flat(rowSource)
     expect(source).not.toContain('<Icon')
     expect(source.match(/<path /g)).toHaveLength(1)
-    expect(source).toContain(`<path d="${TRIANGLE}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />`)
-    expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
+    expect(source).toContain("const [chevron] = icons['chevron-right']")
+    expect(source).toContain('<path d={chevron.d} />')
     expect(source).toContain('.turn { position: relative; left: calc((7px + var(--inset-wide)) / 2); }')
+    expect(source).toContain('const turn = prefersReducedMotion() ? 0 : ENTER_MS')
     expect(source).toContain('.turn path { transform-box: view-box; transform-origin: center; transition: transform var(--turn); }')
     expect(source).toContain('.turn.open path { transform: rotate(90deg); }')
     expect(source).toContain('display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; width: 44px; padding: 0; color: var(--soft); }')
   })
 
-  it('moves the triangle halfway from the dot to the title with the tokens', () => {
+  it('moves the chevron halfway from the dot to the title with the tokens', () => {
     const rule = flat(rowSource).match(/\.turn \{[^}]*\}/)?.[0]
     expect(rule).toContain('position: relative; left: calc((7px + var(--inset-wide)) / 2);')
     expect(rule).not.toMatch(/11\.5|11px|12px/)
     expect(flat(rowSource).match(/\.turn[^{]*\{[^}]*\}/g)?.join(' ')).not.toMatch(/translate/)
   })
 
-  it('turns the drawing inside the triangle and never the triangle itself, whose frame would reach the title', () => {
+  it('turns the drawing inside the chevron and never its frame, which would reach the title', () => {
     const source = flat(rowSource)
     expect(source).not.toMatch(/\.turn(\.open)? \{[^}]*transform/)
     expect(source).toMatch(/\.turn\.open path \{ transform: rotate\(90deg\); \}/)
   })
 
-  it('draws a triangle only on the rows with children', () => {
+  it('draws a chevron only on the rows with children', () => {
     const tree = [at(1, 'working', { title: 'Lead' }), at(2, 'idle', { title: 'Kid', parent: 1, depth: 1 }), at(4, 'idle', { title: 'Alone' })]
     const body = draw(tree, CONNECTED, 0, unfolded(27, 1))
     expect(titles(body)).toEqual(['Lead', 'Kid', 'Alone'])
@@ -295,7 +298,7 @@ describe('Board', () => {
     expect(body).toMatch(/<span class="mark svelte-[\w-]+"><!--\[-1-->(?:<!--[^>]*-->)*<svg class="dot svelte-[\w-]+" role="img" aria-label="Done"/)
   })
 
-  it('turns the triangle at once with reduced motion', () => {
+  it('turns the chevron at once with reduced motion', () => {
     vi.stubGlobal('window', { matchMedia: (query: string) => ({ matches: query.includes('reduce') }) })
     try {
       expect(disclosures(draw(BRANCH)).map((m) => m[4])).toEqual(['0'])
@@ -423,7 +426,7 @@ describe('Board search', () => {
     expect(folds.expanded(machine, 'b1').size).toBe(0)
   })
 
-  it('keeps every dot inside its row while searching, with no triangle and no spoken status', () => {
+  it('keeps every dot inside its row while searching, with no chevron and no spoken status', () => {
     const body = draw(BRANCH, CONNECTED, 0, searching(49, 'dig'))
     expect(titles(body)).toEqual(['Lead', 'Ask', 'Dig'])
     expect(body).not.toContain('<svg class="turn')

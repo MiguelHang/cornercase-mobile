@@ -282,13 +282,13 @@ describe('Thread', () => {
     expect(body).toContain('<strong')
   })
 
-  it('marks only the last message of the agent whose turn is not over, faintly, after its text', () => {
+  it('marks only the last message of the agent whose turn is not over, quietly, after its text', () => {
     const conversation = [GAP, { ...ASKED, turn_over: false }, agentSaid(2, 'Writing it', { turn_over: false })]
     const body = thread(threadChat(conversation))
     expect(count(body, 'More to come…')).toBe(1)
     expect(body).toMatch(/<p class="going svelte-[\w-]+">More to come…<\/p>/)
     expect(at(body, 'Writing it')).toBeLessThan(at(body, 'More to come…'))
-    expect(flat(threadSource)).toContain('.written, .going { color: var(--faint); font-size: 13px; }')
+    expect(flat(threadSource)).toContain('.written, .going { color: var(--muted); font-size: 13px; }')
   })
 
   it.each([true, null])('leaves the mark out when the last turn is %o', (turnOver) => {
@@ -349,7 +349,7 @@ describe('Thread', () => {
     expect(source).toContain(
       '$effect.pre(() => { void chat.reading void chat.outgoing const was = drawn drawn = chat.conversation.length > 0 if (drawn && (!was || untrack(ending))) { void tick().then(toEnd) } })',
     )
-    expect(source).toContain('const toEnd = () => { const scrolled = scroller() scrolled.scrollTo({ top: scrolled.scrollHeight }) }')
+    expect(source).toContain('const toEnd = () => { const scrolling = scroller() scrolling.scrollTo({ top: scrolling.scrollHeight }) }')
     expect(source).toContain(
       'const ending = () => { const { scrollTop, clientHeight, scrollHeight } = scroller() return atEnd(scrollTop, clientHeight, scrollHeight) }',
     )
@@ -359,25 +359,45 @@ describe('Thread', () => {
     expect(flat(threadSource)).toContain(
       'const scroller = () => (boxed && box !== undefined ? box : document.documentElement)',
     )
-    expect(flat(threadSource)).toContain('.boxed { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }')
+    expect(flat(threadSource)).toContain('.boxed { min-height: 0; margin-bottom: -100vh; overflow-y: auto; overscroll-behavior: contain; }')
     expect(thread(chatWith(ROW))).toMatch(/<div class="thread svelte-[\w-]+">/)
     expect(render(Thread, { props: { chat: chatWith(ROW), now: LATER, boxed: true } }).body).toMatch(
       /<div class="thread svelte-[\w-]+ boxed">/,
     )
   })
 
-  it('goes to its end as the keyboard opens or closes, and as its box changes height while open only if it was at its end', () => {
+  it('goes to its end as the keyboard opens, and as its box changes height while open only if it was at its end', () => {
     const source = flat(threadSource)
-    expect(source).toContain('let wasBoxed = untrack(() => boxed) let pinned = true')
+    expect(source).toContain('let wasBoxed = untrack(() => boxed) let pinned = true let left = 0')
     expect(source).toContain(
-      '$effect(() => { void tall if (boxed !== wasBoxed || (boxed && pinned)) { wasBoxed = boxed toEnd() } })',
+      '$effect(() => { void tall if (boxed === wasBoxed && !(boxed && pinned)) return const closing = wasBoxed && !boxed wasBoxed = boxed if (closing && !pinned) keepFromEnd(scroller(), left) else toEnd() })',
     )
-    expect(source).toContain(
-      '<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={() => (pinned = ending())}>',
+  })
+
+  it('keeps the place of a reader who scrolled up as the keyboard closes, by the distance from the end', () => {
+    expect(flat(threadSource)).toContain('const scrolled = () => { pinned = ending() left = fromEnd(scroller()) }')
+    expect(flat(threadSource)).toContain(
+      '<div class="thread" class:boxed bind:this={box} bind:clientHeight={tall} onscroll={scrolled}>',
     )
   })
 
   it('stacks your bubble on the right of the column', () => {
     expect(flat(threadSource)).toContain('.thread { display: flex; flex: 1; flex-direction: column;')
+    expect(flat(threadSource)).toContain('.entries { display: flex; flex-direction: column; gap: var(--inset-wide); min-width: 0; }')
+  })
+
+  it('reaches behind the composer and the keys while the keyboard is open, with room at its end, so its end still sits above the composer', () => {
+    const source = flat(threadSource)
+    expect(source).toContain('.room { flex: none; height: calc(100vh - var(--inset-wide)); }')
+    expect(source).toContain('{#if boxed} <div class="room"></div> {/if}')
+    expect(thread(chatWith(ROW))).not.toContain('class="room')
+    expect(render(Thread, { props: { chat: chatWith(ROW), now: LATER, boxed: true } }).body).toMatch(/<div class="room svelte-[\w-]+">/)
+  })
+
+  it('moves its messages down with the composer by a transform while a finger takes the keys down, showing older ones above', () => {
+    const props = { chat: chatWith(ROW), now: LATER, boxed: true }
+    expect(render(Thread, { props: { ...props, drop: 190 } }).body).toMatch(/<div class="entries svelte-[\w-]+" style="transform: translateY\(190px\);">/)
+    expect(render(Thread, { props }).body).not.toContain('transform')
+    expect(flat(threadSource)).toContain('.boxed .entries { will-change: transform; }')
   })
 })

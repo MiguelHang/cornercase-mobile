@@ -38,6 +38,7 @@
   .where {
     display: flex;
     flex-direction: column;
+    padding-bottom: 22px;
   }
 
   .note {

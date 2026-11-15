@@ -84,16 +84,27 @@ describe('Markdown, with what could run or load', () => {
     expect(draw(markdown)).toBe(`<div class="markdown"><p class="block">${text}</p></div>`)
   })
 
-  it('never draws a link, an image or a script', () => {
+  it('never draws an image, a script, nor a link that leaves the web', () => {
     const html = draw(
       [
         '<script>alert(1)</script>',
-        '[x](javascript:alert(1)) ![y](https://example.com/y.png) <https://example.com> www.example.com',
-        '| [a](https://a.example) | ![b](https://b.example/b.png) |\n| --- | --- |',
+        '[x](javascript:alert(1)) ![y](https://example.com/y.png) [m](mailto:a@example.com)',
+        '| ![b](https://b.example/b.png) |\n| --- |',
         '```html\n<img src=x onerror=alert(1)>\n```',
       ].join('\n\n'),
     )
     expect(html).not.toMatch(/<(a|img|script)[\s>]|href=/)
+  })
+
+  it('draws a link to the web as a link, which the system opens in its browser instead of the app', () => {
+    expect(draw('see [the docs](https://example.com)')).toBe(
+      '<div class="markdown"><p class="block">see <a class="link" href="https://example.com">the docs</a></p></div>',
+    )
+    expect(flat(nodeSource)).toContain('onclick={(event) => { event.preventDefault() void follow(opener, url) }}')
+  })
+
+  it('keeps iOS from previewing a link on a long press, which would open it in the app', () => {
+    expect(flat(nodeSource)).toContain('-webkit-touch-callout: none;')
   })
 
   it('never writes raw markup', () => {

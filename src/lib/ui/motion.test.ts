@@ -1,4 +1,4 @@
-import { cubicOut, quadIn } from 'svelte/easing'
+import { cubicOut, quadIn, quintOut } from 'svelte/easing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import tokens from '../theme/tokens.css?raw'
 import {
@@ -7,12 +7,18 @@ import {
   POP_MS,
   PULSE_MS,
   RISE_PX,
+  SHEET_IN_MS,
+  SHEET_OUT_MS,
   dropIn,
   enter,
   fadeOut,
   leave,
   prefersReducedMotion,
   riseIn,
+  sheetIn,
+  sheetOut,
+  veilIn,
+  veilOut,
 } from './motion'
 
 const token = (name: string) => tokens.match(new RegExp(`${name}:\\s*(\\d+)ms;`))?.[1]
@@ -64,6 +70,26 @@ describe('motion', () => {
     expect(riseIn(node)).toMatchObject({ duration: entering, easing: cubicOut })
     expect(dropIn(node)).toMatchObject({ duration: entering, easing: cubicOut })
     expect(fadeOut(node)).toMatchObject({ duration: leaving, easing: quadIn })
+  })
+
+  it.each([
+    [false, SHEET_IN_MS, SHEET_OUT_MS],
+    [true, 0, 0],
+  ])('slides the sheet and fades its veil with reduced motion %s, leaving faster than it came', (reduced, entering, leaving) => {
+    stubMotion(reduced)
+    const node = {} as Element
+    expect(sheetIn(node)).toMatchObject({ duration: entering, easing: quintOut })
+    expect(sheetOut(node)).toMatchObject({ duration: leaving, easing: cubicOut })
+    expect(veilIn(node)).toMatchObject({ duration: entering, easing: cubicOut })
+    expect(veilOut(node)).toMatchObject({ duration: leaving, easing: cubicOut })
+    expect(SHEET_OUT_MS).toBeLessThan(SHEET_IN_MS)
+  })
+
+  it('slides the sheet from below the bottom edge, opaque all the way', () => {
+    stubMotion(false)
+    const frame = sheetIn({} as Element).css?.(0, 1) ?? ''
+    expect(frame).toContain('translate(0px, 100%)')
+    expect(frame).toContain('opacity: 1')
   })
 
   it('rises from 14 px below', () => {

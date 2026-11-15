@@ -21,7 +21,9 @@ pub fn run() {
     let specta = bindings::specta();
     let (hear, paths) = network::listen();
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_keyboard::init())
         .plugin(tauri_plugin_network::init(hear))
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_photos::init())
         .plugin(tauri_plugin_secrets::init());
     #[cfg(mobile)]

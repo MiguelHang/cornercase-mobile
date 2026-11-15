@@ -4,6 +4,7 @@
   import type { Progress } from '../../lib/closeAgent.svelte'
   import { OPEN_WIDTH, watchLongPress, watchRowSwipe, type RowGesture } from '../../lib/rowSwipe'
   import Hidden from '../../lib/ui/Hidden.svelte'
+  import { icons } from '../../lib/ui/icons/shapes'
   import { ENTER_MS, prefersReducedMotion } from '../../lib/ui/motion'
   import Spinner from '../../lib/ui/Spinner.svelte'
   import StatusDot from '../../lib/ui/StatusDot.svelte'
@@ -38,6 +39,7 @@
   const time = $derived(elapsed(row.since, now))
 
   const turn = prefersReducedMotion() ? 0 : ENTER_MS
+  const [chevron] = icons['chevron-right']
 
   let dragged = $state<number | null>(null)
 
@@ -94,12 +96,16 @@
           class:open={!item.folded}
           style:--turn="{turn}ms"
           aria-hidden="true"
-          width="14"
-          height="14"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
-          fill="currentColor"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <path d="M6.5 5v14l11-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          <path d={chevron.d} />
         </svg>
       </button>
     {/if}
@@ -268,7 +274,7 @@
     flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
-    color: var(--faint);
+    color: var(--muted);
     font-size: 13px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

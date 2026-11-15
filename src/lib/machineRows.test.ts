@@ -54,7 +54,7 @@ describe('rowStatus of another machine', () => {
     [
       'without a secret',
       { state: 'no_token' },
-      { text: 'No secret: scan its code again', tone: 'failed', pulsing: false },
+      { text: 'No secret', tone: 'failed', pulsing: false },
     ],
     [
       'not answering',

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import Glass from './Glass.svelte'
-  import { fadeOut, riseIn } from './motion'
+  import { sheetIn, sheetOut, veilIn, veilOut } from './motion'
   import { overPage } from './overPage'
 
   let { label, oncancel, children }: { label: string; oncancel: () => void; children: Snippet } = $props()
@@ -9,9 +9,9 @@
   const focused = (node: HTMLElement) => node.focus({ preventScroll: true })
 </script>
 
-<div class="layer" {@attach overPage} out:fadeOut>
-  <button class="scrim" type="button" tabindex="-1" aria-hidden="true" onclick={oncancel}></button>
-  <div class="sheet" role="dialog" aria-modal="true" aria-label={label} tabindex="-1" {@attach focused} in:riseIn>
+<div class="layer" {@attach overPage}>
+  <button class="scrim" type="button" tabindex="-1" aria-hidden="true" onclick={oncancel} in:veilIn out:veilOut></button>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label={label} tabindex="-1" {@attach focused} in:sheetIn out:sheetOut>
     <Glass sheet>
       <div class="body">
         {@render children()}

@@ -108,7 +108,7 @@
 
   .tag {
     flex: none;
-    color: var(--faint);
+    color: var(--muted);
     font-size: 13px;
     font-style: italic;
   }

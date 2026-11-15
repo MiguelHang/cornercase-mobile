@@ -160,7 +160,7 @@ describe('Agent, its subagents', () => {
   })
 
   it('starts folded again for each agent opened, and opens its children like the board', () => {
-    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} boxed={seen !== null} />')
+    expect(flat(agentSource)).toContain('{#key row.pane} <Subagents {row} agents={agents ?? []} {onopen} /> {/key} <Thread {chat} {now} boxed={seen !== null} {drop} />')
   })
 
   it('follows the rows as they change', () => {
@@ -194,10 +194,10 @@ describe('Agent, its sticky header', () => {
     expect(draw(chatWith(ROW), 52)).toMatch(/<div class="bar ios svelte-[\w-]+ fixed" style="--below: 52px;"><div class="start/)
   })
 
-  it('carries a compact line between them, with the dot, the title and the status, hidden from VoiceOver', () => {
+  it('carries a compact line between them, with the dot and the title, hidden from VoiceOver', () => {
     const short = bar(ROW).match(SHORT)?.[1] ?? ''
     expect(short).toContain('aria-label="Waiting"')
-    expect(short).toMatch(/<span class="called svelte-[\w-]+">Fix the login flow<\/span> <span class="state svelte-[\w-]+">Waiting<\/span>$/)
+    expect(short).toMatch(/<span class="called svelte-[\w-]+">Fix the login flow<\/span>$/)
     const shown = bar(ROW)
     expect(shown.indexOf('class="short')).toBeGreaterThan(shown.indexOf('<div class="center'))
     expect(shown.indexOf('class="short')).toBeLessThan(shown.indexOf('<div class="end'))
@@ -205,7 +205,7 @@ describe('Agent, its sticky header', () => {
 
   it('names the agent in the compact line when it has no title', () => {
     const short = bar({ ...ROW, title: null, status: 'working' }).match(SHORT)?.[1] ?? ''
-    expect(short).toMatch(/<span class="called svelte-[\w-]+">claude<\/span> <span class="state svelte-[\w-]+">Working<\/span>$/)
+    expect(short).toMatch(/<span class="called svelte-[\w-]+">claude<\/span>$/)
   })
 
   it('turns compact past the large header, measured, following the page with a passive listener', () => {
@@ -295,7 +295,7 @@ describe('Agent, its composer', () => {
     expect(body).toMatch(/<div class="composer svelte-[\w-]+" style="--below: 0px;">/)
     expect(body).toMatch(/<textarea class="area svelte-[\w-]+" rows="1" aria-label="Answer" placeholder="Answer claude"/)
     expect(body).toContain('go on</textarea>')
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} {drop} /> <Composer {chat} agent={row.agent} {below} {seen} {drop} {onfailed} {ontoast} />')
   })
 
   it('offers no attaching without its agent, nor once it is gone', () => {
@@ -328,9 +328,32 @@ const header = (boxed: boolean) =>
   }).body
 
 describe('Agent, with the phone keyboard open', () => {
+  it('lays the composer\'s ground under it down to the bottom, moving with it, so a frame of lag behind the keys shows no gap', () => {
+    const source = flat(agentSource)
+    expect(source).toContain(
+      '{#if seen !== null} <div class="floor" style:transform={drop > 0 ? `translateY(${drop}px)` : undefined}></div> {/if}',
+    )
+    expect(source).toContain(
+      '.floor { position: absolute; top: 100%; right: 0; left: 0; height: 100vh; background: var(--glass); pointer-events: none; will-change: transform; }',
+    )
+  })
+
+  it('drops the composer onto the keys while a finger takes them down, from where the app says they begin', () => {
+    const source = flat(agentSource)
+    expect(source).toContain(
+      'const keys = new KeyboardTop() const seen = $derived(keyboard.covered ? keyboard.height : null) const drop = $derived(seen === null ? 0 : dropped(seen, keys.top))',
+    )
+    expect(source).toContain('<Composer {chat} agent={row.agent} {below} {seen} {drop} {onfailed} {ontoast} />')
+    expect(source).toContain('$effect(() => keys.watch(globalThis))')
+  })
+
+  it('tells the app, while it is open, that the keys may follow the finger here and nowhere else', () => {
+    expect(flat(agentSource)).toContain('$effect(() => followKeys(document.documentElement))')
+  })
+
   it('takes the place and height of what the keyboard leaves visible, as the terminal does', () => {
     const source = flat(agentSource)
-    expect(source).toContain('const keyboard = new Keyboard(globalThis) const seen = $derived(keyboard.covered ? keyboard.height : null)')
+    expect(source).toContain('const keyboard = new Keyboard(globalThis)')
     expect(source).toContain('$effect(() => keyboard.watch())')
     expect(source).toContain(
       'class:keyboard={seen !== null} style:--below="{below}px" style:top={seen === null ? undefined : `${keyboard.offset}px`} style:height={seen === null ? undefined : `${seen}px`} >',
@@ -578,8 +601,8 @@ describe('Agent, its keys', () => {
 
 describe('Agent, its live line', () => {
   it('draws the line at the end of the thread, above the composer', () => {
-    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} /> <Composer {chat} agent={row.agent} {below} {seen} {onfailed} {ontoast} />')
-    expect(flat(threadSource)).toContain('{#if note !== null} <p class="reason">{note}</p> {/if} <AgentLine {chat} {now} /> </div>')
+    expect(flat(agentSource)).toContain('<Thread {chat} {now} boxed={seen !== null} {drop} /> <Composer {chat} agent={row.agent} {below} {seen} {drop} {onfailed} {ontoast} />')
+    expect(flat(threadSource)).toContain('{#if note !== null} <p class="reason">{note}</p> {/if} <AgentLine {chat} {now} /> {#if boxed} <div class="room"></div> {/if} </div> </div>')
   })
 
   it('tells the time by the chat clock', () => {
@@ -624,13 +647,13 @@ describe('Agent, closing its agent', () => {
     return { classes: classes.trim(), attributes: attributes.trim(), spinner: inside.includes('class="spinner'), text }
   }
 
-  const RESTING = { classes: 'resting', attributes: 'type="button" disabled="" aria-disabled="true"', spinner: false }
+  const RESTING = { classes: 'quiet resting', attributes: 'type="button" disabled="" aria-disabled="true"', spinner: false }
 
   const dialog = (body: string) => body.match(/<div class="sheet svelte-[\w-]+" role="dialog" aria-modal="true" aria-label="([^"]+)"/)?.[1]
 
-  it('offers a danger Close agent at the foot of the large header, named by its text for VoiceOver', async () => {
+  it('offers a quiet danger Close agent at the foot of the large header, named by its text for VoiceOver', async () => {
     const body = await shown('idle')
-    expect(button(body)).toEqual({ classes: '', attributes: 'type="button"', spinner: false, text: 'Close agent' })
+    expect(button(body)).toEqual({ classes: 'quiet', attributes: 'type="button"', spinner: false, text: 'Close agent' })
     expect(body.search(CLOSE_AGENT)).toBeGreaterThan(body.indexOf('</header>'))
     expect(body.search(CLOSE_AGENT)).toBeLessThan(body.indexOf('class="composer'))
     expect(dialog(body)).toBeUndefined()
@@ -649,7 +672,7 @@ describe('Agent, closing its agent', () => {
 
   it('turns a spinner while cornercase checks what closing it stops', async () => {
     const body = await shown('checking')
-    expect(button(body)).toEqual({ classes: 'busy', attributes: 'type="button" disabled="" aria-busy="true"', spinner: true, text: 'Close agent' })
+    expect(button(body)).toEqual({ classes: 'quiet busy', attributes: 'type="button" disabled="" aria-busy="true"', spinner: true, text: 'Close agent' })
   })
 
   it('says Closing… while it closes, and takes no other close', async () => {

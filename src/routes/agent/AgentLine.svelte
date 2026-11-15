@@ -40,7 +40,7 @@
   }
 
   .time {
-    color: var(--faint);
+    color: var(--muted);
   }
 
   .muted,

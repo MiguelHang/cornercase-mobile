@@ -5,6 +5,12 @@ const text = (value: string): Node => ({ type: 'text', value })
 
 const paragraph = (...children: Node[]): Node => ({ type: 'paragraph', children })
 
+const link = (url: string, ...children: Node[]): Node => ({ type: 'link', url, children })
+
+type Found = { type: string; url?: string; children?: Found[] }
+
+const found = (nodes: Found[]): Found[] => nodes.flatMap((node) => [node, ...found(node.children ?? [])])
+
 const kinds = (nodes: unknown[]): string[] =>
   nodes.flatMap((node) => {
     const { type, children } = node as { type: string; children?: unknown[] }
@@ -124,9 +130,8 @@ describe('parse, with what could run or load', () => {
     ['an image tag', '<img src=x onerror=alert(1)>', [paragraph(text('<img src=x onerror=alert(1)>'))]],
     ['inline html', 'a <b>bold</b> word', [paragraph(text('a <b>bold</b> word'))]],
     ['a javascript link', '[x](javascript:alert(1))', [paragraph(text('x'))]],
-    ['a link', 'see [the docs](https://example.com)', [paragraph(text('see the docs'))]],
-    ['a bare url', 'at https://example.com now', [paragraph(text('at https://example.com now'))]],
-    ['an autolink', '<https://example.com>', [paragraph(text('https://example.com'))]],
+    ['a mail link', '[me](mailto:a@example.com)', [paragraph(text('me'))]],
+    ['a link to a file', '[notes](file:///etc/hosts)', [paragraph(text('notes'))]],
     ['a reference link', '[docs][d]\n\n[d]: https://example.com', [paragraph(text('docs'))]],
     ['an image', '![a cat](https://example.com/cat.png)', [paragraph(text('a cat'))]],
     ['an image without alt', 'before ![](https://example.com/x.png) after', [paragraph(text('before  after'))]],
@@ -135,17 +140,32 @@ describe('parse, with what could run or load', () => {
     expect(parse(markdown)).toEqual(tree)
   })
 
+  it.each<[string, string, Node[]]>([
+    ['a link', 'see [the docs](https://example.com)', [paragraph(text('see '), link('https://example.com', text('the docs')))]],
+    ['a bare url', 'at https://example.com now', [paragraph(text('at '), link('https://example.com', text('https://example.com')), text(' now'))]],
+    ['an autolink', '<https://example.com>', [paragraph(link('https://example.com', text('https://example.com')))]],
+    ['a www address', 'www.example.com', [paragraph(link('http://www.example.com', text('www.example.com')))]],
+    ['a link with styled words', '[**the** docs](http://example.com/a?b=1#c)', [paragraph(link('http://example.com/a?b=1#c', { type: 'strong', children: [text('the')] }, text(' docs')))]],
+  ])('keeps %s to the web as a link', (_, markdown, tree) => {
+    expect(parse(markdown)).toEqual(tree)
+  })
+
   it('keeps what it does not draw as its text', () => {
     expect(parse('a note[^1]\n\n[^1]: the footnote')).toEqual([paragraph(text('a note')), paragraph(text('the footnote'))])
   })
 
-  it('never gives a link or an image', () => {
+  it('never gives an image, nor a link that leaves the web', () => {
     const markdown = [
       '[x](javascript:alert(1)) ![y](https://example.com/y.png) <https://example.com> www.example.com',
       '> - [z](https://example.com) ![w][w]',
       '| [a](https://a.example) | ![b](https://b.example/b.png) |\n| --- | --- |',
       '[w]: https://example.com/w.png',
     ].join('\n\n')
-    expect(kinds(parse(markdown)).filter((kind) => /link|image/i.test(kind))).toEqual([])
+    expect(kinds(parse(markdown)).filter((kind) => /image|reference/i.test(kind))).toEqual([])
+    expect(
+      found(parse(markdown) as Found[])
+        .filter(({ type }) => type === 'link')
+        .map(({ url }) => url),
+    ).toEqual(['https://example.com', 'http://www.example.com', 'https://example.com', 'https://a.example'])
   })
 })

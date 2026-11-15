@@ -20,7 +20,9 @@ serde_json = "1.0.154"
 specta = { workspace = true }
 tauri = { version = "2.12", features = ["specta"] }
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive"] }
+tauri-plugin-keyboard = { path = "plugins/keyboard" }
 tauri-plugin-network = { path = "plugins/network" }
+tauri-plugin-opener = "2.7.3"
 tauri-plugin-photos = { path = "plugins/photos" }
 tauri-plugin-secrets = { path = "plugins/secrets" }
 tokio = { version = "1.54.1", features = ["macros", "sync", "time"] }

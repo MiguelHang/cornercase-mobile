@@ -27,13 +27,8 @@ describe('ConnectionBar', () => {
     ['connecting', { state: 'connecting' }, 'Connecting…', 'working'],
     ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
-    ['missing', MISSING, 'cornercase on the Mac lacks watch: update it', 'failed'],
-    [
-      'not_paired',
-      { state: 'not_paired' },
-      'This Mac no longer recognizes this phone: scan its code again in Machines',
-      'failed',
-    ],
+    ['missing', MISSING, 'Update cornercase on the Mac', 'failed'],
+    ['not_paired', { state: 'not_paired' }, 'This Mac no longer recognizes this phone', 'failed'],
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
     const body = bar(connection)
     expect(body).toMatch(new RegExp(`<span class="dot ${tone} svelte-[\\w-]+( pulsing)?"></span>`))

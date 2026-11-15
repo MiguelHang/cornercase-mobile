@@ -63,4 +63,14 @@
   .toggle:disabled {
     opacity: 0.6;
   }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .toggle {
+      transition: background-color var(--enter) ease;
+    }
+
+    .toggle::after {
+      transition: transform var(--enter) cubic-bezier(0.23, 1, 0.32, 1);
+    }
+  }
 </style>

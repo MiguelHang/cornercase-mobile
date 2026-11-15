@@ -169,7 +169,8 @@ describe('Machines', () => {
   it('offers Scan again on the active one the Mac forgot, with the text of the bar', async () => {
     const [active] = rows(await screen(loaded(FINGERPRINT), { state: 'not_paired' }))
     expect(active).toMatch(scanAgain)
-    expect(active).toContain('This Mac no longer recognizes this phone: scan its code again in Machines')
+    expect(active).toContain('This Mac no longer recognizes this phone')
+    expect(active).toContain('Scan its code again in Machines')
   })
 
   it('offers Scan again, in the place of Check again, on another one the Mac forgot, saying it is not paired', async () => {

@@ -58,7 +58,6 @@
     <div class="short" class:compact aria-hidden="true">
       <StatusDot status={row.status} />
       <span class="called">{label(row, agents)}</span>
-      <span class="state">{statusName(row.status)}</span>
     </div>
   {/snippet}
   {#snippet right()}
@@ -77,9 +76,9 @@
 </header>
 <div class="close" class:spoken={boxed}>
   {#if progress === 'closing'}
-    <Button tone="danger" resting>Closing…</Button>
+    <Button tone="danger" quiet resting>Closing…</Button>
   {:else}
-    <Button tone="danger" resting={!closable && progress === null} busy={progress === 'checking'} onclick={onclose}>
+    <Button tone="danger" quiet resting={!closable && progress === null} busy={progress === 'checking'} onclick={onclose}>
       Close agent
     </Button>
   {/if}
@@ -117,12 +116,6 @@
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .state {
-    flex: none;
-    color: var(--muted);
-    font-size: 13px;
   }
 
   .head {

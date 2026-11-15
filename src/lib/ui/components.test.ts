@@ -79,7 +79,7 @@ describe('Sheet', () => {
   })
 
   it('cancels on a tap outside it, on the veil', () => {
-    expect(flat(sheetSource)).toContain('aria-hidden="true" onclick={oncancel}></button>')
+    expect(flat(sheetSource)).toContain('aria-hidden="true" onclick={oncancel} in:veilIn out:veilOut></button>')
   })
 
   it('sits over the whole page, out of the screens that slide, and takes the focus', () => {
@@ -93,8 +93,7 @@ describe('Sheet', () => {
     '.scrim { position: absolute; inset: 0; padding: 0; border: 0; background: var(--veil); touch-action: none; }',
     '.sheet { position: relative; width: 100%; max-width: 520px; margin: 0 auto;',
     'padding: var(--inset-wide) var(--inset-wide) calc(env(safe-area-inset-bottom) + var(--inset-wide));',
-    'out:fadeOut',
-    'in:riseIn',
+    '{@attach focused} in:sheetIn out:sheetOut>',
   ])('holds %s', (text) => {
     expect(flat(sheetSource)).toContain(text)
   })
@@ -182,7 +181,7 @@ describe('CodeBox', () => {
 })
 
 describe('Button', () => {
-  type Props = { tone?: 'primary' | 'plain' | 'danger'; type?: 'button' | 'submit'; resting?: boolean; busy?: boolean }
+  type Props = { tone?: 'primary' | 'plain' | 'danger'; type?: 'button' | 'submit'; quiet?: boolean; resting?: boolean; busy?: boolean }
   const button = (props: Props, label = 'Add machine') =>
     render(Button, { props: { ...props, children: html(label) } }).body
 
@@ -207,6 +206,16 @@ describe('Button', () => {
     expect(button({ tone: 'danger' }, 'Remove')).toMatch(/<button class="button danger svelte-[\w-]+" type="button">/)
   })
 
+  it('goes quiet as text in its tone, with no fill or edge, its label still on the line of the text beside it', () => {
+    expect(button({ tone: 'danger', quiet: true }, 'Close agent')).toMatch(
+      /<button class="button danger svelte-[\w-]+ quiet" type="button">/,
+    )
+    expect(flat(buttonSource)).toContain(
+      '.quiet { margin-left: calc(-1 * var(--inset)); padding: 0 var(--inset); border-color: transparent; background: none; }',
+    )
+    expect(flat(buttonSource)).toContain('.quiet:not(.resting):active { border-color: transparent; }')
+  })
+
   it('shows the spinner before its label and stops answering while busy', () => {
     const body = button({ busy: true, type: 'submit' }, 'Adding…')
     expect(body).toMatch(
@@ -219,7 +228,7 @@ describe('Button', () => {
   it.each([
     'gap: 6px;',
     'border-radius: var(--radius-control);',
-    '.primary { border: 1px solid rgb(43 123 255 / 0.7); background: linear-gradient(180deg, var(--brand-light), var(--brand)); box-shadow: 0 0 10px rgb(0 95 255 / 0.28); color: var(--on-brand); font-weight: 500; }',
+    '.primary { border: 1px solid rgb(43 123 255 / 0.7); background: linear-gradient(180deg, var(--brand), var(--brand-hover)); box-shadow: 0 0 10px rgb(0 95 255 / 0.28); color: var(--on-brand); font-weight: 500; }',
     '.plain { border: 1px solid var(--border); background: var(--hover); color: var(--soft); }',
     '.danger { border: 1px solid color-mix(in srgb, var(--failed) 35%, transparent); background: color-mix(in srgb, var(--failed) 10%, transparent); color: var(--failed); }',
   ])('holds %s', (text) => {
@@ -367,7 +376,7 @@ describe('SearchField', () => {
     '.search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 32%, transparent); }',
     'font-size: 16px;',
     '-webkit-user-select: text; user-select: text;',
-    '.query::placeholder { color: var(--faint); }',
+    '.query::placeholder { color: var(--muted); }',
     '.bar { display: flex; align-items: center; gap: var(--gap); }',
     '.cancel { flex: none; min-height: 44px; padding: 0 4px; border: none; background: none; color: var(--accent);',
   ])('holds %s', (text) => {
