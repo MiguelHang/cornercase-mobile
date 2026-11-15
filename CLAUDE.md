@@ -28,8 +28,6 @@ pnpm install                                      # frontend packages and the Ta
 pnpm build                                        # dist/: release builds need it; CI runs it before cargo
 pnpm tauri ios dev "<iPhone>"                     # the app in the iOS simulator; names from `xcrun simctl list devices`
 pnpm tauri android dev [<AVD or device>]          # the app on Android; names from `emulator -list-avds`, `adb devices`
-cargo run -p cornercase-bridge                    # the development bridge, on the Mac's LAN and Tailscale addresses
-cargo run -p cornercase-bridge -- --loopback --port 0   # the same, only on 127.0.0.1, to try it on the Mac
 cargo fmt --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
@@ -73,20 +71,18 @@ pnpm test                                         # vitest
     -D warnings`, needs the NDK's compiler: with `T=$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin`, set
     `CC_aarch64_linux_android=$T/aarch64-linux-android24-clang`, `AR_aarch64_linux_android=$T/llvm-ar` and
     `CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$T/aarch64-linux-android24-clang`.
-  - **The emulator reaches the bridge** at the Mac's LAN or Tailscale address the bridge prints, not at `10.0.2.2`
-    (`--loopback` prints `127.0.0.1`, which is the emulator itself). Paste the code into the form, or type it with
-    `adb shell "input text '<piece>'"`, 16 characters at a time: longer text gets cut.
+  - Paste a machine's code into the emulator's form, or type it with `adb shell "input text '<piece>'"`, 16
+    characters at a time: longer text gets cut.
 - **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest, the two files of
   `res/xml/`, `MainActivity.kt` (the keyboard's insets) and the launch's resources (`values/colors.xml`,
   `values/themes.xml`, `values-v31/themes.xml`, `drawable/launch_mark.xml`; `values-night/themes.xml` deleted) are
   changed by hand. `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
 
 ## Structure
-- `crates/core/`: pure, testable logic: transport trait, bridge protocol, CLI types over `--json`,
+- `crates/core/`: pure, testable logic: transport trait, the protocol of cornercase's `/cli`, CLI types over `--json`,
   ordered queue, `Store`, machines and routes. No Tauri, no platform code.
 - `src-tauri/`: the app shell: Tauri commands and events, key storage (Keychain / Keystore), lifecycle
   and network-change hooks, mobile projects.
-- `bridge/`: the development bridge binary (WebSocket ↔ `cornercase <args>`), runs on the Mac.
 - `src/`: the Svelte UI.
 - `design/`, `DESIGN.md`: decisions by area. `docs/`: idea, roadmap and tasks.
 
@@ -105,7 +101,7 @@ pnpm test                                         # vitest
 - No dead code.
 
 ## Tests
-- `crates/core` and `bridge/` carry the logic and its unit tests (protocol, allowlist, queue, Store,
+- `crates/core` carries the logic and its unit tests (protocol, queue, Store,
   applying frames and patches, route selection), with JSON fixtures from cornercase's `--json` output.
 - UI logic that is not markup (stores, formatting, key mapping) has vitest tests.
 - Every task closes with tests green and fmt, clippy, svelte-check, lint and jscpd clean.

@@ -36,7 +36,6 @@ keyring-core = "1.0.1"
 apple-native-keyring-store = { version = "1.0.2", features = ["protected"] }
 
 [dev-dependencies]
-cornercase-bridge = { path = "../bridge", features = ["test-util"] }
 cornercase-core = { path = "../crates/core", features = ["test-util"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 keyring-core = "1.0.1"

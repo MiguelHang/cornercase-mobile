@@ -57,7 +57,6 @@ describe('file size', () => {
 describe('what is walked', () => {
   it.each([
     'crates/core/src/lib.rs',
-    'bridge/src/main.rs',
     'src-tauri/src/lib.rs',
     'src-tauri/build.rs',
     'src/App.svelte',
