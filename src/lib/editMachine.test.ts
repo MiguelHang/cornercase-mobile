@@ -2,11 +2,11 @@ import { untrack } from 'svelte'
 import { describe, expect, it, vi } from 'vitest'
 import type { CommandError, MachineView_Serialize, MergeView } from './bindings'
 import { EditMachine, type EditCalls } from './editMachine.svelte'
-import { NAME_EMPTY, NAME_TAKEN, NO_TOKEN } from './machineForm'
+import { NAME_EMPTY, NAME_TAKEN, NO_CODE } from './machineForm'
 
 vi.mock('svelte', async (actual) => ({ ...(await actual<object>()), untrack: vi.fn((read: () => unknown) => read()) }))
 
-const URL_TEXT = 'ws://100.64.0.3:9000/?token=abc'
+const URL_TEXT = 'ws://100.64.0.3:9000/?code=4f9a'
 
 const ROUTES = ['ws://studio.lan:9000/', 'ws://192.168.1.20:9000/']
 
@@ -187,7 +187,7 @@ describe('EditMachine adding a route', () => {
   })
 
   it('takes the machine code scanned again whole, for the core to add its addresses and update the token', async () => {
-    const code = 'ws://192.168.1.20:9000/?token=new&also=100.64.0.3&name=Studio'
+    const code = 'ws://192.168.1.20:9000/?code=7a8b&also=100.64.0.3&name=Studio'
     const { edit, commands, onchanged } = editor()
     edit.open()
     await edit.fill(code)
@@ -195,12 +195,12 @@ describe('EditMachine adding a route', () => {
     expect(onchanged).toHaveBeenCalledOnce()
   })
 
-  it('refuses a URL without a token under the field, keeping the form open', async () => {
+  it('refuses a URL without a pairing code under the field, keeping the form open', async () => {
     const { edit, commands } = editor()
     edit.open()
     edit.url = 'ws://100.64.0.3:9000/'
     await edit.addRoute()
-    expect([edit.urlError, edit.adding]).toEqual([NO_TOKEN, true])
+    expect([edit.urlError, edit.adding]).toEqual([NO_CODE, true])
     expect(commands.machineMerge).not.toHaveBeenCalled()
   })
 
@@ -226,7 +226,7 @@ describe('EditMachine adding a route', () => {
     await adding
     edit.open()
     edit.url = 'ws://x'
-    edit.urlError = NO_TOKEN
+    edit.urlError = NO_CODE
     edit.close()
     expect([edit.adding, edit.url, edit.urlError]).toEqual([false, '', null])
   })

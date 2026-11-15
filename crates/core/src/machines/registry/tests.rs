@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use rstest::rstest;
 
 use super::*;
-use crate::machines::code::MachineCode;
 use crate::machines::store::JsonFileStore;
 use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
 use crate::secrets::memory::MemorySecrets;
@@ -84,9 +83,7 @@ fn route(host: &str, token: &str) -> Route {
 }
 
 fn code(hosts: &[&str], token: &str) -> Vec<Route> {
-    let (first, also) = hosts.split_first().expect("at least one host");
-    let first = MachineCode::new(first.parse().expect("an ip"), 8765, token).expect("a machine code");
-    also.iter().fold(first, |code, host| code.with_also(host.parse().expect("an ip"))).routes()
+    hosts.iter().map(|host| route(host, token)).collect()
 }
 
 fn address(host: &str) -> Address {
@@ -790,11 +787,11 @@ mod same {
     use crate::machines::same::Why;
 
     #[test]
-    fn compares_the_tokens_read_back_from_the_secrets() {
+    fn compares_the_secrets_read_back_from_the_secrets_store() {
         let phone = Phone::new();
         let (_, id) = phone.studio();
-        let same = phone.open().same(&[route("studio.local", TOKEN)], "new", None, &HashMap::new());
-        assert_eq!(same, Some(Same { machine: id, why: Why::Token }));
+        let same = phone.open().same(&[route(LAN, TOKEN)], "new", None, &HashMap::new());
+        assert_eq!(same, Some(Same { machine: id, why: Why::AlreadySaved }));
     }
 }
 

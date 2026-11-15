@@ -78,7 +78,6 @@ mod of_pairing {
     #[case::refused(PairError::Answered(Error::PairingRefused), "pairing_refused")]
     #[case::failed(PairError::Answered(Error::PairingFailed), "pairing_failed")]
     #[case::malformed(PairError::Answered(Error::MalformedSecret), "protocol")]
-    #[case::no_code(PairError::NoCode, "connect")]
     fn carries_the_code_of_what_the_mac_answered(#[case] error: PairError, #[case] code: &str) {
         let message = error.to_string();
         assert_eq!(json_of(&CommandError::from(error)), json!({ "code": code, "message": message }));
@@ -114,13 +113,14 @@ mod from_a_route_error {
     }
 
     #[rstest]
-    #[case::also_empty("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=", "route_also_empty")]
-    #[case::also_invalid("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=[::1]", "route_also_invalid")]
-    #[case::name_encoding("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=%FF", "route_name_encoding")]
-    #[case::name_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&name=a&name=b", "route_name_twice")]
+    #[case::also_empty("ws://studio.lan:9000/?code=c0de&also=", "route_also_empty")]
+    #[case::also_invalid("ws://studio.lan:9000/?code=c0de&also=[::1]", "route_also_invalid")]
+    #[case::name_encoding("ws://studio.lan:9000/?code=c0de&name=%FF", "route_name_encoding")]
+    #[case::name_twice("ws://studio.lan:9000/?code=c0de&name=a&name=b", "route_name_twice")]
+    #[case::no_code("ws://studio.lan:9000/?also=10.0.0.2", "route_no_code")]
+    #[case::bridge_code("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", "route_bridge_code")]
     #[case::empty_code("ws://studio.lan:9000/?code=", "route_empty_code")]
     #[case::code_twice("ws://studio.lan:9000/?code=c0de&code=c0de", "route_code_twice")]
-    #[case::token_and_code("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&code=c0de", "route_token_and_code")]
     #[case::code_characters("ws://studio.lan:9000/?code=C0DE", "route_code_characters")]
     fn carries_the_code_of_a_machine_code_error(#[case] text: &str, #[case] code: &str) {
         assert_carries(MachineCode::parse(text).expect_err("a code that does not parse"), code);

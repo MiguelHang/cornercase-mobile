@@ -4,7 +4,7 @@ import { OpenScanner, openScanner, pageClasses, Scanner, type ScannerApi } from 
 
 type PermissionState = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
-const URL_TEXT = 'ws://studio.lan:9000/?token=abc'
+const URL_TEXT = 'ws://studio.lan:9000/?code=4f9a'
 
 const read = (content: string): Scanned => ({ content, format: Format.QRCode, bounds: null })
 

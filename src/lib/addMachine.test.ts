@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AddMachine, send, type MachineCalls } from './addMachine.svelte'
 import type { CommandError, MatchFound, MergeView, SameWhy } from './bindings'
-import { EMPTY, NAME_TAKEN, NAME_TOO_LONG, NO_TOKEN } from './machineForm'
+import { EMPTY, NAME_TAKEN, NAME_TOO_LONG, NO_CODE } from './machineForm'
 
-const URL_TEXT = 'ws://studio.lan:9000/?token=abc'
+const URL_TEXT = 'ws://studio.lan:9000/?code=4f9a'
 
-const CODE = 'ws://192.168.1.20:9000/?token=abc&also=100.101.102.103&name=Mac%20Studio'
+const CODE = 'ws://192.168.1.20:9000/?code=4f9a&also=100.101.102.103&name=Mac%20Studio'
 
 const MERGED: MergeView = { added: ['ws://100.101.102.103:9000/'], token_updated: true, skipped: [] }
 
@@ -101,7 +101,7 @@ describe('AddMachine', () => {
     const pending = gate()
     const { draft, commands } = form({ machineAdd: () => pending.promise })
     const sent = draft.submit()
-    await draft.fill('ws://other.lan:9000/?token=xyz')
+    await draft.fill('ws://other.lan:9000/?code=5e6f')
     pending.open(3)
     await sent
     expect([draft.url, commands.machineAdd.mock.calls]).toEqual([URL_TEXT, [[URL_TEXT, 'studio.lan']]])
@@ -109,7 +109,7 @@ describe('AddMachine', () => {
 
   it.each([
     ['empty', '', EMPTY],
-    ['without its token', 'ws://studio.lan:9000/', NO_TOKEN],
+    ['without its token', 'ws://studio.lan:9000/', NO_CODE],
   ])('puts the problem of a URL %s under it without sending it', async (_, url, error) => {
     const { draft, commands } = form({}, url)
     await draft.submit()
@@ -354,7 +354,7 @@ describe('AddMachine offering the same machine', () => {
   it('ignores a submit or a scan while the offer is up', async () => {
     const { draft, commands } = await offered('boot')
     await draft.submit()
-    await draft.fill('ws://other.lan:9000/?token=xyz')
+    await draft.fill('ws://other.lan:9000/?code=5e6f')
     expect([draft.url, commands.machineMatch.mock.calls.length]).toEqual([URL_TEXT, 1])
   })
 })

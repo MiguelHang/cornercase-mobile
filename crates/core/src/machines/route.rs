@@ -38,12 +38,14 @@ pub enum RouteError {
     TokenTwice,
     #[error("the code's token has characters other than letters, digits, - and _")]
     TokenCharacters,
+    #[error("the code has no pairing code")]
+    NoCode,
+    #[error("this is a code of the old bridge: scan the one in cornercase's Settings › Remote › Phone app")]
+    BridgeCode,
     #[error("the code's pairing code is empty")]
     EmptyCode,
     #[error("the code has more than one pairing code")]
     CodeTwice,
-    #[error("the code has both a token and a pairing code")]
-    TokenAndCode,
     #[error("the code's pairing code has characters other than 0-9 and a-f")]
     CodeCharacters,
     #[error("the code has an empty also= address")]
@@ -204,7 +206,7 @@ fn path(uri: &Uri) -> Result<(), RouteError> {
     if path == "/" { Ok(()) } else { Err(RouteError::Path) }
 }
 
-pub(super) fn token(query: Option<&str>) -> Result<Token, RouteError> {
+fn token(query: Option<&str>) -> Result<Token, RouteError> {
     match values(query, "token").as_slice() {
         [] => Err(RouteError::NoToken),
         [value] => checked_token(value),
@@ -212,7 +214,7 @@ pub(super) fn token(query: Option<&str>) -> Result<Token, RouteError> {
     }
 }
 
-pub(super) fn checked_token(value: &str) -> Result<Token, RouteError> {
+fn checked_token(value: &str) -> Result<Token, RouteError> {
     if value.is_empty() {
         Err(RouteError::EmptyToken)
     } else if base64url(value) {

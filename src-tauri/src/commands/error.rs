@@ -59,9 +59,10 @@ pub(crate) enum ErrorCode {
     RouteEmptyToken,
     RouteTokenTwice,
     RouteTokenCharacters,
+    RouteNoCode,
+    RouteBridgeCode,
     RouteEmptyCode,
     RouteCodeTwice,
-    RouteTokenAndCode,
     RouteCodeCharacters,
     RouteAlsoEmpty,
     RouteAlsoInvalid,
@@ -156,7 +157,7 @@ impl From<PairError> for CommandError {
     fn from(error: PairError) -> Self {
         match error {
             PairError::Answered(error) => Self::from(error),
-            unanswered => Self::new(ErrorCode::Connect, unanswered),
+            unanswered @ PairError::NoAnswer(_) => Self::new(ErrorCode::Connect, unanswered),
         }
     }
 }
@@ -219,9 +220,10 @@ fn route_code(error: RouteError) -> ErrorCode {
         RouteError::EmptyToken => ErrorCode::RouteEmptyToken,
         RouteError::TokenTwice => ErrorCode::RouteTokenTwice,
         RouteError::TokenCharacters => ErrorCode::RouteTokenCharacters,
+        RouteError::NoCode => ErrorCode::RouteNoCode,
+        RouteError::BridgeCode => ErrorCode::RouteBridgeCode,
         RouteError::EmptyCode => ErrorCode::RouteEmptyCode,
         RouteError::CodeTwice => ErrorCode::RouteCodeTwice,
-        RouteError::TokenAndCode => ErrorCode::RouteTokenAndCode,
         RouteError::CodeCharacters => ErrorCode::RouteCodeCharacters,
         RouteError::AlsoEmpty => ErrorCode::RouteAlsoEmpty,
         RouteError::AlsoInvalid => ErrorCode::RouteAlsoInvalid,

@@ -3,7 +3,7 @@ use std::hash::BuildHasher;
 use std::mem::discriminant;
 
 use super::name::folded;
-use super::route::{Address, Route, Token};
+use super::route::{Address, Route};
 use super::{Machine, MachineId, tailscale};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,7 +15,6 @@ pub struct Same {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Why {
     AlreadySaved,
-    Token,
     Tailscale,
     AllAddresses,
     Address,
@@ -25,7 +24,7 @@ pub enum Why {
 
 impl Why {
     pub fn merges(self) -> bool {
-        matches!(self, Self::AlreadySaved | Self::Token | Self::Tailscale | Self::AllAddresses)
+        matches!(self, Self::AlreadySaved | Self::Tailscale | Self::AllAddresses)
     }
 }
 
@@ -37,7 +36,6 @@ pub fn same_machine<S: BuildHasher>(
     seen_boots: &HashMap<MachineId, String, S>,
 ) -> Option<Same> {
     already_saved(machines, routes)
-        .or_else(|| by_token(machines, routes))
         .or_else(|| by_address(machines, routes, Why::Tailscale, tailscale))
         .or_else(|| by_all_addresses(machines, routes))
         .or_else(|| by_address(machines, routes, Why::Address, |_| true))
@@ -49,15 +47,6 @@ fn already_saved(machines: &[Machine], routes: &[Route]) -> Option<Same> {
     first(machines, Why::AlreadySaved, |machine| {
         !routes.is_empty() && routes.iter().all(|route| route.has_token() && machine.routes.contains(route))
     })
-}
-
-fn by_token(machines: &[Machine], routes: &[Route]) -> Option<Same> {
-    let tokens: Vec<_> = bridge_tokens(routes).collect();
-    first(machines, Why::Token, |machine| bridge_tokens(&machine.routes).any(|token| tokens.contains(&token)))
-}
-
-fn bridge_tokens(routes: &[Route]) -> impl Iterator<Item = &Token> {
-    routes.iter().filter(|route| matches!(route, Route::Bridge { .. })).filter_map(Route::token)
 }
 
 fn by_address(machines: &[Machine], routes: &[Route], why: Why, counts: impl Fn(&Address) -> bool) -> Option<Same> {

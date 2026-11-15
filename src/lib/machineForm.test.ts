@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { ErrorCode, MergeView, SameWhy } from './bindings'
 import * as form from './machineForm'
 
-const URL_TEXT = 'ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA'
+const URL_TEXT = 'ws://studio.lan:47682/?code=4f9a0c1d2e3b'
 
-const CODE = 'ws://192.168.1.20:9000/?token=c3R1ZGlvLXNlY3JldA&also=100.101.102.103&also=fd7a:115c:a1e0::1'
+const CODE = 'ws://192.168.1.20:47682/?code=4f9a0c1d2e3b&also=100.101.102.103&also=fd7a:115c:a1e0::1'
 
 const named = (name: string) => `${CODE}&name=${name}`
 
@@ -14,16 +14,18 @@ describe('checkUrl', () => {
   it.each<[string, string, string]>([
     ['nothing', '', form.EMPTY],
     ['only blanks', ' \n\t ', form.EMPTY],
-    ['no scheme', 'studio.lan:9000/?token=abc', form.NO_SCHEME],
-    ['plain http', 'http://studio.lan:9000/?token=abc', form.NO_SCHEME],
-    ['a secure scheme the bridge does not serve', 'wss://studio.lan:9000/?token=abc', form.NO_SCHEME],
+    ['no scheme', 'studio.lan:47682/?code=4f9a', form.NO_SCHEME],
+    ['plain http', 'http://studio.lan:47682/?code=4f9a', form.NO_SCHEME],
+    ['a secure scheme cornercase does not serve', 'wss://studio.lan:47682/?code=4f9a', form.NO_SCHEME],
     ['no host', 'ws://', form.NOT_A_URL],
-    ['a space in the host', 'ws://studio lan:9000/?token=abc', form.NOT_A_URL],
-    ['no token', 'ws://studio.lan:9000/', form.NO_TOKEN],
-    ['an empty token', 'ws://studio.lan:9000/?token=', form.NO_TOKEN],
-    ['another parameter', 'ws://studio.lan:9000/?tokens=abc', form.NO_TOKEN],
-    ['an empty pairing code', 'ws://studio.lan:47682/?code=&name=Studio', form.NO_TOKEN],
-    ['empty code and token', 'ws://studio.lan:47682/?code=&token=', form.NO_TOKEN],
+    ['a space in the host', 'ws://studio lan:47682/?code=4f9a', form.NOT_A_URL],
+    ['no pairing code', 'ws://studio.lan:47682/', form.NO_CODE],
+    ['another parameter', 'ws://studio.lan:47682/?codes=4f9a', form.NO_CODE],
+    ['an empty pairing code', 'ws://studio.lan:47682/?code=&name=Studio', form.NO_CODE],
+    ['a code of the old bridge', 'ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA', form.BRIDGE_CODE],
+    ['a code of the old bridge with more addresses', 'ws://192.168.1.20:9000/?token=abc&also=10.0.0.2', form.BRIDGE_CODE],
+    ['a code of the old bridge with an empty token', 'ws://studio.lan:9000/?token=', form.BRIDGE_CODE],
+    ['an empty pairing code beside a token', 'ws://studio.lan:47682/?code=&token=abc', form.BRIDGE_CODE],
   ])('refuses %s', (_, raw, error) => {
     expect(form.checkUrl(raw)).toEqual({ ok: false, error })
   })
@@ -45,12 +47,16 @@ describe('checkUrl', () => {
     expect(form.checkUrl(` ${PAIRING}\n`)).toEqual({ ok: true, url: PAIRING })
   })
 
-  it('leaves a code with both a pairing code and a token to the app, which names what is wrong', () => {
+  it('accepts a pairing code beside a token, which the app leaves aside', () => {
     expect(form.checkUrl('ws://studio.lan:47682/?code=4f9a&token=abc').ok).toBe(true)
   })
 
   it('accepts the scheme in capitals', () => {
-    expect(form.checkUrl('WS://studio.lan:9000/?token=abc').ok).toBe(true)
+    expect(form.checkUrl('WS://studio.lan:47682/?code=4f9a').ok).toBe(true)
+  })
+
+  it('names neither the address nor the token of a code of the old bridge', () => {
+    expect(form.BRIDGE_CODE).not.toMatch(/studio|c3R1ZGlvLXNlY3JldA|ws:/)
   })
 })
 
@@ -110,9 +116,10 @@ describe('nameFor', () => {
 describe('placeholderName', () => {
   it.each<[string, string, string]>([
     ['a valid URL', URL_TEXT, 'studio.lan'],
-    ['an IPv6 address', 'ws://[fd7a::1]:9000/?token=abc', '[fd7a::1]'],
+    ['an IPv6 address', 'ws://[fd7a::1]:47682/?code=4f9a', '[fd7a::1]'],
     ['nothing yet', '', 'Name'],
-    ['a URL without its token', 'ws://studio.lan:9000/', 'Name'],
+    ['a URL without its pairing code', 'ws://studio.lan:47682/', 'Name'],
+    ['a code of the old bridge', 'ws://studio.lan:9000/?token=abc', 'Name'],
   ])('shows the host for %s', (_, url, shown) => {
     expect(form.placeholderName(url)).toBe(shown)
   })
@@ -127,9 +134,9 @@ describe('placeholderName', () => {
 
 describe('fieldOf', () => {
   it.each<[ErrorCode, form.Field]>([
-    ['route_no_token', 'url'],
+    ['route_no_code', 'url'],
     ['route_scheme', 'url'],
-    ['route_token_characters', 'url'],
+    ['route_bridge_code', 'url'],
     ['name_empty', 'name'],
     ['name_too_long', 'name'],
     ['name_taken', 'name'],
@@ -209,12 +216,12 @@ describe('mergedText', () => {
 
 describe('the texts of adding a machine', () => {
   it('speak of the machine and its code, never of routes, URLs or the bridge', () => {
-    const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN, form.UNCHECKED]
+    const texts = [form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_CODE, form.UNCHECKED]
     const offers = (['address', 'boot', 'name'] as const).map((why) => form.offerText({ saved: 'Studio', why }))
     const all = [...texts, form.NEW_MACHINE, ...offers.flatMap(({ reason, keep }) => [reason, keep])]
     expect(all.filter((text) => /route|url/i.test(text))).toEqual([])
     expect(all.filter((text) => /bridge/i.test(text))).toEqual([])
-    expect([form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_TOKEN]).toEqual([
+    expect([form.EMPTY, form.NO_SCHEME, form.NOT_A_URL, form.NO_CODE]).toEqual([
       'Paste the code from cornercase › Settings › Remote › Phone app',
       'The code starts with ws://',
       'This is not a machine code',

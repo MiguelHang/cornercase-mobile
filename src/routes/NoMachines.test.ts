@@ -16,7 +16,7 @@ import noMachinesSource from './NoMachines.svelte?raw'
 
 type Permission = Awaited<ReturnType<ScannerApi['checkPermissions']>>
 
-const SCANNED = 'ws://studio.lan:9000/?token=abc'
+const SCANNED = 'ws://studio.lan:9000/?code=4f9a'
 
 const camera = (permission: Permission, scan: ScannerApi['scan']) =>
   new Scanner(

@@ -114,7 +114,7 @@ fn telling(fake: FakeTransport, hosts: &[&str]) -> FakeTransport {
 }
 
 fn tailscale() -> Route {
-    Route::parse(&format!("{TAILSCALE}?token={TOKEN}")).expect("a tailscale url")
+    paired_routes(&format!("{TAILSCALE}?code={PAIRING_CODE}")).remove(0)
 }
 
 fn saved_routes(studio: &Studio) -> Vec<Route> {
@@ -297,7 +297,7 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn adds_an_address_once_however_often_the_bridge_tells_it() {
+    async fn adds_an_address_once_however_often_the_mac_tells_it() {
         let studio = Studio::new();
         let (store, _driver) = store_of(studio.id, serving(&[]));
         let transport: Arc<dyn Transport> =

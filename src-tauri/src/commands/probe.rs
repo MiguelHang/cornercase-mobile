@@ -62,9 +62,6 @@ pub(crate) async fn paired_routes(
     text: &str,
 ) -> Result<Vec<Route>, CommandError> {
     let code = MachineCode::parse(text)?;
-    if !code.needs_pairing() {
-        return Ok(code.routes());
-    }
     if let Some(secret) = state.secret_of(text) {
         return Ok(code.cli_routes(&secret));
     }

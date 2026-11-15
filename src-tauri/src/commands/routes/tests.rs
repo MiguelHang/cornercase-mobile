@@ -1,7 +1,9 @@
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::pairing::PairError;
+use cornercase_core::machines::route::Token;
 use cornercase_core::network::{Kind, Network};
 use cornercase_core::transport::Transport;
 use rstest::rstest;
@@ -13,28 +15,33 @@ use crate::commands::error::ErrorCode;
 use crate::commands::machines::{add, list};
 use crate::commands::probe::matching;
 use crate::test_util::{
-    ADDRESS, BOOT, BRIDGE, CLI_ADDRESS, Ipc, PAIRING, Recorder, SECRET, Studio, changed, connected, pairing, serving,
-    settle, snapshot,
+    ADDRESS, BOOT, BRIDGE, CLI_ADDRESS, Ipc, PAIRING, Recorder, SECRET, Studio, changed, connected, pairing, route,
+    serving, settle, snapshot,
 };
 use crate::view::{ConnectionView, RouteView};
 
-const LAPTOP: &str = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA";
+const LAPTOP: &str = "ws://laptop.lan:9000/?code=1a2b3c4d";
 const LAPTOP_ADDRESS: &str = "ws://laptop.lan:9000/";
-const NEW_TOKEN: &str = "ws://studio.lan:9000/?token=bmV3LXNlY3JldA";
-const WITH_THE_LAPTOP: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&also=laptop.lan";
+const STUDIO: &str = "ws://studio.lan:9000/?code=5e6f7a8b";
+const WITH_THE_LAPTOP: &str = "ws://studio.lan:9000/?code=9c0d1e2f&also=laptop.lan";
+const TAILSCALE: &str = "ws://100.101.102.103:9000/?code=3a4b5c6d";
 const TAILSCALE_ADDRESS: &str = "ws://100.101.102.103:9000/";
+const NEW_SECRET: &str = "7d3e.8a9b0c";
 
-type Asked = Arc<Mutex<Vec<String>>>;
+type Asked = Arc<Mutex<Vec<Route>>>;
 
 fn recording() -> (Launcher, Asked) {
+    recording_paired(SECRET)
+}
+
+fn recording_paired(secret: &'static str) -> (Launcher, Asked) {
     let transport: Arc<dyn Transport> = Arc::new(serving(&[snapshot(BOOT, 7, "first")]));
     let asked = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&asked);
     let launcher = Launcher::new(
         move |route: &Route| {
-            let url = route.connection_url()?;
-            seen.lock().unwrap_or_else(PoisonError::into_inner).push(url.clone());
-            if url == LAPTOP {
+            seen.lock().unwrap_or_else(PoisonError::into_inner).push(route.clone());
+            if route.address().to_string() == LAPTOP_ADDRESS {
                 Err(Error::Connect("the laptop is asleep".to_owned()))
             } else {
                 Ok(Arc::clone(&transport))
@@ -42,11 +49,24 @@ fn recording() -> (Launcher, Asked) {
         },
         |task| JoinHandle::Tokio(tokio::spawn(task)),
     );
-    (launcher, asked)
+    (pairing(launcher, Ok(secret)).0, asked)
 }
 
-fn urls_asked(asked: &Asked) -> Vec<String> {
+fn routes_asked(asked: &Asked) -> Vec<Route> {
     asked.lock().unwrap_or_else(PoisonError::into_inner).clone()
+}
+
+fn at(address: &str, secret: &str) -> Route {
+    MachineCode::parse(&format!("{address}?code=c")).expect("a code").cli_routes(&Token::fake(secret)).remove(0)
+}
+
+fn laptop() -> Route {
+    at(LAPTOP_ADDRESS, SECRET)
+}
+
+fn add_laptop(state: &AppState) -> MachineId {
+    state.redeemed(LAPTOP, Token::fake(SECRET));
+    add(state, LAPTOP, "laptop").expect("the laptop is added")
 }
 
 fn urls(state: &AppState, id: MachineId) -> Vec<String> {
@@ -82,20 +102,20 @@ mod adding_a_route {
         merge(&studio.state, Recorder::default(), &launcher, studio.id, LAPTOP).await.expect("added");
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS, LAPTOP_ADDRESS]);
         assert!(studio.state.active().is_none());
-        assert_eq!(urls_asked(&asked), Vec::<String>::new());
+        assert_eq!(routes_asked(&asked), Vec::<Route>::new());
     }
 
     #[tokio::test(start_paused = true)]
     async fn to_another_machine_keeps_the_connection() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        let laptop = add_laptop(&studio.state);
         let recorder = Recorder::default();
         let (launcher, asked) = recording();
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connecting");
         settle().await;
-        merge(&studio.state, recorder.clone(), &launcher, laptop, NEW_TOKEN).await.expect("added");
+        merge(&studio.state, recorder.clone(), &launcher, laptop, TAILSCALE).await.expect("added");
         settle().await;
-        assert_eq!(urls_asked(&asked), [BRIDGE]);
+        assert_eq!(routes_asked(&asked), [route()]);
         assert_eq!(recorder.connections(), once_connected(&studio));
     }
 
@@ -108,19 +128,19 @@ mod adding_a_route {
         settle().await;
         merge(&studio.state, recorder.clone(), &launcher, studio.id, LAPTOP).await.expect("added");
         settle().await;
-        assert_eq!(urls_asked(&asked), [BRIDGE, BRIDGE, LAPTOP]);
+        assert_eq!(routes_asked(&asked), [route(), route(), laptop()]);
         assert_eq!(recorder.connections(), twice_connected(&studio));
     }
 
     #[tokio::test(start_paused = true)]
-    async fn with_a_new_token_for_the_connected_machine_connects_again_with_it() {
+    async fn with_a_new_secret_for_the_connected_machine_connects_again_with_it() {
         let studio = Studio::new();
-        let (launcher, asked) = recording();
+        let (launcher, asked) = recording_paired(NEW_SECRET);
         start(&studio.state, Recorder::default(), &launcher, studio.id).expect("connecting");
         settle().await;
-        merge(&studio.state, Recorder::default(), &launcher, studio.id, NEW_TOKEN).await.expect("replaced");
+        merge(&studio.state, Recorder::default(), &launcher, studio.id, STUDIO).await.expect("replaced");
         settle().await;
-        assert_eq!(urls_asked(&asked), [BRIDGE, NEW_TOKEN]);
+        assert_eq!(routes_asked(&asked), [route(), at(ADDRESS, NEW_SECRET)]);
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS]);
     }
 
@@ -128,13 +148,14 @@ mod adding_a_route {
     async fn takes_every_route_of_a_code() {
         let studio = Studio::new();
         let (launcher, _asked) = recording();
-        let code = "ws://laptop.lan:9000/?token=bGFwdG9wLXNlY3JldA&also=100.101.102.103";
+        let code = "ws://laptop.lan:9000/?code=1a2b3c4d&also=100.101.102.103";
         merge(&studio.state, Recorder::default(), &launcher, studio.id, code).await.expect("added");
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS, LAPTOP_ADDRESS, TAILSCALE_ADDRESS]);
     }
 
     #[rstest]
-    #[case::without_a_token("ws://laptop.lan:9000/", 0, ErrorCode::RouteNoToken)]
+    #[case::without_a_code("ws://laptop.lan:9000/", 0, ErrorCode::RouteNoCode)]
+    #[case::of_the_bridge(BRIDGE, 0, ErrorCode::RouteBridgeCode)]
     #[case::to_an_unknown_machine(LAPTOP, 99, ErrorCode::UnknownMachine)]
     #[tokio::test(start_paused = true)]
     async fn says_why_it_did_not(#[case] url: &str, #[case] id: u64, #[case] code: ErrorCode) {
@@ -144,7 +165,7 @@ mod adding_a_route {
         let error = merge(&studio.state, Recorder::default(), &launcher, id, url).await.expect_err("refused");
         assert_eq!(error.code, code);
         assert_eq!(urls(&studio.state, studio.id), [ADDRESS]);
-        assert_eq!(urls_asked(&asked), Vec::<String>::new());
+        assert_eq!(routes_asked(&asked), Vec::<Route>::new());
     }
 }
 
@@ -157,45 +178,49 @@ mod merging_a_code {
     use super::*;
 
     #[rstest]
-    #[case::with_a_missing_route(WITH_THE_LAPTOP, merged(&[LAPTOP_ADDRESS], false, &[]), &[ADDRESS, LAPTOP_ADDRESS])]
-    #[case::with_a_new_token(NEW_TOKEN, merged(&[], true, &[]), &[ADDRESS])]
-    #[case::with_nothing_new(BRIDGE, merged(&[], false, &[]), &[ADDRESS])]
+    #[case::with_a_missing_route(WITH_THE_LAPTOP, SECRET, merged(&[LAPTOP_ADDRESS], false, &[]), &[ADDRESS, LAPTOP_ADDRESS])]
+    #[case::with_a_new_secret(STUDIO, NEW_SECRET, merged(&[], true, &[]), &[ADDRESS])]
+    #[case::with_nothing_new(STUDIO, SECRET, merged(&[], false, &[]), &[ADDRESS])]
     #[tokio::test(start_paused = true)]
     async fn says_what_it_changed_without_connecting(
         #[case] code: &str,
+        #[case] secret: &'static str,
         #[case] expected: MergeView,
         #[case] saved: &[&str],
     ) {
         let studio = Studio::new();
-        let (launcher, asked) = recording();
+        let (launcher, asked) = recording_paired(secret);
         assert_eq!(merge(&studio.state, Recorder::default(), &launcher, studio.id, code).await, Ok(expected));
         assert_eq!(urls(&studio.reloaded(), studio.id), saved);
         assert!(studio.state.active().is_none());
-        assert_eq!(urls_asked(&asked), Vec::<String>::new());
+        assert_eq!(routes_asked(&asked), Vec::<Route>::new());
     }
 
     #[tokio::test(start_paused = true)]
     async fn leaves_out_an_address_another_machine_has() {
         let studio = Studio::new();
-        add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
+        add_laptop(&studio.state);
         let merged_view = merge(&studio.state, Recorder::default(), &recording().0, studio.id, WITH_THE_LAPTOP).await;
         assert_eq!(merged_view, Ok(merged(&[], false, &[LAPTOP_ADDRESS])));
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS]);
     }
 
     #[rstest]
-    #[case::with_a_missing_route(WITH_THE_LAPTOP, BRIDGE)]
-    #[case::with_a_new_token(NEW_TOKEN, NEW_TOKEN)]
+    #[case::with_a_missing_route(WITH_THE_LAPTOP, SECRET)]
+    #[case::with_a_new_secret(STUDIO, NEW_SECRET)]
     #[tokio::test(start_paused = true)]
-    async fn into_the_connected_machine_connects_again_when_it_changed_it(#[case] code: &str, #[case] first: &str) {
+    async fn into_the_connected_machine_connects_again_when_it_changed_it(
+        #[case] code: &str,
+        #[case] secret: &'static str,
+    ) {
         let studio = Studio::new();
         let recorder = Recorder::default();
-        let (launcher, asked) = recording();
+        let (launcher, asked) = recording_paired(secret);
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connecting");
         settle().await;
         merge(&studio.state, recorder.clone(), &launcher, studio.id, code).await.expect("merged");
         settle().await;
-        assert_eq!(urls_asked(&asked)[..2], [BRIDGE, first]);
+        assert_eq!(routes_asked(&asked)[..2], [route(), at(ADDRESS, secret)]);
         assert_eq!(recorder.connections(), twice_connected(&studio));
     }
 
@@ -206,9 +231,9 @@ mod merging_a_code {
         let (launcher, asked) = recording();
         start(&studio.state, recorder.clone(), &launcher, studio.id).expect("connecting");
         settle().await;
-        merge(&studio.state, recorder.clone(), &launcher, studio.id, BRIDGE).await.expect("merged");
+        merge(&studio.state, recorder.clone(), &launcher, studio.id, STUDIO).await.expect("merged");
         settle().await;
-        assert_eq!(urls_asked(&asked), [BRIDGE]);
+        assert_eq!(routes_asked(&asked), [route()]);
         assert_eq!(recorder.connections(), once_connected(&studio));
     }
 }
@@ -216,14 +241,12 @@ mod merging_a_code {
 mod merging_a_pairing_code {
     use super::*;
 
-    const NEW_SECRET: &str = "7d3e.8a9b0c";
-
     fn saved_secret(studio: &Studio) -> Option<Vec<u8>> {
         studio.secrets.get(&format!("route/{}/{CLI_ADDRESS}", studio.id.0)).expect("the keychain answers")
     }
 
     #[tokio::test(start_paused = true)]
-    async fn pairs_and_adds_its_routes_next_to_those_of_the_bridge() {
+    async fn pairs_and_adds_its_routes_next_to_the_saved_ones() {
         let studio = Studio::new();
         let (launcher, pairings) = pairing(recording().0, Ok(SECRET));
         let view = merge(&studio.state, Recorder::default(), &launcher, studio.id, PAIRING).await;
@@ -275,7 +298,7 @@ mod removing_a_route {
         remove_route(&studio.state, recorder.clone(), &recording().0, studio.id, LAPTOP_ADDRESS).expect("removed");
         settle().await;
         assert_eq!(urls(&studio.reloaded(), studio.id), [ADDRESS]);
-        assert_eq!(urls_asked(&asked), [BRIDGE, LAPTOP]);
+        assert_eq!(routes_asked(&asked), [route(), laptop()]);
         assert_eq!(recorder.connections(), once_connected(&studio));
     }
 
@@ -288,7 +311,7 @@ mod removing_a_route {
         remove_route(&studio.state, recorder.clone(), &launcher, studio.id, ADDRESS).expect("removed");
         settle().await;
         assert_eq!(urls(&studio.reloaded(), studio.id), [LAPTOP_ADDRESS]);
-        assert_eq!(urls_asked(&asked).first().map(String::as_str), Some(LAPTOP));
+        assert_eq!(routes_asked(&asked).first(), Some(&laptop()));
         assert_eq!(recorder.connections()[2], changed(studio.id, ConnectionView::Connecting));
     }
 
@@ -307,9 +330,8 @@ mod removing_a_route {
     #[tokio::test(start_paused = true)]
     async fn of_another_machine_keeps_the_connection() {
         let studio = Studio::new();
-        let laptop = add(&studio.state, LAPTOP, "laptop").expect("the laptop is added");
-        let tailscale = "ws://100.101.102.103:9000/?token=bGFwdG9wLXNlY3JldA";
-        merge(&studio.state, Recorder::default(), &recording().0, laptop, tailscale).await.expect("added");
+        let laptop = add_laptop(&studio.state);
+        merge(&studio.state, Recorder::default(), &recording().0, laptop, TAILSCALE).await.expect("added");
         let recorder = Recorder::default();
         start(&studio.state, recorder.clone(), &recording().0, studio.id).expect("connecting");
         settle().await;
@@ -373,7 +395,9 @@ mod over_ipc {
     #[test]
     fn adds_moves_and_removes_a_route_of_a_machine_that_is_not_connected() {
         let studio = Studio::new();
-        let ipc = Ipc::new(studio.reloaded());
+        let state = studio.reloaded();
+        state.redeemed(LAPTOP, Token::fake(SECRET));
+        let ipc = Ipc::new(state);
         let id = studio.id.0;
         let merged = ipc.invoke("machine_merge", json!({ "id": id, "code": LAPTOP }));
         assert_eq!(merged, Ok(json!({ "added": [LAPTOP_ADDRESS], "token_updated": false, "skipped": [] })));
@@ -387,7 +411,9 @@ mod over_ipc {
     #[test]
     fn merges_a_code_and_answers_what_changed() {
         let studio = Studio::new();
-        let ipc = Ipc::new(studio.reloaded());
+        let state = studio.reloaded();
+        state.redeemed(WITH_THE_LAPTOP, Token::fake(SECRET));
+        let ipc = Ipc::new(state);
         let answer = ipc.invoke("machine_merge", json!({ "id": studio.id.0, "code": WITH_THE_LAPTOP }));
         assert_eq!(answer, Ok(json!({ "added": [LAPTOP_ADDRESS], "token_updated": false, "skipped": [] })));
     }
