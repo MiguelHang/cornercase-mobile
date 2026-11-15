@@ -20,6 +20,9 @@ use crate::test_util::{PAIRING, SECRET, TOKEN, released, route};
 
 const IDENTITY_KEY: &str = "identity/ed25519";
 const NO_FOLDER: Result<PathBuf, &str> = Err("no home folder");
+const V1_WITH_BRIDGES: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../crates/core/tests/fixtures/machines/v1-bridge.json"));
+const LAPTOP_BRIDGE_KEY: &str = "route/4/ws://10.0.0.9:8765/";
 
 fn keychain() -> Arc<dyn Secrets> {
     Arc::new(on_mock(mock_store()))
@@ -98,6 +101,25 @@ mod loading_the_machines {
         let shared = state.shared_machines();
         shared.with(|machines| machines.add("studio", &[route()]).map_err(CommandError::from)).expect("added");
         assert_eq!(state.machines(|machines| Ok(machines.machines().len())), Ok(1));
+    }
+
+    #[test]
+    fn drops_the_bridge_routes_and_forgets_the_history_of_a_machine_left_without_routes() {
+        let dir = TempDir::new();
+        fs::write(dir.path().join("machines.json"), V1_WITH_BRIDGES).expect("write the file of an older app");
+        let history = dir.path().join("history");
+        for id in ["3", "4"] {
+            fs::create_dir_all(history.join(id)).expect("keep a machine's history");
+        }
+        let routes = keychain();
+        routes.set(LAPTOP_BRIDGE_KEY, TOKEN.as_bytes()).expect("keep the laptop's token");
+        let state = loaded(&dir, Arc::clone(&routes)).keeping_history(Some(dir.path().to_path_buf()));
+        let names =
+            state.machines(|machines| Ok(machines.machines().iter().map(|machine| machine.name.clone()).collect()));
+        assert_eq!(names, Ok(vec!["studio".to_owned()]));
+        assert_eq!((history.join("3").is_dir(), history.join("4").exists()), (true, false));
+        assert_eq!(routes.get(LAPTOP_BRIDGE_KEY), Ok(None));
+        assert!(!saved_file(&dir).contains("bridge"), "{}", saved_file(&dir));
     }
 
     #[test]

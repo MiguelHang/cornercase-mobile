@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::error::Category;
 
+use super::route::{Address, Route};
 use super::{Machine, MachineId};
 use crate::error::Error;
 use crate::files::write_atomically;
@@ -13,7 +14,7 @@ use crate::files::write_atomically;
 const VERSION: u32 = 1;
 
 pub trait MachineStore: Send + Sync {
-    fn load(&self) -> Result<Saved, Error>;
+    fn load(&self) -> Result<Loaded, Error>;
     fn save(&self, saved: &Saved) -> Result<(), Error>;
 }
 
@@ -22,6 +23,12 @@ pub struct Saved {
     pub next_id: u64,
     pub machines: Vec<Machine>,
     pub active: Option<MachineId>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Loaded {
+    pub saved: Saved,
+    pub dropped: Vec<(MachineId, Address)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,9 +52,24 @@ struct Version {
 #[derive(Deserialize)]
 struct Read {
     next_id: u64,
-    machines: Vec<Machine>,
+    machines: Vec<ReadMachine>,
     #[serde(default)]
     active: Option<MachineId>,
+}
+
+#[derive(Deserialize)]
+struct ReadMachine {
+    id: MachineId,
+    name: String,
+    routes: Vec<ReadRoute>,
+    last_route: Option<Address>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ReadRoute {
+    Bridge { url: Address },
+    Cli { url: Address },
 }
 
 impl JsonFileStore {
@@ -57,10 +79,10 @@ impl JsonFileStore {
 }
 
 impl MachineStore for JsonFileStore {
-    fn load(&self) -> Result<Saved, Error> {
+    fn load(&self) -> Result<Loaded, Error> {
         match fs::read(&self.path) {
             Ok(text) => parsed(&text),
-            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Saved::default()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Loaded::default()),
             Err(error) => Err(io_error("cannot read the file", &error)),
         }
     }
@@ -73,9 +95,24 @@ impl MachineStore for JsonFileStore {
     }
 }
 
-fn parsed(text: &[u8]) -> Result<Saved, Error> {
+fn parsed(text: &[u8]) -> Result<Loaded, Error> {
     let Read { next_id, machines, active } = versioned(text, VERSION)?;
-    Ok(Saved { next_id, machines, active })
+    let mut dropped = Vec::new();
+    let machines = machines.into_iter().map(|machine| kept(machine, &mut dropped)).collect();
+    Ok(Loaded { saved: Saved { next_id, machines, active }, dropped })
+}
+
+fn kept(machine: ReadMachine, dropped: &mut Vec<(MachineId, Address)>) -> Machine {
+    let ReadMachine { id, name, routes, last_route } = machine;
+    let mut kept = Vec::new();
+    for route in routes {
+        match route {
+            ReadRoute::Bridge { url } => dropped.push((id, url)),
+            ReadRoute::Cli { url } => kept.push(Route::cli(url, None)),
+        }
+    }
+    let last_route = last_route.filter(|address| kept.iter().any(|route| route.address() == address));
+    Machine { id, name, routes: kept, last_route }
 }
 
 pub(crate) fn versioned<T: DeserializeOwned>(text: &[u8], expected: u32) -> Result<T, Error> {

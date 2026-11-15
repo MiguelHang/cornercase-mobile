@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::name::checked_name;
 use super::route::{Address, Route, Token};
 use super::same::{Same, same_machine};
-use super::store::{MachineStore, Saved};
+use super::store::{Loaded, MachineStore, Saved};
 use super::{Machine, MachineId};
 use crate::error::Error;
 use crate::secrets::Secrets;
@@ -42,14 +42,19 @@ pub struct Machines {
 }
 
 impl Machines {
-    pub fn load(store: Box<dyn MachineStore>, secrets: Arc<dyn Secrets>) -> Result<Self, Error> {
-        let mut saved = store.load()?;
+    pub fn load(store: Box<dyn MachineStore>, secrets: Arc<dyn Secrets>) -> Result<(Self, Vec<MachineId>), Error> {
+        let Loaded { mut saved, dropped } = store.load()?;
         let after_last = saved.machines.iter().map(|machine| machine.id.0.saturating_add(1)).max().unwrap_or_default();
         saved.next_id = saved.next_id.max(after_last);
+        let forgotten = if dropped.is_empty() {
+            Vec::new()
+        } else {
+            forget(store.as_ref(), secrets.as_ref(), &mut saved, &dropped)?
+        };
         for machine in &mut saved.machines {
             fill_tokens(secrets.as_ref(), machine)?;
         }
-        Ok(Self { store, secrets, saved })
+        Ok((Self { store, secrets, saved }, forgotten))
     }
 
     pub fn machines(&self) -> &[Machine] {
@@ -253,6 +258,27 @@ impl fmt::Debug for Machines {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("Machines").field("machines", &self.saved.machines).finish_non_exhaustive()
     }
+}
+
+fn forget(
+    store: &dyn MachineStore,
+    secrets: &dyn Secrets,
+    saved: &mut Saved,
+    dropped: &[(MachineId, Address)],
+) -> Result<Vec<MachineId>, Error> {
+    for (id, address) in dropped {
+        if !saved.machines.iter().any(|machine| machine.id == *id && position(&machine.routes, address).is_ok()) {
+            secrets.delete(&key(*id, address))?;
+        }
+    }
+    let forgotten: Vec<MachineId> =
+        saved.machines.iter().filter(|machine| machine.routes.is_empty()).map(|machine| machine.id).collect();
+    saved.machines.retain(|machine| !machine.routes.is_empty());
+    if saved.active.is_some_and(|id| forgotten.contains(&id)) {
+        saved.active = None;
+    }
+    store.save(saved)?;
+    Ok(forgotten)
 }
 
 fn fill_tokens(secrets: &dyn Secrets, machine: &mut Machine) -> Result<(), Error> {
