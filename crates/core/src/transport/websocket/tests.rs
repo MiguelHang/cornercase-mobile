@@ -16,7 +16,7 @@ use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
 use super::*;
-use crate::protocol::{BridgeMessage, ClientMessage};
+use crate::protocol::{ClientMessage, ServerMessage};
 use crate::transport::fake::cli::{CLI, Peer, closed_cleanly, heard, listening, say, serve};
 use crate::transport::{Out, listen};
 
@@ -88,7 +88,7 @@ mod config {
     }
 
     #[test]
-    fn bears_the_bridges_silence_by_default() {
+    fn bears_the_server_s_silence_for_45_seconds_by_default() {
         assert_eq!(SocketConfig::default().silence_timeout, Duration::from_secs(45));
     }
 
@@ -250,7 +250,7 @@ mod run {
         (WebSocketTransport::new(url, config).bearing(SECRET.to_owned()), serve(listener, SECRET, script))
     }
 
-    async fn answer(messages: Vec<BridgeMessage>) -> (Result<Exit, Error>, Vec<Out>, (Vec<String>, bool)) {
+    async fn answer(messages: Vec<ServerMessage>) -> (Result<Exit, Error>, Vec<Out>, (Vec<String>, bool)) {
         let (transport, script) = bridge(SocketConfig::default(), async move |mut bridge| {
             let heard = heard(&mut bridge).await;
             say(&mut bridge, &messages).await;
@@ -266,7 +266,7 @@ mod run {
 
     #[tokio::test]
     async fn sends_the_argv_then_the_input_then_its_end() {
-        let (_, _, (heard, _)) = answer(vec![BridgeMessage::Exit(0)]).await;
+        let (_, _, (heard, _)) = answer(vec![ServerMessage::Exit(0)]).await;
         let expected = [
             ClientMessage::Argv(argv()),
             ClientMessage::Stdin("one".to_owned()),
@@ -279,12 +279,12 @@ mod run {
     #[tokio::test]
     async fn hands_the_output_on_in_order_and_exits_with_the_code() {
         let lines = [
-            BridgeMessage::Stdout("a".to_owned()),
-            BridgeMessage::Stderr("b".to_owned()),
-            BridgeMessage::Stdout("c".to_owned()),
-            BridgeMessage::Stderr("d".to_owned()),
+            ServerMessage::Stdout("a".to_owned()),
+            ServerMessage::Stderr("b".to_owned()),
+            ServerMessage::Stdout("c".to_owned()),
+            ServerMessage::Stderr("d".to_owned()),
         ];
-        let (ended, outs, _) = answer(lines.into_iter().chain([BridgeMessage::Exit(3)]).collect()).await;
+        let (ended, outs, _) = answer(lines.into_iter().chain([ServerMessage::Exit(3)]).collect()).await;
         assert_eq!(ended, Ok(Exit { code: 3, stderr: "b\nd".to_owned() }));
         let expected = [Out::Stdout("a".to_owned()), Out::Stderr("b".to_owned())];
         let expected = expected.into_iter().chain([Out::Stdout("c".to_owned()), Out::Stderr("d".to_owned())]);
@@ -294,7 +294,7 @@ mod run {
     #[tokio::test]
     async fn closes_after_the_exit_and_ignores_what_follows_it() {
         let (ended, outs, (_, closed)) =
-            answer(vec![BridgeMessage::Exit(0), BridgeMessage::Stdout("late".to_owned())]).await;
+            answer(vec![ServerMessage::Exit(0), ServerMessage::Stdout("late".to_owned())]).await;
         assert_eq!(ended, Ok(Exit { code: 0, stderr: String::new() }));
         assert_eq!(outs, Vec::new());
         assert!(closed, "the client did not close cleanly");
@@ -308,7 +308,7 @@ mod run {
     async fn drops_when_the_bridge_goes_without_an_exit(#[case] code: Option<CloseCode>) {
         let (transport, script) = bridge(SocketConfig::default(), async move |mut bridge| {
             heard(&mut bridge).await;
-            say(&mut bridge, &[BridgeMessage::Stdout("a".to_owned())]).await;
+            say(&mut bridge, &[ServerMessage::Stdout("a".to_owned())]).await;
             if let Some(code) = code {
                 bridge.close(Some(CloseFrame { code, reason: "".into() })).await.expect("closed");
             }
@@ -369,7 +369,7 @@ mod run {
         let (transport, script) = bridge(silent_after(silence), async move |mut bridge| {
             heard(&mut bridge).await;
             ping(&mut bridge, silence / 6, 10).await;
-            say(&mut bridge, &[BridgeMessage::Exit(0)]).await;
+            say(&mut bridge, &[ServerMessage::Exit(0)]).await;
             closed_cleanly(&mut bridge).await
         })
         .await;
@@ -383,7 +383,7 @@ mod run {
     async fn closes_when_nobody_listens_to_the_output() {
         let (transport, script) = bridge(SocketConfig::default(), async move |mut bridge| {
             heard(&mut bridge).await;
-            say(&mut bridge, &[BridgeMessage::Stdout("a".to_owned())]).await;
+            say(&mut bridge, &[ServerMessage::Stdout("a".to_owned())]).await;
             closed_cleanly(&mut bridge).await
         })
         .await;

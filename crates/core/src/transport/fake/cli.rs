@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::http::{self, StatusCode};
 use tokio_tungstenite::{WebSocketStream, accept_hdr_async};
 
-use crate::protocol::{BridgeMessage, ClientMessage};
+use crate::protocol::{ClientMessage, ServerMessage};
 use crate::transport::Stdin;
 
 pub const CLI: &str = "/cli";
@@ -81,7 +81,7 @@ pub fn request(heard: &[String]) -> Heard {
     request
 }
 
-pub async fn say(peer: &mut Peer, messages: &[BridgeMessage]) {
+pub async fn say(peer: &mut Peer, messages: &[ServerMessage]) {
     for message in messages {
         peer.send(Message::text(serde_json::to_string(message).expect("a message"))).await.expect("sent");
     }

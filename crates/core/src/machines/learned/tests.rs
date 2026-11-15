@@ -2,7 +2,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
-use crate::protocol::BridgeRoute;
+use crate::protocol::AppRoute;
 use crate::transport::fake::FakeTransport;
 
 const LAN: &str = "192.168.1.20";
@@ -11,9 +11,9 @@ const TAILSCALE_V6: &str = "fd7a:115c:a1e0::1";
 const OTHER_TOKEN: &str = "b3RoZXItdG9rZW4";
 const TOLD: &str = r#"{"routes":[{"host":"100.101.102.103","port":8765}]}"#;
 
-fn answer(routes: &[(&str, u16)]) -> BridgeRoutes {
-    let routes = routes.iter().map(|&(host, port)| BridgeRoute { host: host.to_owned(), port });
-    BridgeRoutes { routes: routes.collect() }
+fn answer(routes: &[(&str, u16)]) -> AppRoutes {
+    let routes = routes.iter().map(|&(host, port)| AppRoute { host: host.to_owned(), port });
+    AppRoutes { routes: routes.collect() }
 }
 
 fn winner() -> Route {
@@ -76,17 +76,11 @@ mod learned_routes {
 mod ask_routes {
     use super::*;
 
-    #[rstest]
-    #[case::cornercase(cli(LAN, 8765, Some(SECRET)), APP_ROUTES, cli(TAILSCALE, 8765, Some(SECRET)))]
-    #[case::bridge(winner(), &[BRIDGE_ROUTES], bridge(TAILSCALE, 8765, Some(TOKEN)))]
     #[tokio::test]
-    async fn asks_the_question_of_the_winner_s_kind(
-        #[case] winner: Route,
-        #[case] question: &[&str],
-        #[case] learned: Route,
-    ) {
-        let fake = FakeTransport::default().answer(question, &[TOLD], &[], 0);
-        assert_eq!(ask_routes(&fake, &winner).await.expect("the routes"), [learned]);
+    async fn asks_the_app_routes_and_gives_them_the_winner_s_secret() {
+        let fake = FakeTransport::default().answer(APP_ROUTES, &[TOLD], &[], 0);
+        let learned = ask_routes(&fake, &cli(LAN, 8765, Some(SECRET))).await.expect("the routes");
+        assert_eq!(learned, [cli(TAILSCALE, 8765, Some(SECRET))]);
     }
 
     #[test]
