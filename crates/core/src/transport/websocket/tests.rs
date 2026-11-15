@@ -7,16 +7,17 @@ use futures_util::{SinkExt, StreamExt, stream};
 use rstest::rstest;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+use tokio_tungstenite::accept_hdr_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::error::{ProtocolError, UrlError};
 use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
-use tokio_tungstenite::{accept_async, accept_hdr_async};
 
 use super::*;
 use crate::protocol::{BridgeMessage, ClientMessage};
+use crate::transport::fake::cli::{CLI, Peer, closed_cleanly, heard, listening, say, serve};
 use crate::transport::{Out, listen};
 
 const URL: &str = "ws://bridge.example:7777/?token=secret";
@@ -36,13 +37,7 @@ fn refusal(status: u16) -> WebSocketError {
 }
 
 async fn listener() -> (String, TcpListener) {
-    listener_at(BRIDGE).await
-}
-
-async fn listener_at(path: &str) -> (String, TcpListener) {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("a listener");
-    let url = format!("ws://{}{path}", listener.local_addr().expect("its address"));
-    (url, listener)
+    listening(BRIDGE).await
 }
 
 struct Answer(Option<u16>, oneshot::Sender<Head>);
@@ -64,7 +59,7 @@ async fn upgrade(listener: TcpListener, answer: Option<u16>, head: oneshot::Send
 }
 
 async fn connect_with(path: &str, bearer: Option<&str>, answer: Option<u16>) -> (Result<Socket, Error>, Head) {
-    let (url, listener) = listener_at(path).await;
+    let (url, listener) = listening(path).await;
     let (sender, receiver) = oneshot::channel();
     tokio::spawn(upgrade(listener, answer, sender));
     let transport = WebSocketTransport::new(url, SocketConfig::default());
@@ -128,15 +123,15 @@ mod connect {
     #[case::unavailable(503, Error::Rejected { status: 503 })]
     #[tokio::test]
     async fn tells_a_forgotten_secret_from_another_refusal(#[case] status: u16, #[case] expected: Error) {
-        let (connected, _) = connect_with("/cli", Some(SECRET), Some(status)).await;
+        let (connected, _) = connect_with(CLI, Some(SECRET), Some(status)).await;
         assert_eq!(connected.err(), Some(expected));
     }
 
     #[tokio::test]
     async fn takes_the_secret_in_the_authorization_header() {
-        let (connected, head) = connect_with("/cli", Some(SECRET), None).await;
+        let (connected, head) = connect_with(CLI, Some(SECRET), None).await;
         assert!(connected.is_ok(), "the upgrade failed");
-        assert_eq!(head, ("/cli".to_owned(), Some(format!("Bearer {SECRET}"))));
+        assert_eq!(head, (CLI.to_owned(), Some(format!("Bearer {SECRET}"))));
     }
 
     #[tokio::test]
@@ -147,7 +142,7 @@ mod connect {
 
     #[tokio::test]
     async fn refuses_a_secret_that_cannot_go_in_a_header() {
-        let (url, _listener) = listener_at("/cli").await;
+        let (url, _listener) = listening(CLI).await;
         let transport = WebSocketTransport::new(url, SocketConfig::default()).bearing("a\nb".to_owned());
         let refused = Some(Error::Secrets("the saved secret cannot go in a header".to_owned()));
         assert_eq!(transport.connect().await.err(), refused);
@@ -237,8 +232,6 @@ mod secrecy {
 mod run {
     use super::*;
 
-    type Bridge = WebSocketStream<TcpStream>;
-
     fn argv() -> Vec<String> {
         vec!["send".to_owned(), "-".to_owned()]
     }
@@ -247,58 +240,14 @@ mod run {
         serde_json::to_string(message).expect("a message")
     }
 
-    async fn heard(bridge: &mut Bridge) -> Vec<String> {
-        let mut heard = Vec::new();
-        while let Some(Ok(message)) = bridge.next().await {
-            let Message::Text(text) = message else { continue };
-            heard.push(text.as_str().to_owned());
-            if text == sent(&ClientMessage::Eof) {
-                break;
-            }
-        }
-        heard
-    }
-
-    async fn say(bridge: &mut Bridge, messages: &[BridgeMessage]) {
-        for message in messages {
-            bridge.send(Message::text(serde_json::to_string(message).expect("a message"))).await.expect("sent");
-        }
-    }
-
-    async fn closed_cleanly(bridge: &mut Bridge) -> bool {
-        let mut closed = false;
-        while let Some(message) = bridge.next().await {
-            match message {
-                Ok(Message::Close(_)) => closed = true,
-                Ok(_) => {}
-                Err(_) => return false,
-            }
-        }
-        closed
-    }
-
-    async fn serve<S, F>(path: &str, script: S) -> (String, tokio::task::JoinHandle<F::Output>)
-    where
-        S: FnOnce(Bridge) -> F + Send + 'static,
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        let (url, listener) = listener_at(path).await;
-        let script = tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.expect("a connection");
-            script(accept_async(stream).await.expect("an upgrade")).await
-        });
-        (url, script)
-    }
-
     async fn bridge<S, F>(config: SocketConfig, script: S) -> (WebSocketTransport, tokio::task::JoinHandle<F::Output>)
     where
-        S: FnOnce(Bridge) -> F + Send + 'static,
+        S: FnOnce(Peer) -> F + Send + 'static,
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        let (url, script) = serve(BRIDGE, script).await;
-        (WebSocketTransport::new(url, config), script)
+        let (url, listener) = listening(CLI).await;
+        (WebSocketTransport::new(url, config).bearing(SECRET.to_owned()), serve(listener, SECRET, script))
     }
 
     async fn answer(messages: Vec<BridgeMessage>) -> (Result<Exit, Error>, Vec<Out>, (Vec<String>, bool)) {
@@ -325,22 +274,6 @@ mod run {
             ClientMessage::Eof,
         ];
         assert_eq!(heard, expected.iter().map(sent).collect::<Vec<_>>());
-    }
-
-    #[tokio::test]
-    async fn runs_a_whole_command_on_cli_as_on_the_bridge() {
-        let (url, script) = serve("/cli", async move |mut cli| {
-            let heard = heard(&mut cli).await;
-            say(&mut cli, &[BridgeMessage::Stdout("a".to_owned()), BridgeMessage::Exit(0)]).await;
-            (heard, closed_cleanly(&mut cli).await)
-        })
-        .await;
-        let (out, mut receiver) = listen(Some);
-        let ended = cli(url).run(argv(), stream::empty().boxed(), out).await;
-        assert_eq!(ended, Ok(Exit { code: 0, stderr: String::new() }));
-        assert_eq!(receiver.try_recv().ok(), Some(Out::Stdout("a".to_owned())));
-        let expected = vec![sent(&ClientMessage::Argv(argv())), sent(&ClientMessage::Eof)];
-        assert_eq!(within(script).await.expect("the server's script"), (expected, true));
     }
 
     #[tokio::test]
@@ -423,7 +356,7 @@ mod run {
         assert!(within(script).await.expect("the bridge's script"), "the client did not close cleanly");
     }
 
-    async fn ping(bridge: &mut Bridge, every: Duration, times: usize) {
+    async fn ping(bridge: &mut Peer, every: Duration, times: usize) {
         for _ in 0..times {
             tokio::time::sleep(every).await;
             bridge.send(Message::Ping(Vec::new().into())).await.expect("pinged");

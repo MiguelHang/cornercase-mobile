@@ -494,7 +494,6 @@ name = "cornercase-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
- "cornercase-bridge",
  "cornercase-core",
  "ed25519-dalek",
  "futures-util",
