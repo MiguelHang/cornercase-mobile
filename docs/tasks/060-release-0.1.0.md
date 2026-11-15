@@ -20,6 +20,10 @@ firmado en GitHub Releases.
 - [ ] CA6 — Política de privacidad (la pide TestFlight para pruebas externas): la app no recoge datos y solo habla con
   el Mac emparejado.
 - [ ] CA7 — Repo público (también desbloquea las issues de la 033).
+- [ ] CA8 — Solo iPhone (decidido por el usuario el 2026-11-15): `TARGETED_DEVICE_FAMILY: "1"` en
+  `src-tauri/gen/apple/project.yml` (xcodegen pone `"1,2"` por defecto, que es lo que hay hoy en el `.xcodeproj`) y
+  fuera `UISupportedInterfaceOrientations~ipad`. Así App Review no la revisa en iPad ni pide capturas de iPad, donde
+  hoy se vería el diseño del móvil estirado. El iPad y las tablets llegan en la 062.
 
 ## Decisiones del usuario que hacen falta
 - Alta en el Apple Developer Program (99 $/año) y el nombre de la app en App Store Connect.

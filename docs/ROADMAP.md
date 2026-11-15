@@ -109,6 +109,14 @@ Remote, el canje por un secreto del dispositivo y `/cli`.
 | 060 | [Primera versión: 0.1.0 por TestFlight y APK](tasks/060-release-0.1.0.md) | 059 (la 057 ya está publicada) | ~300 (+ CI) |
 | 061 | [Upstream: el servidor arrancado al iniciar sesión no encuentra los agentes](tasks/061-upstream-server-path.md) | — (issue) | — |
 
+## Hito 7 — iPad y tablets
+Decidido por el usuario el 2026-11-15: la 0.1.0 sale solo para iPhone (060 › CA8) y el iPad llega después, con un
+diseño de tablet de verdad, no el del móvil estirado.
+
+| # | Tarea | Depende de | Tamaño |
+|---|---|---|---|
+| 062 | [iPad y tablets: dos paneles, terminal ancha y teclado físico](tasks/062-ipad-tablet.md) | 060 | ~800–1.200 |
+
 ## Camino crítico
 `001 → 003 → 004 → 005 → 007 → (008, 010, 011) → 012 → 013 → 014 → 015 → 016 → … → 029`.
 Orden de trabajo del Hito 0 y el arranque del 1: `001 → 002 → 034 → 003`; la 034 solo pide 002 y la 014 la necesita.
