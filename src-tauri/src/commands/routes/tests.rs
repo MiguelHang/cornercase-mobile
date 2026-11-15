@@ -72,7 +72,7 @@ fn add_laptop(state: &AppState) -> MachineId {
 fn urls(state: &AppState, id: MachineId) -> Vec<String> {
     let machines = list(state).expect("the machines load").machines;
     let machine = machines.into_iter().find(|machine| machine.id == id.0).expect("the machine is listed");
-    machine.routes.into_iter().map(|(RouteView::Bridge { url, .. } | RouteView::Cli { url, .. })| url).collect()
+    machine.routes.into_iter().map(|RouteView::Cli { url, .. }| url).collect()
 }
 
 fn twice_connected(studio: &Studio) -> Vec<crate::events::ConnectionChanged> {
@@ -344,7 +344,7 @@ mod removing_a_route {
     #[rstest]
     #[case::the_last_one(ADDRESS, 0, ErrorCode::LastRoute)]
     #[case::unknown(LAPTOP_ADDRESS, 0, ErrorCode::UnknownRoute)]
-    #[case::with_its_token(BRIDGE, 0, ErrorCode::UnknownRoute)]
+    #[case::with_a_code(PAIRING, 0, ErrorCode::UnknownRoute)]
     #[case::of_an_unknown_machine(ADDRESS, 99, ErrorCode::UnknownMachine)]
     #[tokio::test(start_paused = true)]
     async fn says_why_it_did_not(#[case] url: &str, #[case] id: u64, #[case] code: ErrorCode) {

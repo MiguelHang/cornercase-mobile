@@ -29,7 +29,6 @@ pub(crate) struct MachineList {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub(crate) enum RouteView {
-    Bridge { url: String, has_token: bool },
     Cli { url: String, has_token: bool },
 }
 
@@ -169,11 +168,7 @@ impl From<&Machines> for MachineList {
 
 impl From<&Route> for RouteView {
     fn from(route: &Route) -> Self {
-        let (url, has_token) = (route.address().to_string(), route.has_token());
-        match route {
-            Route::Bridge { .. } => Self::Bridge { url, has_token },
-            Route::Cli { .. } => Self::Cli { url, has_token },
-        }
+        Self::Cli { url: route.address().to_string(), has_token: route.has_token() }
     }
 }
 

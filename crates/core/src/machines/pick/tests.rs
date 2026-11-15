@@ -12,7 +12,7 @@ use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 
 use super::*;
 use crate::machines::MachineId;
-use crate::machines::tests::{SECRET, TOKEN, bridge, cli, within};
+use crate::machines::tests::{SECRET, cli, within};
 use crate::transport::fake::FakeTransport;
 use crate::transport::{Closed, Exit, Out};
 
@@ -64,11 +64,7 @@ fn saved(routes: Vec<Route>, host: &str) -> Machine {
 }
 
 fn route(host: &str) -> Route {
-    bridge(host, 8765, Some(TOKEN))
-}
-
-fn cornercase(host: &str) -> Route {
-    cli(host, 7700, Some(SECRET))
+    cli(host, 8765, Some(SECRET))
 }
 
 fn address(host: &str) -> Address {
@@ -208,12 +204,12 @@ mod pick_route {
     #[tokio::test(start_paused = true)]
     async fn fails_a_route_without_a_token_before_reaching_it() {
         let network = Network::default().with(LAN, answers_after(0, "{}")).with(TAILNET, answers_after(0, "{}"));
-        let routes = vec![bridge(LAN, 8765, None), route(TAILNET)];
+        let routes = vec![cli(LAN, 8765, None), route(TAILNET)];
         let started = Instant::now();
         assert_eq!(network.pick(routes).await.map(|picked| picked.route), Ok(route(TAILNET)));
         assert_eq!(started.elapsed(), Duration::ZERO);
         assert_eq!(network.calls(), [TAILNET]);
-        let result = network.pick(vec![bridge(LAN, 8765, None)]).await.map(|picked| picked.route);
+        let result = network.pick(vec![cli(LAN, 8765, None)]).await.map(|picked| picked.route);
         assert_eq!(result, Err(PickError::AllFailed(vec![(address(LAN), Error::NoToken)])));
         assert_eq!(network.calls(), [TAILNET]);
     }
@@ -277,21 +273,6 @@ mod preference {
         assert_eq!(picked, (route(winner), Duration::from_millis(millis)));
     }
 
-    #[rstest]
-    #[case::cornercase_on_the_lan_over_the_bridge_on_tailscale(vec![cornercase(PUBLIC), route(TAILNET), cornercase(LAN)], LAN)]
-    #[case::the_bridge_on_the_lan_over_cornercase_on_tailscale(vec![route(PUBLIC), cornercase(TAILNET), route(LAN)], LAN)]
-    #[case::cornercase_on_tailscale_over_the_bridge_elsewhere(vec![route(PUBLIC), cornercase(TAILNET), route(GONE)], TAILNET)]
-    #[tokio::test(start_paused = true)]
-    async fn races_the_routes_of_both_kinds_alike(#[case] routes: Vec<Route>, #[case] winner: &str) {
-        let network = Network::default()
-            .with(PUBLIC, answers_after(20, "{}"))
-            .with(TAILNET, answers_after(60, "{}"))
-            .with(LAN, answers_after(100, "{}"));
-        let (picked, _) = races(&network, machine(routes.clone()), PickConfig::default()).await;
-        let expected = routes.iter().find(|route| route.address().host == winner).expect("the winner is a route");
-        assert_eq!(&picked, expected);
-    }
-
     #[tokio::test(start_paused = true)]
     async fn picks_the_lan_over_a_saved_tailscale_route_that_answers_first() {
         let (network, routes) = network_of(vec![(TAILNET, answers_after(20, "{}")), (LAN, answers_after(100, "{}"))]);
@@ -333,7 +314,7 @@ mod picked {
         let picked = network.pick(vec![route(LAN)]).await.expect("the route answers");
         let text = format!("{picked:?}");
         assert!(text.contains(LAN) && text.contains("version"), "{text}");
-        assert!(!text.contains(TOKEN), "{text}");
+        assert!(!text.contains(SECRET), "{text}");
     }
 }
 
@@ -361,19 +342,13 @@ mod websocket_transports {
     }
 
     #[tokio::test]
-    async fn takes_a_route_of_cornercase_to_cli_with_its_secret_in_a_header() {
+    async fn takes_a_route_to_cli_with_its_secret_in_a_header() {
         let head = head_heard_by(|port| cli("127.0.0.1", port, Some(SECRET))).await;
         assert_eq!(head, Some(("/cli".to_owned(), Some(format!("Bearer {SECRET}")))));
     }
 
-    #[tokio::test]
-    async fn takes_a_route_of_the_bridge_to_its_token_in_the_url() {
-        let head = head_heard_by(|port| bridge("127.0.0.1", port, Some(TOKEN))).await;
-        assert_eq!(head, Some((format!("/?token={TOKEN}"), None)));
-    }
-
     #[test]
-    fn needs_the_secret_of_a_route_of_cornercase() {
+    fn needs_the_secret_of_the_route() {
         let made = websocket_transports(SocketConfig::default())(&cli("mac.local", 7700, None));
         assert_eq!(made.err(), Some(Error::NoToken));
     }

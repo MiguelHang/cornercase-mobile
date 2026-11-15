@@ -6,12 +6,7 @@ use rstest::rstest;
 use serde_json::{Value, json};
 
 use super::*;
-
-const URL: &str = "ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA";
-
-fn route() -> Route {
-    Route::parse(URL).expect("a route with a token")
-}
+use crate::test_util::{SECRET, route};
 
 fn json_of(value: &impl Serialize) -> Value {
     serde_json::to_value(value).expect("a view serializes")
@@ -35,26 +30,24 @@ mod a_machine {
         let expected = json!({
             "id": 3,
             "name": "studio",
-            "routes": [{ "kind": "bridge", "url": "ws://studio.lan:9000/", "has_token": true }],
+            "routes": [{ "kind": "cli", "url": "ws://studio.lan:9000/", "has_token": true }],
             "last_route": "ws://studio.lan:9000/",
         });
         assert_eq!(json_of(&MachineView::from(&machine())), expected);
     }
 
     #[test]
-    fn leaves_the_token_out() {
+    fn leaves_the_secret_out() {
         let text = serde_json::to_string(&MachineView::from(&machine())).expect("a view serializes");
-        assert!(!text.contains("c3R1ZGlvLXNlY3JldA"), "{text}");
-        assert!(!text.contains(r#""token""#) && !text.contains("?token="), "{text}");
+        assert!(!text.contains(SECRET), "{text}");
+        assert!(!text.contains(r#""token""#), "{text}");
     }
 
-    #[rstest]
-    #[case::bridge("bridge")]
-    #[case::cli("cli")]
-    fn says_a_route_whose_token_is_missing_has_none(#[case] kind: &str) {
+    #[test]
+    fn says_a_route_whose_secret_is_missing_has_none() {
         let tokenless: Route =
-            serde_json::from_value(json!({ "kind": kind, "url": "ws://studio.lan:9000/" })).expect("a bare route");
-        let expected = json!({ "kind": kind, "url": "ws://studio.lan:9000/", "has_token": false });
+            serde_json::from_value(json!({ "kind": "cli", "url": "ws://studio.lan:9000/" })).expect("a bare route");
+        let expected = json!({ "kind": "cli", "url": "ws://studio.lan:9000/", "has_token": false });
         assert_eq!(json_of(&RouteView::from(&tokenless)), expected);
     }
 

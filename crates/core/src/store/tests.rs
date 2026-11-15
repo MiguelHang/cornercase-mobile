@@ -9,6 +9,7 @@ use tokio::time::{self, Instant};
 
 use super::*;
 use crate::machines::MachineId;
+use crate::machines::route::Token;
 use crate::transport::fake::FakeTransport;
 use crate::transport::{Exit, OutSink, Stdin};
 
@@ -24,7 +25,7 @@ mod transport;
 const CONTRACT: &[&str] = &["contract", "--json"];
 const LAN: &str = "studio.local";
 const TAILNET: &str = "studio.tailnet.ts.net";
-const TOKEN: &str = "c2VjcmV0LXRva2Vu";
+const SECRET: &str = "4f2a91c0.9c1e2a7b5d0f";
 
 #[derive(Clone, Default)]
 struct Asked(Arc<Mutex<Vec<String>>>);
@@ -58,7 +59,7 @@ impl Transport for Recording {
 }
 
 fn route(host: &str) -> Route {
-    Route::parse(&format!("ws://{host}:8765/?token={TOKEN}")).expect("a bridge url")
+    Route::cli(Address { host: host.to_owned(), port: 8765 }, Some(Token::new(SECRET.to_owned())))
 }
 
 fn machine(routes: Vec<Route>) -> Machine {

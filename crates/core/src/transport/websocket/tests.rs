@@ -20,9 +20,8 @@ use crate::protocol::{ClientMessage, ServerMessage};
 use crate::transport::fake::cli::{CLI, Peer, closed_cleanly, heard, listening, say, serve};
 use crate::transport::{Out, listen};
 
-const URL: &str = "ws://bridge.example:7777/?token=secret";
+const URL: &str = "ws://studio.example:7777/cli";
 const UNRESOLVED: &str = "the address could not be resolved or reached";
-const BRIDGE: &str = "/?token=secret";
 const SECRET: &str = "4f2a91c0.9c1e2a7b5d0f";
 
 type Head = (String, Option<String>);
@@ -34,10 +33,6 @@ async fn within<T>(work: impl Future<Output = T>) -> T {
 fn refusal(status: u16) -> WebSocketError {
     let response = http::Response::builder().status(status).body(None).expect("a response");
     WebSocketError::Http(Box::new(response))
-}
-
-async fn listener() -> (String, TcpListener) {
-    listening(BRIDGE).await
 }
 
 struct Answer(Option<u16>, oneshot::Sender<Head>);
@@ -58,25 +53,16 @@ async fn upgrade(listener: TcpListener, answer: Option<u16>, head: oneshot::Send
     let _ = accept_hdr_async(stream, Answer(answer, head)).await;
 }
 
-async fn connect_with(path: &str, bearer: Option<&str>, answer: Option<u16>) -> (Result<Socket, Error>, Head) {
-    let (url, listener) = listening(path).await;
+async fn connect_with(answer: Option<u16>) -> (Result<Socket, Error>, Head) {
+    let (url, listener) = listening(CLI).await;
     let (sender, receiver) = oneshot::channel();
     tokio::spawn(upgrade(listener, answer, sender));
-    let transport = WebSocketTransport::new(url, SocketConfig::default());
-    let transport = match bearer {
-        Some(secret) => transport.bearing(secret.to_owned()),
-        None => transport,
-    };
-    let connected = transport.connect().await;
+    let connected = cli(url).connect().await;
     (connected, within(receiver).await.expect("the head of the upgrade"))
 }
 
-async fn connect_to(answer: Option<u16>) -> Result<Socket, Error> {
-    connect_with(BRIDGE, None, answer).await.0
-}
-
 fn cli(url: String) -> WebSocketTransport {
-    WebSocketTransport::new(url, SocketConfig::default()).bearing(SECRET.to_owned())
+    WebSocketTransport::new(url, SECRET.to_owned(), SocketConfig::default())
 }
 
 mod config {
@@ -105,54 +91,39 @@ mod connect {
 
     #[tokio::test]
     async fn upgrades_to_a_websocket() {
-        assert!(connect_to(None).await.is_ok(), "the upgrade failed");
-    }
-
-    #[rstest]
-    #[case::unauthorized(401, Error::Unauthorized)]
-    #[case::forbidden(403, Error::Rejected { status: 403 })]
-    #[case::not_found(404, Error::Rejected { status: 404 })]
-    #[case::unavailable(503, Error::Rejected { status: 503 })]
-    #[tokio::test]
-    async fn tells_a_refused_token_from_another_refusal(#[case] status: u16, #[case] expected: Error) {
-        assert_eq!(connect_to(Some(status)).await.err(), Some(expected));
+        assert!(connect_with(None).await.0.is_ok(), "the upgrade failed");
     }
 
     #[rstest]
     #[case::forbidden(403, Error::NotPaired)]
+    #[case::unauthorized(401, Error::Unauthorized)]
+    #[case::not_found(404, Error::Rejected { status: 404 })]
     #[case::unavailable(503, Error::Rejected { status: 503 })]
     #[tokio::test]
     async fn tells_a_forgotten_secret_from_another_refusal(#[case] status: u16, #[case] expected: Error) {
-        let (connected, _) = connect_with(CLI, Some(SECRET), Some(status)).await;
-        assert_eq!(connected.err(), Some(expected));
+        assert_eq!(connect_with(Some(status)).await.0.err(), Some(expected));
     }
 
     #[tokio::test]
     async fn takes_the_secret_in_the_authorization_header() {
-        let (connected, head) = connect_with(CLI, Some(SECRET), None).await;
+        let (connected, head) = connect_with(None).await;
         assert!(connected.is_ok(), "the upgrade failed");
         assert_eq!(head, (CLI.to_owned(), Some(format!("Bearer {SECRET}"))));
     }
 
     #[tokio::test]
-    async fn sends_no_authorization_to_the_bridge() {
-        let (_, head) = connect_with(BRIDGE, None, None).await;
-        assert_eq!(head, (BRIDGE.to_owned(), None));
-    }
-
-    #[tokio::test]
     async fn refuses_a_secret_that_cannot_go_in_a_header() {
         let (url, _listener) = listening(CLI).await;
-        let transport = WebSocketTransport::new(url, SocketConfig::default()).bearing("a\nb".to_owned());
+        let transport = WebSocketTransport::new(url, "a\nb".to_owned(), SocketConfig::default());
         let refused = Some(Error::Secrets("the saved secret cannot go in a header".to_owned()));
         assert_eq!(transport.connect().await.err(), refused);
     }
 
     #[tokio::test]
     async fn gives_up_when_the_upgrade_does_not_come_in_time() {
-        let (url, _listener) = listener().await;
+        let (url, _listener) = listening(CLI).await;
         let config = SocketConfig { connect_timeout: Duration::from_millis(100), ..SocketConfig::default() };
-        assert_eq!(WebSocketTransport::new(url, config).connect().await.err(), Some(Error::Timeout));
+        assert_eq!(WebSocketTransport::new(url, SECRET.to_owned(), config).connect().await.err(), Some(Error::Timeout));
     }
 }
 
@@ -189,18 +160,11 @@ mod secrecy {
     use super::*;
 
     #[test]
-    fn shows_neither_the_url_nor_the_token_of_the_transport() {
-        let transport = WebSocketTransport::new(URL.to_owned(), SocketConfig::default());
+    fn shows_neither_the_url_nor_the_secret_of_the_transport() {
         assert_eq!(
-            format!("{transport:?}"),
+            format!("{:?}", cli(URL.to_owned())),
             "WebSocketTransport { config: SocketConfig { connect_timeout: 3s, silence_timeout: 45s }, .. }"
         );
-    }
-
-    #[test]
-    fn shows_nothing_of_the_secret_it_bears() {
-        let shown = format!("{:?}", cli(URL.to_owned()));
-        assert!(!shown.contains(SECRET) && !shown.contains("4f2a91c0"), "{shown}");
     }
 
     #[test]
@@ -224,7 +188,7 @@ mod secrecy {
     fn keeps_them_out_of_a_connection_error(#[case] error: WebSocketError) {
         let error = connect_error(error);
         for shown in [error.to_string(), format!("{error:?}")] {
-            assert!(!shown.contains("secret") && !shown.contains("bridge.example"), "{shown}");
+            assert!(!shown.contains("studio.example"), "{shown}");
         }
     }
 }
@@ -247,7 +211,7 @@ mod run {
         F::Output: Send + 'static,
     {
         let (url, listener) = listening(CLI).await;
-        (WebSocketTransport::new(url, config).bearing(SECRET.to_owned()), serve(listener, SECRET, script))
+        (WebSocketTransport::new(url, SECRET.to_owned(), config), serve(listener, SECRET, script))
     }
 
     async fn answer(messages: Vec<ServerMessage>) -> (Result<Exit, Error>, Vec<Out>, (Vec<String>, bool)) {

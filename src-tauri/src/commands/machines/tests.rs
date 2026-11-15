@@ -70,7 +70,7 @@ mod adding_a_machine {
 
     #[rstest]
     #[case::not_a_url("studio.lan c3R1ZGlvLXNlY3JldA", ErrorCode::RouteNotAUrl)]
-    #[case::plain_http("http://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", ErrorCode::RouteScheme)]
+    #[case::plain_http("http://studio.lan:9000/?code=0f1e2d3c", ErrorCode::RouteScheme)]
     #[case::no_code("ws://studio.lan:9000/", ErrorCode::RouteNoCode)]
     #[case::of_the_bridge(BRIDGE, ErrorCode::RouteBridgeCode)]
     fn says_what_is_wrong_with_the_url_without_repeating_it(#[case] url: &str, #[case] code: ErrorCode) {

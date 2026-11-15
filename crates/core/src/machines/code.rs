@@ -2,7 +2,7 @@ use std::net::Ipv6Addr;
 
 use tokio_tungstenite::tungstenite::http::Uri;
 
-use super::route::{Address, Route, RouteError, RouteUrl, Token, address, values};
+use super::route::{Address, Route, RouteError, Token, address, values};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MachineCode {
@@ -26,7 +26,7 @@ impl MachineCode {
     }
 
     pub fn cli_routes(&self, secret: &Token) -> Vec<Route> {
-        self.hosts().map(|host| Route::Cli { url: self.url(host, secret) }).collect()
+        self.addresses().into_iter().map(|address| Route::cli(address, Some(secret.clone()))).collect()
     }
 
     pub fn name(&self) -> Option<&str> {
@@ -49,10 +49,6 @@ impl MachineCode {
 
     fn hosts(&self) -> impl Iterator<Item = &String> {
         std::iter::once(&self.first).chain(&self.also)
-    }
-
-    fn url(&self, host: &str, token: &Token) -> RouteUrl {
-        RouteUrl { address: self.address(host), token: Some(token.clone()) }
     }
 
     fn address(&self, host: &str) -> Address {

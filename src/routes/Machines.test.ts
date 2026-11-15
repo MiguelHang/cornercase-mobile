@@ -10,13 +10,13 @@ import machinesSource from './Machines.svelte?raw'
 const machine = (id: number, name: string): MachineView_Serialize => ({
   id,
   name,
-  routes: [{ kind: 'bridge', url: `ws://${name.toLowerCase()}.lan:9000/`, has_token: true }],
+  routes: [{ kind: 'cli', url: `ws://${name.toLowerCase()}.lan:9000/`, has_token: true }],
   last_route: null,
 })
 
 const MACHINES = [machine(1, 'Studio'), machine(2, 'Desk'), machine(3, 'Laptop'), machine(4, 'Attic')]
 
-const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://192.168.1.20:7000/?token=abc' }
+const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: 'ws://192.168.1.20:7000/' }
 
 const PROBED: Record<number, ProbeView> = {
   2: { state: 'answers', route: 'ws://desk.lan:9000/' },

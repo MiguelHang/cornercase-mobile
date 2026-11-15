@@ -1,5 +1,5 @@
 use cornercase_core::machines::code::MachineCode;
-use cornercase_core::machines::route::{Address, Route};
+use cornercase_core::machines::route::Address;
 use rstest::rstest;
 use serde_json::json;
 
@@ -98,21 +98,12 @@ mod from_a_route_error {
     use super::*;
 
     #[rstest]
-    #[case::not_a_url("studio lan c3R1ZGlvLXNlY3JldA", "route_not_a_url")]
-    #[case::scheme("http://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", "route_scheme")]
-    #[case::user_info("ws://me@studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA", "route_user_info")]
-    #[case::no_host("ws://:9000/?token=c3R1ZGlvLXNlY3JldA", "route_no_host")]
-    #[case::port("ws://studio.lan:99999/?token=c3R1ZGlvLXNlY3JldA", "route_port")]
-    #[case::path("ws://studio.lan:9000/bridge?token=c3R1ZGlvLXNlY3JldA", "route_path")]
-    #[case::no_token("ws://studio.lan:9000/?key=c3R1ZGlvLXNlY3JldA", "route_no_token")]
-    #[case::empty_token("ws://studio.lan:9000/?token=", "route_empty_token")]
-    #[case::token_twice("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA&token=c3R1ZGlvLXNlY3JldA", "route_token_twice")]
-    #[case::token_characters("ws://studio.lan:9000/?token=c3R1ZGlvLXNlY3JldA%3D", "route_token_characters")]
-    fn carries_its_code_and_a_message_without_the_url(#[case] url: &str, #[case] code: &str) {
-        assert_carries(Route::parse(url).expect_err("a route that does not parse"), code);
-    }
-
-    #[rstest]
+    #[case::not_a_url("studio lan c0de", "route_not_a_url")]
+    #[case::scheme("http://studio.lan:9000/?code=c0de", "route_scheme")]
+    #[case::user_info("ws://me@studio.lan:9000/?code=c0de", "route_user_info")]
+    #[case::no_host("ws://:9000/?code=c0de", "route_no_host")]
+    #[case::port("ws://studio.lan:99999/?code=c0de", "route_port")]
+    #[case::path("ws://studio.lan:9000/cli?code=c0de", "route_path")]
     #[case::also_empty("ws://studio.lan:9000/?code=c0de&also=", "route_also_empty")]
     #[case::also_invalid("ws://studio.lan:9000/?code=c0de&also=[::1]", "route_also_invalid")]
     #[case::name_encoding("ws://studio.lan:9000/?code=c0de&name=%FF", "route_name_encoding")]

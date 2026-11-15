@@ -268,7 +268,7 @@ mod matching_a_url {
     async fn refuses_a_url_that_is_not_a_route() {
         let studio = Studio::new();
         let launcher = answering(contracted(BOOT), Err(asleep()));
-        let result = matching(&studio.state, &launcher, "http://laptop.lan:9000/?token=eA", "desk").await;
+        let result = matching(&studio.state, &launcher, "http://laptop.lan:9000/?code=0f1e", "desk").await;
         assert_eq!(result.map_err(|error| error.code), Err(ErrorCode::RouteScheme));
     }
 }

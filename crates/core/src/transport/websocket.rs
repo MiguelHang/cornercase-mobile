@@ -38,18 +38,13 @@ impl Default for SocketConfig {
 
 pub struct WebSocketTransport {
     url: String,
-    bearer: Option<String>,
+    secret: String,
     config: SocketConfig,
 }
 
 impl WebSocketTransport {
-    pub fn new(url: String, config: SocketConfig) -> Self {
-        Self { url, bearer: None, config }
-    }
-
-    #[must_use]
-    pub fn bearing(self, credential: String) -> Self {
-        Self { bearer: Some(credential), ..self }
+    pub fn new(url: String, secret: String, config: SocketConfig) -> Self {
+        Self { url, secret, config }
     }
 
     pub(crate) async fn connect(&self) -> Result<Socket, Error> {
@@ -57,26 +52,17 @@ impl WebSocketTransport {
         let upgrade = connect_async_with_config(request, Some(websocket()), true);
         match tokio::time::timeout(self.config.connect_timeout, upgrade).await {
             Ok(Ok((socket, _))) => Ok(socket),
-            Ok(Err(error)) => Err(self.refused(error)),
+            Ok(Err(error)) => Err(refused(error)),
             Err(_) => Err(Error::Timeout),
         }
     }
 
     fn request(&self) -> Result<Request, Error> {
         let mut request = self.url.as_str().into_client_request().map_err(connect_error)?;
-        if let Some(credential) = &self.bearer {
-            let mut value = HeaderValue::from_str(&format!("Bearer {credential}")).map_err(|_| unfit_secret())?;
-            value.set_sensitive(true);
-            request.headers_mut().insert(AUTHORIZATION, value);
-        }
+        let mut value = HeaderValue::from_str(&format!("Bearer {}", self.secret)).map_err(|_| unfit_secret())?;
+        value.set_sensitive(true);
+        request.headers_mut().insert(AUTHORIZATION, value);
         Ok(request)
-    }
-
-    fn refused(&self, error: WebSocketError) -> Error {
-        match (connect_error(error), &self.bearer) {
-            (Error::Rejected { status: 403 }, Some(_)) => Error::NotPaired,
-            (error, _) => error,
-        }
     }
 }
 
@@ -99,6 +85,13 @@ impl fmt::Debug for WebSocketTransport {
 
 fn websocket() -> WebSocketConfig {
     WebSocketConfig::default().max_frame_size(Some(LARGEST_ANSWER)).max_message_size(Some(LARGEST_ANSWER))
+}
+
+fn refused(error: WebSocketError) -> Error {
+    match connect_error(error) {
+        Error::Rejected { status: 403 } => Error::NotPaired,
+        error => error,
+    }
 }
 
 fn unfit_secret() -> Error {

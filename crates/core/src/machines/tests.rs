@@ -1,31 +1,23 @@
-use super::route::{RouteUrl, Token};
+use super::route::Token;
 use super::*;
 
 pub(super) const TOKEN: &str = "c2VjcmV0LXRva2Vu";
 pub(super) const SECRET: &str = "9c1e2a7b.5d0f3c8e9a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6071";
 
-pub(super) fn bridge(host: &str, port: u16, token: Option<&str>) -> Route {
-    Route::Bridge { url: url(host, port, token) }
-}
-
 pub(super) fn cli(host: &str, port: u16, secret: Option<&str>) -> Route {
-    Route::Cli { url: url(host, port, secret) }
+    let address = Address { host: host.to_owned(), port };
+    Route::cli(address, secret.map(|secret| Token::new(secret.to_owned())))
 }
 
 pub(super) async fn within<T>(work: impl Future<Output = T>) -> T {
     tokio::time::timeout(std::time::Duration::from_secs(5), work).await.expect("it gets there within five seconds")
 }
 
-fn url(host: &str, port: u16, token: Option<&str>) -> RouteUrl {
-    let address = Address { host: host.to_owned(), port };
-    RouteUrl { address, token: token.map(|token| Token::new(token.to_owned())) }
-}
-
 fn machine() -> Machine {
     Machine {
         id: MachineId(7),
         name: "studio".to_owned(),
-        routes: vec![bridge("192.168.1.20", 8765, Some(TOKEN)), bridge("fd7a:115c:a1e0::1", 8765, Some(TOKEN))],
+        routes: vec![cli("192.168.1.20", 8765, Some(TOKEN)), cli("fd7a:115c:a1e0::1", 8765, Some(TOKEN))],
         last_route: Some(Address { host: "fd7a:115c:a1e0::1".to_owned(), port: 8765 }),
     }
 }
@@ -51,8 +43,8 @@ mod json {
         assert_eq!(
             text,
             concat!(
-                r#"{"id":7,"name":"studio","routes":[{"kind":"bridge","url":"ws://192.168.1.20:8765/"},"#,
-                r#"{"kind":"bridge","url":"ws://[fd7a:115c:a1e0::1]:8765/"}],"#,
+                r#"{"id":7,"name":"studio","routes":[{"kind":"cli","url":"ws://192.168.1.20:8765/"},"#,
+                r#"{"kind":"cli","url":"ws://[fd7a:115c:a1e0::1]:8765/"}],"#,
                 r#""last_route":"ws://[fd7a:115c:a1e0::1]:8765/"}"#
             )
         );
@@ -63,7 +55,7 @@ mod json {
         let text = serde_json::to_string(&machine()).expect("serialize the machine");
         let read: Machine = serde_json::from_str(&text).expect("read the machine");
         let expected = Machine {
-            routes: vec![bridge("192.168.1.20", 8765, None), bridge("fd7a:115c:a1e0::1", 8765, None)],
+            routes: vec![cli("192.168.1.20", 8765, None), cli("fd7a:115c:a1e0::1", 8765, None)],
             ..machine()
         };
         assert_eq!(read, expected);

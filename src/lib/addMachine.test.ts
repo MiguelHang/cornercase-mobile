@@ -55,7 +55,7 @@ describe('send', () => {
   })
 
   it.each<[string, CommandError, string]>([
-    ['a route error under the URL', { code: 'route_empty_token', message: 'the token is empty' }, 'url'],
+    ['a route error under the URL', { code: 'route_empty_code', message: "the code's pairing code is empty" }, 'url'],
     ['a name error under the name', { code: 'name_taken', message: 'the name is taken' }, 'name'],
     ['any other under the form', { code: 'store', message: 'the disk is full' }, 'form'],
   ])('puts %s', async (_, error, kind) => {

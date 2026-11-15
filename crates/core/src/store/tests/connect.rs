@@ -27,9 +27,7 @@ fn old(stderr: &str) -> FakeTransport {
 }
 
 fn tokenless(host: &str) -> Route {
-    let mut route = route(host);
-    route.set_token(None);
-    route
+    Route::cli(route(host).address().clone(), None)
 }
 
 pub(super) fn without_notices() -> String {

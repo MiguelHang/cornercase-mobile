@@ -5,7 +5,7 @@ use rstest::rstest;
 
 use super::*;
 use crate::machines::store::JsonFileStore;
-use crate::machines::tests::{SECRET, TOKEN, bridge, cli};
+use crate::machines::tests::{SECRET, TOKEN, cli};
 use crate::secrets::memory::MemorySecrets;
 use crate::test_util::TempDir;
 
@@ -79,7 +79,7 @@ impl Phone {
 }
 
 fn route(host: &str, token: &str) -> Route {
-    bridge(host, 8765, Some(token))
+    cli(host, 8765, Some(token))
 }
 
 fn code(hosts: &[&str], token: &str) -> Vec<Route> {
@@ -122,7 +122,7 @@ mod load {
         let (_, id) = phone.studio();
         phone.secrets.delete(&key(id, &address(LAN))).expect("forget the token");
         let routes = phone.open().machine(id).expect("the studio").routes.clone();
-        assert_eq!(routes, [bridge(LAN, 8765, None), route(TAILNET, TOKEN)]);
+        assert_eq!(routes, [cli(LAN, 8765, None), route(TAILNET, TOKEN)]);
     }
 
     #[test]
@@ -138,7 +138,7 @@ mod load {
     #[test]
     fn takes_the_routes_of_a_code_into_a_machine_saved_before_codes() {
         let phone = Phone::new();
-        let machine = r#"{"id": 0, "name": "studio", "routes": [{"kind": "bridge", "url": "ws://192.168.1.20:8765/"}], "last_route": null}"#;
+        let machine = r#"{"id": 0, "name": "studio", "routes": [{"kind": "cli", "url": "ws://192.168.1.20:8765/"}], "last_route": null}"#;
         fs::write(phone.file(), format!(r#"{{"version": 1, "next_id": 1, "machines": [{machine}]}}"#))
             .expect("write the file by hand");
         phone.secrets.set(&key(MachineId(0), &address(LAN)), TOKEN.as_bytes()).expect("keep the token");
@@ -354,21 +354,6 @@ mod merge {
     }
 
     #[test]
-    fn adds_the_cornercase_routes_of_the_same_mac_beside_its_bridge_routes() {
-        let phone = Phone::new();
-        let (mut machines, id) = phone.studio();
-        let result = machines.merge(id, &paired(&[LAN, TAILNET], SECRET));
-        let added = vec![phone_address(LAN), phone_address(TAILNET)];
-        assert_eq!(result, Ok(Merged { added, token_updated: false, skipped: Vec::new() }));
-        let bridge_routes = vec![route(LAN, TOKEN), route(TAILNET, TOKEN)];
-        assert_eq!(routes(&phone, id), [bridge_routes, paired(&[LAN, TAILNET], SECRET)].concat());
-        assert_eq!(
-            (phone.secret(id, LAN).as_deref(), phone.secret_at(id, &phone_address(LAN)).as_deref()),
-            (Some(TOKEN), Some(SECRET))
-        );
-    }
-
-    #[test]
     fn replaces_the_secret_when_the_mac_is_paired_again() {
         let phone = Phone::new();
         let id = phone.open().add("studio", &paired(&[LAN, TAILNET], SECRET)).expect("add the studio");
@@ -457,7 +442,7 @@ mod learn {
     }
 
     #[test]
-    fn never_removes_a_route_the_bridge_no_longer_lists() {
+    fn never_removes_a_route_cornercase_no_longer_lists() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
         assert_eq!(machines.learn(id, &[route(NEW_TAILNET, TOKEN)]), Ok(vec![route(NEW_TAILNET, TOKEN)]));
@@ -485,7 +470,7 @@ mod learn {
     fn refuses_a_route_without_a_token() {
         let phone = Phone::new();
         let (mut machines, id) = phone.studio();
-        let result = phone.unchanged(&mut machines, |machines| machines.learn(id, &[bridge(NEW_TAILNET, 8765, None)]));
+        let result = phone.unchanged(&mut machines, |machines| machines.learn(id, &[cli(NEW_TAILNET, 8765, None)]));
         assert_eq!(result, Err(Error::NoToken));
     }
 }

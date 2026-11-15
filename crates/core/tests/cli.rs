@@ -25,7 +25,7 @@ async fn within<T>(work: impl Future<Output = T>) -> T {
 }
 
 fn transport(url: String, secret: &str) -> WebSocketTransport {
-    WebSocketTransport::new(url, SocketConfig::default()).bearing(secret.to_owned())
+    WebSocketTransport::new(url, secret.to_owned(), SocketConfig::default())
 }
 
 fn argv() -> Vec<String> {
@@ -170,7 +170,7 @@ mod run {
     async fn gives_up_on_a_listener_that_never_answers() {
         let (url, _listener) = listening(CLI).await;
         let config = SocketConfig { connect_timeout: DEADLINE, ..SocketConfig::default() };
-        let transport = WebSocketTransport::new(url, config).bearing(SECRET.to_owned());
+        let transport = WebSocketTransport::new(url, SECRET.to_owned(), config);
         let started = Instant::now();
         assert_eq!(run(&transport, Vec::new()).await, (Err(Error::Timeout), Vec::new()));
         let waited = started.elapsed();

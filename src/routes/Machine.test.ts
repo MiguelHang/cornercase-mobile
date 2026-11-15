@@ -10,7 +10,7 @@ const ROUTES = ['ws://studio.lan:9000/', 'ws://192.168.1.20:9000/', 'ws://100.64
 const studio = (urls = ROUTES): MachineView_Serialize => ({
   id: 3,
   name: 'Studio',
-  routes: urls.map((url, index) => ({ kind: 'bridge', url, has_token: index !== 2 })),
+  routes: urls.map((url, index) => ({ kind: 'cli', url, has_token: index !== 2 })),
   last_route: null,
 })
 
@@ -86,18 +86,12 @@ describe('Machine', () => {
     expect(addresses).toEqual(['studio.lan:9000', '192.168.1.20:9000', '100.64.0.3:9000'])
   })
 
-  it('marks the route it is connected through and the one without a token', () => {
+  it('marks the route it is connected through and the one without a secret', () => {
     const [first, second, third] = routes(screen())
     expect(first).not.toContain('class="mark')
     expect(second).toMatch(/<span class="mark done svelte-[\w-]+">Connected<\/span>/)
-    expect(third).toMatch(/<span class="mark failed svelte-[\w-]+">No token<\/span>/)
+    expect(third).toMatch(/<span class="mark failed svelte-[\w-]+">No secret<\/span>/)
     expect(third).not.toContain('Connected')
-  })
-
-  it('marks a route of cornercase without its secret', () => {
-    const machine = { ...studio(), routes: [{ kind: 'cli' as const, url: ROUTES[0], has_token: false }] }
-    const [only] = routes(screen(machine, null))
-    expect(only).toMatch(/<span class="mark failed svelte-[\w-]+">No secret<\/span>/)
   })
 
   it('marks no route when the machine is not the one connected', () => {

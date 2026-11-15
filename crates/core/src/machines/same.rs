@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::BuildHasher;
-use std::mem::discriminant;
 
 use super::name::folded;
 use super::route::{Address, Route};
@@ -74,15 +73,7 @@ fn by_name(machines: &[Machine], name: &str) -> Option<Same> {
 }
 
 fn has(machine: &Machine, route: &Route) -> bool {
-    machine.routes.iter().any(|saved| same_place(saved, route))
-}
-
-fn same_place(saved: &Route, route: &Route) -> bool {
-    if discriminant(saved) == discriminant(route) {
-        saved.address() == route.address()
-    } else {
-        saved.address().host == route.address().host
-    }
+    machine.routes.iter().any(|saved| saved.address() == route.address())
 }
 
 fn first(machines: &[Machine], why: Why, matches: impl Fn(&Machine) -> bool) -> Option<Same> {

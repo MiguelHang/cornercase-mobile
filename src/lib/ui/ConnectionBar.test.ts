@@ -25,7 +25,7 @@ const flat = (text: string) => text.replace(/\s+/g, ' ')
 describe('ConnectionBar', () => {
   it.each<[string, ConnectionView_Serialize, string, Tone]>([
     ['connecting', { state: 'connecting' }, 'Connecting…', 'working'],
-    ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/?token=abc' }, 'MacBook · via 192.168.1.20:7000', 'done'],
+    ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
     ['missing', MISSING, 'cornercase on the Mac lacks watch: update it', 'failed'],
     [

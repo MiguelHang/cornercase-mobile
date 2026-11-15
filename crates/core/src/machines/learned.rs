@@ -17,7 +17,7 @@ pub fn learned_routes(answer: &AppRoutes, winner: &Route) -> Vec<Route> {
         .routes
         .iter()
         .filter_map(|route| saved_address(&Address { host: route.host.clone(), port: route.port }.to_string()))
-        .map(|address| winner.at(address))
+        .map(|address| Route::cli(address, winner.token().cloned()))
         .collect()
 }
 

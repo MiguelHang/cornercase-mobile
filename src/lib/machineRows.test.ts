@@ -6,7 +6,7 @@ import { CHECKING, rescannable, rowStatus, type Probe } from './machineRows'
 const MACHINE: MachineView_Serialize = {
   id: 2,
   name: 'Studio',
-  routes: [{ kind: 'bridge', url: 'ws://studio.lan:9000/', has_token: true }],
+  routes: [{ kind: 'cli', url: 'ws://studio.lan:9000/', has_token: true }],
   last_route: null,
 }
 
@@ -17,7 +17,7 @@ const shown = (probe: Probe) => {
 
 describe('rowStatus of the active machine', () => {
   it.each<ConnectionView_Serialize>([
-    { state: 'connected', route: 'ws://studio.lan:9000/?token=abc' },
+    { state: 'connected', route: 'ws://studio.lan:9000/' },
     { state: 'connecting' },
     { state: 'offline' },
     { state: 'unauthorized' },
@@ -47,7 +47,7 @@ describe('rowStatus of another machine', () => {
     ['checking', CHECKING, { text: 'Checking…', tone: 'working', pulsing: true }],
     [
       'answering',
-      { state: 'answers', route: 'ws://studio.lan:9000/?token=abc' },
+      { state: 'answers', route: 'ws://studio.lan:9000/' },
       { text: 'Answers via studio.lan:9000', tone: 'done', pulsing: false },
     ],
     ['rejecting its token', { state: 'unauthorized' }, { text: 'Token rejected', tone: 'failed', pulsing: false }],
@@ -70,8 +70,8 @@ describe('rowStatus of another machine', () => {
     const probe: Probe = {
       state: 'no_answer',
       failures: [
-        { route: 'ws://studio.lan:9000/?token=abc', error: { code: 'timeout', message: 'timed out' } },
-        { route: 'ws://100.64.0.2:9000/?token=abc', error: { code: 'connect', message: 'refused' } },
+        { route: 'ws://studio.lan:9000/', error: { code: 'timeout', message: 'timed out' } },
+        { route: 'ws://100.64.0.2:9000/', error: { code: 'connect', message: 'refused' } },
       ],
     }
     expect(rowStatus(MACHINE, null, probe).failures).toEqual([

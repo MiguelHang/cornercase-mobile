@@ -8,9 +8,7 @@ use crate::cli::contract::fixtures::REAL;
 use crate::machines::route::Token;
 
 fn with_token(host: &str, token: &str) -> Route {
-    let mut route = route(host);
-    route.set_token(Some(Token::new(token.to_owned())));
-    route
+    Route::cli(route(host).address().clone(), Some(Token::new(token.to_owned())))
 }
 
 fn lan_then_tailnet(asked: &Asked) -> (Store, Changes) {

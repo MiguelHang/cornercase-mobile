@@ -131,11 +131,11 @@ describe('status', () => {
 
 describe('routeAddress', () => {
   it.each([
-    ['ws://192.168.1.20:7000/?token=secret', '192.168.1.20:7000'],
-    ['wss://mac.tail1234.ts.net:7443/bridge?token=secret', 'mac.tail1234.ts.net:7443'],
-    ['wss://mac.local/?token=secret', 'mac.local'],
-    ['ws://[fe80::1]:7000/?token=secret', '[fe80::1]:7000'],
-    ['not a route?token=secret', 'not a route'],
+    ['ws://192.168.1.20:7000/', '192.168.1.20:7000'],
+    ['wss://mac.tail1234.ts.net:7443/cli', 'mac.tail1234.ts.net:7443'],
+    ['wss://mac.local/', 'mac.local'],
+    ['ws://[fe80::1]:7000/', '[fe80::1]:7000'],
+    ['not a route?code=c0de', 'not a route'],
   ])('shows %s as %s', (route, address) => {
     expect(connection.routeAddress(route)).toBe(address)
   })

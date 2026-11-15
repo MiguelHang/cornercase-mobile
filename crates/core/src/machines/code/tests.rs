@@ -48,6 +48,11 @@ mod parse {
     #[rstest]
     #[case::ipv6_first("ws://[fd7a:115c:a1e0::1]:47682/?code=c", TAILSCALE_V6, 47682)]
     #[case::no_name("ws://10.0.0.1:1/?code=c", "10.0.0.1", 1)]
+    #[case::spaces_around(" \tws://mac.local:8765/?code=c  ", "mac.local", 8765)]
+    #[case::no_port("ws://mac.local/?code=c", "mac.local", 80)]
+    #[case::ipv6_without_port("ws://[fd7a:115c:a1e0::1]/?code=c", TAILSCALE_V6, 80)]
+    #[case::upper_case_scheme("WS://mac.local:8765/?code=c", "mac.local", 8765)]
+    #[case::other_parameters("ws://mac.local:8765/?v=1&code=c", "mac.local", 8765)]
     fn reads_a_code_of_one_route(#[case] text: &str, #[case] host: &str, #[case] port: u16) {
         let read = read(text);
         assert_eq!(read.cli_routes(&secret()), vec![cli(host, port, Some(SECRET))]);
@@ -94,7 +99,7 @@ mod parse {
 
     #[test]
     fn leaves_a_token_beside_the_pairing_code_aside() {
-        let read = read(&format!("ws://mac.local:47682/?token={TOKEN}&code={PAIRING}"));
+        let read = read(&format!("ws://mac.local:47682/?code={PAIRING}&token={TOKEN}"));
         assert_eq!(read.pairing_code().as_str(), PAIRING);
     }
 
@@ -152,12 +157,38 @@ mod parse {
     }
 
     #[rstest]
-    #[case::wss(&format!("wss://mac.local:47682/?code={PAIRING}"), RouteError::Scheme)]
-    #[case::path(&format!("ws://mac.local:47682/x?code={PAIRING}"), RouteError::Path)]
-    #[case::port_zero(&format!("ws://mac.local:0/?code={PAIRING}"), RouteError::Port)]
+    #[case::wss("wss://mac.local:8765/", RouteError::Scheme)]
+    #[case::http("http://mac.local:8765/", RouteError::Scheme)]
+    #[case::no_scheme("/", RouteError::Scheme)]
+    #[case::user("ws://user@mac.local:8765/", RouteError::UserInfo)]
+    #[case::user_and_password("ws://user:pass@mac.local:8765/", RouteError::UserInfo)]
+    #[case::user_before_ipv6("ws://user@[fd7a:115c:a1e0::1]:8765/", RouteError::UserInfo)]
+    #[case::empty_host("ws://:8765/", RouteError::NoHost)]
+    #[case::empty_brackets("ws://[]:8765/", RouteError::NoHost)]
+    #[case::port_text("ws://mac.local:port/", RouteError::Port)]
+    #[case::port_sign("ws://mac.local:+8765/", RouteError::Port)]
+    #[case::port_too_high("ws://mac.local:65536/", RouteError::Port)]
+    #[case::port_zero("ws://mac.local:0/", RouteError::Port)]
+    #[case::port_empty("ws://mac.local:/", RouteError::Port)]
+    #[case::other_path("ws://mac.local:8765/other", RouteError::Path)]
+    #[case::empty_path("ws://mac.local:8765", RouteError::Path)]
+    #[case::unclosed_bracket("ws://[fd7a:115c:a1e0::1:8765/", RouteError::NotAUrl)]
+    fn refuses_a_bad_address_with_its_own_reason_and_without_it(#[case] url: &str, #[case] reason: RouteError) {
+        let refused = MachineCode::parse(&format!("{url}?code={PAIRING}")).expect_err("refuse");
+        assert_eq!(refused, reason);
+        for text in [refused.to_string(), format!("{refused:?}")] {
+            assert!(!text.contains("mac.local"), "{text}");
+            assert!(!text.contains("fd7a"), "{text}");
+            assert!(!text.contains(PAIRING), "{text}");
+        }
+    }
+
+    #[rstest]
     #[case::not_a_url("not a code", RouteError::NotAUrl)]
+    #[case::empty("", RouteError::NotAUrl)]
+    #[case::only_spaces(" \n", RouteError::NotAUrl)]
     #[case::no_query("ws://mac.local:47682/", RouteError::NoCode)]
-    fn refuses_what_a_route_url_refuses(#[case] text: &str, #[case] reason: RouteError) {
+    fn refuses_what_is_not_a_code(#[case] text: &str, #[case] reason: RouteError) {
         assert_eq!(MachineCode::parse(text), Err(reason));
     }
 

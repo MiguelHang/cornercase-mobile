@@ -13,7 +13,7 @@ const ROUTES = ['ws://studio.lan:9000/', 'ws://192.168.1.20:9000/']
 const studio = (routes = ROUTES): MachineView_Serialize => ({
   id: 3,
   name: 'Studio',
-  routes: routes.map((url) => ({ kind: 'bridge', url, has_token: true })),
+  routes: routes.map((url) => ({ kind: 'cli', url, has_token: true })),
   last_route: null,
 })
 
@@ -205,7 +205,7 @@ describe('EditMachine adding a route', () => {
   })
 
   it.each<[string, CommandError, 'urlError' | 'formError']>([
-    ['a route error under the field', { code: 'route_empty_token', message: 'the token is empty' }, 'urlError'],
+    ['a route error under the field', { code: 'route_empty_code', message: "the code's pairing code is empty" }, 'urlError'],
     ['any other under the page', { code: 'secrets', message: 'the keychain is locked' }, 'formError'],
   ])('puts %s, keeping the form open', async (_, error, field) => {
     const { edit, onchanged } = editor({ machineMerge: () => refused(error) })
