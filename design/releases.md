@@ -50,7 +50,7 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 
 ## App Store Connect
 
-- **The app**: "Cornercase remote", Apple ID 6835431973, SKU `cornercase-mobile`, primary language en-US, bundle ID `dev.usecornercase.mobile`, team `22FWTVV94S` (the paid Apple Developer Program). The store's name differs from `productName`, "cornercase", which is the name under the icon, on purpose.
+- **The app**: "Cornercase remote", Apple ID 6835431973, SKU `cornercase-mobile`, primary language en-US, bundle ID `dev.usecornercase.mobile`, team `22FWTVV94S` (the paid Apple Developer Program). The name under the icon is "Cornercase" (decided by the user on 2026-11-16): `CFBundleDisplayName` in `project.yml` › `info.properties` on iOS, `app_name` and `main_activity_title` in `res/values/strings.xml` on Android. `productName` stays "cornercase", since it also names the binaries and the bundles.
 - **The privacy policy** is `PRIVACY.md`. External TestFlight testing and the App Store need it at a public URL, which the repository gives once it is public.
 
 ## The repository's URLs

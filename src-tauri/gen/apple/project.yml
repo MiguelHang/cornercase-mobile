@@ -49,6 +49,7 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         UIUserInterfaceStyle: Dark
         ITSAppUsesNonExemptEncryption: false
+        CFBundleDisplayName: Cornercase
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
