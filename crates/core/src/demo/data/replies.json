@@ -1,0 +1,8 @@
+[
+  "Done: the retry now waits twice as long after each failure, capped at thirty seconds. The three new tests for the backoff pass.",
+  "I renamed `parse_line` to `read_entry` across the crate and updated the two call sites in the importer. Nothing else changed.",
+  "The flaky test was racing the cache warm-up. It now awaits the first refresh before asserting; it passed fifty runs in a row.",
+  "I added a `--dry-run` flag to the export command. It prints the files it would write and exits without touching the disk.",
+  "The slow page was loading every invoice at once. It now pages twenty at a time, and the first paint dropped from 2.1 s to 0.3 s.",
+  "Lint is clean and the full suite is green. The branch is ready for review whenever you are."
+]

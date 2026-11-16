@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde_json::json;
 
 use super::clock;
@@ -15,8 +17,12 @@ impl World {
             .to_string()
     }
 
-    pub(super) fn events(&self) -> Vec<String> {
-        places(&self.session).filter_map(|place| self.changed(&place)).collect()
+    pub(super) fn events(&self, told: &mut HashMap<u64, String>) -> Vec<String> {
+        let changes = places(&self.session).filter_map(|place| Some((place.pane.id, self.changed(&place)?)));
+        changes
+            .filter(|(pane, event)| told.insert(*pane, event.clone()).as_ref() != Some(event))
+            .map(|(_, event)| event)
+            .collect()
     }
 
     fn changed(&self, place: &Place) -> Option<String> {

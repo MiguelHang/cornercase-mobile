@@ -28,7 +28,7 @@ fn refused(connection: &Connection) -> bool {
     matches!(connection, Connection::Missing(_) | Connection::NotPaired | Connection::Incompatible(_))
 }
 
-async fn entered() -> (Store, Vec<Change>) {
+pub(super) async fn entered() -> (Store, Vec<Change>) {
     let demo = DemoTransport::new();
     let factory = move |_: &Route| Ok(Arc::new(demo.clone()) as Arc<dyn Transport>);
     let (store, driver) = Store::new(demo_machine(), factory, PickConfig::default());

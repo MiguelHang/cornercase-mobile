@@ -36,7 +36,7 @@ pub(super) async fn input(stdin: BoxStream<'static, Stdin>, out: OutSink) -> Res
 
 pub(super) async fn pasted(argv: &[String], stdin: BoxStream<'static, Stdin>) -> Answer {
     let bytes = stdin.fold(0, async |bytes, read| bytes + length(&read)).await;
-    let pane = dispatch::valued(argv, "--pane").and_then(|pane| pane.parse::<u64>().ok()).unwrap_or_default();
+    let pane = dispatch::pane(argv).unwrap_or_default();
     let name = argv.iter().find_map(|word| word.strip_prefix("--name=")).unwrap_or(UNNAMED);
     Answer::printed(json!({ "pane": pane, "path": format!("{PASTED}/{name}"), "bytes": bytes }).to_string())
 }
