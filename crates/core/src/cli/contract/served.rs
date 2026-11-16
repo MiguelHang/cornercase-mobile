@@ -3,7 +3,11 @@ use serde_json::{Value, json};
 use super::{CONTRACT, REQUIRED, Required, SINCE};
 
 pub(crate) fn descriptor(boot: &str) -> Value {
-    REQUIRED.described(newest(SINCE.iter().map(|(_, _, version)| *version)), boot)
+    REQUIRED.described(version(), boot)
+}
+
+pub(crate) fn version() -> &'static str {
+    newest(SINCE.iter().map(|(_, _, version)| *version))
 }
 
 impl Required {

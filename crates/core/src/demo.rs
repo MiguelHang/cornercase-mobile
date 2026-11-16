@@ -8,7 +8,10 @@ use self::world::World;
 use crate::error::Error;
 use crate::transport::{Exit, OutSink, Stdin, Transport};
 
+mod clock;
+mod data;
 mod dispatch;
+mod status;
 mod world;
 
 #[derive(Clone, Default)]
