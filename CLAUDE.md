@@ -34,10 +34,12 @@ pnpm check                                        # svelte-check, then tsc on vi
 pnpm lint                                         # eslint, then scripts/check-rules.mjs (1,000 lines, comments)
 npx -y jscpd@4.3.0                                # copy-paste detector, reads .jscpd.json
 pnpm test                                         # vitest
+scripts/ios-release.sh                            # build the iPhone app and upload it to TestFlight (--help)
 ```
 
 - **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets and `aarch64-linux-android`; rustup
-  installs it on the first cargo command. Node 22.
+  installs it on the first cargo command. Node 22, with pnpm through `corepack enable`, which gives the version that
+  `package.json` names in `packageManager`.
 - **CI runs `pnpm install --frozen-lockfile`, `pnpm build` and the checks from `cargo fmt --check` down, in that
   order** (`design/code-layout.md`). Before calling a task done, run them and fix what fails.
 - **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
@@ -46,12 +48,13 @@ pnpm test                                         # vitest
   libimobiledevice on `ios init`, ios-deploy on `ios dev`); CocoaPods is `brew install cocoapods`.
 - **`src-tauri/gen/apple` is in git** (`design/architecture.md`): change the Xcode project in its `project.yml`,
   which the Tauri CLI turns into the `.xcodeproj`, and commit both; `.gitignore` leaves out what the builds write.
-- **On an iPhone** (the free Personal Team `22FWTVV94S` in `tauri.conf.json` › `bundle.iOS.developmentTeam`): plug it in,
-  turn on Developer Mode, then `pnpm build && LANG=en_US.UTF-8 pnpm tauri ios dev "<iPhone's name>" --no-watch --features
-  tauri/custom-protocol --config '{"build":{"beforeDevCommand":"","devUrl":null}}'`, which embeds `dist/` and needs no Vite
-  server. The first launch needs the certificate trusted on the phone (Settings › General › VPN & Device Management).
-  A free profile expires after 7 days: install again. `ios build --export-method debugging` fails with a free team
-  ("no devices"): the build has to target the phone.
+- **On an iPhone** (team `22FWTVV94S`, the paid Apple Developer Program, in `tauri.conf.json` ›
+  `bundle.iOS.developmentTeam`): plug it in, turn on Developer Mode, then `pnpm build && LANG=en_US.UTF-8 pnpm tauri
+  ios dev "<iPhone's name>" --no-watch --features tauri/custom-protocol --config
+  '{"build":{"beforeDevCommand":"","devUrl":null}}'`, which embeds `dist/` and needs no Vite server.
+- **Releases** (`design/releases.md`): Android's APK comes from `.github/workflows/release.yml` on a `v*` tag, as a
+  draft GitHub Release; the iPhone build goes to TestFlight from a Mac with `scripts/ios-release.sh`, which needs the
+  App Store Connect API key and, on Xcode 27, `rustup component add llvm-tools`.
 - **Android needs JDK 17, the SDK and NDK 29.0.14206865**, without Android Studio and without sudo
   (`design/architecture/android.md`):
   - `brew install openjdk@17`, `brew install --cask android-commandlinetools`, then in the shell's profile
@@ -73,9 +76,10 @@ pnpm test                                         # vitest
   - Paste a machine's code into the emulator's form, or type it with `adb shell "input text '<piece>'"`, 16
     characters at a time: longer text gets cut.
 - **`src-tauri/gen/android` is in git** too, as `android init` wrote it; only the manifest, the two files of
-  `res/xml/`, `proguard-rules.pro` (R8 and ML Kit), `MainActivity.kt` (the keyboard's insets) and the launch's resources (`values/colors.xml`,
-  `values/themes.xml`, `values-v31/themes.xml`, `drawable/launch_mark.xml`; `values-night/themes.xml` deleted) are
-  changed by hand. `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
+  `res/xml/`, `values/strings.xml` (the name under the icon), `proguard-rules.pro` (R8 and ML Kit),
+  `MainActivity.kt` (the keyboard's insets) and the launch's resources (`values/colors.xml`, `values/themes.xml`,
+  `values-v31/themes.xml`, `drawable/launch_mark.xml`; `values-night/themes.xml` deleted) are changed by hand.
+  `minSdk` and the debug suffix live in `tauri.conf.json` › `bundle.android`.
 
 ## Structure
 - `crates/core/`: pure, testable logic: transport trait, the protocol of cornercase's `/cli`, CLI types over `--json`,
