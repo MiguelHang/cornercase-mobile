@@ -1,14 +1,17 @@
 use std::sync::{Mutex, PoisonError};
 
 use futures_util::future;
+use futures_util::stream::BoxStream;
+use serde_json::json;
 
+use super::queue;
 use super::world::World;
 use crate::error::Error;
-use crate::transport::{Exit, Out, OutSink, emit};
+use crate::transport::{Exit, Out, OutSink, Stdin, emit, only_stdout};
 
 const UNKNOWN: i32 = 2;
 
-struct Answer {
+pub(super) struct Answer {
     lines: Vec<Out>,
     code: i32,
     stderr: String,
@@ -16,7 +19,7 @@ struct Answer {
 }
 
 impl Answer {
-    fn printed(stdout: String) -> Self {
+    pub(super) fn printed(stdout: String) -> Self {
         Self { lines: vec![Out::Stdout(stdout)], code: 0, stderr: String::new(), open: false }
     }
 
@@ -36,16 +39,35 @@ impl Answer {
         }
         Ok(Exit { code: self.code, stderr: self.stderr })
     }
+
+    pub(super) fn reply(self) -> String {
+        let text: Vec<String> = self.lines.into_iter().filter_map(only_stdout).collect();
+        json!({ "status": self.code, "text": text.join("\n"), "error": self.stderr }).to_string()
+    }
 }
 
-pub(super) async fn run(world: &Mutex<World>, argv: Vec<String>, mut out: OutSink) -> Result<Exit, Error> {
-    let answer = answer(&world.lock().unwrap_or_else(PoisonError::into_inner), &argv);
-    answer.sent(&mut out).await
+pub(super) async fn run(
+    world: &Mutex<World>,
+    argv: Vec<String>,
+    stdin: BoxStream<'static, Stdin>,
+    mut out: OutSink,
+) -> Result<Exit, Error> {
+    match argv.first().map(String::as_str) {
+        Some("requests") if flagged(&argv, "--follow") => queue::requests(world, stdin, out).await,
+        Some("input") if flagged(&argv, "--follow") && flagged(&argv, "--json") => queue::input(stdin, out).await,
+        Some("paste-file") if flagged(&argv, "--json") => queue::pasted(&argv, stdin).await.sent(&mut out).await,
+        _ => answered(world, &argv).sent(&mut out).await,
+    }
+}
+
+pub(super) fn answered(world: &Mutex<World>, argv: &[String]) -> Answer {
+    answer(&world.lock().unwrap_or_else(PoisonError::into_inner), argv)
 }
 
 fn answer(world: &World, argv: &[String]) -> Answer {
     match argv.first().map(String::as_str) {
         Some("contract") if flagged(argv, "--json") => Answer::printed(world.contract()),
+        Some("send" | "keys" | "mark") if flagged(argv, "--pane") => Answer::printed(String::new()),
         Some("status") if flagged(argv, "--follow") && flagged(argv, "--json") => Answer::followed(status(world, argv)),
         Some("events") if flagged(argv, "--json") => Answer::followed(world.events()),
         _ => Answer::unknown(argv),
@@ -58,4 +80,8 @@ fn status(world: &World, argv: &[String]) -> Vec<String> {
 
 fn flagged(argv: &[String], flag: &str) -> bool {
     argv.iter().skip(1).any(|word| word == flag)
+}
+
+pub(super) fn valued<'a>(argv: &'a [String], flag: &str) -> Option<&'a str> {
+    argv.iter().skip_while(|word| *word != flag).nth(1).map(String::as_str)
 }

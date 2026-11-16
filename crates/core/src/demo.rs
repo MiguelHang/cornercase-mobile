@@ -11,6 +11,7 @@ use crate::transport::{Exit, OutSink, Stdin, Transport};
 mod clock;
 mod data;
 mod dispatch;
+mod queue;
 mod status;
 mod world;
 
@@ -30,10 +31,10 @@ impl Transport for DemoTransport {
     fn run(
         &self,
         argv: Vec<String>,
-        _stdin: BoxStream<'static, Stdin>,
+        stdin: BoxStream<'static, Stdin>,
         out: OutSink,
     ) -> BoxFuture<'_, Result<Exit, Error>> {
-        dispatch::run(&self.world, argv, out).boxed()
+        dispatch::run(&self.world, argv, stdin, out).boxed()
     }
 }
 
