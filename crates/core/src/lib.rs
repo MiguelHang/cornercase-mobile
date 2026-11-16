@@ -1,6 +1,7 @@
 pub mod board;
 pub mod changes;
 pub mod cli;
+pub mod demo;
 pub mod error;
 mod files;
 pub mod follow;

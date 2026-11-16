@@ -1,0 +1,38 @@
+use std::sync::{Arc, Mutex};
+
+use futures_util::FutureExt;
+use futures_util::future::BoxFuture;
+use futures_util::stream::BoxStream;
+
+use self::world::World;
+use crate::error::Error;
+use crate::transport::{Exit, OutSink, Stdin, Transport};
+
+mod dispatch;
+mod world;
+
+#[derive(Clone, Default)]
+#[must_use]
+pub struct DemoTransport {
+    world: Arc<Mutex<World>>,
+}
+
+impl DemoTransport {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Transport for DemoTransport {
+    fn run(
+        &self,
+        argv: Vec<String>,
+        _stdin: BoxStream<'static, Stdin>,
+        out: OutSink,
+    ) -> BoxFuture<'_, Result<Exit, Error>> {
+        dispatch::run(&self.world, argv, out).boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests;
