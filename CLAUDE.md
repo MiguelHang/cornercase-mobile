@@ -4,8 +4,7 @@
 > the cornercase server only through its command line, the public contract, like cornercase-gpui.
 
 ## Context
-- Idea and requirements: `docs/IDEA.md`
-- Roadmap and tasks: `docs/ROADMAP.md`, `docs/tasks/`
+- Idea, roadmap and tasks: kept outside this repo, in a private one checked out as `docs/` (ignored by git).
 - Design decisions: `DESIGN.md` (index) and `design/`, one file per area. Read the area's file before
   changing it; record what was decided and why (and what was rejected) in the same PR.
 - References to follow, not to copy blindly:
@@ -84,7 +83,7 @@ pnpm test                                         # vitest
 - `src-tauri/`: the app shell: Tauri commands and events, key storage (Keychain / Keystore), lifecycle
   and network-change hooks, mobile projects.
 - `src/`: the Svelte UI.
-- `design/`, `DESIGN.md`: decisions by area. `docs/`: idea, roadmap and tasks.
+- `design/`, `DESIGN.md`: decisions by area.
 
 ## Code rules
 - No comments, in Rust, TypeScript or Svelte, directives such as `eslint-disable` included. Names and small functions
@@ -107,6 +106,6 @@ pnpm test                                         # vitest
 - Every task closes with tests green and fmt, clippy, svelte-check, lint and jscpd clean.
 
 ## Workflow
-- One task in `docs/tasks/` = one branch = one PR.
+- One task = one branch = one PR.
 - Commits: Conventional Commits.
 - This repo uses the harness (`/hx-start`, `/hx-build`, `/hx-review`, `/hx-ship`).

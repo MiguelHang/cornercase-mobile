@@ -88,7 +88,7 @@ export const fakeMarker = (answer: () => ReturnType<MarkReviewed> = () => marked
   return { markReviewed, marked }
 }
 
-export const PASTED_PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
+export const PASTED_PATH = '/Users/me/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
 
 export const THUMBNAIL = 'data:image/jpeg;base64,/9j/2w=='
 

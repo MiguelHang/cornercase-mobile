@@ -17,7 +17,7 @@ mod reading {
     fn reads_what_cornercase_0_13_19_prints() {
         let expected = Pasted {
             pane: 543,
-            path: "/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg".to_owned(),
+            path: "/Users/me/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg".to_owned(),
             bytes: 48_213,
         };
         assert_eq!(serde_json::from_str::<Pasted>(PASTED).expect("a pasted file"), expected);

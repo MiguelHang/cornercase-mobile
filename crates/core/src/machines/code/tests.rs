@@ -22,7 +22,7 @@ mod parse {
     fn reads_every_route_and_the_name_of_cornercase_s_code() {
         let read = read(concat!(
             "ws://192.168.1.20:47682/?code=0f1e2d3c4b5a69788796a5b4c3d2e1f0",
-            "&also=192.168.64.1&also=fd7a:115c:a1e0::1&name=MacBook%20Pro%20de%20Miguel"
+            "&also=192.168.64.1&also=fd7a:115c:a1e0::1&name=MacBook%20Pro%20de%20Ana"
         ));
         let expected = vec![
             cli(LAN, 47682, Some(SECRET)),
@@ -30,7 +30,7 @@ mod parse {
             cli(TAILSCALE_V6, 47682, Some(SECRET)),
         ];
         assert_eq!(read.cli_routes(&secret()), expected);
-        assert_eq!(read.name(), Some("MacBook Pro de Miguel"));
+        assert_eq!(read.name(), Some("MacBook Pro de Ana"));
     }
 
     #[test]
@@ -68,7 +68,7 @@ mod parse {
     }
 
     #[rstest]
-    #[case::plain("name=Mac%20de%20Miguel", Some("Mac de Miguel"))]
+    #[case::plain("name=Mac%20de%20Ana", Some("Mac de Ana"))]
     #[case::lower_case_hex("name=%c3%a9", Some("é"))]
     #[case::literal_plus("name=a+b", Some("a+b"))]
     #[case::empty("name=", None)]
