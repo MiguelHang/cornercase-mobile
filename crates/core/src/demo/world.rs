@@ -5,6 +5,7 @@ use tokio::sync::watch;
 use tokio::time::Instant;
 
 use super::data;
+use super::question::Question;
 use crate::cli::contract::served;
 use crate::cli::status::Snapshot;
 
@@ -15,7 +16,8 @@ pub(crate) struct World {
     pub(super) changed: HashMap<u64, SystemTime>,
     pub(super) replies: Vec<String>,
     pub(super) turns: HashMap<u64, u64>,
-    pub(super) due: HashMap<u64, Instant>,
+    pub(super) due: HashMap<u64, (Instant, &'static str)>,
+    pub(super) questions: Vec<Question>,
     pub(super) told: watch::Sender<u64>,
     entered: SystemTime,
     started: Instant,
@@ -39,6 +41,7 @@ impl Default for World {
             replies: data::replies(),
             turns: HashMap::new(),
             due: HashMap::new(),
+            questions: data::questions(),
             entered,
             started: Instant::now(),
         }

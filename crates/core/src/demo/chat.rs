@@ -15,24 +15,29 @@ const SPREAD: u64 = 3;
 
 impl World {
     pub(super) fn sent(&mut self, pane: u64) {
+        self.worked(pane, IDLE);
+    }
+
+    pub(super) fn worked(&mut self, pane: u64, then: &'static str) {
         let thinking = Duration::from_secs(SHORTEST + (pane + self.turn(pane)) % SPREAD);
         if self.moved(pane, WORKING) {
-            self.due.insert(pane, Instant::now() + thinking);
+            self.due.insert(pane, (Instant::now() + thinking, then));
         }
     }
 
     pub(super) fn settle(&mut self) {
         let now = Instant::now();
-        let over: Vec<u64> = self.due.iter().filter(|&(_, at)| *at <= now).map(|(&pane, _)| pane).collect();
-        for pane in over {
+        let over: Vec<(u64, &str)> =
+            self.due.iter().filter(|&(_, (at, _))| *at <= now).map(|(&pane, &(_, then))| (pane, then)).collect();
+        for (pane, then) in over {
             self.due.remove(&pane);
             *self.turns.entry(pane).or_default() += 1;
-            self.moved(pane, IDLE);
+            self.moved(pane, then);
         }
     }
 
     pub(super) fn next_due(&self) -> Option<Instant> {
-        self.due.values().min().copied()
+        self.due.values().map(|&(at, _)| at).min()
     }
 
     pub(super) fn last_message(&self, pane: u64) -> Option<String> {

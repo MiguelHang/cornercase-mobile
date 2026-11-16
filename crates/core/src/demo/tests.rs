@@ -39,6 +39,11 @@ pub(super) async fn entered() -> (Store, Vec<Change>) {
     (store, seen)
 }
 
+pub(super) fn status(store: &Store, pane: u64) -> Option<String> {
+    let rows = store.agents().expect("the demo shows a board");
+    rows.into_iter().find(|row| row.pane == pane).and_then(|row| row.status)
+}
+
 async fn board() -> Vec<AgentRow> {
     entered().await.0.agents().expect("the demo shows a board")
 }

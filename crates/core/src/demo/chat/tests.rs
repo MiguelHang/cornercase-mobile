@@ -7,7 +7,7 @@ use tokio::time;
 use crate::board::AgentRow;
 use crate::cli::last_message::{self, LastMessage};
 use crate::demo::DemoTransport;
-use crate::demo::tests::entered;
+use crate::demo::tests::{entered, status};
 use crate::queue::Outcome;
 use crate::store::Store;
 use crate::transport::{self, Output, Stdin, Transport};
@@ -21,11 +21,6 @@ async fn sent(store: &Store, pane: u64) {
     let text = Some(Stdin::Text("Tidy up the importer".to_owned()));
     let outcome = queue.ask(last_message::send_args(pane), text).await;
     assert!(matches!(outcome, Ok(Outcome::Done(_))), "{outcome:?}");
-}
-
-fn status(store: &Store, pane: u64) -> Option<String> {
-    let rows = store.agents().expect("the demo shows a board");
-    rows.into_iter().find(|row| row.pane == pane).and_then(|row| row.status)
 }
 
 async fn read(store: &Store, pane: u64) -> LastMessage {

@@ -3,11 +3,13 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
+use super::question::Question;
 use crate::cli::status::Project;
 
 const PROJECTS: &str = include_str!("data/projects.json");
 const AGES: &str = include_str!("data/ages.json");
 const REPLIES: &str = include_str!("data/replies.json");
+const QUESTIONS: &str = include_str!("data/questions.json");
 
 #[derive(Deserialize)]
 struct Age {
@@ -25,6 +27,10 @@ pub(super) fn ages() -> impl Iterator<Item = (u64, Duration)> {
 
 pub(super) fn replies() -> Vec<String> {
     read(REPLIES)
+}
+
+pub(super) fn questions() -> Vec<Question> {
+    read(QUESTIONS)
 }
 
 fn read<T: DeserializeOwned>(json: &str) -> T {
