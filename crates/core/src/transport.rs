@@ -105,6 +105,12 @@ pub(crate) fn listen<T: Send + 'static>(keep: fn(Out) -> Option<T>) -> (OutSink,
     (Box::pin(sink), receiver)
 }
 
+#[cfg(any(test, feature = "test-util"))]
+pub(crate) async fn emit(out: &mut OutSink, lines: Vec<Out>) -> Result<(), Error> {
+    let mut lines = stream::iter(lines.into_iter().map(Ok));
+    futures_util::SinkExt::send_all(out, &mut lines).await.map_err(|Closed| Error::OutputClosed)
+}
+
 pub(crate) fn only_stdout(out: Out) -> Option<String> {
     match out {
         Out::Stdout(line) => Some(line),
