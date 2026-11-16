@@ -37,7 +37,8 @@ pnpm test                                         # vitest
 ```
 
 - **The toolchain is pinned** in `rust-toolchain.toml`, with the two iOS targets and `aarch64-linux-android`; rustup
-  installs it on the first cargo command. Node 22.
+  installs it on the first cargo command. Node 22, with pnpm through `corepack enable`, which gives the version that
+  `package.json` names in `packageManager`.
 - **CI runs `pnpm install --frozen-lockfile`, `pnpm build` and the checks from `cargo fmt --check` down, in that
   order** (`design/code-layout.md`). Before calling a task done, run them and fix what fails.
 - **iOS needs the full Xcode**, not the Command Line Tools: `sudo xcode-select -s /Applications/Xcode.app`,
