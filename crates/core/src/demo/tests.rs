@@ -139,3 +139,5 @@ mod anything_else {
         assert_eq!(answer, Output { stdout: String::new(), stderr, code: 2 });
     }
 }
+
+mod privacy;
