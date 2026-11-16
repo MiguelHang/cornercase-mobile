@@ -4,8 +4,9 @@ use std::sync::{Mutex, PoisonError};
 use futures_util::stream::BoxStream;
 use serde_json::json;
 
+use super::follow::{self, Followed};
+use super::queue;
 use super::world::World;
-use super::{follow, queue};
 use crate::cli::surface::Size;
 use crate::error::Error;
 use crate::transport::{Exit, Out, OutSink, Stdin, emit, only_stdout};
@@ -43,9 +44,7 @@ enum Kind {
     Requests,
     Input,
     Pasted,
-    Status { app: bool },
-    Events,
-    Surface { tab: u64, size: Size },
+    Followed(Followed),
     Answered,
 }
 
@@ -59,9 +58,7 @@ pub(super) async fn run(
         Kind::Requests => queue::requests(world, stdin, out).await,
         Kind::Input => queue::input(stdin, out).await,
         Kind::Pasted => queue::pasted(&argv, stdin).await.sent(&mut out).await,
-        Kind::Status { app } => follow::status(world, out, app).await,
-        Kind::Events => follow::events(world, out).await,
-        Kind::Surface { tab, size } => follow::surface(world, out, tab, size).await,
+        Kind::Followed(followed) => follow::run(world, followed, out).await,
         Kind::Answered => answered(world, &argv).sent(&mut out).await,
     }
 }
@@ -72,8 +69,9 @@ fn kind(argv: &[String]) -> Kind {
         Some("requests") if follows => Kind::Requests,
         Some("input") if follows && json => Kind::Input,
         Some("paste-file") if json => Kind::Pasted,
-        Some("status") if follows && json => Kind::Status { app: flagged(argv, "--app") },
-        Some("events") if json => Kind::Events,
+        Some("status") if follows && json => Kind::Followed(Followed::Status { app: flagged(argv, "--app") }),
+        Some("events") if json => Kind::Followed(Followed::Events),
+        Some("view") => on_tab(argv).map_or(Kind::Answered, |(tab, size)| Kind::Followed(Followed::View { tab, size })),
         Some("surface") => surfaced(argv),
         _ => Kind::Answered,
     }
@@ -105,9 +103,15 @@ fn answer(world: &mut World, argv: &[String]) -> Answer {
 }
 
 fn surfaced(argv: &[String]) -> Kind {
-    let tab = number(argv, "--tab");
+    if let Some(view) = number(argv, "--view") {
+        return Kind::Followed(Followed::Viewed { view });
+    }
+    on_tab(argv).map_or(Kind::Answered, |(tab, size)| Kind::Followed(Followed::Surface { tab, size }))
+}
+
+fn on_tab(argv: &[String]) -> Option<(u64, Size)> {
     let size = number(argv, "--cols").zip(number(argv, "--rows")).map(|(cols, rows)| Size { cols, rows });
-    tab.zip(size).map_or(Kind::Answered, |(tab, size)| Kind::Surface { tab, size })
+    number(argv, "--tab").zip(size)
 }
 
 pub(super) fn pane(argv: &[String]) -> Option<u64> {

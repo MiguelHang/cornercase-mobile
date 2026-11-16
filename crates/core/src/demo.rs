@@ -17,6 +17,7 @@ mod question;
 mod queue;
 mod status;
 mod surface;
+mod terminal;
 mod world;
 
 #[derive(Clone, Default)]

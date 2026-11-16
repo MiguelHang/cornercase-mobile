@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::surface::{ASKED, CHIP, DIM, PICKED, PLAIN, Row};
+use super::surface::{Row, Tone, row};
 use super::world::World;
 
 const RULE: char = '─';
@@ -30,25 +30,26 @@ struct Choice {
 
 impl Question {
     fn rows(&self, cols: u16) -> Vec<Row> {
-        let mut rows: Vec<Row> = self.said.iter().map(|line| (PLAIN, line.clone())).collect();
+        let mut rows: Vec<Row> = self.said.iter().map(|line| row(Tone::Plain, line.as_str())).collect();
         rows.push(blank());
         match self.chosen.and_then(|at| self.options.get(at)) {
-            Some(choice) => rows.push((DIM, format!("{TICKED} {}: {}", self.topic, choice.label))),
+            Some(choice) => rows.push(row(Tone::Dim, format!("{TICKED} {}: {}", self.topic, choice.label))),
             None => rows.extend(self.open(cols)),
         }
         rows
     }
 
     fn open(&self, cols: u16) -> Vec<Row> {
-        let rule = (DIM, RULE.to_string().repeat(usize::from(cols)));
-        let mut rows = vec![rule, (CHIP, format!(" {OPEN} {} ", self.topic)), blank(), (ASKED, self.asked.clone())];
+        let rule = row(Tone::Dim, RULE.to_string().repeat(usize::from(cols)));
+        let chip = row(Tone::Chip, format!(" {OPEN} {} ", self.topic));
+        let mut rows = vec![rule, chip, blank(), row(Tone::Asked, self.asked.as_str())];
         rows.push(blank());
         for (at, choice) in self.options.iter().enumerate() {
-            let (style, mark) = if at == 0 { (PICKED, POINTER) } else { (PLAIN, ' ') };
-            rows.push((style, format!("{mark} {}. {}", at + 1, choice.label)));
-            rows.push((DIM, format!("{DETAIL}{}", choice.detail)));
+            let (tone, mark) = if at == 0 { (Tone::Picked, POINTER) } else { (Tone::Plain, ' ') };
+            rows.push(row(tone, format!("{mark} {}. {}", at + 1, choice.label)));
+            rows.push(row(Tone::Dim, format!("{DETAIL}{}", choice.detail)));
         }
-        rows.extend([blank(), (DIM, self.help.clone())]);
+        rows.extend([blank(), row(Tone::Dim, self.help.as_str())]);
         rows
     }
 
@@ -70,17 +71,13 @@ impl World {
         }
     }
 
-    pub(super) fn screen(&self, pane: u64, cols: u16) -> Vec<Row> {
-        self.questions
-            .iter()
-            .find(|question| question.pane == pane)
-            .map(|question| question.rows(cols))
-            .unwrap_or_default()
+    pub(super) fn asked(&self, pane: u64, cols: u16) -> Option<Vec<Row>> {
+        self.questions.iter().find(|question| question.pane == pane).map(|question| question.rows(cols))
     }
 }
 
 fn blank() -> Row {
-    (PLAIN, String::new())
+    Row::new()
 }
 
 #[cfg(test)]

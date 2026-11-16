@@ -1,0 +1,112 @@
+[
+  {
+    "pane": 4,
+    "lines": [
+      [["dim", "> "], ["plain", "Add Apple Pay to the checkout, next to the card form"]],
+      [],
+      [["plain", "⏺ "], ["plain", "I'll add an Apple Pay button that opens the payment sheet."]],
+      [],
+      [["green", "⏺ "], ["bold", "Read"], ["dim", "(src/checkout/PaymentForm.tsx)"]],
+      [["dim", "  ⎿  Read 142 lines"]],
+      [],
+      [["green", "⏺ "], ["bold", "Update"], ["dim", "(src/checkout/PaymentForm.tsx)"]],
+      [["dim", "  ⎿  Updated src/checkout/PaymentForm.tsx with 4 additions and 1 removal"]],
+      [["dim", "      38   "], ["plain", "  return ("]],
+      [["dim", "      39   "], ["red", "-   <CardForm onPay={pay} />"]],
+      [["dim", "      39   "], ["green", "+   <>"]],
+      [["dim", "      40   "], ["green", "+     <ApplePayButton amount={total} onPay={pay} />"]],
+      [["dim", "      41   "], ["green", "+     <CardForm onPay={pay} />"]],
+      [["dim", "      42   "], ["green", "+   </>"]],
+      [],
+      [["green", "⏺ "], ["bold", "Bash"], ["dim", "(pnpm test checkout)"]],
+      [["dim", "  ⎿  "], ["green", "✓ "], ["plain", "PaymentForm shows the Apple Pay button "], ["dim", "(12 ms)"]],
+      [["dim", "     "], ["green", "✓ "], ["plain", "PaymentForm keeps the card form "], ["dim", "(4 ms)"]],
+      [],
+      [["accent", "✻ Wiring the payment sheet… "], ["dim", "(48s · esc to interrupt)"]],
+      [],
+      [["dim", "> "]],
+      [["magenta", "  ⏵⏵ accept edits on"], ["dim", " (shift+tab to cycle)"]]
+    ]
+  },
+  {
+    "pane": 6,
+    "lines": [
+      [["dim", "> "], ["plain", "Cover the new payment sheet with tests"]],
+      [],
+      [["green", "⏺ "], ["bold", "Search"], ["dim", "(pattern: \"ApplePay\", path: \"src\")"]],
+      [["dim", "  ⎿  Found 3 files"]],
+      [],
+      [["green", "⏺ "], ["bold", "Write"], ["dim", "(src/checkout/ApplePayButton.test.tsx)"]],
+      [["dim", "  ⎿  Wrote 58 lines to src/checkout/ApplePayButton.test.tsx"]],
+      [],
+      [["green", "⏺ "], ["bold", "Bash"], ["dim", "(pnpm test ApplePayButton)"]],
+      [["dim", "  ⎿  "], ["green", "✓ "], ["plain", "opens the sheet with the cart total"]],
+      [["dim", "     "], ["red", "✗ "], ["plain", "closes the sheet when the payment is cancelled"]],
+      [["dim", "     "], ["red", "  Expected: \"closed\"  Received: \"open\""]],
+      [],
+      [["plain", "⏺ "], ["plain", "The cancel handler never reaches the sheet. Fixing the test setup."]],
+      [],
+      [["accent", "✻ Running the tests again… "], ["dim", "(12s · esc to interrupt)"]]
+    ]
+  },
+  {
+    "pane": 8,
+    "lines": [
+      [["dim", "> "], ["plain", "Polish the confirmation email"]],
+      [],
+      [["green", "⏺ "], ["bold", "Update"], ["dim", "(emails/order-confirmed.mjml)"]],
+      [["dim", "  ⎿  Updated emails/order-confirmed.mjml with 6 additions and 6 removals"]],
+      [["dim", "      12   "], ["red", "-  Thanks for your order!"]],
+      [["dim", "      12   "], ["green", "+  Thanks, your order is on its way."]],
+      [],
+      [["green", "⏺ "], ["bold", "Bash"], ["dim", "(pnpm email:preview order-confirmed)"]],
+      [["dim", "  ⎿  Preview written to out/order-confirmed.html"]],
+      [],
+      [["plain", "⏺ "], ["plain", "The email now leads with the delivery date and the order number,"]],
+      [["plain", "  "], ["plain", "and the footer links to the returns page instead of the home page."]],
+      [],
+      [["dim", "> "]],
+      [["dim", "  ? for shortcuts"]]
+    ]
+  },
+  {
+    "pane": 10,
+    "lines": [
+      [["green", "demo@studio "], ["blue", "~/src/acme-store "], ["magenta", "(main) "], ["plain", "$ git log --oneline -4"]],
+      [["yellow", "a41c9e2 "], ["plain", "Show the order number on the receipt"]],
+      [["yellow", "7d03b1f "], ["plain", "Keep the cart when the session expires"]],
+      [["yellow", "e92f6a0 "], ["plain", "Load the product images lazily"]],
+      [["yellow", "3c5e8d4 "], ["plain", "Add the returns page"]],
+      [["green", "demo@studio "], ["blue", "~/src/acme-store "], ["magenta", "(main) "], ["plain", "$ git status --short"]],
+      [["red", " M "], ["plain", "src/checkout/PaymentForm.tsx"]],
+      [["green", "A  "], ["plain", "src/checkout/ApplePayButton.tsx"]],
+      [["green", "demo@studio "], ["blue", "~/src/acme-store "], ["magenta", "(main) "], ["plain", "$ ls"]],
+      [["plain", "README.md  "], ["green", "deploy.sh  "], ["blue", "emails  "], ["plain", "package.json  "], ["blue", "public  src"]],
+      [["green", "demo@studio "], ["blue", "~/src/acme-store "], ["magenta", "(main) "], ["plain", "$ "]]
+    ]
+  },
+  {
+    "pane": 17,
+    "lines": [
+      [["dim", "> "], ["plain", "Move the forecast cache to Swift 6"]],
+      [],
+      [["green", "⏺ "], ["bold", "Update"], ["dim", "(Sources/WeatherKit/ForecastCache.swift)"]],
+      [["dim", "  ⎿  Updated Sources/WeatherKit/ForecastCache.swift with 18 additions and 24 removals"]],
+      [["dim", "      9   "], ["red", "-final class ForecastCache {"]],
+      [["dim", "      9   "], ["green", "+actor ForecastCache {"]],
+      [],
+      [["green", "⏺ "], ["bold", "Bash"], ["dim", "(swift build -Xswiftc -strict-concurrency=complete)"]],
+      [["dim", "  ⎿  "], ["cyan", "Building for debugging..."]],
+      [["dim", "     "], ["green", "Build complete! "], ["dim", "(6.42s)"]],
+      [],
+      [["green", "⏺ "], ["bold", "Bash"], ["dim", "(swift test)"]],
+      [["dim", "  ⎿  "], ["green", "✔ "], ["plain", "Test run with 41 tests passed after 1.8 seconds."]],
+      [],
+      [["plain", "⏺ "], ["plain", "The cache is an actor now, so the forecast screen and the widget can"]],
+      [["plain", "  "], ["plain", "read it at the same time without the lock. The build has no warnings."]],
+      [],
+      [["dim", "> "]],
+      [["dim", "  ? for shortcuts"]]
+    ]
+  }
+]

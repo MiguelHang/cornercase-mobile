@@ -6,8 +6,10 @@ use tokio::time::Instant;
 
 use super::data;
 use super::question::Question;
+use super::surface::Row;
 use crate::cli::contract::served;
 use crate::cli::status::Snapshot;
+use crate::cli::surface::Size;
 
 const BOOT: &str = "demo";
 
@@ -18,6 +20,8 @@ pub(crate) struct World {
     pub(super) turns: HashMap<u64, u64>,
     pub(super) due: HashMap<u64, (Instant, &'static str)>,
     pub(super) questions: Vec<Question>,
+    pub(super) printed: HashMap<u64, Vec<Row>>,
+    pub(super) views: HashMap<u64, Size>,
     pub(super) told: watch::Sender<u64>,
     entered: SystemTime,
     started: Instant,
@@ -42,6 +46,8 @@ impl Default for World {
             turns: HashMap::new(),
             due: HashMap::new(),
             questions: data::questions(),
+            printed: data::terminals(),
+            views: HashMap::new(),
             entered,
             started: Instant::now(),
         }
