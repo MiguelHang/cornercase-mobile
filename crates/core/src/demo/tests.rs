@@ -8,17 +8,11 @@ use super::clock::iso;
 use super::*;
 use crate::board::AgentRow;
 use crate::cli::contract::{self, Descriptor};
+use crate::machines::MachineId;
 use crate::machines::pick::PickConfig;
-use crate::machines::route::{Address, Route, Token};
-use crate::machines::{Machine, MachineId};
+use crate::machines::route::{Address, Route};
 use crate::store::{Change, Connection, Store};
 use crate::transport::{self, Output};
-
-fn demo_machine() -> Machine {
-    let address = Address { host: "demo".to_owned(), port: 0 };
-    let route = Route::cli(address, Some(Token::new("demo".to_owned())));
-    Machine { id: MachineId(1), name: "Demo Mac".to_owned(), routes: vec![route], last_route: None }
-}
 
 fn owned(argv: &[&str]) -> Vec<String> {
     argv.iter().map(|&word| word.to_owned()).collect()
@@ -31,7 +25,7 @@ fn refused(connection: &Connection) -> bool {
 pub(super) async fn entered() -> (Store, Vec<Change>) {
     let demo = DemoTransport::new();
     let factory = move |_: &Route| Ok(Arc::new(demo.clone()) as Arc<dyn Transport>);
-    let (store, driver) = Store::new(demo_machine(), factory, PickConfig::default());
+    let (store, driver) = Store::new(machine(MachineId(1)), factory, PickConfig::default());
     let mut changes = store.changes();
     tokio::spawn(driver);
     time::sleep(Duration::from_secs(60)).await;

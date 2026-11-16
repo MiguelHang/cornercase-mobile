@@ -6,6 +6,8 @@ use futures_util::stream::BoxStream;
 
 use self::world::World;
 use crate::error::Error;
+use crate::machines::route::{Address, Route, Token};
+use crate::machines::{Machine, MachineId};
 use crate::transport::{Exit, OutSink, Stdin, Transport};
 
 mod changes;
@@ -24,6 +26,14 @@ mod status;
 mod surface;
 mod terminal;
 mod world;
+
+pub const NAME: &str = "Demo Mac";
+const HOST: &str = "demo";
+
+pub fn machine(id: MachineId) -> Machine {
+    let route = Route::cli(Address { host: HOST.to_owned(), port: 0 }, Some(Token::new(HOST.to_owned())));
+    Machine { id, name: NAME.to_owned(), routes: vec![route], last_route: None }
+}
 
 #[derive(Clone, Default)]
 #[must_use]

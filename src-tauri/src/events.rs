@@ -21,7 +21,7 @@ use tauri::{AppHandle, Runtime};
 use tauri_specta::Event;
 
 use crate::commands::error::CommandError;
-use crate::state::SharedMachines;
+use crate::state::{DEMO, SharedMachines};
 use crate::view::ConnectionView;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type, Event)]
@@ -253,7 +253,7 @@ fn pane_status_changed(machine: MachineId, event: &CliEvent) -> Option<Emitted> 
 
 fn connection_changed(machine: MachineId, machines: &SharedMachines, connection: &Connection) -> Vec<Emitted> {
     let changed = Emitted::Connection(ConnectionChanged { machine: machine.0, connection: connection.into() });
-    let Connection::Connected { route } = connection else {
+    let (Connection::Connected { route }, false) = (connection, machine == DEMO) else {
         return vec![changed];
     };
     match machines.with(|all| all.remember(machine, route).map_err(CommandError::from)) {

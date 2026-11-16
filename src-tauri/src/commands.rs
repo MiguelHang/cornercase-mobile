@@ -2,6 +2,7 @@ pub(crate) mod changes;
 pub(crate) mod chat;
 pub(crate) mod close;
 pub(crate) mod connection;
+pub(crate) mod demo;
 pub(crate) mod error;
 pub(crate) mod files;
 pub(crate) mod flows;

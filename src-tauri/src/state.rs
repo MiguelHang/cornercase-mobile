@@ -26,6 +26,7 @@ pub(crate) mod attached;
 const MACHINES_FILE: &str = "machines.json";
 const HISTORY_FOLDER: &str = "history";
 const REDEEMED_FOR: Duration = Duration::from_mins(10);
+pub(crate) const DEMO: MachineId = MachineId(0xFFFF_FFFF);
 
 pub(crate) struct AppState {
     machines: SharedMachines,
@@ -36,6 +37,11 @@ pub(crate) struct AppState {
     attached: AttachedImages,
     history: Mutex<Option<JsonFolderStore>>,
     redeemed: Mutex<Option<Redeemed>>,
+    demo: Mutex<Option<Demo>>,
+}
+
+pub(crate) struct Demo {
+    pub(crate) previous: Option<MachineId>,
 }
 
 struct Redeemed {
@@ -82,6 +88,7 @@ impl AppState {
             attached: AttachedImages::default(),
             history: Mutex::new(None),
             redeemed: Mutex::new(None),
+            demo: Mutex::new(None),
         }
     }
 
@@ -159,6 +166,18 @@ impl AppState {
         *self.redeemed_slot() = None;
     }
 
+    pub(crate) fn entered_demo(&self, previous: Option<MachineId>) {
+        *self.demo_slot() = Some(Demo { previous });
+    }
+
+    pub(crate) fn left_demo(&self) -> Option<Demo> {
+        self.demo_slot().take()
+    }
+
+    fn demo_slot(&self) -> MutexGuard<'_, Option<Demo>> {
+        self.demo.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     fn redeemed_slot(&self) -> MutexGuard<'_, Option<Redeemed>> {
         self.redeemed.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -197,6 +216,10 @@ impl Active {
 
     pub(crate) fn store(&self) -> &Store {
         &self.store
+    }
+
+    pub(crate) fn is_demo(&self) -> bool {
+        self.machine == DEMO
     }
 
     pub(crate) fn show(&mut self, tab: u64, terminal: JoinHandle<()>) {

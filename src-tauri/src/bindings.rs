@@ -2,7 +2,8 @@ use tauri::{Runtime, Wry};
 use tauri_specta::{Builder, Commands, collect_commands, collect_events};
 
 use crate::commands::{
-    changes, chat, close, connection, files, flows, history, identity, issues, machines, probe, routes, start, terminal,
+    changes, chat, close, connection, demo, files, flows, history, identity, issues, machines, probe, routes, start,
+    terminal,
 };
 use crate::events::{
     AgentsChanged, ChangesChanged, ConnectionChanged, PaneStatusChanged, QuestionChanged, TerminalChanged, Toast,
@@ -36,6 +37,8 @@ macro_rules! app_commands {
             connection::connect::<Wry>,
             connection::connection_state,
             connection::agents,
+            demo::demo_start::<Wry>,
+            demo::demo_leave::<Wry>,
             identity::identity_fingerprint,
             chat::last_message,
             chat::send,

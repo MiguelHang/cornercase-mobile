@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use cornercase_core::board::AgentRow;
 use cornercase_core::error::Error;
-use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
 use cornercase_core::machines::pairing::{PairConfig, PairError, pair};
 use cornercase_core::machines::pick::{PickConfig, websocket_transports};
 use cornercase_core::machines::route::{Route, Token};
+use cornercase_core::machines::{Machine, MachineId};
 use cornercase_core::store::Store;
 use cornercase_core::transport::Transport;
 use cornercase_core::transport::websocket::SocketConfig;
@@ -17,7 +17,7 @@ use tauri::{AppHandle, Runtime, State};
 
 use crate::commands::error::CommandError;
 use crate::events::{Emit, forward};
-use crate::state::{Active, AppState};
+use crate::state::{Active, AppState, DEMO};
 use crate::view::ConnectionState;
 
 pub(crate) type Task = Pin<Box<dyn Future<Output = ()> + Send>>;
@@ -108,17 +108,22 @@ pub(crate) fn switch_to(
 pub(crate) fn start(state: &AppState, emit: impl Emit, launcher: &Launcher, id: MachineId) -> Result<(), CommandError> {
     let mut active = state.active();
     let machine = state.machines(|machines| machines.machine(id).cloned().ok_or(Error::UnknownMachine.into()))?;
+    *active = Some(launched(state, emit, launcher, machine));
+    Ok(())
+}
+
+pub(crate) fn launched(state: &AppState, emit: impl Emit, launcher: &Launcher, machine: Machine) -> Active {
+    let id = machine.id;
     let transports = Arc::clone(&launcher.transports);
     let (store, driver) = Store::new(machine, move |route: &Route| transports(route), PickConfig::default());
-    if state.network_is_down() {
+    if state.network_is_down() && id != DEMO {
         store.offline();
     }
     let changes = store.changes();
     let forwarder = forward(id, store.clone(), changes, state.shared_machines(), emit);
     let driver = (launcher.spawn)(Box::pin(driver));
     let forwarder = (launcher.spawn)(Box::pin(forwarder));
-    *active = Some(Active::new(id, store, driver, forwarder));
-    Ok(())
+    Active::new(id, store, driver, forwarder)
 }
 
 pub(crate) fn current(state: &AppState) -> ConnectionState {
