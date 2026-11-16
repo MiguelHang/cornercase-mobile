@@ -13,7 +13,7 @@ import type { CommandError } from './bindings'
 
 const PANE = 543
 
-const PATH = '/Users/miguelhang/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
+const PATH = '/Users/me/.local/state/cornercase/pasted/2026-11-09T19-40-12Z/IMG_0042.jpg'
 
 const THUMBNAIL = 'data:image/jpeg;base64,/9j/2w=='
 
