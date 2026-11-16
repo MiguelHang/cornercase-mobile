@@ -1,10 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use tokio::sync::watch;
 use tokio::time::Instant;
 
+use super::changes::{self, Diffs};
 use super::data;
+use super::files::Tree;
 use super::question::Question;
 use super::surface::Row;
 use crate::cli::contract::served;
@@ -22,6 +24,9 @@ pub(crate) struct World {
     pub(super) questions: Vec<Question>,
     pub(super) printed: HashMap<u64, Vec<Row>>,
     pub(super) views: HashMap<u64, Size>,
+    pub(super) trees: Vec<Tree>,
+    pub(super) diffs: Vec<Diffs>,
+    pub(super) seen: HashSet<(u64, String)>,
     pub(super) told: watch::Sender<u64>,
     entered: SystemTime,
     started: Instant,
@@ -37,6 +42,8 @@ impl Default for World {
             groups: Vec::new(),
             projects: data::projects(),
         };
+        let trees = data::trees();
+        let diffs = changes::diffs(data::changes(), &trees);
         let changed = data::ages().map(|(pane, ago)| (pane, entered.checked_sub(ago).unwrap_or(entered))).collect();
         Self {
             told: watch::Sender::new(session.revision),
@@ -48,6 +55,9 @@ impl Default for World {
             questions: data::questions(),
             printed: data::terminals(),
             views: HashMap::new(),
+            trees,
+            diffs,
+            seen: HashSet::new(),
             entered,
             started: Instant::now(),
         }

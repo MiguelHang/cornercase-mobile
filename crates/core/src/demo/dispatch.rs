@@ -2,11 +2,12 @@ use std::str::FromStr;
 use std::sync::{Mutex, PoisonError};
 
 use futures_util::stream::BoxStream;
+use serde::Serialize;
 use serde_json::json;
 
 use super::follow::{self, Followed};
-use super::queue;
 use super::world::World;
+use super::{changes, files, queue};
 use crate::cli::surface::Size;
 use crate::error::Error;
 use crate::transport::{Exit, Out, OutSink, Stdin, emit, only_stdout};
@@ -24,7 +25,7 @@ impl Answer {
         Self { lines: vec![Out::Stdout(stdout)], code: 0, stderr: String::new() }
     }
 
-    fn unknown(argv: &[String]) -> Self {
+    pub(super) fn unknown(argv: &[String]) -> Self {
         let stderr = format!("error: the demo has no answer for `{}`", argv.join(" "));
         Self { lines: vec![Out::Stderr(stderr.clone())], code: UNKNOWN, stderr }
     }
@@ -73,6 +74,7 @@ fn kind(argv: &[String]) -> Kind {
         Some("events") if json => Kind::Followed(Followed::Events),
         Some("view") => on_tab(argv).map_or(Kind::Answered, |(tab, size)| Kind::Followed(Followed::View { tab, size })),
         Some("surface") => surfaced(argv),
+        Some("changes") if follows => listed(argv),
         _ => Kind::Answered,
     }
 }
@@ -95,6 +97,8 @@ fn answer(world: &mut World, argv: &[String]) -> Answer {
             Answer::printed(String::new())
         }
         (Some("mark"), Some(_)) => Answer::printed(String::new()),
+        (Some("changes"), _) => changes::answer(world, argv),
+        (Some("files"), _) => files::answer(world, argv),
         (Some("read"), Some(pane)) if flagged(argv, "--last-message") && flagged(argv, "--json") => {
             world.last_message(pane).map_or_else(|| Answer::unknown(argv), Answer::printed)
         }
@@ -109,6 +113,12 @@ fn surfaced(argv: &[String]) -> Kind {
     on_tab(argv).map_or(Kind::Answered, |(tab, size)| Kind::Followed(Followed::Surface { tab, size }))
 }
 
+fn listed(argv: &[String]) -> Kind {
+    let mode = changes::mode(argv);
+    number(argv, "--workspace")
+        .map_or(Kind::Answered, |workspace| Kind::Followed(Followed::Changes { workspace, mode }))
+}
+
 fn on_tab(argv: &[String]) -> Option<(u64, Size)> {
     let size = number(argv, "--cols").zip(number(argv, "--rows")).map(|(cols, rows)| Size { cols, rows });
     number(argv, "--tab").zip(size)
@@ -118,14 +128,22 @@ pub(super) fn pane(argv: &[String]) -> Option<u64> {
     number(argv, "--pane")
 }
 
-fn number<T: FromStr>(argv: &[String], flag: &str) -> Option<T> {
+pub(super) fn number<T: FromStr>(argv: &[String], flag: &str) -> Option<T> {
     valued(argv, flag)?.parse().ok()
 }
 
-fn flagged(argv: &[String], flag: &str) -> bool {
+pub(super) fn flagged(argv: &[String], flag: &str) -> bool {
     argv.iter().skip(1).any(|word| word == flag)
 }
 
-fn valued<'a>(argv: &'a [String], flag: &str) -> Option<&'a str> {
+pub(super) fn valued<'a>(argv: &'a [String], flag: &str) -> Option<&'a str> {
     argv.iter().skip_while(|word| *word != flag).nth(1).map(String::as_str)
+}
+
+pub(super) fn operands(argv: &[String]) -> impl Iterator<Item = &str> {
+    argv.iter().skip_while(|word| *word != "--").skip(1).map(String::as_str)
+}
+
+pub(super) fn json(value: &impl Serialize) -> String {
+    serde_json::to_string(value).expect("the demo's answers always serialize")
 }

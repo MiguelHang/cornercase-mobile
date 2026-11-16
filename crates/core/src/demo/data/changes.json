@@ -1,0 +1,163 @@
+[
+  {
+    "project": 1,
+    "workspace": 2,
+    "base": "main",
+    "files": [
+      {
+        "path": "src/checkout/PaymentForm.tsx",
+        "status": "modified",
+        "hunks": [
+          {
+            "old_start": 1,
+            "new_start": 1,
+            "lines": [
+              "+import { ApplePayButton } from \"./ApplePayButton\";",
+              " import { CardForm } from \"./CardForm\";",
+              " import { usePayment } from \"./usePayment\";",
+              " "
+            ]
+          },
+          {
+            "old_start": 9,
+            "new_start": 10,
+            "context": "export function PaymentForm({ total }: Props) {",
+            "lines": [
+              "   const pay = usePayment(total);",
+              " ",
+              "   return (",
+              "-    <CardForm onPay={pay} />",
+              "+    <>",
+              "+      <ApplePayButton amount={total} onPay={pay} />",
+              "+      <CardForm onPay={pay} />",
+              "+    </>",
+              "   );",
+              " }"
+            ]
+          }
+        ]
+      },
+      { "path": "src/checkout/ApplePayButton.tsx", "status": "added" },
+      { "path": "src/checkout/ApplePayButton.test.tsx", "status": "untracked" },
+      {
+        "path": "src/checkout/OldPayButton.tsx",
+        "status": "deleted",
+        "hunks": [
+          {
+            "old_start": 1,
+            "new_start": 0,
+            "lines": ["-export function OldPayButton() {", "-  return <button>Pay</button>;", "-}"]
+          }
+        ]
+      },
+      {
+        "path": "emails/order-confirmed.mjml",
+        "status": "modified",
+        "hunks": [
+          {
+            "old_start": 4,
+            "new_start": 4,
+            "context": "<mj-section>",
+            "lines": [
+              "       <mj-column>",
+              "-        <mj-text font-size=\"20px\">Thanks for your order!</mj-text>",
+              "-        <mj-text>We will email you when it ships.</mj-text>",
+              "-        <mj-button href=\"{{ home }}\">Back to the shop</mj-button>",
+              "+        <mj-text font-size=\"20px\">Thanks, your order is on its way.</mj-text>",
+              "+        <mj-text>Order {{ number }} arrives on {{ delivery }}.</mj-text>",
+              "+        <mj-button href=\"{{ returns }}\">Returns and refunds</mj-button>",
+              "       </mj-column>"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "project": 1,
+    "workspace": 11,
+    "base": "main",
+    "files": [
+      {
+        "path": "src/cart/totals.ts",
+        "status": "modified",
+        "hunks": [
+          {
+            "old_start": 1,
+            "new_start": 1,
+            "lines": [
+              "+import { discounted } from \"./discounts\";",
+              " import type { Line } from \"./types\";",
+              " ",
+              "-export const lineTotal = (line: Line): number =>",
+              "-  Math.round(line.price * line.quantity * (1 - line.discount) * 100) / 100;",
+              "+export const lineTotal = (line: Line): number => discounted(line);",
+              " ",
+              " export const cartTotal = (lines: Line[]): number =>",
+              "-  lines.reduce((total, line) => total + lineTotal(line), 0);",
+              "+  Math.round(lines.reduce((total, line) => total + lineTotal(line), 0) * 100) / 100;"
+            ]
+          }
+        ]
+      },
+      { "path": "src/cart/discounts.ts", "status": "added" },
+      {
+        "path": "src/cart/totals.test.ts",
+        "status": "modified",
+        "hunks": [
+          {
+            "old_start": 5,
+            "new_start": 5,
+            "lines": [
+              "-test(\"rounds each line\", () => {",
+              "-  expect(cartTotal([line, line, line])).toBe(9.06);",
+              "+test(\"rounds once, like the receipt\", () => {",
+              "+  expect(cartTotal([line, line, line])).toBe(9.05);",
+              " });"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "project": 14,
+    "workspace": 15,
+    "base": "main",
+    "files": [
+      {
+        "path": "Sources/WeatherKit/ForecastCache.swift",
+        "status": "modified",
+        "hunks": [
+          {
+            "old_start": 1,
+            "new_start": 1,
+            "lines": [
+              " import Foundation",
+              " ",
+              "-final class ForecastCache {",
+              "-    private let lock = NSLock()",
+              "+actor ForecastCache {",
+              "     private var kept: [String: (Forecast, Date)] = [:]",
+              " ",
+              "     func forecast(for city: String) -> Forecast? {",
+              "-        lock.lock()",
+              "-        defer { lock.unlock() }",
+              "         guard let (forecast, at) = kept[city], at.timeIntervalSinceNow > -600 else { return nil }",
+              "         return forecast",
+              "     }",
+              " ",
+              "     func keep(_ forecast: Forecast) {",
+              "-        lock.lock()",
+              "-        defer { lock.unlock() }",
+              "         kept[forecast.city] = (forecast, Date())",
+              "     }",
+              " }"
+            ]
+          }
+        ]
+      },
+      { "path": "Tests/WeatherKitTests/ForecastCacheTests.swift", "status": "added" }
+    ]
+  }
+]

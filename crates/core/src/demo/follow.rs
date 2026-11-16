@@ -6,8 +6,10 @@ use futures_util::future;
 use tokio::sync::watch;
 use tokio::time::{self, Instant};
 
+use super::changes::Listed;
 use super::surface::Surface;
 use super::world::World;
+use crate::cli::changes::Mode;
 use crate::cli::surface::Size;
 use crate::error::Error;
 use crate::transport::{Exit, Out, OutSink, emit};
@@ -20,6 +22,7 @@ pub(super) enum Followed {
     View { tab: u64, size: Size },
     Surface { tab: u64, size: Size },
     Viewed { view: u64 },
+    Changes { workspace: u64, mode: Mode },
 }
 
 pub(super) async fn run(world: &Mutex<World>, followed: Followed, out: OutSink) -> Result<Exit, Error> {
@@ -29,6 +32,7 @@ pub(super) async fn run(world: &Mutex<World>, followed: Followed, out: OutSink) 
         Followed::View { tab, size } => view(world, out, tab, size).await,
         Followed::Surface { tab, size } => surface(world, out, tab, size).await,
         Followed::Viewed { view } => viewed(world, out, view).await,
+        Followed::Changes { workspace, mode } => changes(world, out, Listed::new(workspace, mode)).await,
     }
 }
 
@@ -56,6 +60,10 @@ async fn viewed(world: &Mutex<World>, mut out: OutSink, view: u64) -> Result<Exi
         Some(size) => drawn(world, out, Surface::new(view, Some(view), size)).await,
         None => ended(&mut out, format!("error: no view {view}")).await,
     }
+}
+
+async fn changes(world: &Mutex<World>, out: OutSink, mut listed: Listed) -> Result<Exit, Error> {
+    followed(world, out, move |world| Ok(listed.fresh(world))).await
 }
 
 async fn drawn(world: &Mutex<World>, out: OutSink, mut surface: Surface) -> Result<Exit, Error> {

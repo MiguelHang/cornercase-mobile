@@ -4,6 +4,8 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
+use super::changes::Changed;
+use super::files::Tree;
 use super::question::Question;
 use super::surface::Row;
 use crate::cli::status::Project;
@@ -13,6 +15,8 @@ const AGES: &str = include_str!("data/ages.json");
 const REPLIES: &str = include_str!("data/replies.json");
 const QUESTIONS: &str = include_str!("data/questions.json");
 const TERMINALS: &str = include_str!("data/terminals.json");
+const CHANGES: &str = include_str!("data/changes.json");
+const FILES: &str = include_str!("data/files.json");
 
 #[derive(Deserialize)]
 struct Age {
@@ -44,6 +48,14 @@ pub(super) fn questions() -> Vec<Question> {
 
 pub(super) fn terminals() -> HashMap<u64, Vec<Row>> {
     read::<Vec<Printed>>(TERMINALS).into_iter().map(|printed| (printed.pane, printed.lines)).collect()
+}
+
+pub(super) fn changes() -> Vec<Changed> {
+    read(CHANGES)
+}
+
+pub(super) fn trees() -> Vec<Tree> {
+    read(FILES)
 }
 
 fn read<T: DeserializeOwned>(json: &str) -> T {

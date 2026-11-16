@@ -8,10 +8,12 @@ use self::world::World;
 use crate::error::Error;
 use crate::transport::{Exit, OutSink, Stdin, Transport};
 
+mod changes;
 mod chat;
 mod clock;
 mod data;
 mod dispatch;
+mod files;
 mod follow;
 mod question;
 mod queue;

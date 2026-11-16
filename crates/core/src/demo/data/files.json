@@ -1,0 +1,247 @@
+[
+  {
+    "workspace": 2,
+    "dir": "/Users/demo/src/acme-store",
+    "files": [
+      { "path": ".gitignore", "lines": ["node_modules/", "out/", ".env"] },
+      {
+        "path": "README.md",
+        "lines": [
+          "# Acme Store",
+          "",
+          "The storefront of Acme: product pages, the cart and the checkout.",
+          "",
+          "    pnpm install",
+          "    pnpm dev",
+          "",
+          "The emails live in `emails/` and build with `pnpm email:preview <name>`."
+        ]
+      },
+      {
+        "path": "package.json",
+        "lines": [
+          "{",
+          "  \"name\": \"acme-store\",",
+          "  \"private\": true,",
+          "  \"scripts\": {",
+          "    \"dev\": \"vite\",",
+          "    \"test\": \"vitest run\",",
+          "    \"email:preview\": \"mjml-preview\"",
+          "  }",
+          "}"
+        ]
+      },
+      {
+        "path": "deploy.sh",
+        "lines": ["#!/bin/sh", "set -e", "pnpm build", "rsync -a dist/ shop.example.com:/srv/acme-store/"]
+      },
+      { "path": "public/robots.txt", "lines": ["User-agent: *", "Disallow: /checkout"] },
+      {
+        "path": "emails/order-confirmed.mjml",
+        "lines": [
+          "<mjml>",
+          "  <mj-body>",
+          "    <mj-section>",
+          "      <mj-column>",
+          "        <mj-text font-size=\"20px\">Thanks, your order is on its way.</mj-text>",
+          "        <mj-text>Order {{ number }} arrives on {{ delivery }}.</mj-text>",
+          "        <mj-button href=\"{{ returns }}\">Returns and refunds</mj-button>",
+          "      </mj-column>",
+          "    </mj-section>",
+          "  </mj-body>",
+          "</mjml>"
+        ]
+      },
+      {
+        "path": "src/cart/totals.ts",
+        "lines": [
+          "import type { Line } from \"./types\";",
+          "",
+          "export const lineTotal = (line: Line): number =>",
+          "  Math.round(line.price * line.quantity * (1 - line.discount) * 100) / 100;",
+          "",
+          "export const cartTotal = (lines: Line[]): number =>",
+          "  lines.reduce((total, line) => total + lineTotal(line), 0);"
+        ]
+      },
+      {
+        "path": "src/checkout/CardForm.tsx",
+        "lines": [
+          "type Props = {",
+          "  onPay: (method: string) => void;",
+          "};",
+          "",
+          "export function CardForm({ onPay }: Props) {",
+          "  return (",
+          "    <form onSubmit={() => onPay(\"card\")}>",
+          "      <input name=\"card\" autoComplete=\"cc-number\" />",
+          "      <button type=\"submit\">Pay</button>",
+          "    </form>",
+          "  );",
+          "}"
+        ]
+      },
+      {
+        "path": "src/checkout/PaymentForm.tsx",
+        "lines": [
+          "import { ApplePayButton } from \"./ApplePayButton\";",
+          "import { CardForm } from \"./CardForm\";",
+          "import { usePayment } from \"./usePayment\";",
+          "",
+          "type Props = {",
+          "  total: number;",
+          "};",
+          "",
+          "export function PaymentForm({ total }: Props) {",
+          "  const pay = usePayment(total);",
+          "",
+          "  return (",
+          "    <>",
+          "      <ApplePayButton amount={total} onPay={pay} />",
+          "      <CardForm onPay={pay} />",
+          "    </>",
+          "  );",
+          "}"
+        ]
+      },
+      {
+        "path": "src/checkout/ApplePayButton.tsx",
+        "lines": [
+          "type Props = {",
+          "  amount: number;",
+          "  onPay: (method: string) => void;",
+          "};",
+          "",
+          "export function ApplePayButton({ amount, onPay }: Props) {",
+          "  const label = `Pay ${amount.toFixed(2)} with Apple Pay`;",
+          "  return (",
+          "    <button className=\"apple-pay\" aria-label={label} onClick={() => onPay(\"apple-pay\")} />",
+          "  );",
+          "}"
+        ]
+      },
+      {
+        "path": "src/checkout/ApplePayButton.test.tsx",
+        "lines": [
+          "import { render, screen } from \"@testing-library/react\";",
+          "import { ApplePayButton } from \"./ApplePayButton\";",
+          "",
+          "test(\"opens the sheet with the cart total\", () => {",
+          "  const onPay = vi.fn();",
+          "  render(<ApplePayButton amount={42} onPay={onPay} />);",
+          "  screen.getByLabelText(\"Pay 42.00 with Apple Pay\").click();",
+          "  expect(onPay).toHaveBeenCalledWith(\"apple-pay\");",
+          "});"
+        ]
+      }
+    ]
+  },
+  {
+    "workspace": 11,
+    "dir": "/Users/demo/src/acme-store-fix-cart-totals",
+    "files": [
+      {
+        "path": "README.md",
+        "lines": ["# Acme Store", "", "The storefront of Acme: product pages, the cart and the checkout."]
+      },
+      {
+        "path": "src/cart/discounts.ts",
+        "lines": [
+          "import type { Line } from \"./types\";",
+          "",
+          "export const discounted = (line: Line): number => line.price * line.quantity * (1 - line.discount);"
+        ]
+      },
+      {
+        "path": "src/cart/totals.ts",
+        "lines": [
+          "import { discounted } from \"./discounts\";",
+          "import type { Line } from \"./types\";",
+          "",
+          "export const lineTotal = (line: Line): number => discounted(line);",
+          "",
+          "export const cartTotal = (lines: Line[]): number =>",
+          "  Math.round(lines.reduce((total, line) => total + lineTotal(line), 0) * 100) / 100;"
+        ]
+      },
+      {
+        "path": "src/cart/totals.test.ts",
+        "lines": [
+          "import { cartTotal } from \"./totals\";",
+          "",
+          "const line = { price: 3.35, quantity: 1, discount: 0.1 };",
+          "",
+          "test(\"rounds once, like the receipt\", () => {",
+          "  expect(cartTotal([line, line, line])).toBe(9.05);",
+          "});"
+        ]
+      }
+    ]
+  },
+  {
+    "workspace": 15,
+    "dir": "/Users/demo/src/weather-kit",
+    "files": [
+      {
+        "path": "Package.swift",
+        "lines": [
+          "// swift-tools-version: 6.0",
+          "import PackageDescription",
+          "",
+          "let package = Package(",
+          "    name: \"WeatherKit\",",
+          "    targets: [",
+          "        .target(name: \"WeatherKit\"),",
+          "        .testTarget(name: \"WeatherKitTests\", dependencies: [\"WeatherKit\"]),",
+          "    ]",
+          ")"
+        ]
+      },
+      {
+        "path": "README.md",
+        "lines": ["# WeatherKit", "", "Forecasts for the app and its widget, cached for ten minutes."]
+      },
+      {
+        "path": "Sources/WeatherKit/Forecast.swift",
+        "lines": [
+          "public struct Forecast: Sendable {",
+          "    public let city: String",
+          "    public let hours: [Double]",
+          "}"
+        ]
+      },
+      {
+        "path": "Sources/WeatherKit/ForecastCache.swift",
+        "lines": [
+          "import Foundation",
+          "",
+          "actor ForecastCache {",
+          "    private var kept: [String: (Forecast, Date)] = [:]",
+          "",
+          "    func forecast(for city: String) -> Forecast? {",
+          "        guard let (forecast, at) = kept[city], at.timeIntervalSinceNow > -600 else { return nil }",
+          "        return forecast",
+          "    }",
+          "",
+          "    func keep(_ forecast: Forecast) {",
+          "        kept[forecast.city] = (forecast, Date())",
+          "    }",
+          "}"
+        ]
+      },
+      {
+        "path": "Tests/WeatherKitTests/ForecastCacheTests.swift",
+        "lines": [
+          "import Testing",
+          "@testable import WeatherKit",
+          "",
+          "@Test func keepsAForecast() async {",
+          "    let cache = ForecastCache()",
+          "    await cache.keep(Forecast(city: \"Lisbon\", hours: [18]))",
+          "    #expect(await cache.forecast(for: \"Lisbon\") != nil)",
+          "}"
+        ]
+      }
+    ]
+  }
+]
