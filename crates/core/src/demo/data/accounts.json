@@ -1,0 +1,20 @@
+{
+  "agents": [
+    { "agent": "claude", "command": "claude", "installed": true },
+    { "agent": "codex", "command": "codex", "installed": true },
+    { "agent": "gemini", "command": "gemini", "installed": false }
+  ],
+  "providers": [
+    {
+      "provider": "claude",
+      "system_label": "work",
+      "system_login": { "state": "signed-in" },
+      "active": "personal",
+      "accounts": [
+        { "name": "personal", "login": { "state": "signed-in" } },
+        { "name": "side-projects", "label": "side projects", "login": { "state": "signed-out" } }
+      ]
+    },
+    { "provider": "codex", "accounts": [] }
+  ]
+}

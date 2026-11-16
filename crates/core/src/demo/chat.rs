@@ -8,7 +8,8 @@ use super::world::World;
 use crate::board::places;
 use crate::cli::status::Tab;
 
-const WORKING: &str = "working";
+pub(super) const WORKING: &str = "working";
+pub(super) const DONE: &str = "done";
 const IDLE: &str = "idle";
 const SHORTEST: u64 = 2;
 const SPREAD: u64 = 3;
@@ -22,6 +23,14 @@ impl World {
         let thinking = Duration::from_secs(SHORTEST + (pane + self.turn(pane)) % SPREAD);
         if self.moved(pane, WORKING) {
             self.due.insert(pane, (Instant::now() + thinking, then));
+        }
+    }
+
+    pub(super) fn reviewed(&mut self, pane: u64) {
+        let done =
+            places(&self.session).any(|place| place.pane.id == pane && place.pane.status.as_deref() == Some(DONE));
+        if done {
+            self.moved(pane, IDLE);
         }
     }
 
@@ -68,8 +77,7 @@ impl World {
         tab.panes.iter_mut().filter(|seen| seen.id == pane).for_each(|seen| seen.status.clone_from(&status));
         tab.status = status;
         self.changed.insert(pane, now);
-        self.session.revision += 1;
-        self.told.send_replace(self.session.revision);
+        self.revised();
         true
     }
 

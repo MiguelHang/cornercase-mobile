@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 use super::changes::Changed;
 use super::files::Tree;
@@ -17,6 +18,7 @@ const QUESTIONS: &str = include_str!("data/questions.json");
 const TERMINALS: &str = include_str!("data/terminals.json");
 const CHANGES: &str = include_str!("data/changes.json");
 const FILES: &str = include_str!("data/files.json");
+const ACCOUNTS: &str = include_str!("data/accounts.json");
 
 #[derive(Deserialize)]
 struct Age {
@@ -56,6 +58,10 @@ pub(super) fn changes() -> Vec<Changed> {
 
 pub(super) fn trees() -> Vec<Tree> {
     read(FILES)
+}
+
+pub(super) fn accounts() -> Value {
+    read(ACCOUNTS)
 }
 
 fn read<T: DeserializeOwned>(json: &str) -> T {

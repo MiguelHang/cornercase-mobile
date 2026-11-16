@@ -9,6 +9,7 @@ use super::data;
 use super::files::Tree;
 use super::question::Question;
 use super::surface::Row;
+use crate::board::places;
 use crate::cli::contract::served;
 use crate::cli::status::Snapshot;
 use crate::cli::surface::Size;
@@ -28,6 +29,7 @@ pub(crate) struct World {
     pub(super) diffs: Vec<Diffs>,
     pub(super) seen: HashSet<(u64, String)>,
     pub(super) told: watch::Sender<u64>,
+    issued: u64,
     entered: SystemTime,
     started: Instant,
 }
@@ -44,6 +46,9 @@ impl Default for World {
         };
         let trees = data::trees();
         let diffs = changes::diffs(data::changes(), &trees);
+        let issued =
+            places(&session).flat_map(|place| [place.project.id, place.workspace.id, place.tab.id, place.pane.id]);
+        let issued = issued.max().unwrap_or_default();
         let changed = data::ages().map(|(pane, ago)| (pane, entered.checked_sub(ago).unwrap_or(entered))).collect();
         Self {
             told: watch::Sender::new(session.revision),
@@ -58,6 +63,7 @@ impl Default for World {
             trees,
             diffs,
             seen: HashSet::new(),
+            issued,
             entered,
             started: Instant::now(),
         }
@@ -71,5 +77,15 @@ impl World {
 
     pub(super) fn now(&self) -> SystemTime {
         self.entered + self.started.elapsed()
+    }
+
+    pub(super) fn revised(&mut self) {
+        self.session.revision += 1;
+        self.told.send_replace(self.session.revision);
+    }
+
+    pub(super) fn issue(&mut self) -> u64 {
+        self.issued += 1;
+        self.issued
     }
 }

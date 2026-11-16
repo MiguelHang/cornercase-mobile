@@ -7,7 +7,7 @@ use serde_json::json;
 
 use super::follow::{self, Followed};
 use super::world::World;
-use super::{changes, files, queue};
+use super::{changes, close, empty, files, queue, start};
 use crate::cli::surface::Size;
 use crate::error::Error;
 use crate::transport::{Exit, Out, OutSink, Stdin, emit, only_stdout};
@@ -96,7 +96,15 @@ fn answer(world: &mut World, argv: &[String]) -> Answer {
             world.pressed(pane, argv.last().map(String::as_str));
             Answer::printed(String::new())
         }
+        (Some("mark"), Some(pane)) if flagged(argv, "--reviewed") => {
+            world.reviewed(pane);
+            Answer::printed(String::new())
+        }
         (Some("mark"), Some(_)) => Answer::printed(String::new()),
+        (Some("account"), _) => start::accounts(argv),
+        (Some("start"), _) => start::answer(world, argv),
+        (Some("close"), Some(pane)) => close::answer(world, pane, argv),
+        (Some("issue" | "flow"), _) => empty::answer(argv),
         (Some("changes"), _) => changes::answer(world, argv),
         (Some("files"), _) => files::answer(world, argv),
         (Some("read"), Some(pane)) if flagged(argv, "--last-message") && flagged(argv, "--json") => {
