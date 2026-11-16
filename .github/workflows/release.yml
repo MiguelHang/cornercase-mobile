@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,8 +22,12 @@ jobs:
     name: android apk
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: version
         run: echo "VERSION=$(jq -r .version src-tauri/tauri.conf.json)" >> "$GITHUB_ENV"
@@ -35,6 +39,19 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match version $VERSION in src-tauri/tauri.conf.json"
             exit 1
           fi
+
+      - name: signing secrets are set
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          for secret in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS; do
+            if [ -z "${!secret}" ]; then
+              echo "::error::secret $secret is not set"
+              exit 1
+            fi
+          done
 
       - uses: actions/setup-java@v6
         with:
@@ -53,16 +70,11 @@ jobs:
           rustup toolchain install
           rustup target add armv7-linux-androideabi
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
 
       - name: install
         run: pnpm install --frozen-lockfile
