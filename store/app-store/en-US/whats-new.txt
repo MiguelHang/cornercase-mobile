@@ -1,0 +1,10 @@
+The first release: follow, answer and start cornercase's coding agents from your iPhone. It needs cornercase 0.13.78 or later on your Mac.
+
+- Pair with your Mac: scan the QR code of cornercase's Settings > Remote > Phone app, or paste the code. Add one machine per Mac and switch between them.
+- See every agent on one board, with its status, the ones that need you first, and the agents they started folded under them. It updates live.
+- Talk to an agent: read its conversation, answer it, tap the options of its questions, send keys, and attach images from your photos.
+- Open the live terminal, fitted to your phone's width, and type into it.
+- Start new work: an agent with a prompt, in an open workspace or a new worktree, or an agent or a flow on an issue.
+- Check the changes and the files: read each diff and mark it viewed, browse the workspace's files and search them by name.
+- Close an agent: swipe a row left, or tap Close agent on its screen.
+- Try it without a Mac: tap Try a demo on the first screen to open a simulated Demo Mac with sample agents.
