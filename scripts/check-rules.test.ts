@@ -64,6 +64,9 @@ describe('what is walked', () => {
     'src/lib/theme/tokens.css',
     'scripts/tool.mjs',
     'scripts/tool.js',
+    'site/page.html',
+    'site/site.css',
+    'site/nested/page.html',
     'vite.config.ts',
     'eslint.config.js',
     'other.config.mjs',
@@ -82,6 +85,8 @@ describe('what is walked', () => {
     'src-tauri/other.rs',
     'docs/tool.ts',
     'src/lib/notes.md',
+    'site/index.md',
+    'index.html',
     'nested/vite.config.ts',
   ])('ignores %s', (path) => {
     expect(check(tree({ [path]: lines(1001) }))).toEqual([])
@@ -313,6 +318,32 @@ describe('Svelte comments', () => {
     ['src/lib/Card.svelte', '<script>\n  // why\n</script>\n', 'line comment'],
   ])('fails %s with a comment at its line', (path, text, reason) => {
     expect(check(tree({ [path]: text }))).toEqual([expect.stringMatching(new RegExp(`^${path}:2: ${reason}\\. `))])
+  })
+})
+
+describe('HTML comments', () => {
+  it.each([
+    ['a markup comment', '<main>\n  <!-- why -->\n</main>\n', 'markup comment'],
+    ['a block comment in a style', '<style>\n  /* why */\n</style>\n', 'block comment'],
+    ['a line comment in a script', '<script>\n  // why\n</script>\n', 'line comment'],
+  ])('fails site/page.html with %s at its line', (_, text, reason) => {
+    expect(check(tree({ 'site/page.html': text }))).toEqual([
+      expect.stringMatching(new RegExp(`^site/page\\.html:2: ${reason}\\. `)),
+    ])
+  })
+
+  it('fails a CSS file of the site with a block comment at its line', () => {
+    expect(check(tree({ 'site/site.css': 'main {\n  /* why */\n}\n' }))).toEqual([
+      expect.stringMatching(/^site\/site\.css:2: block comment\. /),
+    ])
+  })
+
+  it('passes a clean page of the site', () => {
+    const text =
+      '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n' +
+      '  <link rel="stylesheet" href="site.css">\n</head>\n<body>\n' +
+      '  <a href="https://github.com/owner/name/issues">Issues</a>\n  {{content}}\n</body>\n</html>\n'
+    expect(check(tree({ 'site/page.html': text, 'site/site.css': 'a { color: var(--accent); }\n' }))).toEqual([])
   })
 })
 
