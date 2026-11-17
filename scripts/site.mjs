@@ -1,9 +1,16 @@
-import { posix } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { join, posix } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parseArgs } from 'node:util'
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { gfm } from 'micromark-extension-gfm'
 
 export const PAGES = { 'site/index.md': '', 'PRIVACY.md': 'privacy', 'SUPPORT.md': 'support' }
+const ASSETS = { 'src/lib/theme/tokens.css': 'tokens.css', 'site/site.css': 'site.css' }
+const TEMPLATE = 'site/page.html'
+const SITE = 'Cornercase remote'
+const NO_REPOSITORY = 'site.mjs needs the GitHub repository: set GITHUB_REPOSITORY or pass --repository owner/name.'
 
 const REPOSITORY = /^[\w.-]+\/[\w.-]+$/
 const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
@@ -89,7 +96,64 @@ function html(node, context) {
   return HANDLERS[node.type](node, context)
 }
 
-export function render(markdown, context) {
-  const tree = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] })
-  return html(tree, context)
+function parse(markdown) {
+  return fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] })
 }
+
+export function render(markdown, context) {
+  return html(parse(markdown), context)
+}
+
+export function plainText(node) {
+  return node.value ?? (node.children ?? []).map(plainText).join('')
+}
+
+function pageTitle(tree, source) {
+  const heading = tree.children.find((node) => node.type === 'heading' && node.depth === 1)
+  if (heading === undefined) throw new Error(`${source}: the page has no # heading to name it`)
+  return [...new Set([plainText(heading), SITE])].join(' · ')
+}
+
+export function fill(template, values) {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    if (!Object.hasOwn(values, key)) throw new Error(`${TEMPLATE}: no value for {{${key}}}`)
+    return values[key]
+  })
+}
+
+function page(template, markdown, context) {
+  const tree = parse(markdown)
+  const title = escape(pageTitle(tree, context.source))
+  return fill(template, { root: pageLink(PAGES[context.source], ''), title, content: html(tree, context) })
+}
+
+export function build({ root, out, repository }) {
+  repositoryBase(repository)
+  const template = readFileSync(join(root, TEMPLATE), 'utf8')
+  const pages = Object.entries(PAGES).map(([source, folder]) => {
+    const markdown = readFileSync(join(root, source), 'utf8')
+    return { folder, text: page(template, markdown, { source, repository }) }
+  })
+  rmSync(out, { recursive: true, force: true })
+  for (const { folder, text } of pages) {
+    mkdirSync(join(out, folder), { recursive: true })
+    writeFileSync(join(out, folder, 'index.html'), text)
+  }
+  for (const [source, name] of Object.entries(ASSETS)) copyFileSync(join(root, source), join(out, name))
+}
+
+function main() {
+  const { values } = parseArgs({ options: { repository: { type: 'string' } } })
+  const repository = values.repository || process.env.GITHUB_REPOSITORY
+  const root = fileURLToPath(new URL('..', import.meta.url))
+  try {
+    if (!repository) throw new Error(NO_REPOSITORY)
+    build({ root, out: join(root, '_site'), repository })
+  } catch (error) {
+    console.error(error.message)
+    process.exitCode = 1
+  }
+}
+
+const started = process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1])
+if (started && import.meta.url === pathToFileURL(started).href) main()

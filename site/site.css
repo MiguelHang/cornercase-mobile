@@ -1,0 +1,20 @@
+body {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: var(--inset-wide);
+  background: var(--glass);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inset-wide);
+}
