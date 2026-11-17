@@ -61,8 +61,8 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 
 ## App Review
 
-- **The demo is the way in** (064, `demo.md`): the app does nothing without a Mac running cornercase, and App Review (guideline 2.1) has to see it work. The notes for the reviewer in App Store Connect › App Review Information say so, and `Sign-in required` stays off, since there is no account:
-  - "Cornercase remote controls the cornercase app running on the user's Mac, so a real session needs a Mac with cornercase 0.13.78 or later that the phone can reach. To try it without one, tap `Try a demo` on the first screen: it adds a simulated Demo Mac inside the app, marked `DEMO`, with sample agents to open, message, answer, start and close. It uses no network and saves nothing. Tap `Leave demo` on the connection bar to leave it."
+- **The demo is the way in** (064, `demo.md`): the app does nothing without a computer running cornercase, and App Review (guideline 2.1) has to see it work. The notes for the reviewer in App Store Connect › App Review Information say so, and `Sign-in required` stays off, since there is no account:
+  - "Cornercase remote controls the cornercase app running on the user's computer (Linux or macOS), so a real session needs a computer with cornercase 0.13.78 or later that the phone can reach. To try it without one, tap `Try a demo` on the first screen: it adds a simulated Demo machine inside the app, marked `DEMO`, with sample agents to open, message, answer, start and close. It uses no network and saves nothing. Tap `Leave demo` on the connection bar to leave it."
 - **The screenshots** can come from the demo too: its sample is fictional and in English, made for them. None has been taken yet.
 
 ## The site

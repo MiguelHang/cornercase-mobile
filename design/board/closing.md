@@ -1,6 +1,6 @@
 # Closing an agent
 
-A topic of [Board](../board.md): closing an agent from the phone, as the Mac's **close agent** does, from two places, the board's row and the agent's screen. Both ask cornercase what would close, show it in one confirmation and close through the queue with `--boot`. Upstream's own decision is in its `design/layout/agents-section.md` › Closing an agent (#399, #438), read on 2026-11-13. The state per pane is in `src/lib/closeAgent.svelte.ts` (`CloseAgent`), without markup, with the commands injected as in `addMachine.svelte.ts`. The gestures are pure machines in `src/lib/rowSwipe.ts` with the clock injected, as `backSwipe.ts` is. The argv and the answer are in `crates/core/src/cli/close.rs`, and the two commands in `src-tauri/src/commands/close.rs`.
+A topic of [Board](../board.md): closing an agent from the phone, as the machine's **close agent** does, from two places, the board's row and the agent's screen. Both ask cornercase what would close, show it in one confirmation and close through the queue with `--boot`. Upstream's own decision is in its `design/layout/agents-section.md` › Closing an agent (#399, #438), read on 2026-11-13. The state per pane is in `src/lib/closeAgent.svelte.ts` (`CloseAgent`), without markup, with the commands injected as in `addMachine.svelte.ts`. The gestures are pure machines in `src/lib/rowSwipe.ts` with the clock injected, as `backSwipe.ts` is. The argv and the answer are in `crates/core/src/cli/close.rs`, and the two commands in `src-tauri/src/commands/close.rs`.
 
 ## Where it is
 
@@ -41,22 +41,22 @@ A topic of [Board](../board.md): closing an agent from the phone, as the Mac's *
 ## Asking before and asking again
 
 - **The check runs before the sheet shows**: `close --agent --pane P --boot B --check --json` asks cornercase what would close, while the row (in place of its time) or the screen's button shows a spinner. A check that fails opens no sheet: a toast says cornercase's reason (`stale-boot`, `pane N runs no agent cornercase reads`, a project that is closing, and so on). A check that gets no answer (`Unanswered`) says `cornercase did not answer, so nothing was closed. Try again.` rather than the generic `maybe_sent`, whose "it may have been sent" would suggest that a read closed the agent.
-- **A row that leaves the board drops what it was asking**: a check, an open sheet or a second check of a pane no longer in `agents-changed` (its agent ended, or the Mac closed it) is forgotten, and a check's answer that comes after is ignored, so no sheet opens for a gone agent and its `Close` cannot end in `runs no agent`.
-- **`Close` checks again before closing** (P4), as the Mac's window plans again on confirming (`Plan::grew`). While it runs, `Close` shows a spinner and `Cancel` rests. If the plan grew, the sheet shows the new plan instead of closing: a flow `run` it did not have, or a tab or an agent to stop that was not shown. A plan that shrank closes, since it closes less than the user confirmed. On a phone the sheet may stay open for a long time while a team starts agents. It costs one command more. Rejected: closing on the first answer. `close --agent` has no flag to close only the tabs that were confirmed (Upstream gaps).
+- **A row that leaves the board drops what it was asking**: a check, an open sheet or a second check of a pane no longer in `agents-changed` (its agent ended, or the machine closed it) is forgotten, and a check's answer that comes after is ignored, so no sheet opens for a gone agent and its `Close` cannot end in `runs no agent`.
+- **`Close` checks again before closing** (P4), as the machine's window plans again on confirming (`Plan::grew`). While it runs, `Close` shows a spinner and `Cancel` rests. If the plan grew, the sheet shows the new plan instead of closing: a flow `run` it did not have, or a tab or an agent to stop that was not shown. A plan that shrank closes, since it closes less than the user confirmed. On a phone the sheet may stay open for a long time while a team starts agents. It costs one command more. Rejected: closing on the first answer. `close --agent` has no flag to close only the tabs that were confirmed (Upstream gaps).
 
 ## The close
 
 - **Both commands go through the queue** (`reach::asked`), so they never overtake a send queued before them. Rejected: the check one-shot like `read --last-message`, which could answer about a pane that a queued send is still changing.
 - **`--boot` from the row** (`AgentRow.boot`): a restart between the check and the close makes cornercase refuse with exit 4 (`StaleBoot`), so the close never reaches the agent that inherited the pane's id. A row without a `boot` offers no close.
 - **`Closing…` until the rows go**: from the close on, the agent's row, the rows of its `stops` that are on the board, and its screen read `Closing…` and take no other close. The state ends when none of those panes is in an `agents-changed` any more, even if the command answered first and the rows stay a while; then the rows leave with the list's usual animation. A failure ends it with a toast of cornercase's reason. `Unanswered` (the close may have gone) keeps `Closing…` for 15 s waiting for the rows to go, then says `cornercase did not answer, so the agent may still close: look at the board before trying again.` That text is its own rather than the generic `maybe_sent`, since the board shows whether it did. `Skipped` says `not_sent`, as every send.
-- **Switching the active machine drops the states**, since a `CloseAgent` belongs to a machine: a close under way finishes on the Mac without its `Closing…`, and its failure still shows a toast.
+- **Switching the active machine drops the states**, since a `CloseAgent` belongs to a machine: a close under way finishes on the machine without its `Closing…`, and its failure still shows a toast.
 
 ## Nothing on disk
 
 - **The argv never carries `--remove-worktree`, `--delete-branch`, `--force` or `--unlock`**, and a test of the argv holds it (CA7):
   - the ticket leaves them out;
   - removing a worktree from the phone, without seeing its uncommitted changes or its lock, cannot be undone. Upstream took exactly that out of its own close agent in 0.12.178 ("Close agent only closes agents");
-  - removing a worktree stays on the Mac (the workspace's `×`, the Worktrees dialog).
+  - removing a worktree stays on the machine (the workspace's `×`, the Worktrees dialog).
 - **The contract promises it**: `close-agent-tabs` is required, and without it the CLI refuses `close --agent` (Connection › The contract).
 
 ## Why danger
@@ -68,7 +68,7 @@ A topic of [Board](../board.md): closing an agent from the phone, as the Mac's *
 - **Once the agent the user is on closes, the app returns to the board** (P5, `Router.closed`). That holds on its screen, on its terminal over it, and on a subagent's screen over its parent's when the parent closes, since its `stops` take the child. The return happens when the `Closing…` state ends. Rejected: going back to the screen below if its agent still runs, more rules for a stack the user can rebuild from the board in one tap. It also leaves the ticket's "back to the board".
 - **`This agent is no longer running.` never shows first**: `Chat.see` takes whether the phone is closing the pane, and while it is, a list without the pane keeps the last row instead of counting the agent as gone (Chat › Gone). The effect that feeds `Chat.see` runs before the one that ends the state, so the screen is already leaving when the rows go.
 - **Only the top of the stack goes back**: with Changes, Files or Machines open over the agent's screen, the stack stays, and coming back shows the agent gone. Taking away a screen the user opened on top, maybe halfway through a diff, was judged worse than one more `Back`.
-- **A close from the Mac, or from another phone**, has no `Closing…` here, so its screen turns gone as before (Chat › Gone).
+- **A close from the machine, or from another phone**, has no `Closing…` here, so its screen turns gone as before (Chat › Gone).
 
 ## Left out
 
