@@ -157,6 +157,12 @@ describe('App wiring', () => {
     expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed)')
   })
 
+  it('leaves the demo from the bar, then loads the machines and the connection again as on opening', () => {
+    expect(source).toContain(
+      "const leaveDemo = async () => { const left = await commands.demoLeave() if (left.status === 'error') { toasts.failed(left.error) return } await load() }",
+    )
+  })
+
   it('loads the agents with the state, and never the session', () => {
     expect(source).toContain('commands.connectionState(), commands.agents(), ])')
     expect(source).toContain('screen(state, agents)')
@@ -168,7 +174,7 @@ describe('App wiring', () => {
       "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
     )
     expect(source).toContain(
-      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {/if}",
+      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} demo={barMachine.demo} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} onleave={() => void leaveDemo().catch(toasts.failed)} /> {/if}",
     )
     expect(source).toContain(
       'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',
@@ -423,7 +429,7 @@ describe('App wiring', () => {
   it('slides every screen but the connection bar and the toasts, and the terminal on its own', () => {
     expect(source).toContain('let shift = $state<Shift>(RESTING)')
     expect(source).toContain(
-      "onmachines={() => router.go({ name: 'machines' })} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
+      "onleave={() => void leaveDemo().catch(toasts.failed)} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
     )
     expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} {/if} <ToastStack')
     expect(source.match(/translated\(shift\)/g)).toHaveLength(1)

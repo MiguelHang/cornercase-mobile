@@ -83,6 +83,7 @@
       {#each machines as machine (machine.id)}
         <MachineRow
           name={machine.name}
+          demo={machine.demo}
           shown={shownFor(machine)}
           active={machine.id === active}
           checking={machine.id !== active && probes.of(machine.id).state === 'checking'}

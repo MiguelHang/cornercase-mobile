@@ -51,11 +51,12 @@ const screen = async (
   device = loaded(FINGERPRINT),
   connection: ConnectionView_Serialize = CONNECTED,
   probes: Promise<Probes> = probed(),
+  machines = MACHINES,
 ) =>
   render(Machines, {
     props: {
-      machines: MACHINES,
-      active: 1,
+      machines,
+      active: machines[0].id,
       connection,
       backTo: 'Agents',
       onback: () => {},
@@ -183,6 +184,19 @@ describe('Machines', () => {
     expect(forgotten).not.toContain('Check again')
   })
 
+  it('tags the demo Demo beside its name, and shows it by its name alone, with Edit to leave it', async () => {
+    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const listed = [demo, ...MACHINES]
+    const [shown, studio] = rows(await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), listed))
+    expect(shown).toMatch(
+      /<span class="title svelte-[\w-]+"><span class="name svelte-[\w-]+">Demo Mac<\/span> <!--\[0?--><span class="tag svelte-[\w-]+">Demo<\/span>/,
+    )
+    expect(shown).toMatch(/<span class="text svelte-[\w-]+">Demo Mac<\/span>/)
+    expect(shown).toContain('aria-current="true"')
+    expect(shown).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Edit/)
+    expect(studio).not.toContain('class="tag')
+  })
+
   it('offers adding a machine and shows no form yet', async () => {
     const body = await screen()
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
@@ -208,6 +222,14 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain(
       '{:else if !active} <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button> {/if}',
     )
+  })
+
+  it('tells each row whether it is the demo, and lets a long name give way to the tag', () => {
+    expect(script).toContain('demo={machine.demo}')
+    expect(flat(rowSource)).toContain(
+      '<span class="title"> <span class="name">{name}</span> {#if demo} <DemoTag /> {/if} </span>',
+    )
+    expect(flat(rowSource)).toContain('.title { display: flex; align-items: center; gap: var(--gap); min-width: 0; }')
   })
 
   it('opens the machine edited', () => {

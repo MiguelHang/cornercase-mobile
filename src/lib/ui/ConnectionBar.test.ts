@@ -5,6 +5,7 @@ import type { Tone } from '../connection'
 import clockSource from '../retryClock.svelte.ts?raw'
 import ConnectionBar from './ConnectionBar.svelte'
 import barSource from './ConnectionBar.svelte?raw'
+import tagSource from './DemoTag.svelte?raw'
 import dotSource from './ToneDot.svelte?raw'
 
 const RETRYING: ConnectionView_Serialize = {
@@ -18,7 +19,12 @@ const MISSING: ConnectionView_Serialize = {
 }
 
 const bar = (connection: ConnectionView_Serialize) =>
-  render(ConnectionBar, { props: { connection, machineName: 'MacBook', onmachines: () => {} } }).body
+  render(ConnectionBar, { props: { connection, machineName: 'MacBook', demo: false, onmachines: () => {}, onleave: () => {} } })
+    .body
+
+const demoBar = (connection: ConnectionView_Serialize) =>
+  render(ConnectionBar, { props: { connection, machineName: 'Demo Mac', demo: true, onmachines: () => {}, onleave: () => {} } })
+    .body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
 
@@ -113,5 +119,57 @@ describe('ConnectionBar', () => {
     '.failed { background: var(--failed); }',
   ])('draws its dot with %s', (text) => {
     expect(flat(dotSource)).toContain(text)
+  })
+
+  describe('in the demo', () => {
+    const DEMO_STATES: ConnectionView_Serialize[] = [{ state: 'connecting' }, { state: 'connected', route: '' }]
+
+    it.each(DEMO_STATES)('tags itself Demo, in capitals, beside its dot when $state', (connection) => {
+      expect(demoBar(connection)).toMatch(
+        /<span class="dot \w+ svelte-[\w-]+( pulsing)?"><\/span><!----> <!--\[0?--><span class="tag svelte-[\w-]+">Demo<\/span>/,
+      )
+      expect(flat(tagSource)).toContain('text-transform: uppercase;')
+    })
+
+    it('shows the demo by its name alone, with no address, and never a lost network or a retry', () => {
+      for (const connection of DEMO_STATES) {
+        const body = demoBar(connection)
+        expect(body).not.toMatch(/No network|Retrying|via |:\d+/)
+      }
+      expect(demoBar({ state: 'connected', route: '' })).toMatch(
+        /<span class="line text svelte-[\w-]+">Demo Mac<\/span>/,
+      )
+    })
+
+    it('offers Leave demo before the machines, which asks to leave', () => {
+      expect(demoBar({ state: 'connected', route: '' })).toMatch(
+        /<button class="leave svelte-[\w-]+" type="button">Leave demo<\/button><!--\]--> <button class="machines/,
+      )
+      expect(flat(barSource)).toContain(
+        '{#if demo} <button class="leave" type="button" onclick={onleave} ontouchstart={() => {}}>Leave demo</button> {/if}',
+      )
+    })
+
+    it('neither tags nor offers leaving a machine that is not the demo', () => {
+      const body = bar({ state: 'connected', route: 'ws://192.168.1.20:7000/' })
+      expect(body).not.toContain('class="tag')
+      expect(body).not.toContain('Leave demo')
+    })
+
+    it.each([
+      '.leave { flex: none; min-height: 44px;',
+      'color: var(--accent);',
+      '.leave:active { background: var(--hover); }',
+    ])('draws Leave demo with %s', (text) => {
+      expect(flat(barSource)).toContain(text)
+    })
+
+    it.each([
+      'border-radius: var(--radius-chip);',
+      'background: var(--accent-soft); color: var(--accent);',
+      'font-size: 11px; font-weight: 600;',
+    ])('draws the tag with %s', (text) => {
+      expect(flat(tagSource)).toContain(text)
+    })
   })
 })

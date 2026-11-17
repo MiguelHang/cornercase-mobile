@@ -412,6 +412,15 @@
     }
   }
 
+  const leaveDemo = async () => {
+    const left = await commands.demoLeave()
+    if (left.status === 'error') {
+      toasts.failed(left.error)
+      return
+    }
+    await load()
+  }
+
   onMount(() => {
     if (!isTauri()) {
       return
@@ -451,8 +460,10 @@
         <ConnectionBar
           connection={current.connection}
           machineName={barMachine.name}
+          demo={barMachine.demo}
           bind:height={barHeight}
           onmachines={() => router.go({ name: 'machines' })}
+          onleave={() => void leaveDemo().catch(toasts.failed)}
         />
       {/if}
       <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>

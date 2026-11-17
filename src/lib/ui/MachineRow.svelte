@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { RowStatus } from '../machineRows'
   import Button from './Button.svelte'
+  import DemoTag from './DemoTag.svelte'
   import Spinner from './Spinner.svelte'
   import ToneDot from './ToneDot.svelte'
 
   let {
     name,
+    demo,
     shown,
     active,
     checking,
@@ -16,6 +18,7 @@
     onedit,
   }: {
     name: string
+    demo: boolean
     shown: RowStatus
     active: boolean
     checking: boolean
@@ -28,7 +31,12 @@
 </script>
 
 {#snippet about()}
-  <span class="name">{name}</span>
+  <span class="title">
+    <span class="name">{name}</span>
+    {#if demo}
+      <DemoTag />
+    {/if}
+  </span>
   <span class="state">
     {#if checking}
       <Spinner />
@@ -103,6 +111,13 @@
     color: var(--text);
     font: inherit;
     text-align: left;
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    min-width: 0;
   }
 
   .name {
