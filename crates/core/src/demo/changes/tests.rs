@@ -62,8 +62,26 @@ async fn text(workspace: u64, path: &str) -> Vec<String> {
     read.text.expect("a text file").lines().map(str::to_owned).collect()
 }
 
+async fn listed(workspace: u64) -> Vec<ChangedFile> {
+    let mut followed = Followed::start(workspace).await;
+    followed.summaries().remove(0).workspaces.remove(0).files
+}
+
 mod the_list {
     use super::*;
+
+    #[rstest]
+    #[case::the_shop(2, 1, FORM)]
+    #[case::the_fix(11, 1, "src/cart/totals.ts")]
+    #[case::the_package(15, 14, "Sources/WeatherKit/ForecastCache.swift")]
+    #[tokio::test(start_paused = true)]
+    async fn lists_the_files_of_its_own_workspace(#[case] workspace: u64, #[case] project: u64, #[case] first: &str) {
+        let mut followed = Followed::start(workspace).await;
+        let summary = followed.summaries().remove(0);
+        let [changed] = summary.workspaces.as_slice() else { panic!("the summary has {:?}", summary.workspaces) };
+        assert_eq!((changed.project, changed.base.as_deref()), (project, Some("main")));
+        assert_eq!(changed.files.first().map(|file| file.path.as_str()), Some(first));
+    }
 
     #[rstest]
     #[tokio::test(start_paused = true)]
@@ -122,6 +140,20 @@ mod viewing {
 mod a_diff {
     use super::*;
 
+    #[rstest]
+    #[case::the_shop(2, "src/checkout/ApplePayButton.tsx")]
+    #[case::the_fix(11, "src/cart/discounts.ts")]
+    #[case::the_package(15, "Tests/WeatherKitTests/ForecastCacheTests.swift")]
+    #[tokio::test(start_paused = true)]
+    async fn of_a_new_file_shows_all_of_it_added(#[case] workspace: u64, #[case] path: &str) {
+        let patch = patch(workspace, path, Mode::Uncommitted).await.expect("the diff");
+        let text = text(workspace, path).await;
+        let added: Vec<&str> = patch.hunks.iter().flat_map(|hunk| &hunk.lines).map(|line| line.text.as_str()).collect();
+        assert_ne!(added, Vec::<&str>::new());
+        assert_eq!(added, text.iter().map(String::as_str).collect::<Vec<_>>());
+        assert_eq!(patch.file.added, u64::try_from(text.len()).expect("a small file"));
+    }
+
     #[tokio::test]
     async fn shows_the_removed_and_added_lines_with_their_numbers() {
         let patch = patch(SHOP, FORM, Mode::All).await.expect("the diff");
@@ -153,10 +185,5 @@ mod a_diff {
     async fn fails_for_a_file_that_did_not_change() {
         let error = patch(SHOP, "README.md", Mode::Uncommitted).await.expect_err("README.md did not change");
         assert!(matches!(error, Error::Failed { code: 2, .. }), "{error:?}");
-    }
-
-    async fn listed(workspace: u64) -> Vec<ChangedFile> {
-        let mut followed = Followed::start(workspace).await;
-        followed.summaries().remove(0).workspaces.remove(0).files
     }
 }

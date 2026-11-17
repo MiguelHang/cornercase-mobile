@@ -160,6 +160,48 @@ mod a_launch {
         assert_eq!(started.workspace, MAIN);
     }
 
+    #[rstest]
+    #[case::the_first_project(1, 2)]
+    #[case::the_second_project(14, 15)]
+    #[tokio::test(start_paused = true)]
+    async fn in_a_project_goes_to_its_first_workspace(#[case] project: u64, #[case] workspace: u64) {
+        let (store, _) = entered().await;
+        let argv = ["start", "codex", "--project", &project.to_string(), "--prompt=Hi", "--placed", "--json"]
+            .map(str::to_owned)
+            .to_vec();
+        let started = start::started(&asked(&store, argv).await.expect("the agent starts")).expect("a start");
+        assert_eq!((started.project, started.workspace), (project, workspace));
+    }
+
+    #[rstest]
+    #[case::the_first(2)]
+    #[case::a_later_one(11)]
+    #[case::of_another_project(15)]
+    #[tokio::test(start_paused = true)]
+    async fn puts_the_pane_in_the_workspace_asked_for(#[case] workspace: u64) {
+        let (store, _) = entered().await;
+        let started = launched(&store, Place::Workspace { workspace }).await;
+        let session = store.session().expect("the demo has a session");
+        let holding: Vec<u64> = session
+            .projects
+            .iter()
+            .flat_map(|project| &project.workspaces)
+            .filter(|seen| seen.tabs.iter().any(|tab| tab.panes.iter().any(|pane| pane.id == started.pane)))
+            .map(|seen| seen.id)
+            .collect();
+        assert_eq!(holding, [workspace]);
+    }
+
+    #[rstest]
+    #[case::without_json(&["account", "list", "--check"])]
+    #[case::another_subcommand(&["account", "show", "--json"])]
+    #[tokio::test(start_paused = true)]
+    async fn refuses_an_account_request_it_does_not_know(#[case] argv: &[&str]) {
+        let (store, _) = entered().await;
+        let refused = asked(&store, argv.iter().map(|word| (*word).to_owned()).collect()).await;
+        assert!(matches!(refused, Err(Error::Failed { code: 2, .. })), "{refused:?}");
+    }
+
     #[tokio::test(start_paused = true)]
     async fn is_refused_in_a_workspace_the_demo_lacks() {
         let (store, _) = entered().await;

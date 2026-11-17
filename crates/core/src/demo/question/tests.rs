@@ -36,8 +36,12 @@ fn shown(heard: &mut UnboundedReceiver<Asked>) -> Option<Card> {
 }
 
 async fn pressed(store: &Store, key: &str) {
+    pressed_in(store, ASKING, key).await;
+}
+
+async fn pressed_in(store: &Store, pane: u64, key: &str) {
     let queue = store.queue().expect("the demo has a queue");
-    let outcome = queue.ask(keys::args(ASKING, &[key]).expect("a known key"), None).await;
+    let outcome = queue.ask(keys::args(pane, &[key]).expect("a known key"), None).await;
     assert!(matches!(outcome, Ok(Outcome::Done(_))), "{outcome:?}");
 }
 
@@ -87,6 +91,8 @@ mod the_question {
     #[rstest]
     #[case::a_key_that_is_not_an_option("enter")]
     #[case::a_number_past_the_options("9")]
+    #[case::the_number_just_past_the_options("4")]
+    #[case::zero("0")]
     #[tokio::test(start_paused = true)]
     async fn stays_for_any_other_key(#[case] key: &str) {
         let (store, mut heard) = opened().await;
@@ -110,5 +116,17 @@ mod the_surface {
         let answer = transport::output(&DemoTransport::new(), argv).await.expect("the demo answers");
         let stderr = "error: no tab 99".to_owned();
         assert_eq!(answer, Output { stdout: String::new(), stderr, code: 1 });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stays_for_a_key_pressed_in_another_pane() {
+        let (store, mut heard) = opened().await;
+        shown(&mut heard);
+
+        pressed_in(&store, 4, "1").await;
+        time::sleep(WORKING_AT_MOST).await;
+
+        assert!(heard.is_empty(), "the question changed");
+        assert_eq!(status(&store, ASKING).as_deref(), Some("waiting"));
     }
 }
