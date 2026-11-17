@@ -31,6 +31,10 @@ What is new in each version is in the [changelog](CHANGELOG.md).
 
 A code lasts ten minutes and pairs one phone. To cut a phone off, forget it in the same place in cornercase.
 
+## Help
+
+To ask a question or report a problem, see [support](SUPPORT.md): where to ask and what to include.
+
 ## Privacy
 
 The app collects nothing and talks only to the Macs you pair it with. The [privacy policy](PRIVACY.md) says what it
