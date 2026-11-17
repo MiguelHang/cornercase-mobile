@@ -265,7 +265,7 @@ describe('build with the repository', () => {
       'PRIVACY.md',
       '.github/workflows/pages.yml',
     ].filter((path) => existsSync(join(root, path)))
-    expect(sources).toContain('site/page.html')
+    expect(sources).toEqual(expect.arrayContaining(['site/page.html', '.github/workflows/pages.yml']))
     const owner = new RegExp(['miguel', 'hang'].join(''), 'i')
     for (const path of sources) expect(readFileSync(join(root, path), 'utf8'), path).not.toMatch(owner)
   })
@@ -289,6 +289,28 @@ describe('the style sheet of the site', () => {
       expect(used, token).toContain(token)
       expect(light, token).toMatch(new RegExp(`${token}: #[0-9a-f]{6}(?:[0-9a-f]{2})?;`))
     }
+  })
+})
+
+describe('the workflow that publishes the site', () => {
+  const workflow = (name: string) => readFileSync(join(root, `.github/workflows/${name}.yml`), 'utf8')
+  const actions = (text: string) =>
+    new Map([...text.matchAll(/uses: ([\w/-]+)@(\S+)/g)].map((match) => [match[1], match[2]]))
+  const pages = workflow('pages')
+  const ci = actions(workflow('ci'))
+
+  it('sets up the tools with the same versions as CI', () => {
+    const shared = [...actions(pages)].filter(([action]) => ci.has(action))
+    expect(shared.map(([action]) => action)).toEqual(['actions/checkout', 'pnpm/action-setup', 'actions/setup-node'])
+    for (const [action, version] of shared) expect(version, action).toBe(ci.get(action))
+    expect(pages).toMatch(/node-version: 22\n/)
+    expect(pages).toContain('run: pnpm install --frozen-lockfile')
+  })
+
+  it('builds the site again when any of its sources changes', () => {
+    const markdown = PAGES.map(([source]) => source).filter((source) => !source.startsWith('site/'))
+    const sources = [...markdown, 'site/**', 'scripts/site.mjs', 'src/lib/theme/tokens.css', 'pnpm-lock.yaml']
+    for (const source of sources) expect(pages, source).toContain(`- ${source}\n`)
   })
 })
 
