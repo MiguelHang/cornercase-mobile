@@ -21,6 +21,9 @@ const SINGLE_FILES = [
   'README.md',
   'PRIVACY.md',
   'CHANGELOG.md',
+  'SUPPORT.md',
+  'site/index.md',
+  'site/page.html',
 ]
 const NOT_SHOWN = new Set(['src/lib/bindings.ts'])
 
