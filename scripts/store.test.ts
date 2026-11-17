@@ -1,0 +1,242 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+const root = join(import.meta.dirname, '..')
+const store = join(root, 'store/app-store')
+const screenshots = join(store, 'screenshots/iphone-6.9')
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+type FileRef = { $file: string }
+type PngHeader = { width: number; height: number; colorType: number; chunks: string[] }
+
+function isFileRef(value: unknown): value is FileRef {
+  return typeof value === 'object' && value !== null && typeof (value as FileRef).$file === 'string'
+}
+
+function fileRefs(value: unknown): string[] {
+  if (isFileRef(value)) return [value.$file]
+  if (typeof value !== 'object' || value === null) return []
+  return Object.values(value).flatMap(fileRefs)
+}
+
+function characters(text: string) {
+  return [...text].length
+}
+
+function bytes(text: string) {
+  return Buffer.byteLength(text, 'utf8')
+}
+
+function words(text: string) {
+  return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+}
+
+function keywordProblems(keywords: string, name: string) {
+  const nameWords = words(name)
+  const problems = bytes(keywords) > 100 ? [`${bytes(keywords)} bytes`] : []
+  for (const keyword of keywords.split(',')) {
+    if (characters(keyword.trim()) <= 2) problems.push(`too short: "${keyword}"`)
+    if (words(keyword).some((word) => nameWords.includes(word))) problems.push(`repeats the name: "${keyword}"`)
+  }
+  return problems
+}
+
+function pngHeader(data: Buffer): PngHeader {
+  if (!data.subarray(0, 8).equals(pngSignature)) throw new Error('not a png')
+  const chunks: string[] = []
+  for (let offset = 8; offset + 8 <= data.length; offset += 12 + data.readUInt32BE(offset)) {
+    chunks.push(data.toString('latin1', offset + 4, offset + 8))
+  }
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20), colorType: data[25], chunks }
+}
+
+function screenshotProblems({ width, height, colorType, chunks }: PngHeader) {
+  return [
+    width === 1320 && height === 2868 ? '' : `${width}x${height}`,
+    colorType === 2 ? '' : `colorType ${colorType}`,
+    chunks.includes('tRNS') ? 'tRNS' : '',
+  ].filter(Boolean)
+}
+
+function mentionsAndroid(text: string) {
+  return /android/i.test(text)
+}
+
+function mentionsMac(text: string) {
+  return /\bMacs?\b/.test(text)
+}
+
+function chunk(type: string, data: Buffer) {
+  const length = Buffer.alloc(4)
+  length.writeUInt32BE(data.length)
+  return Buffer.concat([length, Buffer.from(type, 'latin1'), data, Buffer.alloc(4)])
+}
+
+function syntheticPng(width: number, height: number, colorType: number, extra: string[] = []) {
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = colorType
+  const middle = extra.map((type) => chunk(type, Buffer.alloc(2)))
+  return Buffer.concat([pngSignature, chunk('IHDR', ihdr), ...middle, chunk('IDAT', Buffer.alloc(3)), chunk('IEND', Buffer.alloc(0))])
+}
+
+function json(path: string) {
+  return JSON.parse(readFileSync(join(store, path), 'utf8'))
+}
+
+function text(value: unknown) {
+  return isFileRef(value) ? readFileSync(join(store, value.$file), 'utf8') : (value as string)
+}
+
+describe('fileRefs', () => {
+  it('finds the files referenced at any depth', () => {
+    const value = { a: { $file: 'x.txt' }, b: [{ c: { $file: 'y.txt' } }], d: 'z', e: null }
+    expect(fileRefs(value)).toEqual(['x.txt', 'y.txt'])
+  })
+
+  it('ignores a $file that is not a string', () => {
+    expect(fileRefs({ a: { $file: 1 } })).toEqual([])
+  })
+})
+
+describe('characters and bytes', () => {
+  it('count the same in ASCII', () => {
+    expect([characters('abc'), bytes('abc')]).toEqual([3, 3])
+  })
+
+  it('differ beyond ASCII', () => {
+    expect([characters('a›é'), bytes('a›é')]).toEqual([3, 6])
+  })
+})
+
+describe('keywordProblems', () => {
+  const name = 'Cornercase remote'
+
+  it('accepts keywords within 100 bytes, longer than 2 characters and away from the name', () => {
+    expect(keywordProblems('coding agent,terminal,diff', name)).toEqual([])
+  })
+
+  it('counts bytes, not characters', () => {
+    expect(keywordProblems(`${'é'.repeat(50)},abc`, name)).toEqual(['104 bytes'])
+  })
+
+  it('rejects a keyword of 2 characters', () => {
+    expect(keywordProblems('terminal, ai', name)).toEqual(['too short: " ai"'])
+  })
+
+  it('rejects a word of the name, in any case', () => {
+    expect(keywordProblems('Remote control,cornercase', name)).toEqual([
+      'repeats the name: "Remote control"',
+      'repeats the name: "cornercase"',
+    ])
+  })
+
+  it('accepts a word that only contains one of the name', () => {
+    expect(keywordProblems('remotely', name)).toEqual([])
+  })
+})
+
+describe('pngHeader', () => {
+  it('reads the size, the colour type and the chunks', () => {
+    expect(pngHeader(syntheticPng(1320, 2868, 2, ['sRGB']))).toEqual({
+      width: 1320,
+      height: 2868,
+      colorType: 2,
+      chunks: ['IHDR', 'sRGB', 'IDAT', 'IEND'],
+    })
+  })
+
+  it('refuses what is not a png', () => {
+    expect(() => pngHeader(Buffer.from('not a png at all, no signature'))).toThrow('not a png')
+  })
+})
+
+describe('screenshotProblems', () => {
+  it('accepts an RGB 1320x2868 image', () => {
+    expect(screenshotProblems(pngHeader(syntheticPng(1320, 2868, 2)))).toEqual([])
+  })
+
+  it('rejects another size, an alpha channel and a transparent colour', () => {
+    expect(screenshotProblems(pngHeader(syntheticPng(1290, 2796, 6, ['tRNS'])))).toEqual(['1290x2796', 'colorType 6', 'tRNS'])
+  })
+})
+
+describe('mentionsAndroid and mentionsMac', () => {
+  it('find Android in any case', () => {
+    expect(['Android', 'ANDROID phones', 'android'].map(mentionsAndroid)).toEqual([true, true, true])
+    expect(mentionsAndroid('iPhone')).toBe(false)
+  })
+
+  it('find Mac as a word, and let macOS through', () => {
+    expect(['your Mac', "the Mac's", 'Macs', 'Mac.'].map(mentionsMac)).toEqual([true, true, true, true])
+    expect(['Linux or macOS', 'MacBook', 'machine', 'mac'].map(mentionsMac)).toEqual([false, false, false, false])
+  })
+})
+
+describe('the App Store listing', () => {
+  const info = json('app-info.json').appInfoLocalizations['en-US'].attributes
+  const version = json('version.json')
+  const localization = version.appStoreVersionLocalizations['en-US'].attributes
+  const notes = text(json('review.json').appStoreReviewDetails.attributes.notes)
+  const listing = {
+    subtitle: info.subtitle as string,
+    keywords: localization.keywords as string,
+    promotionalText: localization.promotionalText as string,
+    description: text(localization.description),
+    whatsNew: text(localization.whatsNew),
+  }
+
+  it('fits the subtitle in 30 characters', () => {
+    expect(characters(listing.subtitle)).toBeLessThanOrEqual(30)
+  })
+
+  it('has valid keywords', () => {
+    expect(keywordProblems(listing.keywords, info.name)).toEqual([])
+  })
+
+  it('fits the promotional text in 170 characters', () => {
+    expect(characters(listing.promotionalText)).toBeLessThanOrEqual(170)
+  })
+
+  it.each(['description', 'whatsNew'] as const)('fits the %s in 4000 characters', (key) => {
+    expect(characters(listing[key])).toBeLessThanOrEqual(4000)
+  })
+
+  it('fits the review notes in 4000 bytes', () => {
+    expect(bytes(notes)).toBeLessThanOrEqual(4000)
+  })
+
+  it('gives the version of package.json', () => {
+    expect(version.appStoreVersions.attributes.versionString).toBe(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version)
+  })
+
+  it('references only files that exist', () => {
+    const jsons = readdirSync(store).filter((name) => name.endsWith('.json'))
+    const missing = jsons.flatMap((name) => fileRefs(json(name))).filter((path) => !existsSync(join(store, path)))
+    expect(missing).toEqual([])
+  })
+
+  it('never mentions Android in the listing', () => {
+    expect(Object.entries(listing).filter(([, value]) => mentionsAndroid(value))).toEqual([])
+  })
+
+  it('never calls the computer a Mac, in the listing or the review notes', () => {
+    expect(Object.entries({ ...listing, notes }).filter(([, value]) => mentionsMac(value))).toEqual([])
+  })
+})
+
+describe('the 6.9-inch iPhone screenshots', () => {
+  const names = readdirSync(screenshots).filter((name) => name.endsWith('.png'))
+
+  it('are 4 to 6', () => {
+    expect(names.length).toBeGreaterThanOrEqual(4)
+    expect(names.length).toBeLessThanOrEqual(6)
+  })
+
+  it.each(names)('%s is RGB, 1320x2868, with no transparency', (name) => {
+    expect(screenshotProblems(pngHeader(readFileSync(join(screenshots, name))))).toEqual([])
+  })
+})
