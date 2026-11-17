@@ -70,16 +70,46 @@ it does, that is one more set from an iPhone 17 Pro or later.
 
 ## Regenerating the screenshots and the recording
 
-On a Mac with Xcode and the iOS simulator runtime (`CLAUDE.md`), never with a real machine paired:
+On a Mac with Xcode and the iOS simulator runtime (`CLAUDE.md`), only in the demo, never with a real machine paired.
+With other simulators booted, give `simctl` the UDID, never `booted`.
 
-1. A simulator of its own: `xcrun simctl create "cornercase store 6.9" "iPhone 17 Pro Max"
-   com.apple.CoreSimulator.SimRuntime.iOS-27-2`, then `xcrun simctl boot <UDID>`.
-2. The app with `dist/` embedded and no Vite server: `pnpm build && LANG=en_US.UTF-8 pnpm tauri ios dev "cornercase
+1. **The simulator**, kept for the next version: "cornercase store 6.9", an iPhone 17 Pro Max on iOS 27.2, whose
+   display is 1320×2868. If it is gone: `xcrun simctl create "cornercase store 6.9"
+   com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-27-2`, which prints
+   the new UDID; `xcrun simctl list devices | grep "cornercase store"` finds it later.
+2. **In English**: a new simulator takes the Mac's language, and the status bar then reads `09:41`, the keyboard and the
+   spell checker another language. `xcrun simctl spawn <UDID> defaults write -g AppleLanguages -array en-US`, the same
+   with `-g AppleLocale -string en_US` and `-g AppleKeyboards -array "en_US@sw=QWERTY;hw=Automatic"`, then `xcrun simctl
+   shutdown <UDID>` and `xcrun simctl boot <UDID>`.
+3. **The app** with `dist/` embedded and no Vite server: `pnpm build && LANG=en_US.UTF-8 pnpm tauri ios dev "cornercase
    store 6.9" --no-watch --features tauri/custom-protocol --config '{"build":{"beforeDevCommand":"","devUrl":null}}'`,
-   on a clean install with no machines. Afterwards `git checkout src-tauri/gen/apple`, which `ios dev` rewrites.
-3. The status bar: `xcrun simctl status_bar <UDID> override --time 9:41 --batteryState charged --batteryLevel 100
-   --wifiBars 3 --cellularBars 4`.
-4. `Try a demo`, then each screen: `xcrun simctl io <UDID> screenshot --type=png <file>`, and the alpha channel
-   removed, so that each PNG is RGB (`colorType` 2) with no `tRNS`.
-5. The recording: `xcrun simctl io <UDID> recordVideo --codec=h264 <file>` while going through the demo, stopped with
-   SIGINT, then shrunk with `avconvert`, which also drops its metadata.
+   on a clean install with no machines. It ends once the app is deployed. Afterwards `git checkout
+   src-tauri/gen/apple`, which `ios dev` rewrites. The demo is not kept: each launch opens on `No machines yet`.
+4. **The status bar**, again after every boot: `xcrun simctl status_bar <UDID> override --time 9:41 --batteryState
+   charged --batteryLevel 100 --wifiBars 3 --cellularBars 4`.
+5. **Moving through the app** with no Simulator.app: a throwaway XCUITest target, outside the repository, that
+   attaches to `dev.usecornercase.mobile` and taps by accessibility label (`Try a demo`, `Show 2 subagents`,
+   `Terminal`, `Changes`, `Files`, `Start`, `Leave demo`) or by point, built once with `xcodebuild build-for-testing`
+   and run with `test-without-building`.
+6. **Each screen**: `xcrun simctl io <UDID> screenshot --type=png <file>`, once the screen has settled.
+   - `01-board`: the demo's board with `Show 2 subagents` open.
+   - `02-chat`: "Fix rounding in the cart totals", whose question card is waiting.
+   - `03-terminal`: its terminal.
+   - `04-changes`: "Add Apple Pay to the checkout" › Changes › `src/checkout/PaymentForm.tsx`.
+   - `05-start`: Start with the workspace `acme-store › main` and a prompt typed in, the keyboard closed.
+   - `06-files`: Files of that agent, with `src/checkout` open.
+
+   If the board comes out with the Dynamic Island drawn black, take it again after scrolling the board a little.
+7. **No alpha**: simctl's PNGs are RGBA, every pixel opaque. Each one is rewritten as 8-bit RGB (`colorType` 2) with
+   only `IHDR`, `sRGB`, `IDAT` and `IEND`: no `tRNS`, no EXIF. Dropping the alpha loses nothing, which `sips` cannot do
+   without going through JPEG. A few lines with Python's `zlib` and `struct` do it.
+8. **The recording**, `review/demo.mp4`:
+   - Relaunch the app so that it opens on `No machines yet`.
+   - `xcrun simctl io <UDID> recordVideo --codec=h264 raw.mp4` in the background, waiting for `Recording started` on
+     its stderr.
+   - The XCUITest goes through the script: `Try a demo`, the board, the waiting agent, the answer `Round the total`,
+     `Terminal`, back, `Leave demo`.
+   - Stop the recording with SIGINT.
+   - `avconvert --source raw.mp4 --preset Preset1920x1080 --output demo.mp4 --start <s> --duration <s>`: `--start`
+     cuts the seconds before the first tap. The output is 884×1920 H.264, with no audio and none of the source's
+     metadata, which `avconvert` filters. It must stay under 60 seconds; the one here is 32.4 seconds and 2.8 MB.
