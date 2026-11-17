@@ -39,7 +39,7 @@ pub enum PairError {
     #[error(transparent)]
     Answered(Error),
     #[error(
-        "no address of the Mac answered: is phone app on in cornercase, and the phone on its network or on Tailscale?"
+        "no address of the machine answered: is phone app on in cornercase, and the phone on its network or on Tailscale?"
     )]
     NoAnswer(Vec<(Address, Error)>),
 }
@@ -121,7 +121,7 @@ fn secret(message: Option<Result<Message, WebSocketError>>) -> Result<Token, Err
         Some(Ok(Message::Text(text))) => checked(text.as_bytes()),
         Some(Ok(Message::Binary(bytes))) => checked(&bytes),
         Some(Ok(Message::Close(frame))) => Err(closed_early(frame)),
-        Some(Ok(_)) => Err(Error::Protocol("the Mac sent a raw frame instead of the secret".to_owned())),
+        Some(Ok(_)) => Err(Error::Protocol("the machine sent a raw frame instead of the secret".to_owned())),
         Some(Err(_)) | None => Err(Error::Dropped),
     }
 }
@@ -142,14 +142,14 @@ fn closed_early(frame: Option<CloseFrame>) -> Error {
     match frame.map(|frame| frame.code) {
         Some(CloseCode::Policy) => Error::PairingRefused,
         Some(CloseCode::Error) => Error::PairingFailed,
-        _ => Error::Protocol("the Mac closed the pairing without a secret".to_owned()),
+        _ => Error::Protocol("the machine closed the pairing without a secret".to_owned()),
     }
 }
 
 fn ended(message: Option<Result<Message, WebSocketError>>) -> Result<(), Error> {
     match message {
         Some(Ok(Message::Close(Some(frame)))) if frame.code == CloseCode::Normal => Ok(()),
-        _ => Err(Error::Protocol("the Mac did not close the pairing after the secret".to_owned())),
+        _ => Err(Error::Protocol("the machine did not close the pairing after the secret".to_owned())),
     }
 }
 

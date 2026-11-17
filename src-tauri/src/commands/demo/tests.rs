@@ -145,7 +145,7 @@ mod in_the_machines {
         let listed = list(&studio.state).expect("the machines load");
 
         let demo =
-            MachineView { id: DEMO.0, name: "Demo Mac".to_owned(), routes: vec![], last_route: None, demo: true };
+            MachineView { id: DEMO.0, name: "Demo machine".to_owned(), routes: vec![], last_route: None, demo: true };
         assert_eq!(listed.active, Some(DEMO.0));
         assert_eq!(listed.machines.iter().map(|machine| machine.demo).collect::<Vec<_>>(), [false, true]);
         assert_eq!(listed.machines.last(), Some(&demo));

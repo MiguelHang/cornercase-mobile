@@ -6,24 +6,30 @@ mod display {
     use super::*;
 
     #[rstest]
-    #[case::not_paired(Error::NotPaired, "this Mac no longer recognizes this phone; scan its code again in Machines")]
-    #[case::dropped(Error::Dropped, "the connection to the Mac dropped before the command finished")]
+    #[case::not_paired(
+        Error::NotPaired,
+        "this machine no longer recognizes this phone; scan its code again in Machines"
+    )]
+    #[case::dropped(Error::Dropped, "the connection to the machine dropped before the command finished")]
     #[case::output_closed(Error::OutputClosed, "nothing listens to the command's output any more")]
-    #[case::rejected(Error::Rejected { status: 404 }, "the Mac answered with HTTP 404")]
-    #[case::timeout(Error::Timeout, "the Mac did not answer in time")]
-    #[case::connect(Error::Connect("connection refused".to_owned()), "cannot reach the Mac: connection refused")]
+    #[case::rejected(Error::Rejected { status: 404 }, "the machine answered with HTTP 404")]
+    #[case::timeout(Error::Timeout, "the machine did not answer in time")]
+    #[case::connect(Error::Connect("connection refused".to_owned()), "cannot reach the machine: connection refused")]
     #[case::protocol(
         Error::Protocol("a binary frame".to_owned()),
-        "the Mac sent an unexpected message: a binary frame"
+        "the machine sent an unexpected message: a binary frame"
     )]
-    #[case::malformed_secret(Error::MalformedSecret, "the Mac sent a pairing secret that is not in the expected form")]
+    #[case::malformed_secret(
+        Error::MalformedSecret,
+        "the machine sent a pairing secret that is not in the expected form"
+    )]
     #[case::pairing_refused(
         Error::PairingRefused,
         "the code no longer works (it lasts 10 minutes and works once): show another in cornercase's Settings › Remote"
     )]
     #[case::pairing_failed(
         Error::PairingFailed,
-        "the Mac could not save the pairing; show another code in cornercase's Settings › Remote and scan it"
+        "the machine could not save the pairing; show another code in cornercase's Settings › Remote and scan it"
     )]
     #[case::failed(
         Error::Failed { code: 3, stderr: "no such project".to_owned() },
@@ -36,7 +42,7 @@ mod display {
     #[case::stream_ended(Error::StreamEnded, "cornercase ended a stream the app was following")]
     #[case::outdated(
         Error::Outdated,
-        "cornercase on the Mac is too old for this app; update cornercase on the Mac and restart its server"
+        "cornercase on the machine is too old for this app; update cornercase on the machine and restart its server"
     )]
     #[case::contract_too_new(
         Error::ContractTooNew { server: 2, app: 1 },

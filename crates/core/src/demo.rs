@@ -27,7 +27,7 @@ mod surface;
 mod terminal;
 mod world;
 
-pub const NAME: &str = "Demo Mac";
+pub const NAME: &str = "Demo machine";
 const HOST: &str = "demo";
 
 pub fn machine(id: MachineId) -> Machine {

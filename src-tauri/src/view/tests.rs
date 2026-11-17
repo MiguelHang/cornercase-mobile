@@ -77,7 +77,7 @@ mod a_connection {
         json!({
             "state": "retrying",
             "in_ms": 2_500,
-            "error": { "code": "timeout", "message": "the Mac did not answer in time" },
+            "error": { "code": "timeout", "message": "the machine did not answer in time" },
         })
     )]
     #[case::missing(

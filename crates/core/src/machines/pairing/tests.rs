@@ -200,7 +200,7 @@ mod pair {
 
     #[tokio::test]
     async fn keeps_no_secret_the_mac_did_not_close_on() {
-        let failure = Error::Protocol("the Mac did not close the pairing after the secret".to_owned());
+        let failure = Error::Protocol("the machine did not close the pairing after the secret".to_owned());
         let server = Server::start(&["127.0.0.1"], vec![Mac::AnswersAndLeaves]).await;
         let expected = PairError::NoAnswer(vec![(server.address("127.0.0.1"), failure)]);
         assert_eq!(pair_with(&server.code(&[])).await, Err(expected));
@@ -212,7 +212,7 @@ mod pair {
     #[case::away(CloseCode::Away)]
     #[tokio::test]
     async fn keeps_no_secret_the_mac_closed_on_with_another_code(#[case] code: CloseCode) {
-        let failure = Error::Protocol("the Mac did not close the pairing after the secret".to_owned());
+        let failure = Error::Protocol("the machine did not close the pairing after the secret".to_owned());
         let server = Server::start(&["127.0.0.1"], vec![Mac::AnswersThenCloses(code)]).await;
         let expected = PairError::NoAnswer(vec![(server.address("127.0.0.1"), failure)]);
         assert_eq!(pair_with(&server.code(&[])).await, Err(expected));
