@@ -117,3 +117,16 @@ Topics, in `design/look/`:
   - The class goes on only once the camera is allowed, right before `scan`, and comes off in the scanner's `finally`, so a refusal or an error never leaves the page see-through.
 - **A refusal or a failure** shows as a notice between `Scan QR code` and the URL field: `Open Settings` for a refusal, the plugin's message for an error. The field stays usable under it, for pasting.
 - Not seen with a camera yet: the simulator has none, so the real scan is checked on an iPhone.
+
+## Words
+
+- **"machine" in the app** (070): a machine is a computer running cornercase that the phone reaches, and every text the app shows (its screens, its errors, the permission texts of each platform) says "machine", or "computer" for the device itself. cornercase also runs on Linux, so naming one platform told the others the app was not for them.
+- **"your computer (Linux or macOS)" to introduce it**: `README.md`, `PRIVACY.md`, the changelog and the empty screen's second line name it that way the first time, then "the computer" or "the machine".
+- **"Mac" only where macOS itself is meant**: building with Xcode, the iPhone's release, the Podfile, in `design/`, `CLAUDE.md` and `scripts/`. "macOS" stays the system's name. Dated records keep the word they were written with.
+- **`scripts/wording.test.ts` keeps it**: it fails, naming `file:line`, when `\bMacs?\b` (with the capital, so not `macOS`, `MacBook`, `iMac` or `machine`) appears in what the app shows or the user reads:
+  - `src/` (`.svelte` and `.ts`, without the tests and `bindings.ts`), `crates/core/src/` and `src-tauri/src/` (without `tests.rs` and `tests/` folders), and the plugins' Rust, Swift and Kotlin;
+  - the platforms' texts: `project.yml`, `Info.plist`, Android's `strings.xml`, `tauri.conf.json`, `index.html`;
+  - `README.md`, `PRIVACY.md` and `CHANGELOG.md`.
+  - Left out: the tests, whose fixtures carry machine names as a user types them, and `design/`, `CLAUDE.md` and `scripts/`, which speak of macOS and keep dated records. A second test checks that the list holds `NoMachines.svelte`, `error.rs` and `project.yml`, so a mistyped path cannot empty it in silence.
+- **A vitest test, not `scripts/check-rules.mjs`**: that script checks code rules (lines, comments), and this is about words; vitest already runs `scripts/**/*.test.ts`, like `versions.test.ts`. Its walk is its own, skipping the same generated folders. Rejected: an ESLint rule, which would not read Rust, Swift, Kotlin or the platforms' files.
+- **Saved histories keep the old reason**: a send that failed before 070 keeps the `reason` it was saved with; it is not migrated.
