@@ -111,6 +111,18 @@ mod a_review {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn is_not_reviewed_by_any_other_mark() {
+        let (store, _) = entered().await;
+        let queue = store.queue().expect("the demo has a queue");
+        let argv = ["mark", "--pane", "17", "--seen"].map(str::to_owned).to_vec();
+
+        queue.ask(argv, None).await.expect("the demo takes the mark");
+        time::sleep(Duration::from_secs(1)).await;
+
+        assert_eq!(status(&store, FINISHED).as_deref(), Some("done"));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn leaves_a_working_agent_working() {
         let (store, _) = entered().await;
         let queue = store.queue().expect("the demo has a queue");

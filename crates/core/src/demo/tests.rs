@@ -126,6 +126,17 @@ mod anything_else {
     #[case::an_unknown_command(&["issues", "--json"])]
     #[case::the_contract_without_json(&["contract"])]
     #[case::nothing(&[])]
+    #[case::a_status_that_does_not_follow(&["status", "--json"])]
+    #[case::a_status_that_does_not_speak_json(&["status", "--follow"])]
+    #[case::input_that_does_not_follow(&["input", "--json"])]
+    #[case::input_that_does_not_speak_json(&["input", "--follow"])]
+    #[case::requests_that_do_not_follow(&["requests"])]
+    #[case::a_paste_that_does_not_speak_json(&["paste-file"])]
+    #[case::events_that_do_not_speak_json(&["events"])]
+    #[case::a_close_without_the_agent(&["close", "--pane", "4", "--boot", "demo", "--json"])]
+    #[case::a_last_message_without_json(&["read", "--last-message", "--pane", "4"])]
+    #[case::a_read_without_last_message(&["read", "--pane", "4", "--json"])]
+    #[case::a_close_without_json(&["close", "--agent", "--pane", "4", "--boot", "demo"])]
     #[tokio::test]
     async fn fails_naming_what_was_asked(#[case] argv: &[&str]) {
         let answer = transport::output(&DemoTransport::new(), owned(argv)).await.expect("the demo answers");
