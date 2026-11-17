@@ -22,7 +22,7 @@ describe('App', () => {
 
   it('says what a machine is and what it needs', () => {
     expect(body).toContain('A machine is a computer running cornercase whose agents you follow from here.')
-    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.')
+    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your computer (Linux or macOS), and the code it shows.')
   })
 
   it('offers adding a machine, ready to be pressed', () => {

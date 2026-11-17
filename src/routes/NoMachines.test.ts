@@ -75,7 +75,7 @@ describe('NoMachines', () => {
   })
 
   it('sends to Phone app in cornercase for the code, never to the bridge', () => {
-    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.')
+    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your computer (Linux or macOS), and the code it shows.')
     const sources = [noMachinesSource, formSource, urlFieldSource, overlaySource]
     expect(sources.filter((source) => /bridge/i.test(source))).toEqual([])
   })

@@ -14,7 +14,7 @@
 
   const LINES = [
     'A machine is a computer running cornercase whose agents you follow from here.',
-    'It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.',
+    'It needs Phone app turned on in cornercase › Settings › Remote on your computer (Linux or macOS), and the code it shows.',
   ]
 </script>
 
