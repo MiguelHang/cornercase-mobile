@@ -271,6 +271,27 @@ describe('build with the repository', () => {
   })
 })
 
+describe('the style sheet of the site', () => {
+  const sheet = readFileSync(join(root, 'site/site.css'), 'utf8')
+  const tokens = readFileSync(join(root, 'src/lib/theme/tokens.css'), 'utf8')
+  const light = /@media \(prefers-color-scheme: light\) \{\s*:root \{([^}]*)\}\s*\}/.exec(sheet)?.[1] ?? ''
+  const names = (text: string, pattern: RegExp) => new Set([...text.matchAll(pattern)].map((match) => match[1]))
+  const used = names(sheet, /var\((--[\w-]+)\)/g)
+  const overridden = names(light, /(--[\w-]+):/g)
+
+  it('uses only the tokens of the app', () => {
+    for (const token of used) expect(tokens, token).toContain(`${token}:`)
+  })
+
+  it('makes the light palette of colours the site uses, and nothing else', () => {
+    expect(overridden.size).toBeGreaterThan(0)
+    for (const token of overridden) {
+      expect(used, token).toContain(token)
+      expect(light, token).toMatch(new RegExp(`${token}: #[0-9a-f]{6}(?:[0-9a-f]{2})?;`))
+    }
+  })
+})
+
 describe('build with a site of its own', () => {
   const site = {
     'site/page.html': '<title>{{title}}</title>{{root}}|{{content}}',
