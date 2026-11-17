@@ -1,6 +1,6 @@
-Cornercase remote puts the coding agents you run in cornercase on your Mac in your pocket. Follow them, answer them and start new work from your iPhone, while they keep running on the Mac.
+Cornercase remote puts the coding agents you run in cornercase on your computer in your pocket. Follow them, answer them and start new work from your iPhone, while they keep running on the computer.
 
-It works with the cornercase app on your Mac: you need cornercase 0.13.78 or later, and a phone that can reach the Mac, on the same network or with both on your Tailscale network.
+It works with the cornercase app on your computer (Linux or macOS): you need cornercase 0.13.78 or later, and a phone that can reach that computer, on the same network or with both on your Tailscale network.
 
 SEE EVERY AGENT ON ONE BOARD
 Each agent of your projects shows with its status and for how long it has been in it. The ones that need you come first, and the agents they started fold under them. The board updates live.
@@ -15,16 +15,16 @@ START NEW WORK
 Start an agent with a prompt, in a workspace that is already open or in a new worktree, with the agent, account and model you pick. Or start an agent or a flow on an issue from any tracker cornercase is connected to.
 
 CHECK THE CHANGES AND THE FILES
-See which files a workspace changed, read each diff and mark it viewed, as the Mac's changes panel does. Browse the workspace's files, read a file or a picture, and search them by name.
+See which files a workspace changed, read each diff and mark it viewed, as cornercase's changes panel does. Browse the workspace's files, read a file or a picture, and search them by name.
 
 CLOSE AN AGENT
 Swipe a row left, or tap Close agent on its screen. The app shows what will close and asks before closing it.
 
-PAIR WITH YOUR MAC
-In cornercase on your Mac, open Settings > Remote > Phone app, then scan its QR code from the app's Machines screen, or paste the code. Add one machine per Mac, give it a name and switch between them; the app opens the last one you used.
+PAIR WITH YOUR COMPUTER
+In cornercase on your computer, open Settings > Remote > Phone app, then scan its QR code from the app's Machines screen, or paste the code. Add one machine per computer, give it a name and switch between them; the app opens the last one you used.
 
-TRY IT WITHOUT A MAC
-Tap Try a demo on the first screen to open a Demo Mac simulated on the phone, marked DEMO, with sample agents to read, message, answer, start and close. It uses no network and saves nothing. Tap Leave demo on the connection bar to go back.
+TRY IT WITHOUT A MACHINE
+Tap Try a demo on the first screen to open a demo machine simulated on the phone, marked DEMO, with sample agents to read, message, answer, start and close. It uses no network and saves nothing. Tap Leave demo on the connection bar to go back.
 
 PRIVATE BY DESIGN
-The app has no account and collects nothing. It talks only to the Macs you pair it with.
+The app has no account and collects nothing. It talks only to the machines you pair it with.

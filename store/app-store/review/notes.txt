@@ -1,8 +1,8 @@
-Cornercase remote controls the cornercase app running on the user's Mac, so a real session needs a Mac with cornercase 0.13.78 or later that the phone can reach, on the same network or through Tailscale. There is no account and no sign-in.
+Cornercase remote controls the cornercase app running on the user's computer (Linux or macOS), so a real session needs a computer with cornercase 0.13.78 or later that the phone can reach, on the same network or through Tailscale. There is no account and no sign-in.
 
-To try the app without a Mac:
-1. Open the app. Under the card on the first screen, the line "No Mac nearby?" ends with a link, "Try a demo". Tap it.
-2. The app adds a simulated Demo Mac inside the app, marked DEMO, and shows its board of sample agents.
+To try the app without such a computer:
+1. Open the app. Under the card on the first screen, tap the Try a demo link.
+2. The app adds a simulated demo machine inside the app, marked DEMO, and shows its board of sample agents.
 3. Tap an agent to read its conversation, answer its question with one of the option buttons, or send it a message. The icons at the top of the agent's screen open its live terminal, the changes of its workspace and its files. The Start button on the board starts a new agent; Close agent closes one.
 4. Tap Leave demo on the connection bar at the top to leave the demo and go back to the first screen.
 

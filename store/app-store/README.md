@@ -51,6 +51,9 @@ applied yet. The decisions behind it are in [design/releases/app-store.md](../..
 - **The support URL** (`supportUrl`): for example the repository's issues, at an absolute URL.
 - **The reviewer's contact** (`contactFirstName`, `contactLastName`, `contactPhone`, `contactEmail`): given at upload
   time only, never written into this repository.
+- **The screenshots and the recording, taken again**: they still show the app's own words for the demo, "Demo Mac" and
+  "No Mac nearby?", while the listing and the notes speak of a machine, since cornercase runs on Linux and macOS. Once
+  task 070 renames them in the app, take them again with the steps below, before submitting.
 
 ## By hand, without an API
 
