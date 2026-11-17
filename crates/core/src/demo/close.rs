@@ -51,8 +51,12 @@ impl World {
     }
 
     fn closed(&mut self, tabs: &[u64]) {
+        let gone: Vec<u64> =
+            places(&self.session).filter(|place| tabs.contains(&place.tab.id)).map(|place| place.pane.id).collect();
         let workspaces = self.session.projects.iter_mut().flat_map(|project| project.workspaces.iter_mut());
         workspaces.for_each(|workspace| workspace.tabs.retain(|tab| !tabs.contains(&tab.id)));
+        self.due.retain(|pane, _| !gone.contains(pane));
+        self.printed.retain(|pane, _| !gone.contains(pane));
         self.revised();
     }
 }

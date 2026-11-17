@@ -75,9 +75,9 @@ describe('App wiring', () => {
     )
   })
 
-  it('goes home with a new machine, reloads the machines for its name and connects to it', () => {
+  it('goes home with a new machine, reloads the machines for its name and connects to it, leaving the demo out of the list', () => {
     expect(source).toContain(
-      'const added = (machine: number) => { show(connecting(machine)) Promise.all([commands.machinesList().then(remember), join(machine)]).catch(toasts.failed) }',
+      'const added = (machine: number) => { const from = current.machine show(connecting(machine)) Promise.all([commands.machinesList().then(remember), demoExit.switched(from, join(machine))]).catch(toasts.failed) }',
     )
     expect(source).toContain('const barMachine = $derived(onTheBar(machines, current.machine))')
   })
@@ -121,7 +121,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} ondemo={() => void tryDemo().catch(toasts.failed)} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void pick(machine).catch(toasts.failed)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} ondemo={() => void tryDemo().catch(toasts.failed)} />",
     )
   })
 
@@ -134,7 +134,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={goBack} onchanged={reload} onremoved={removed} adding={rescanning} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={goBack} onchanged={reload} onremoved={() => demoExit.removed(editing.demo, removed)} adding={rescanning} />',
     )
   })
 
@@ -157,10 +157,14 @@ describe('App wiring', () => {
     expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed)')
   })
 
-  it('leaves the demo from the bar, then loads the machines and the connection again as on opening', () => {
+  it('leaves the demo through its exit, which goes back to the board and loads again as on opening', () => {
     expect(source).toContain(
-      "const leaveDemo = async () => { const left = await commands.demoLeave() if (left.status === 'error') { toasts.failed(left.error) return } await load() }",
+      'const demoExit = new DemoExit(commands, { root: () => router.root(), load, reload, failed: toasts.failed })',
     )
+  })
+
+  it('joins a machine picked in Machines through the demo exit, which lists the machines again after the demo', () => {
+    expect(source).toContain('const pick = (machine: number) => demoExit.switched(current.machine, join(machine))')
   })
 
   it('enters the demo on its board, shown as connecting to it before it starts so none of its events is lost, then lists it', () => {
@@ -181,7 +185,7 @@ describe('App wiring', () => {
       "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
     )
     expect(source).toContain(
-      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} demo={barMachine.demo} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} onleave={() => void leaveDemo().catch(toasts.failed)} /> {/if}",
+      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} demo={barMachine.demo} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} onleave={() => void demoExit.leave().catch(toasts.failed)} /> {/if}",
     )
     expect(source).toContain(
       'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',
@@ -436,7 +440,7 @@ describe('App wiring', () => {
   it('slides every screen but the connection bar and the toasts, and the terminal on its own', () => {
     expect(source).toContain('let shift = $state<Shift>(RESTING)')
     expect(source).toContain(
-      "onleave={() => void leaveDemo().catch(toasts.failed)} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
+      "onleave={() => void demoExit.leave().catch(toasts.failed)} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
     )
     expect(source).toContain('<NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} /> {/if} </div> {/if} {/if} <ToastStack')
     expect(source.match(/translated\(shift\)/g)).toHaveLength(1)

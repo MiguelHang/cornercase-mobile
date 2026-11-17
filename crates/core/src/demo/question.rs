@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+use super::chat::DONE;
 use super::surface::{Row, Tone, row};
 use super::world::World;
 
@@ -8,7 +9,6 @@ const OPEN: char = '☐';
 const TICKED: char = '✔';
 const POINTER: char = '❯';
 const DETAIL: &str = "     ";
-const DONE: &str = "done";
 
 #[derive(Deserialize)]
 pub(super) struct Question {

@@ -5,7 +5,9 @@ use tokio::time;
 use crate::cli::close::{self, AgentClosing};
 use crate::cli::mark;
 use crate::cli::surface::{self, Size};
+use crate::demo::chat::DONE;
 use crate::demo::tests::{entered, status};
+use crate::demo::world::World;
 use crate::error::Error;
 use crate::queue::Outcome;
 use crate::store::Store;
@@ -93,6 +95,20 @@ mod a_close {
         let argv: Vec<String> = ["surface".to_owned()].into_iter().chain(tab).chain(["--patches".to_owned()]).collect();
         let drawn = transport::output(transport.as_ref(), argv).await.expect("the demo answers");
         assert_eq!((drawn.code, drawn.stderr.as_str()), (1, "error: no tab 16"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn forgets_the_turn_and_the_terminal_of_its_panes() {
+        let mut world = World::default();
+        world.worked(FINISHED, DONE);
+        assert!(world.next_due().is_some());
+
+        let closing = world.closing(FINISHED).expect("the demo can close the agent");
+        world.closed(&closing.tabs);
+
+        assert_eq!(world.next_due(), None);
+        assert!(!world.printed.contains_key(&FINISHED));
+        assert!(world.printed.contains_key(&ROOT));
     }
 }
 

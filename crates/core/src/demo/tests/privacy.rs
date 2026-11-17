@@ -1,12 +1,16 @@
+use std::env;
 use std::fs;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use rstest::rstest;
 
 const SOURCES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
 const ITSELF: &str = "privacy.rs";
-const NAMES: [&str; 3] = ["miguel", "reveni", "@gmail"];
+const GENERIC: [&str; 1] = ["@gmail"];
+const IDENTITY_KEYS: [&str; 2] = ["user.name", "user.email"];
+const SHORTEST_NAME: usize = 4;
 const HOMES: [&str; 2] = ["/Users/", "/home/"];
 const FICTIONAL_HOME: &str = "demo";
 const FICTIONAL_MAIL: [&str; 3] = ["example.com", "example.org", "example.net"];
@@ -30,9 +34,55 @@ fn scanned() -> Vec<PathBuf> {
     paths
 }
 
-fn named(text: &str) -> Vec<String> {
+fn split_case(word: &str) -> Vec<String> {
+    let mut parts = vec![String::new()];
+    let mut previous_lower = false;
+    for letter in word.chars() {
+        if letter.is_uppercase() && previous_lower {
+            parts.push(String::new());
+        }
+        previous_lower = letter.is_lowercase();
+        if let Some(part) = parts.last_mut() {
+            part.push(letter);
+        }
+    }
+    parts.push(word.to_owned());
+    parts
+}
+
+fn words(text: &str) -> Vec<String> {
+    let runs = text.split(|letter: char| !letter.is_alphanumeric()).flat_map(split_case);
+    runs.filter(|word| word.chars().count() >= SHORTEST_NAME).map(|word| word.to_lowercase()).collect()
+}
+
+fn identity<'a>(parts: impl IntoIterator<Item = &'a str>) -> Vec<String> {
+    let mut found: Vec<String> = parts.into_iter().flat_map(words).collect();
+    found.sort();
+    found.dedup();
+    found
+}
+
+fn git_config(key: &str) -> Option<String> {
+    let output = Command::new("git").args(["config", key]).output().ok()?;
+    output.status.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn home_user() -> Option<String> {
+    let home = env::var("HOME").ok()?;
+    let user = HOMES.iter().find_map(|prefix| home.strip_prefix(prefix))?;
+    Some(user.trim_end_matches('/').to_owned())
+}
+
+fn ours() -> Vec<String> {
+    let known: Vec<String> = IDENTITY_KEYS.iter().filter_map(|key| git_config(key)).chain(home_user()).collect();
+    identity(known.iter().map(String::as_str))
+}
+
+fn named(text: &str, identity: &[String]) -> Vec<String> {
     let lowered = text.to_lowercase();
-    NAMES.iter().filter(|name| lowered.contains(*name)).map(|name| (*name).to_owned()).collect()
+    let generic = GENERIC.iter().filter(|name| lowered.contains(*name)).map(|name| (*name).to_owned());
+    let said = words(text);
+    generic.chain(identity.iter().filter(|name| said.contains(name)).cloned()).collect()
 }
 
 fn homes(text: &str) -> Vec<String> {
@@ -82,17 +132,22 @@ fn tokens(text: &str) -> Vec<String> {
     words.filter(|word| prefixed(word) || secret(word)).map(str::to_owned).chain(keys).collect()
 }
 
-fn markers(text: &str) -> Vec<String> {
-    [named(text), homes(text), mails(text), addresses(text), tokens(text)].concat()
+fn markers(text: &str, identity: &[String]) -> Vec<String> {
+    [named(text, identity), homes(text), mails(text), addresses(text), tokens(text)].concat()
+}
+
+fn fictional() -> Vec<String> {
+    identity(["JaneHartwell\n", "jane.hartwell@globex-labs.dev\n", "jhw"])
 }
 
 #[test]
 fn the_demo_names_no_one_real() {
+    let ours = ours();
     let found: Vec<(PathBuf, Vec<String>)> = scanned()
         .into_iter()
         .map(|path| {
             let text = fs::read_to_string(&path).expect("the demo's sources are text");
-            (path.strip_prefix(SOURCES).unwrap_or(&path).to_owned(), markers(&text))
+            (path.strip_prefix(SOURCES).unwrap_or(&path).to_owned(), markers(&text, &ours))
         })
         .filter(|(_, markers)| !markers.is_empty())
         .collect();
@@ -109,8 +164,9 @@ fn the_scan_reads(#[case] file: &str) {
 }
 
 #[rstest]
-#[case::a_name("written by Miguel")]
-#[case::a_company("see reveni.io")]
+#[case::a_first_name("written by Jane")]
+#[case::a_surname("Hartwell wrote it")]
+#[case::the_mail_domain("see globex-labs.dev")]
 #[case::a_mail_at_gmail("someone@gmail")]
 #[case::a_real_mail("someone@company.dev")]
 #[case::a_home("cd /Users/someone/src")]
@@ -118,7 +174,7 @@ fn the_scan_reads(#[case] file: &str) {
 #[case::a_public_address("ssh 8.8.8.8")]
 #[case::a_private_key("-----BEGIN OPENSSH PRIVATE KEY-----")]
 fn the_scan_finds(#[case] text: &str) {
-    assert_ne!(markers(text), Vec::<String>::new(), "{text}");
+    assert_ne!(markers(text, &fictional()), Vec::<String>::new(), "{text}");
 }
 
 #[rstest]
@@ -128,7 +184,7 @@ fn the_scan_finds(#[case] text: &str) {
 #[case::a_bare_secret("", 16)]
 fn the_scan_finds_a_token(#[case] prefix: &str, #[case] pairs: usize) {
     let token = format!("{prefix}{}", "a1".repeat(pairs));
-    assert_eq!(markers(&format!("token = \"{token}\"")), [token]);
+    assert_eq!(markers(&format!("token = \"{token}\""), &[]), [token]);
 }
 
 #[rstest]
@@ -138,7 +194,13 @@ fn the_scan_finds_a_token(#[case] prefix: &str, #[case] pairs: usize) {
 #[case::a_documentation_address("203.0.113.7")]
 #[case::a_version("v1.2.3")]
 #[case::a_long_test_name("puts_the_agent_to_work_and_then_back_to_idle")]
-#[case::a_word_with_a_name_inside("changes")]
+#[case::a_word_with_a_name_inside("changes janeway")]
+#[case::a_short_piece("jhw runs a dev server")]
 fn the_scan_lets_through(#[case] text: &str) {
-    assert_eq!(markers(text), Vec::<String>::new(), "{text}");
+    assert_eq!(markers(text, &fictional()), Vec::<String>::new(), "{text}");
+}
+
+#[test]
+fn the_identity_keeps_whole_names_and_their_parts_but_not_short_pieces() {
+    assert_eq!(fictional(), ["globex", "hartwell", "jane", "janehartwell", "labs"].map(String::from));
 }

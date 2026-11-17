@@ -17,6 +17,7 @@
   import { CloseAgent } from './lib/closeAgent.svelte'
   import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
   import { apply, connecting, firstToConnect, onTheBar, screen, type Screen } from './lib/connection'
+  import { DemoExit } from './lib/demoExit'
   import { FilesState } from './lib/files.svelte'
   import { LocalHistory } from './lib/history'
   import { IssuesState, IssueState } from './lib/issues.svelte'
@@ -393,11 +394,6 @@
     }
   })
 
-  const added = (machine: number) => {
-    show(connecting(machine))
-    Promise.all([commands.machinesList().then(remember), join(machine)]).catch(toasts.failed)
-  }
-
   const load = async () => {
     const [list, state, agents] = await Promise.all([
       commands.machinesList(),
@@ -420,13 +416,14 @@
     await reload()
   }
 
-  const leaveDemo = async () => {
-    const left = await commands.demoLeave()
-    if (left.status === 'error') {
-      toasts.failed(left.error)
-      return
-    }
-    await load()
+  const demoExit = new DemoExit(commands, { root: () => router.root(), load, reload, failed: toasts.failed })
+
+  const pick = (machine: number) => demoExit.switched(current.machine, join(machine))
+
+  const added = (machine: number) => {
+    const from = current.machine
+    show(connecting(machine))
+    Promise.all([commands.machinesList().then(remember), demoExit.switched(from, join(machine))]).catch(toasts.failed)
   }
 
   onMount(() => {
@@ -471,7 +468,7 @@
           demo={barMachine.demo}
           bind:height={barHeight}
           onmachines={() => router.go({ name: 'machines' })}
-          onleave={() => void leaveDemo().catch(toasts.failed)}
+          onleave={() => void demoExit.leave().catch(toasts.failed)}
         />
       {/if}
       <div class="page" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>
@@ -546,7 +543,7 @@
             connection={current.connection}
             {backTo}
             onback={goBack}
-            onpick={(machine) => void join(machine)}
+            onpick={(machine) => void pick(machine).catch(toasts.failed)}
             onadded={added}
             onrouted={reload}
             onedit={(machine) => router.go({ name: 'machine', id: machine })}
@@ -561,7 +558,7 @@
             {backTo}
             onback={goBack}
             onchanged={reload}
-            onremoved={removed}
+            onremoved={() => demoExit.removed(editing.demo, removed)}
             adding={rescanning}
           />
         {:else}

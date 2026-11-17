@@ -256,9 +256,12 @@ fn connection_changed(machine: MachineId, machines: &SharedMachines, connection:
         machine: machine.0,
         connection: ConnectionView::of(machine, connection),
     });
-    let (Connection::Connected { route }, false) = (connection, machine == DEMO) else {
+    let Connection::Connected { route } = connection else {
         return vec![changed];
     };
+    if machine == DEMO {
+        return vec![changed];
+    }
     match machines.with(|all| all.remember(machine, route).map_err(CommandError::from)) {
         Ok(()) => vec![changed],
         Err(error) => vec![changed, Emitted::Toast(Toast::error(error.message))],
