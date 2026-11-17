@@ -3,10 +3,12 @@ use cornercase_core::machines::MachineId;
 use cornercase_core::machines::code::MachineCode;
 use tauri::{AppHandle, Runtime, State};
 
+use crate::commands::connection::Launcher;
+use crate::commands::demo;
 use crate::commands::error::CommandError;
 use crate::commands::history;
 use crate::events::{ConnectionChanged, Emit, Emitted};
-use crate::state::AppState;
+use crate::state::{AppState, DEMO};
 use crate::view::{ConnectionView, MachineList};
 
 #[tauri::command]
@@ -31,7 +33,7 @@ pub(crate) fn machine_remove<R: Runtime>(
     state: State<'_, AppState>,
     id: u64,
 ) -> Result<(), CommandError> {
-    remove(&state, &app, MachineId(id))
+    remove_or_leave(&state, app, &Launcher::default(), MachineId(id))
 }
 
 #[tauri::command(async)]
@@ -49,7 +51,8 @@ pub(crate) fn machine_form_closed(state: State<'_, AppState>) {
 }
 
 pub(crate) fn list(state: &AppState) -> Result<MachineList, CommandError> {
-    state.machines(|machines| Ok(MachineList::from(&*machines)))
+    let listed = state.machines(|machines| Ok(MachineList::from(&*machines)))?;
+    Ok(if state.in_demo() { listed.with_demo() } else { listed })
 }
 
 pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId, CommandError> {
@@ -63,6 +66,18 @@ pub(crate) fn add(state: &AppState, code: &str, name: &str) -> Result<MachineId,
 
 pub(crate) fn rename(state: &AppState, id: MachineId, name: &str) -> Result<(), CommandError> {
     state.machines(|machines| machines.rename(id, name).map_err(CommandError::from))
+}
+
+pub(crate) fn remove_or_leave(
+    state: &AppState,
+    emit: impl Emit,
+    launcher: &Launcher,
+    id: MachineId,
+) -> Result<(), CommandError> {
+    if id == DEMO {
+        return demo::leave(state, emit, launcher);
+    }
+    remove(state, &emit, id)
 }
 
 pub(crate) fn remove(state: &AppState, emit: &dyn Emit, id: MachineId) -> Result<(), CommandError> {

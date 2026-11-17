@@ -1,6 +1,6 @@
 import { render } from 'svelte/server'
 import { describe, expect, it } from 'vitest'
-import type { ConnectionView_Serialize, MachineView_Serialize } from '../lib/bindings'
+import { DEMO_MACHINE, type ConnectionView_Serialize, type MachineView_Serialize } from '../lib/bindings'
 import { EditMachine } from '../lib/editMachine.svelte'
 import Machine from './Machine.svelte'
 import machineSource from './Machine.svelte?raw'
@@ -12,9 +12,14 @@ const studio = (urls = ROUTES): MachineView_Serialize => ({
   name: 'Studio',
   routes: urls.map((url, index) => ({ kind: 'cli', url, has_token: index !== 2 })),
   last_route: null,
+  demo: false,
 })
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: ROUTES[1] }
+
+const DEMO: MachineView_Serialize = { id: DEMO_MACHINE, name: 'Demo Mac', routes: [], last_route: null, demo: true }
+
+const CONNECTED_DEMO: ConnectionView_Serialize = { state: 'connected', route: '' }
 
 const done = () => Promise.resolve({ status: 'ok' as const, data: null })
 
@@ -189,6 +194,25 @@ describe('Machine', () => {
     expect(body).not.toContain('Add route')
     expect(body).not.toContain('Delete machine')
     expect(machineSource).not.toMatch(/bridge/i)
+  })
+
+  it('offers the demo only Delete machine, since it has no saved name or routes to change', () => {
+    const body = screen(DEMO, CONNECTED_DEMO)
+    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Demo Mac<\/h1>/)
+    expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete machine/)
+    expect(body).not.toContain('Rename')
+    expect(body).not.toContain('Routes')
+    expect(body).not.toContain('Edit routes')
+  })
+
+  it('asks before ending the demo, without the routes, secrets and Mac it lacks', () => {
+    const edit = new EditMachine(CALLS, () => DEMO, nothing, nothing, quiet)
+    edit.askToDelete()
+    const body = screen(DEMO, CONNECTED_DEMO, edit)
+    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Demo Mac\?<\/h2>/)
+    expect(body).toContain('The demo ends, and nothing of it stays on this phone.')
+    expect(body).not.toContain('secrets')
+    expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)
   })
 })
 

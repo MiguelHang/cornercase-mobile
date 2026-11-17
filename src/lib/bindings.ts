@@ -18,6 +18,8 @@ export const commands = {
 	connect: (id: number) => typedError<null, CommandError>(__TAURI_INVOKE("connect", { id })),
 	connectionState: () => __TAURI_INVOKE<ConnectionState_Serialize>("connection_state"),
 	agents: () => __TAURI_INVOKE<AgentRow_Serialize[] | null>("agents"),
+	demoStart: () => __TAURI_INVOKE<void>("demo_start"),
+	demoLeave: () => typedError<null, CommandError>(__TAURI_INVOKE("demo_leave")),
 	identityFingerprint: () => typedError<string, CommandError>(__TAURI_INVOKE("identity_fingerprint")),
 	lastMessage: (pane: number) => typedError<LastMessage_Serialize, CommandError>(__TAURI_INVOKE("last_message", { pane })),
 	send: (pane: number, text: string, force: boolean) => typedError<null, CommandError>(__TAURI_INVOKE("send", { pane, text, force })),
@@ -65,6 +67,9 @@ export const events = {
 	terminalChanged: makeEvent<TerminalChanged_Serialize, TerminalChanged_Deserialize>("terminal-changed"),
 	toast: makeEvent<Toast, Toast>("toast"),
 };
+
+/* Constants */
+export const DEMO_MACHINE = 4294967295 as const;
 
 /* Types */
 export type AccountChoice = AccountChoice_Serialize | AccountChoice_Deserialize;
@@ -783,6 +788,7 @@ export type MachineView_Deserialize = {
 	name: string,
 	routes: RouteView[],
 	last_route?: string | null,
+	demo: boolean,
 };
 
 export type MachineView_Serialize = {
@@ -790,6 +796,7 @@ export type MachineView_Serialize = {
 	name: string,
 	routes: RouteView[],
 	last_route: string | null,
+	demo: boolean,
 };
 
 export type MatchFound = { kind: "none" } | { kind: "same"; machine: number; name: string; why: SameWhy } | { kind: "merge"; machine: number; name: string };

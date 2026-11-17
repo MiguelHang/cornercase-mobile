@@ -3,9 +3,8 @@ use std::future::{self, Future};
 
 use futures_util::future::{BoxFuture, FutureExt};
 use futures_util::stream::BoxStream;
-use futures_util::{SinkExt, stream};
 
-use super::{Closed, Exit, Out, OutSink, StderrTail, Stdin, Transport};
+use super::{Exit, Out, OutSink, StderrTail, Stdin, Transport, emit};
 use crate::error::Error;
 
 pub mod cli;
@@ -74,11 +73,6 @@ impl Transport for FakeTransport {
             None => future::ready(Err(unscripted(&argv))).boxed(),
         }
     }
-}
-
-async fn emit(out: &mut OutSink, lines: Vec<Out>) -> Result<(), Error> {
-    let mut lines = stream::iter(lines.into_iter().map(Ok));
-    out.send_all(&mut lines).await.map_err(|Closed| Error::OutputClosed)
 }
 
 fn unscripted(argv: &[String]) -> Error {

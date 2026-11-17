@@ -1,9 +1,9 @@
-use futures_util::{StreamExt, sink};
+use futures_util::{SinkExt, StreamExt, sink, stream};
 use rstest::rstest;
 use tokio::sync::mpsc;
 
 use super::*;
-use crate::transport::listen;
+use crate::transport::{Closed, listen};
 
 fn words(words: &[&str]) -> Vec<String> {
     owned(words)

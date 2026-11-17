@@ -12,6 +12,7 @@ const machine = (id: number, name: string): MachineView_Serialize => ({
   name,
   routes: [{ kind: 'cli', url: `ws://${name.toLowerCase()}.lan:9000/`, has_token: true }],
   last_route: null,
+  demo: false,
 })
 
 const MACHINES = [machine(1, 'Studio'), machine(2, 'Desk'), machine(3, 'Laptop'), machine(4, 'Attic')]
@@ -50,11 +51,12 @@ const screen = async (
   device = loaded(FINGERPRINT),
   connection: ConnectionView_Serialize = CONNECTED,
   probes: Promise<Probes> = probed(),
+  machines = MACHINES,
 ) =>
   render(Machines, {
     props: {
-      machines: MACHINES,
-      active: 1,
+      machines,
+      active: machines[0].id,
       connection,
       backTo: 'Agents',
       onback: () => {},
@@ -63,6 +65,7 @@ const screen = async (
       onrouted: () => {},
       onedit: () => {},
       onrescan: () => {},
+      ondemo: () => {},
       probes: await probes,
       device: await device,
     },
@@ -182,10 +185,36 @@ describe('Machines', () => {
     expect(forgotten).not.toContain('Check again')
   })
 
+  it('tags the demo Demo beside its name, and shows it by its name alone, with Edit to leave it', async () => {
+    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const listed = [demo, ...MACHINES]
+    const [shown, studio] = rows(await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), listed))
+    expect(shown).toMatch(
+      /<span class="title svelte-[\w-]+"><span class="name svelte-[\w-]+">Demo Mac<\/span> <!--\[0?--><span class="tag svelte-[\w-]+">Demo<\/span>/,
+    )
+    expect(shown).toMatch(/<span class="text svelte-[\w-]+">Demo Mac<\/span>/)
+    expect(shown).toContain('aria-current="true"')
+    expect(shown).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Edit/)
+    expect(studio).not.toContain('class="tag')
+  })
+
   it('offers adding a machine and shows no form yet', async () => {
     const body = await screen()
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
     expect(body).not.toContain('<form')
+  })
+
+  it('offers trying a demo, plain, under Add machine', async () => {
+    expect(await screen()).toMatch(
+      /Add machine<!----><\/button><!----> <!--\[0?--><button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+    )
+  })
+
+  it('offers no demo while the demo is listed', async () => {
+    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const body = await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), [demo, ...MACHINES])
+    expect(body).toMatch(/Add machine<!---->/)
+    expect(body).not.toContain('Try a demo')
   })
 })
 
@@ -207,6 +236,14 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain(
       '{:else if !active} <Button tone="plain" resting={checking} onclick={oncheck}>Check again</Button> {/if}',
     )
+  })
+
+  it('tells each row whether it is the demo, and lets a long name give way to the tag', () => {
+    expect(script).toContain('demo={machine.demo}')
+    expect(flat(rowSource)).toContain(
+      '<span class="title"> <span class="name">{name}</span> {#if demo} <DemoTag /> {/if} </span>',
+    )
+    expect(flat(rowSource)).toContain('.title { display: flex; align-items: center; gap: var(--gap); min-width: 0; }')
   })
 
   it('opens the machine edited', () => {
@@ -242,5 +279,13 @@ describe('Machines wiring', () => {
       '<MachineForm taken={machines.map((machine) => machine.name)} onadded={added} onrouted={routed} oncancel={() => (adding = false)} />',
     )
     expect(script).toContain('<Button onclick={() => (adding = true)}>Add machine</Button>')
+  })
+
+  it('hides Try a demo with the form, and while the demo is among the machines, and asks for the demo on it', () => {
+    expect(script).toContain('const inDemo = $derived(machines.some((machine) => machine.demo))')
+    expect(script).toContain(
+      '<Button onclick={() => (adding = true)}>Add machine</Button> {#if !inDemo} <Button tone="plain" onclick={ondemo}>Try a demo</Button> {/if} </div> {/if}',
+    )
+    expect(script).toContain('.actions { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }')
   })
 })

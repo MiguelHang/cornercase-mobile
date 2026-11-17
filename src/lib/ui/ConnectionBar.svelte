@@ -3,19 +3,24 @@
   import { status } from '../connection'
   import { retryClock } from '../retryClock.svelte'
   import { Keyboard } from '../terminal/keyboard.svelte'
+  import DemoTag from './DemoTag.svelte'
   import Icon from './Icon.svelte'
   import ToneDot from './ToneDot.svelte'
 
   let {
     connection,
     machineName,
+    demo,
     height = $bindable(0),
     onmachines,
+    onleave,
   }: {
     connection: ConnectionView_Serialize
     machineName: string
+    demo: boolean
     height?: number
     onmachines: () => void
+    onleave: () => void
   } = $props()
 
   const keyboard = new Keyboard(globalThis)
@@ -30,6 +35,9 @@
 <div class="connection" role="status" style:top={keyboard.covered ? `${keyboard.offset}px` : undefined}>
   <div class="row" bind:clientHeight={height}>
     <ToneDot tone={shown.tone} pulsing={shown.pulsing} />
+    {#if demo}
+      <DemoTag />
+    {/if}
     <span class="lines">
       <span class="line text" aria-hidden={counting ? 'true' : undefined}>{shown.text}</span>
       {#if counting}
@@ -39,6 +47,9 @@
         <span class="line detail">{shown.detail}</span>
       {/if}
     </span>
+    {#if demo}
+      <button class="leave" type="button" onclick={onleave} ontouchstart={() => {}}>Leave demo</button>
+    {/if}
     <button class="machines" type="button" aria-label="Machines" onclick={onmachines} ontouchstart={() => {}}>
       <Icon name="server" size={20} />
     </button>
@@ -89,6 +100,23 @@
   .detail {
     color: var(--muted);
     font-size: 12px;
+  }
+
+  .leave {
+    flex: none;
+    min-height: 44px;
+    margin: calc(-1 * var(--gap)) 0;
+    padding: 0 var(--gap);
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 14px;
+  }
+
+  .leave:active {
+    background: var(--hover);
   }
 
   .machines {

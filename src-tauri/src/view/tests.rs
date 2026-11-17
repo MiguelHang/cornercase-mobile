@@ -32,6 +32,7 @@ mod a_machine {
             "name": "studio",
             "routes": [{ "kind": "cli", "url": "ws://studio.lan:9000/", "has_token": true }],
             "last_route": "ws://studio.lan:9000/",
+            "demo": false,
         });
         assert_eq!(json_of(&MachineView::from(&machine())), expected);
     }
@@ -109,6 +110,26 @@ mod a_connection {
         let view = ConnectionView::from(&Connection::Missing(vec![disabled]));
         let expected = json!([{ "name": "app-routes", "kind": "operation", "reason": "off", "since": "0.13.78" }]);
         assert_eq!(json_of(&view)["missing"], expected);
+    }
+
+    #[rstest]
+    #[case::a_machine(
+        MachineId(3),
+        Connection::Connected { route: route().address().clone() },
+        json!({ "state": "connected", "route": "ws://studio.lan:9000/" })
+    )]
+    #[case::the_demo_connected(
+        DEMO,
+        Connection::Connected { route: demo::machine(DEMO).routes[0].address().clone() },
+        json!({ "state": "connected", "route": "" })
+    )]
+    #[case::the_demo_connecting(DEMO, Connection::Connecting, json!({ "state": "connecting" }))]
+    fn names_the_route_of_every_machine_but_the_demo(
+        #[case] machine: MachineId,
+        #[case] connection: Connection,
+        #[case] expected: Value,
+    ) {
+        assert_eq!(json_of(&ConnectionView::of(machine, &connection)), expected);
     }
 
     #[test]

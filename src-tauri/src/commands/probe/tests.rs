@@ -378,3 +378,55 @@ mod over_ipc {
         assert_eq!(answer["code"], "unknown_machine");
     }
 }
+
+mod the_demo {
+    use std::sync::atomic::AtomicUsize;
+
+    use super::*;
+    use crate::commands::demo::enter;
+    use crate::state::DEMO;
+    use crate::test_util::spawned;
+
+    fn counting_refusals() -> (Launcher, Arc<AtomicUsize>) {
+        let asked = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&asked);
+        let transports = move |_: &Route| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Err(asleep())
+        };
+        (Launcher::new(transports, spawned), asked)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn answers_with_no_address_and_asks_no_transport() {
+        let studio = Studio::new();
+        enter(&studio.state, Recorder::default(), spawned);
+        let (launcher, asked) = counting_refusals();
+
+        let probed = probe(&studio.state, &launcher, DEMO).await.expect("the demo is probed");
+
+        assert_eq!(probed, ProbeView::Answers { route: String::new() });
+        assert_eq!(asked.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn still_asks_the_other_machines() {
+        let studio = Studio::new();
+        enter(&studio.state, Recorder::default(), spawned);
+        let (launcher, asked) = counting_refusals();
+
+        let probed = probe(&studio.state, &launcher, studio.id).await.expect("the studio is probed");
+
+        assert!(matches!(probed, ProbeView::NoAnswer { .. }), "{probed:?}");
+        assert_ne!(asked.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn is_unknown_outside_it() {
+        let studio = Studio::new();
+        let (launcher, asked) = counting_refusals();
+        let error = probe(&studio.state, &launcher, DEMO).await.expect_err("there is no demo");
+        assert_eq!(error, CommandError::from(Error::UnknownMachine));
+        assert_eq!(asked.load(Ordering::SeqCst), 0);
+    }
+}

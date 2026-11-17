@@ -16,7 +16,7 @@ pub(crate) fn resume<R: Runtime>(app: &AppHandle<R>) {
 }
 
 pub(crate) fn on_foreground(state: &AppState) {
-    if let Some(active) = state.active().as_ref() {
+    if let Some(active) = state.active().as_ref().filter(|active| !active.is_demo()) {
         active.store().resume_now();
     }
 }

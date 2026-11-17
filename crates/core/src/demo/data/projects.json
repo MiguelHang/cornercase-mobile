@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "name": "acme-store",
+    "custom_name": null,
+    "path": "/Users/demo/src/acme-store",
+    "group": null,
+    "workspaces": [
+      {
+        "id": 2,
+        "name": "main",
+        "custom_name": null,
+        "path": "/Users/demo/src/acme-store",
+        "branch": "main",
+        "worktree": false,
+        "tabs": [
+          {
+            "id": 3,
+            "name": "checkout",
+            "custom_name": null,
+            "status": "working",
+            "active": true,
+            "panes": [
+              {
+                "id": 4,
+                "agent": "claude",
+                "status": "working",
+                "program": "claude",
+                "title": "Add Apple Pay to the checkout",
+                "path": "/Users/demo/src/acme-store",
+                "parent": null,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": null
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "name": "tests",
+            "custom_name": null,
+            "status": "working",
+            "active": false,
+            "panes": [
+              {
+                "id": 6,
+                "agent": "claude",
+                "status": "working",
+                "program": "claude",
+                "title": "Cover the new payment sheet with tests",
+                "path": "/Users/demo/src/acme-store",
+                "parent": 4,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": null
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "name": "copy",
+            "custom_name": null,
+            "status": "idle",
+            "active": false,
+            "panes": [
+              {
+                "id": 8,
+                "agent": "claude",
+                "status": "idle",
+                "program": "claude",
+                "title": "Polish the confirmation email",
+                "path": "/Users/demo/src/acme-store",
+                "parent": 4,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": null
+              }
+            ]
+          },
+          {
+            "id": 9,
+            "name": "zsh",
+            "custom_name": null,
+            "status": null,
+            "active": false,
+            "panes": [
+              {
+                "id": 10,
+                "agent": null,
+                "status": null,
+                "program": "zsh",
+                "title": null,
+                "path": "/Users/demo/src/acme-store",
+                "parent": null,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "name": "fix-cart-totals",
+        "custom_name": null,
+        "path": "/Users/demo/src/acme-store-fix-cart-totals",
+        "branch": "fix/cart-totals",
+        "worktree": true,
+        "tabs": [
+          {
+            "id": 12,
+            "name": "codex",
+            "custom_name": null,
+            "status": "waiting",
+            "active": true,
+            "panes": [
+              {
+                "id": 13,
+                "agent": "codex",
+                "status": "waiting",
+                "program": "codex",
+                "title": "Fix rounding in the cart totals",
+                "path": "/Users/demo/src/acme-store-fix-cart-totals",
+                "parent": null,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "weather-kit",
+    "custom_name": null,
+    "path": "/Users/demo/src/weather-kit",
+    "group": null,
+    "workspaces": [
+      {
+        "id": 15,
+        "name": "main",
+        "custom_name": null,
+        "path": "/Users/demo/src/weather-kit",
+        "branch": "main",
+        "worktree": false,
+        "tabs": [
+          {
+            "id": 16,
+            "name": "claude",
+            "custom_name": null,
+            "status": "done",
+            "active": true,
+            "panes": [
+              {
+                "id": 17,
+                "agent": "claude",
+                "status": "done",
+                "program": "claude",
+                "title": "Move the forecast cache to Swift 6",
+                "path": "/Users/demo/src/weather-kit",
+                "parent": null,
+                "role": null,
+                "active": true,
+                "dialog": false,
+                "at_prompt": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

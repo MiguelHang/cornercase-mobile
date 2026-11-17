@@ -1,0 +1,20 @@
+[
+  {
+    "pane": 13,
+    "said": [
+      "• Read src/cart/totals.ts and src/cart/discounts.ts",
+      "• Ran the cart tests: 2 failures in totals.test.ts",
+      "",
+      "The totals round each line before the discounts, but the receipt rounds",
+      "once at the end, so a cart with three discounts can be a cent off."
+    ],
+    "topic": "Rounding",
+    "asked": "How should the cart round its totals when several discounts apply?",
+    "options": [
+      { "label": "Round each line", "detail": "Round every line after its discount, then add them up." },
+      { "label": "Round the total", "detail": "Add the exact amounts and round once, like the receipt." },
+      { "label": "Keep both", "detail": "Leave the totals as they are and fix the receipt instead." }
+    ],
+    "help": "Enter to select · ↑/↓ to navigate · Esc to cancel"
+  }
+]

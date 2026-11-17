@@ -75,11 +75,11 @@ describe('App wiring', () => {
     )
   })
 
-  it('goes home with a new machine, reloads the machines for its name and connects to it', () => {
+  it('goes home with a new machine, reloads the machines for its name and connects to it, leaving the demo out of the list', () => {
     expect(source).toContain(
-      'const added = (machine: number) => { show(connecting(machine)) Promise.all([commands.machinesList().then(remember), join(machine)]).catch(toasts.failed) }',
+      'const added = (machine: number) => { const from = current.machine show(connecting(machine)) Promise.all([commands.machinesList().then(remember), demoExit.switched(from, join(machine))]).catch(toasts.failed) }',
     )
-    expect(source).toContain("machines.find((machine) => machine.id === current.machine)?.name ?? ''")
+    expect(source).toContain('const barMachine = $derived(onTheBar(machines, current.machine))')
   })
 
   it('reads the machines before the first screen, so saved machines never show the empty screen', () => {
@@ -121,7 +121,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void pick(machine).catch(toasts.failed)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} ondemo={() => void tryDemo().catch(toasts.failed)} />",
     )
   })
 
@@ -134,7 +134,7 @@ describe('App wiring', () => {
     )
     expect(source).toContain('const reload = () => commands.machinesList().then(remember).catch(toasts.failed)')
     expect(source).toContain(
-      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={goBack} onchanged={reload} onremoved={removed} adding={rescanning} />',
+      '{:else if editing !== undefined} <Machine machine={editing} {taken} connection={editing.id === current.machine ? current.connection : null} {backTo} onback={goBack} onchanged={reload} onremoved={() => demoExit.removed(editing.demo, removed)} adding={rescanning} />',
     )
   })
 
@@ -157,6 +157,23 @@ describe('App wiring', () => {
     expect(source).toContain('Promise.all(listening).then(load).catch(toasts.failed)')
   })
 
+  it('leaves the demo through its exit, which goes back to the board and loads again as on opening', () => {
+    expect(source).toContain(
+      'const demoExit = new DemoExit(commands, { root: () => router.root(), load, reload, failed: toasts.failed })',
+    )
+  })
+
+  it('joins a machine picked in Machines through the demo exit, which lists the machines again after the demo', () => {
+    expect(source).toContain('const pick = (machine: number) => demoExit.switched(current.machine, join(machine))')
+  })
+
+  it('enters the demo on its board, shown as connecting to it before it starts so none of its events is lost, then lists it', () => {
+    expect(source).toContain(
+      'const tryDemo = async () => { show(connecting(DEMO_MACHINE)) router.root() await commands.demoStart() await reload() }',
+    )
+    expect(source.match(/tryDemo\(\)/g)).toHaveLength(2)
+  })
+
   it('loads the agents with the state, and never the session', () => {
     expect(source).toContain('commands.connectionState(), commands.agents(), ])')
     expect(source).toContain('screen(state, agents)')
@@ -168,12 +185,12 @@ describe('App wiring', () => {
       "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
     )
     expect(source).toContain(
-      "{:else} {#if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {/if}",
+      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} demo={barMachine.demo} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} onleave={() => void demoExit.leave().catch(toasts.failed)} /> {/if}",
     )
     expect(source).toContain(
       'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',
     )
-    expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
+    expect(source).toContain('{:else} <NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} /> {/if}')
     expect(source).toContain(
       "<Board machine={current.machine} agents={current.agents} connection={current.connection} {closer} below={barHeight} onopen={open} onstart={start} />",
     )
@@ -423,9 +440,9 @@ describe('App wiring', () => {
   it('slides every screen but the connection bar and the toasts, and the terminal on its own', () => {
     expect(source).toContain('let shift = $state<Shift>(RESTING)')
     expect(source).toContain(
-      "onmachines={() => router.go({ name: 'machines' })} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
+      "onleave={() => void demoExit.leave().catch(toasts.failed)} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
     )
-    expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} {/if} <ToastStack')
+    expect(source).toContain('<NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} /> {/if} </div> {/if} {/if} <ToastStack')
     expect(source.match(/translated\(shift\)/g)).toHaveLength(1)
   })
 

@@ -59,12 +59,12 @@ fn rank(status: Option<&str>) -> u8 {
     }
 }
 
-struct Place<'a> {
+pub(crate) struct Place<'a> {
     boot: &'a str,
-    project: &'a Project,
-    workspace: &'a Workspace,
-    tab: &'a Tab,
-    pane: &'a Pane,
+    pub(crate) project: &'a Project,
+    pub(crate) workspace: &'a Workspace,
+    pub(crate) tab: &'a Tab,
+    pub(crate) pane: &'a Pane,
 }
 
 impl<'a> Place<'a> {
@@ -175,7 +175,7 @@ impl Since {
     }
 }
 
-fn places(snapshot: &Snapshot) -> impl Iterator<Item = Place<'_>> {
+pub(crate) fn places(snapshot: &Snapshot) -> impl Iterator<Item = Place<'_>> {
     let boot = snapshot.boot.as_str();
     snapshot
         .projects

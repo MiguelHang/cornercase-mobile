@@ -5,7 +5,7 @@ use cornercase_core::machines::MachineId;
 use tauri::State;
 
 use crate::commands::error::CommandError;
-use crate::state::AppState;
+use crate::state::{AppState, DEMO};
 
 #[tauri::command(async)]
 #[specta::specta]
@@ -33,6 +33,9 @@ pub(crate) fn history_save(
 }
 
 pub(crate) fn load(state: &AppState, machine: MachineId, boot: &str, pane: u64) -> Result<Vec<HistoryEntry>, String> {
+    if machine == DEMO {
+        return Ok(state.demo_history(boot, pane));
+    }
     held(state, "read", |store| store.load(machine, boot, pane))
 }
 
@@ -43,6 +46,10 @@ pub(crate) fn save(
     pane: u64,
     entries: &[HistoryEntry],
 ) -> Result<(), String> {
+    if machine == DEMO {
+        state.kept_in_demo(boot, pane, entries);
+        return Ok(());
+    }
     held(state, "saved", |store| store.save(machine, boot, pane, entries))
 }
 

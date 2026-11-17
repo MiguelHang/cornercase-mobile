@@ -2,22 +2,27 @@ use tauri::{Runtime, Wry};
 use tauri_specta::{Builder, Commands, collect_commands, collect_events};
 
 use crate::commands::{
-    changes, chat, close, connection, files, flows, history, identity, issues, machines, probe, routes, start, terminal,
+    changes, chat, close, connection, demo, files, flows, history, identity, issues, machines, probe, routes, start,
+    terminal,
 };
 use crate::events::{
     AgentsChanged, ChangesChanged, ConnectionChanged, PaneStatusChanged, QuestionChanged, TerminalChanged, Toast,
 };
+use crate::state::DEMO;
 
 pub(crate) fn specta<R: Runtime>() -> Builder<R> {
-    Builder::<R>::new().commands(commands()).events(collect_events![
-        ConnectionChanged,
-        AgentsChanged,
-        PaneStatusChanged,
-        TerminalChanged,
-        QuestionChanged,
-        ChangesChanged,
-        Toast
-    ])
+    Builder::<R>::new()
+        .commands(commands())
+        .events(collect_events![
+            ConnectionChanged,
+            AgentsChanged,
+            PaneStatusChanged,
+            TerminalChanged,
+            QuestionChanged,
+            ChangesChanged,
+            Toast
+        ])
+        .constant("DEMO_MACHINE", DEMO.0)
 }
 
 macro_rules! app_commands {
@@ -36,6 +41,8 @@ macro_rules! app_commands {
             connection::connect::<Wry>,
             connection::connection_state,
             connection::agents,
+            demo::demo_start::<Wry>,
+            demo::demo_leave::<Wry>,
             identity::identity_fingerprint,
             chat::last_message,
             chat::send,

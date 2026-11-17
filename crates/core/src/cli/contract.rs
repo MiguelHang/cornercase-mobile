@@ -9,6 +9,7 @@ use crate::transport::json_error;
 pub mod boot;
 #[cfg(test)]
 pub(crate) mod fixtures;
+pub(crate) mod served;
 
 pub const CONTRACT: u32 = 1;
 

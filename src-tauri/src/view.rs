@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use cornercase_core::cli::contract::{Kind, Missing};
 use cornercase_core::cli::status::{Project, Workspace};
+use cornercase_core::demo;
 use cornercase_core::machines::registry::{Machines, Merged};
 use cornercase_core::machines::route::Route;
 use cornercase_core::machines::{Machine, MachineId};
@@ -9,6 +10,7 @@ use cornercase_core::store::Connection;
 use serde::Serialize;
 
 use crate::commands::error::CommandError;
+use crate::state::DEMO;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
 pub(crate) struct MachineView {
@@ -17,6 +19,7 @@ pub(crate) struct MachineView {
     pub(crate) name: String,
     pub(crate) routes: Vec<RouteView>,
     pub(crate) last_route: Option<String>,
+    pub(crate) demo: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -151,7 +154,23 @@ impl From<&Machine> for MachineView {
             name: machine.name.clone(),
             routes: machine.routes.iter().map(RouteView::from).collect(),
             last_route: machine.last_route.as_ref().map(ToString::to_string),
+            demo: false,
         }
+    }
+}
+
+impl MachineView {
+    fn demo() -> Self {
+        Self { id: DEMO.0, name: demo::NAME.to_owned(), routes: Vec::new(), last_route: None, demo: true }
+    }
+}
+
+impl MachineList {
+    #[must_use]
+    pub(crate) fn with_demo(mut self) -> Self {
+        self.machines.push(MachineView::demo());
+        self.active = Some(DEMO.0);
+        self
     }
 }
 
@@ -194,6 +213,15 @@ impl From<&Connection> for ConnectionView {
     }
 }
 
+impl ConnectionView {
+    pub(crate) fn of(machine: MachineId, connection: &Connection) -> Self {
+        match (connection, machine == DEMO) {
+            (Connection::Connected { .. }, true) => Self::Connected { route: String::new() },
+            _ => connection.into(),
+        }
+    }
+}
+
 impl From<&Missing> for MissingView {
     fn from(missing: &Missing) -> Self {
         Self {
@@ -227,7 +255,7 @@ impl ConnectionState {
     }
 
     pub(crate) fn of(machine: MachineId, connection: &Connection) -> Self {
-        Self { machine: Some(machine.0), connection: connection.into() }
+        Self { machine: Some(machine.0), connection: ConnectionView::of(machine, connection) }
     }
 }
 

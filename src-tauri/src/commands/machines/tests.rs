@@ -100,6 +100,7 @@ mod adding_a_machine {
             name: "studio".to_owned(),
             routes: vec![RouteView::Cli { url: ADDRESS.to_owned(), has_token: true }],
             last_route: None,
+            demo: false,
         };
         assert_eq!(machines, [expected]);
         let json = serde_json::to_string(&machines).expect("the machines serialize");

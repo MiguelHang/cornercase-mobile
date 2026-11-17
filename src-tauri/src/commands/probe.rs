@@ -10,7 +10,7 @@ use tauri::State;
 
 use crate::commands::connection::Launcher;
 use crate::commands::error::CommandError;
-use crate::state::AppState;
+use crate::state::{AppState, DEMO};
 use crate::view::{MatchFound, MatchView, ProbeView, RouteFailure, SameWhy};
 
 #[tauri::command]
@@ -30,6 +30,9 @@ pub(crate) async fn machine_match(
 }
 
 pub(crate) async fn probe(state: &AppState, launcher: &Launcher, id: MachineId) -> Result<ProbeView, CommandError> {
+    if id == DEMO && state.in_demo() {
+        return Ok(ProbeView::Answers { route: String::new() });
+    }
     let machine = state.machines(|machines| machines.machine(id).cloned().ok_or(Error::UnknownMachine.into()))?;
     let picked = pick_route(&machine, |route: &Route| launcher.transport(route), PickConfig::default()).await;
     Ok(match picked {
