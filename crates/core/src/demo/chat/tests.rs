@@ -6,6 +6,7 @@ use tokio::time;
 
 use crate::board::AgentRow;
 use crate::cli::last_message::{self, LastMessage};
+use crate::cli::mark;
 use crate::demo::DemoTransport;
 use crate::demo::tests::{entered, status};
 use crate::queue::Outcome;
@@ -83,8 +84,28 @@ mod a_message {
         let replied = read(&store, RESTING).await;
 
         assert_eq!((first.turn_over, thinking.turn_over, replied.turn_over), (Some(true), Some(false), Some(true)));
-        assert_eq!(thinking.text, first.text);
+        assert_eq!((&thinking.text, &thinking.written), (&first.text, &first.written));
         assert!(first.written < replied.written);
+    }
+}
+
+mod a_review {
+    use super::*;
+
+    const FINISHED: u64 = 17;
+
+    #[tokio::test(start_paused = true)]
+    async fn keeps_the_message_as_it_was_written() {
+        let (store, _) = entered().await;
+        let queue = store.queue().expect("the demo has a queue");
+        let before = read(&store, FINISHED).await;
+
+        queue.ask(mark::reviewed_args(FINISHED), None).await.expect("the demo marks the agent reviewed");
+        time::sleep(Duration::from_secs(1)).await;
+        let after = read(&store, FINISHED).await;
+
+        assert_eq!(status(&store, FINISHED).as_deref(), Some("idle"));
+        assert_eq!((after.text, after.written), (before.text, before.written));
     }
 }
 

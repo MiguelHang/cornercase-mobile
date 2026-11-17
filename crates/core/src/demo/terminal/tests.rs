@@ -59,12 +59,19 @@ mod the_terminal {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn cuts_the_lines_wider_than_itself() {
-        let update = painted(9, Size { cols: 20, rows: 24 }, true).await;
+    async fn wraps_the_lines_wider_than_itself() {
+        let update = painted(9, Size { cols: 20, rows: 60 }, true).await;
 
         let rows = texts(&update);
-        assert_eq!(rows[0], "demo@studio ~/src/ac");
+        assert_eq!(rows[..3], ["demo@studio ~/src/ac", "me-store (main) $ gi", "t log --oneline -4"]);
         assert!(rows.iter().all(|row| row.chars().count() <= 20), "{rows:?}");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn wraps_a_cell_a_row_with_no_columns() {
+        let update = painted(9, Size { cols: 0, rows: 2 }, true).await;
+
+        assert_eq!(texts(&update), ["$", " "]);
     }
 }
 

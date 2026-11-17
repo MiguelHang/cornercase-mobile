@@ -116,24 +116,39 @@ impl Surface {
 
     fn pane(&self, pane: u64, active: bool, screen: &[Row]) -> Value {
         let Size { cols, rows } = self.size;
-        let hidden = screen.len().saturating_sub(usize::from(rows));
-        let lines: Vec<Value> = screen.iter().skip(hidden).map(|spans| line(spans, usize::from(cols))).collect();
+        let wrapped: Vec<Row> = screen.iter().flat_map(|spans| wrap(spans, usize::from(cols))).collect();
+        let hidden = wrapped.len().saturating_sub(usize::from(rows));
+        let lines: Vec<Value> = wrapped.iter().skip(hidden).map(|spans| line(spans)).collect();
         let area = json!({ "x": 0, "y": 0, "cols": cols, "rows": rows });
         json!({ "pane": pane, "active": active, "rect": area, "size": { "cols": cols, "rows": rows }, "lines": lines })
     }
 }
 
-fn line(spans: &[Span], cols: usize) -> Value {
+fn wrap(spans: &[Span], cols: usize) -> Vec<Row> {
+    let cols = cols.max(1);
+    let mut rows = vec![Row::new()];
     let mut left = cols;
-    let mut runs = Vec::new();
     for (tone, text) in spans {
-        let cells: Vec<String> = text.chars().take(left).map(String::from).collect();
-        left -= cells.len();
-        if !cells.is_empty() {
-            runs.push(json!({ "style": tone.index(), "cells": cells }));
+        let mut chars = text.chars().peekable();
+        while chars.peek().is_some() {
+            if left == 0 {
+                rows.push(Row::new());
+                left = cols;
+            }
+            let piece: String = chars.by_ref().take(left).collect();
+            left -= piece.chars().count();
+            rows.last_mut().expect("a row to fill").push((*tone, piece));
         }
     }
-    Value::Array(runs)
+    rows
+}
+
+fn line(spans: &[Span]) -> Value {
+    let runs = spans.iter().map(|(tone, text)| {
+        let cells: Vec<String> = text.chars().map(String::from).collect();
+        json!({ "style": tone.index(), "cells": cells })
+    });
+    Value::Array(runs.collect())
 }
 
 fn fg(index: u8) -> Value {

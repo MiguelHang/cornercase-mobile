@@ -13,6 +13,7 @@ use crate::error::Error;
 use crate::transport::{Exit, Out, OutSink, Stdin, emit, only_stdout};
 
 const UNKNOWN: i32 = 2;
+const FAILED: i32 = 1;
 
 pub(super) struct Answer {
     lines: Vec<Out>,
@@ -26,8 +27,15 @@ impl Answer {
     }
 
     pub(super) fn unknown(argv: &[String]) -> Self {
-        let stderr = format!("error: the demo has no answer for `{}`", argv.join(" "));
-        Self { lines: vec![Out::Stderr(stderr.clone())], code: UNKNOWN, stderr }
+        Self::refused(UNKNOWN, format!("error: the demo has no answer for `{}`", argv.join(" ")))
+    }
+
+    pub(super) fn failed(stderr: String) -> Self {
+        Self::refused(FAILED, stderr)
+    }
+
+    fn refused(code: i32, stderr: String) -> Self {
+        Self { lines: vec![Out::Stderr(stderr.clone())], code, stderr }
     }
 
     async fn sent(self, out: &mut OutSink) -> Result<Exit, Error> {
@@ -107,9 +115,9 @@ fn answer(world: &mut World, argv: &[String]) -> Answer {
         (Some("issue" | "flow"), _) => empty::answer(argv),
         (Some("changes"), _) => changes::answer(world, argv),
         (Some("files"), _) => files::answer(world, argv),
-        (Some("read"), Some(pane)) if flagged(argv, "--last-message") && flagged(argv, "--json") => {
-            world.last_message(pane).map_or_else(|| Answer::unknown(argv), Answer::printed)
-        }
+        (Some("read"), Some(pane)) if flagged(argv, "--last-message") && flagged(argv, "--json") => world
+            .last_message(pane)
+            .map_or_else(|| Answer::unknown(argv), |read| read.map_or_else(Answer::failed, Answer::printed)),
         _ => Answer::unknown(argv),
     }
 }

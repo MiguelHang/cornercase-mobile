@@ -19,6 +19,7 @@ const BOOT: &str = "demo";
 pub(crate) struct World {
     pub(super) session: Snapshot,
     pub(super) changed: HashMap<u64, SystemTime>,
+    pub(super) written: HashMap<u64, SystemTime>,
     pub(super) replies: Vec<String>,
     pub(super) turns: HashMap<u64, u64>,
     pub(super) due: HashMap<u64, (Instant, &'static str)>,
@@ -49,10 +50,12 @@ impl Default for World {
         let issued =
             places(&session).flat_map(|place| [place.project.id, place.workspace.id, place.tab.id, place.pane.id]);
         let issued = issued.max().unwrap_or_default();
-        let changed = data::ages().map(|(pane, ago)| (pane, entered.checked_sub(ago).unwrap_or(entered))).collect();
+        let changed: HashMap<u64, SystemTime> =
+            data::ages().map(|(pane, ago)| (pane, entered.checked_sub(ago).unwrap_or(entered))).collect();
         Self {
             told: watch::Sender::new(session.revision),
             session,
+            written: changed.clone(),
             changed,
             replies: data::replies(),
             turns: HashMap::new(),

@@ -107,6 +107,18 @@ mod a_launch {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn has_written_nothing_while_it_works() {
+        let (store, _) = entered().await;
+        let started = launched(&store, Place::Workspace { workspace: MAIN }).await;
+
+        let transport = store.transport().expect("the demo is connected");
+        let answer = transport::output(transport.as_ref(), last_message::args(started.pane)).await.expect("an answer");
+
+        let stderr = format!("Error: the codex agent in pane {} has not written a message yet", started.pane);
+        assert_eq!((answer.code, answer.stdout.as_str(), answer.stderr), (1, "", stderr));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn puts_the_new_worktree_on_the_board_with_its_branch() {
         let (store, _) = entered().await;
         let started = launched(&store, Place::Worktree { project: SHOP, branch: "add-coupons".to_owned() }).await;

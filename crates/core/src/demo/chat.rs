@@ -41,6 +41,7 @@ impl World {
         for (pane, then) in over {
             self.due.remove(&pane);
             *self.turns.entry(pane).or_default() += 1;
+            self.written.insert(pane, self.now());
             self.moved(pane, then);
         }
     }
@@ -49,18 +50,21 @@ impl World {
         self.due.values().map(|&(at, _)| at).min()
     }
 
-    pub(super) fn last_message(&self, pane: u64) -> Option<String> {
+    pub(super) fn last_message(&self, pane: u64) -> Option<Result<String, String>> {
         let place = places(&self.session).find(|place| place.pane.id == pane)?;
         let agent = place.pane.agent.as_deref()?;
+        let Some(written) = self.written.get(&pane) else {
+            return Some(Err(format!("Error: the {agent} agent in pane {pane} has not written a message yet")));
+        };
         let at = usize::try_from(pane + self.turn(pane)).unwrap_or_default();
         let message = json!({
             "pane": pane,
             "agent": agent,
             "text": self.replies[at % self.replies.len()],
-            "written": self.changed.get(&pane).map(|time| clock::iso(*time)),
+            "written": clock::iso(*written),
             "turn_over": !self.due.contains_key(&pane),
         });
-        Some(message.to_string())
+        Some(Ok(message.to_string()))
     }
 
     fn turn(&self, pane: u64) -> u64 {
