@@ -9,8 +9,11 @@ use rstest::rstest;
 const SOURCES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
 const ITSELF: &str = "privacy.rs";
 const GENERIC: [&str; 1] = ["@gmail"];
-const IDENTITY_KEYS: [&str; 2] = ["user.name", "user.email"];
-const SHORTEST_NAME: usize = 4;
+const NAME_KEY: &str = "user.name";
+const MAIL_KEY: &str = "user.email";
+const SEPARATORS: [&str; 5] = [" ", "", ".", "_", "-"];
+const FEWEST_PARTS: usize = 2;
+const SHORTEST_COMPANY: usize = 4;
 const HOMES: [&str; 2] = ["/Users/", "/home/"];
 const FICTIONAL_HOME: &str = "demo";
 const FICTIONAL_MAIL: [&str; 3] = ["example.com", "example.org", "example.net"];
@@ -46,17 +49,38 @@ fn split_case(word: &str) -> Vec<String> {
             part.push(letter);
         }
     }
-    parts.push(word.to_owned());
     parts
 }
 
-fn words(text: &str) -> Vec<String> {
+fn parts(text: &str) -> Vec<String> {
     let runs = text.split(|letter: char| !letter.is_alphanumeric()).flat_map(split_case);
-    runs.filter(|word| word.chars().count() >= SHORTEST_NAME).map(|word| word.to_lowercase()).collect()
+    runs.filter(|part| !part.is_empty()).map(|part| part.to_lowercase()).collect()
 }
 
-fn identity<'a>(parts: impl IntoIterator<Item = &'a str>) -> Vec<String> {
-    let mut found: Vec<String> = parts.into_iter().flat_map(words).collect();
+fn spellings(text: &str) -> Vec<String> {
+    let parts = parts(text);
+    if parts.len() < FEWEST_PARTS {
+        return Vec::new();
+    }
+    SEPARATORS.iter().map(|separator| parts.join(separator)).collect()
+}
+
+fn mail_user(mail: &str) -> &str {
+    mail.split_once('@').map_or(mail, |(user, _)| user)
+}
+
+fn company(mail: &str) -> Option<String> {
+    let domain = mail.trim().rsplit_once('@')?.1.to_lowercase();
+    if FICTIONAL_MAIL.contains(&domain.as_str()) {
+        return None;
+    }
+    let (company, _) = domain.rsplit_once('.')?;
+    (company.chars().count() >= SHORTEST_COMPANY).then(|| company.to_owned())
+}
+
+fn identity(name: Option<&str>, mail: Option<&str>, home: Option<&str>) -> Vec<String> {
+    let people = [name, mail.map(mail_user), home].into_iter().flatten().flat_map(spellings);
+    let mut found: Vec<String> = people.chain(mail.and_then(company)).collect();
     found.sort();
     found.dedup();
     found
@@ -74,15 +98,20 @@ fn home_user() -> Option<String> {
 }
 
 fn ours() -> Vec<String> {
-    let known: Vec<String> = IDENTITY_KEYS.iter().filter_map(|key| git_config(key)).chain(home_user()).collect();
-    identity(known.iter().map(String::as_str))
+    let (name, mail) = (git_config(NAME_KEY), git_config(MAIL_KEY));
+    identity(name.as_deref(), mail.as_deref(), home_user().as_deref())
+}
+
+fn said(text: &str, unit: &str) -> bool {
+    let apart = |letter: Option<char>| !letter.is_some_and(char::is_alphanumeric);
+    let bounded = |at: usize| apart(text[..at].chars().next_back()) && apart(text[at + unit.len()..].chars().next());
+    text.match_indices(unit).any(|(at, _)| bounded(at))
 }
 
 fn named(text: &str, identity: &[String]) -> Vec<String> {
     let lowered = text.to_lowercase();
     let generic = GENERIC.iter().filter(|name| lowered.contains(*name)).map(|name| (*name).to_owned());
-    let said = words(text);
-    generic.chain(identity.iter().filter(|name| said.contains(name)).cloned()).collect()
+    generic.chain(identity.iter().filter(|unit| said(&lowered, unit)).cloned()).collect()
 }
 
 fn homes(text: &str) -> Vec<String> {
@@ -137,7 +166,7 @@ fn markers(text: &str, identity: &[String]) -> Vec<String> {
 }
 
 fn fictional() -> Vec<String> {
-    identity(["JaneHartwell\n", "jane.hartwell@globex-labs.dev\n", "jhw"])
+    identity(Some("JaneHartwell\n"), Some("jane.hartwell@globex-labs.dev\n"), Some("jhw"))
 }
 
 #[test]
@@ -164,8 +193,10 @@ fn the_scan_reads(#[case] file: &str) {
 }
 
 #[rstest]
-#[case::a_first_name("written by Jane")]
-#[case::a_surname("Hartwell wrote it")]
+#[case::the_full_name("written by Jane Hartwell")]
+#[case::the_name_run_together("JaneHartwell wrote it")]
+#[case::the_name_as_an_identifier("let jane_hartwell = 1")]
+#[case::the_mail_user("jane.hartwell said so")]
 #[case::the_mail_domain("see globex-labs.dev")]
 #[case::a_mail_at_gmail("someone@gmail")]
 #[case::a_real_mail("someone@company.dev")]
@@ -194,13 +225,22 @@ fn the_scan_finds_a_token(#[case] prefix: &str, #[case] pairs: usize) {
 #[case::a_documentation_address("203.0.113.7")]
 #[case::a_version("v1.2.3")]
 #[case::a_long_test_name("puts_the_agent_to_work_and_then_back_to_idle")]
-#[case::a_word_with_a_name_inside("changes janeway")]
-#[case::a_short_piece("jhw runs a dev server")]
+#[case::a_first_name_alone("written by Jane")]
+#[case::a_surname_alone("Hartwell wrote it")]
+#[case::a_name_inside_a_word("the janehartwells")]
+#[case::a_one_word_home_user("jhw runs a dev server")]
 fn the_scan_lets_through(#[case] text: &str) {
     assert_eq!(markers(text, &fictional()), Vec::<String>::new(), "{text}");
 }
 
 #[test]
-fn the_identity_keeps_whole_names_and_their_parts_but_not_short_pieces() {
-    assert_eq!(fictional(), ["globex", "hartwell", "jane", "janehartwell", "labs"].map(String::from));
+fn the_identity_keeps_whole_names_in_every_spelling_and_the_mail_s_company() {
+    let units = ["globex-labs", "jane hartwell", "jane-hartwell", "jane.hartwell", "jane_hartwell", "janehartwell"];
+    assert_eq!(fictional(), units.map(String::from));
+}
+
+#[test]
+fn the_identity_leaves_one_word_names_and_short_companies_to_the_homes_and_mails() {
+    assert_eq!(identity(Some("Mark"), Some("mark@example.com"), Some("mark")), Vec::<String>::new());
+    assert!(!identity(None, Some("jane.hartwell@ibm.com"), None).contains(&"ibm".to_owned()));
 }
