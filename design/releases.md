@@ -117,7 +117,7 @@ Topics, in `design/releases/`:
 
 - **The repository lives at `MiguelHang/cornercase-mobile` for now and moves to the usecornercase organisation later**, so nothing names it: `README.md`, `CHANGELOG.md` and `PRIVACY.md` link relatively (`PRIVACY.md`, `../../releases/latest`, `../../issues`), as do `SUPPORT.md` and `site/index.md`; `release.yml` uses `github.repository` and `gh`'s defaults, and the site's script `GITHUB_REPOSITORY`.
 - **Absolute URLs to the repository: none** (`grep -rn "MiguelHang/cornercase-mobile" --exclude-dir=node_modules --exclude-dir=docs .` on 2026-11-17, which finds only this file).
-- **The site's URLs name the owner, here only**: `https://miguelhang.github.io/cornercase-mobile/privacy/` and `/support/`, written into App Store Connect by hand. The move changes their host to `usecornercase.github.io` and keeps their paths: change both in App Store Connect then, and check that they answer.
+- **The site's URLs name the owner, here and in the App Store listing**: `https://miguelhang.github.io/cornercase-mobile/privacy/` and `/support/`, written into App Store Connect by hand, and into `store/app-store/app-info.json` and `version.json`, which `scripts/store.test.ts` ties to these two. The move changes their host to `usecornercase.github.io` and keeps their paths: change them here, in the listing and in App Store Connect then, and check that they answer.
 
 ## Checked live
 

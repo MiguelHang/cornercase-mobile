@@ -120,6 +120,6 @@ With other simulators booted, give `simctl` the UDID, never `booted`.
    - Look at a frame every half second before keeping it: each step has to be on screen, with nothing still for long.
    - Stop the recording with SIGINT.
    - `avconvert --source raw.mp4 --preset Preset1920x1080 --output demo.mp4 --start <s> --duration <s>`: `--start`
-     cuts the seconds before the first tap, and `--duration` the still seconds after `Leave demo`. The output is 884×1920 H.264, with no audio and none of the source's
-     metadata, which `avconvert` filters. It must stay under 60 seconds; the one here is 30.5 seconds and 3.5 MB, from
+     cuts the seconds before the first tap, and `--duration` the still seconds after `Leave demo`. The output is
+     884×1920 H.264, with no audio and none of the source's metadata, which `avconvert` filters. It must stay under 60 seconds; the one here is 30.5 seconds and 3.5 MB, from
      second 7.5 of the raw recording.
