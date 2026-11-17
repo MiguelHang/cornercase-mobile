@@ -68,6 +68,9 @@ export const events = {
 	toast: makeEvent<Toast, Toast>("toast"),
 };
 
+/* Constants */
+export const DEMO_MACHINE = 4294967295 as const;
+
 /* Types */
 export type AccountChoice = AccountChoice_Serialize | AccountChoice_Deserialize;
 

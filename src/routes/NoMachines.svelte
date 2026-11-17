@@ -7,7 +7,7 @@
   import { fadeOut, riseIn } from '../lib/ui/motion'
   import MachineForm from './MachineForm.svelte'
 
-  let { onadded }: { onadded: (machine: number) => void } = $props()
+  let { onadded, ondemo }: { onadded: (machine: number) => void; ondemo: () => void } = $props()
 
   let open = $state(false)
 
@@ -30,6 +30,7 @@
       {:else}
         <div class="actions">
           <Button onclick={() => (open = true)}>Add machine</Button>
+          <Button tone="plain" onclick={ondemo}>Try a demo</Button>
         </div>
       {/if}
     </Glass>
@@ -64,7 +65,9 @@
 
   .actions {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap);
     padding: 0 var(--inset-card) var(--inset-card);
   }
 </style>

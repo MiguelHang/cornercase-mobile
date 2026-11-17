@@ -579,3 +579,19 @@ describe('Router.closed', () => {
     expect(router.current).toEqual(NO_MACHINES)
   })
 })
+
+describe('Router.root', () => {
+  it('leaves only the base, whatever sat over it', () => {
+    const router = routed(AGENT, MACHINES)
+    router.root()
+    expect(router.current).toEqual(HOME)
+    expect(router.below).toBeNull()
+    expect(router.opened).toBeNull()
+  })
+
+  it('stays on the base when nothing is over it', () => {
+    const router = new Router(NO_MACHINES)
+    router.root()
+    expect(router.current).toEqual(NO_MACHINES)
+  })
+})

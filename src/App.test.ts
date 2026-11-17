@@ -121,7 +121,7 @@ describe('App wiring', () => {
 
   it('opens Machines from the bar, with the list, the active machine and its connection', () => {
     expect(source).toContain(
-      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} />",
+      "{:else if route.name === 'machines'} <Machines {machines} active={current.machine} connection={current.connection} {backTo} onback={goBack} onpick={(machine) => void join(machine)} onadded={added} onrouted={reload} onedit={(machine) => router.go({ name: 'machine', id: machine })} onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })} ondemo={() => void tryDemo().catch(toasts.failed)} />",
     )
   })
 
@@ -163,6 +163,13 @@ describe('App wiring', () => {
     )
   })
 
+  it('enters the demo on its board, shown as connecting to it before it starts so none of its events is lost, then lists it', () => {
+    expect(source).toContain(
+      'const tryDemo = async () => { show(connecting(DEMO_MACHINE)) router.root() await commands.demoStart() await reload() }',
+    )
+    expect(source.match(/tryDemo\(\)/g)).toHaveLength(2)
+  })
+
   it('loads the agents with the state, and never the session', () => {
     expect(source).toContain('commands.connectionState(), commands.agents(), ])')
     expect(source).toContain('screen(state, agents)')
@@ -179,7 +186,7 @@ describe('App wiring', () => {
     expect(source).toContain(
       'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',
     )
-    expect(source).toContain('{:else} <NoMachines onadded={added} /> {/if}')
+    expect(source).toContain('{:else} <NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} /> {/if}')
     expect(source).toContain(
       "<Board machine={current.machine} agents={current.agents} connection={current.connection} {closer} below={barHeight} onopen={open} onstart={start} />",
     )
@@ -431,7 +438,7 @@ describe('App wiring', () => {
     expect(source).toContain(
       "onleave={() => void leaveDemo().catch(toasts.failed)} /> {/if} <div class=\"page\" class:sliding={shift.x > 0} class:settling={shift.eased} style:transform={translated(shift)}>",
     )
-    expect(source).toContain('<NoMachines onadded={added} /> {/if} </div> {/if} {/if} <ToastStack')
+    expect(source).toContain('<NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} /> {/if} </div> {/if} {/if} <ToastStack')
     expect(source.match(/translated\(shift\)/g)).toHaveLength(1)
   })
 

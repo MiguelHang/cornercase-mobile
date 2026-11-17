@@ -8,17 +8,21 @@ use crate::commands::{
 use crate::events::{
     AgentsChanged, ChangesChanged, ConnectionChanged, PaneStatusChanged, QuestionChanged, TerminalChanged, Toast,
 };
+use crate::state::DEMO;
 
 pub(crate) fn specta<R: Runtime>() -> Builder<R> {
-    Builder::<R>::new().commands(commands()).events(collect_events![
-        ConnectionChanged,
-        AgentsChanged,
-        PaneStatusChanged,
-        TerminalChanged,
-        QuestionChanged,
-        ChangesChanged,
-        Toast
-    ])
+    Builder::<R>::new()
+        .commands(commands())
+        .events(collect_events![
+            ConnectionChanged,
+            AgentsChanged,
+            PaneStatusChanged,
+            TerminalChanged,
+            QuestionChanged,
+            ChangesChanged,
+            Toast
+        ])
+        .constant("DEMO_MACHINE", DEMO.0)
 }
 
 macro_rules! app_commands {

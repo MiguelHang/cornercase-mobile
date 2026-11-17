@@ -4,6 +4,7 @@
   import { onMount, untrack } from 'svelte'
   import {
     commands,
+    DEMO_MACHINE,
     events,
     type AgentRow_Serialize as AgentRow,
     type MachineView_Serialize,
@@ -412,6 +413,13 @@
     }
   }
 
+  const tryDemo = async () => {
+    show(connecting(DEMO_MACHINE))
+    router.root()
+    await commands.demoStart()
+    await reload()
+  }
+
   const leaveDemo = async () => {
     const left = await commands.demoLeave()
     if (left.status === 'error') {
@@ -543,6 +551,7 @@
             onrouted={reload}
             onedit={(machine) => router.go({ name: 'machine', id: machine })}
             onrescan={(machine) => router.go({ name: 'machine', id: machine, adding: true })}
+            ondemo={() => void tryDemo().catch(toasts.failed)}
           />
         {:else if editing !== undefined}
           <Machine
@@ -556,7 +565,7 @@
             adding={rescanning}
           />
         {:else}
-          <NoMachines onadded={added} />
+          <NoMachines onadded={added} ondemo={() => void tryDemo().catch(toasts.failed)} />
         {/if}
       </div>
     {/if}

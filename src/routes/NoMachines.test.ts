@@ -44,13 +44,28 @@ const button = (body: string, label: string) =>
   body.match(new RegExp(`<button class="([^"]*)" type="(\\w+)"[^>]*>(?:<!--[^>]*-->| )*${label}<!---->`))
 
 describe('NoMachines', () => {
-  const body = render(NoMachines, { props: { onadded: () => {} } }).body
+  const body = render(NoMachines, { props: { onadded: () => {}, ondemo: () => {} } }).body
 
   it('offers adding a machine, ready to be pressed', () => {
     const add = button(body, 'Add machine')
     expect(add?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
     expect(add?.[2]).toBe('button')
     expect(add?.[0]).not.toMatch(/disabled|aria-/)
+  })
+
+  it('offers trying a demo, plain, under Add machine', () => {
+    const demo = button(body, 'Try a demo')
+    expect(demo?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
+    expect(demo?.[2]).toBe('button')
+    expect(body.indexOf('Try a demo')).toBeGreaterThan(body.indexOf('Add machine'))
+  })
+
+  it('asks for the demo on Try a demo, and hides it with the form', () => {
+    const markup = flat(noMachinesSource)
+    expect(markup).toContain(
+      '<Button onclick={() => (open = true)}>Add machine</Button> <Button tone="plain" onclick={ondemo}>Try a demo</Button> </div> {/if}',
+    )
+    expect(markup).toContain('.actions { display: flex; flex-direction: column; align-items: center; gap: var(--gap);')
   })
 
   it('shows no form yet', () => {

@@ -22,6 +22,7 @@
     onrouted,
     onedit,
     onrescan,
+    ondemo,
     probes = new Probes(commands),
     device = new ThisDevice(commands),
   }: {
@@ -35,6 +36,7 @@
     onrouted: () => void
     onedit: (machine: number) => void
     onrescan: (machine: number) => void
+    ondemo: () => void
     probes?: Probes
     device?: ThisDevice
   } = $props()
@@ -42,6 +44,8 @@
   const clock = retryClock(() => connection)
 
   let adding = $state(false)
+
+  const inDemo = $derived(machines.some((machine) => machine.demo))
 
   const connectionOf = (machine: MachineView_Serialize) => (machine.id === active ? connection : null)
 
@@ -109,6 +113,9 @@
   {:else}
     <div class="actions">
       <Button onclick={() => (adding = true)}>Add machine</Button>
+      {#if !inDemo}
+        <Button tone="plain" onclick={ondemo}>Try a demo</Button>
+      {/if}
     </div>
   {/if}
   <section class="device">
@@ -151,7 +158,9 @@
 
   .actions {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap);
   }
 
   .device {

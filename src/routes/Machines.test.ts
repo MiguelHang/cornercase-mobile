@@ -65,6 +65,7 @@ const screen = async (
       onrouted: () => {},
       onedit: () => {},
       onrescan: () => {},
+      ondemo: () => {},
       probes: await probes,
       device: await device,
     },
@@ -202,6 +203,19 @@ describe('Machines', () => {
     expect(body).toMatch(/<button class="button primary svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Add machine/)
     expect(body).not.toContain('<form')
   })
+
+  it('offers trying a demo, plain, under Add machine', async () => {
+    expect(await screen()).toMatch(
+      /Add machine<!----><\/button><!----> <!--\[0?--><button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+    )
+  })
+
+  it('offers no demo while the demo is listed', async () => {
+    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const body = await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), [demo, ...MACHINES])
+    expect(body).toMatch(/Add machine<!---->/)
+    expect(body).not.toContain('Try a demo')
+  })
 })
 
 describe('Machines wiring', () => {
@@ -265,5 +279,13 @@ describe('Machines wiring', () => {
       '<MachineForm taken={machines.map((machine) => machine.name)} onadded={added} onrouted={routed} oncancel={() => (adding = false)} />',
     )
     expect(script).toContain('<Button onclick={() => (adding = true)}>Add machine</Button>')
+  })
+
+  it('hides Try a demo with the form, and while the demo is among the machines, and asks for the demo on it', () => {
+    expect(script).toContain('const inDemo = $derived(machines.some((machine) => machine.demo))')
+    expect(script).toContain(
+      '<Button onclick={() => (adding = true)}>Add machine</Button> {#if !inDemo} <Button tone="plain" onclick={ondemo}>Try a demo</Button> {/if} </div> {/if}',
+    )
+    expect(script).toContain('.actions { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }')
   })
 })
