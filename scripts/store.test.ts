@@ -240,3 +240,63 @@ describe('the 6.9-inch iPhone screenshots', () => {
     expect(screenshotProblems(pngHeader(readFileSync(join(screenshots, name))))).toEqual([])
   })
 })
+
+describe('the listing metadata', () => {
+  const info = json('app-info.json')
+  const version = json('version.json').appStoreVersions.attributes
+  const localization = json('version.json').appStoreVersionLocalizations['en-US'].attributes
+  const age = json('age-rating.json').ageRatingDeclarations.attributes
+  const pricing = json('pricing.json')
+  const review = json('review.json').appStoreReviewDetails.attributes
+
+  it('is a Developer Tools app with no secondary category', () => {
+    expect(info.appInfos.relationships.primaryCategory.data.id).toBe('DEVELOPER_TOOLS')
+    expect(info.appInfos.relationships.secondaryCategory.data).toBeNull()
+  })
+
+  it('names the app and leaves the pending URLs null', () => {
+    expect(info.appInfoLocalizations['en-US'].attributes.name).toBe('Cornercase remote')
+    expect([info.appInfoLocalizations['en-US'].attributes.privacyPolicyUrl, localization.supportUrl, localization.marketingUrl]).toEqual([null, null, null])
+  })
+
+  it('has a copyright without a personal name and a manual release', () => {
+    expect(version.copyright).toBe('2026 The cornercase-mobile authors')
+    expect(version.releaseType).toBe('MANUAL')
+  })
+
+  it('answers every age rating question with nothing', () => {
+    const answers = Object.entries(age).filter(([, value]) => value !== null && value !== 'NONE' && value !== false)
+    expect(answers).toEqual([])
+  })
+
+  it('is free in the USA and available in new territories', () => {
+    expect(pricing.appPricePoints.attributes.customerPrice).toBe('0.0')
+    expect(pricing.appPriceSchedules.relationships.baseTerritory.data.id).toBe('USA')
+    expect(pricing.appAvailabilities.attributes.availableInNewTerritories).toBe(true)
+  })
+
+  it('keeps the reviewer contact out of the repo and needs no demo account', () => {
+    const contact = [review.contactFirstName, review.contactLastName, review.contactPhone, review.contactEmail]
+    expect(contact).toEqual([null, null, null, null])
+    expect(review.demoAccountRequired).toBe(false)
+  })
+})
+
+describe('the review notes and recording', () => {
+  const notes = text(json('review.json').appStoreReviewDetails.attributes.notes)
+  const video = readFileSync(join(store, 'review/demo.mp4'))
+
+  it('explain the demo path with the words of the app', () => {
+    for (const phrase of ['0.13.78', 'Try a demo', 'DEMO', 'Leave demo']) expect(notes).toContain(phrase)
+  })
+
+  it('do not quote the old demo wording', () => {
+    expect(notes).not.toContain('No Mac nearby?')
+    expect(notes).not.toContain('Demo Mac')
+  })
+
+  it('has a recording of at most 10 MB, as an MP4', () => {
+    expect(video.length).toBeLessThanOrEqual(10 * 1024 * 1024)
+    expect(video.toString('latin1', 4, 8)).toBe('ftyp')
+  })
+})
