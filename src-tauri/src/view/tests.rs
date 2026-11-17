@@ -97,7 +97,7 @@ mod a_connection {
     #[rstest]
     #[case::the_cli_endpoint(Kind::Feature, "cli-endpoint")]
     #[case::the_learned_routes(Kind::Operation, "app-routes")]
-    fn missing_names_the_version_that_brings_what_the_mac_lacks(#[case] kind: Kind, #[case] name: &str) {
+    fn missing_names_the_version_that_brings_what_the_machine_lacks(#[case] kind: Kind, #[case] name: &str) {
         let lacking = Missing { name: name.to_owned(), kind, reason: None };
         let view = ConnectionView::from(&Connection::Missing(vec![lacking, missing()]));
         assert_eq!(json_of(&view)["missing"][0]["since"], json!("0.13.78"));
@@ -105,7 +105,7 @@ mod a_connection {
     }
 
     #[test]
-    fn missing_keeps_the_reason_the_mac_gives() {
+    fn missing_keeps_the_reason_the_machine_gives() {
         let disabled = Missing { name: "app-routes".to_owned(), kind: Kind::Operation, reason: Some("off".to_owned()) };
         let view = ConnectionView::from(&Connection::Missing(vec![disabled]));
         let expected = json!([{ "name": "app-routes", "kind": "operation", "reason": "off", "since": "0.13.78" }]);
@@ -162,7 +162,7 @@ mod a_project_choice {
     }
 
     #[test]
-    fn names_its_workspaces_as_the_mac_does_in_the_order_of_the_session() {
+    fn names_its_workspaces_as_the_machine_does_in_the_order_of_the_session() {
         let project = project(&json!({ "id": 5, "name": "web", "workspaces": [
             { "id": 12, "name": "main", "custom_name": null, "worktree": false },
             { "id": 9, "name": "fix-login", "custom_name": "Login", "worktree": true },

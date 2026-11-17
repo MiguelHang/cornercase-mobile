@@ -297,7 +297,7 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn adds_an_address_once_however_often_the_mac_tells_it() {
+    async fn adds_an_address_once_however_often_the_machine_tells_it() {
         let studio = Studio::new();
         let (store, _driver) = store_of(studio.id, serving(&[]));
         let transport: Arc<dyn Transport> =
@@ -309,7 +309,7 @@ mod learning_the_routes {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn saves_the_addresses_a_mac_paired_with_cornercase_tells_with_its_secret() {
+    async fn saves_the_addresses_a_machine_paired_with_cornercase_tells_with_its_secret() {
         let studio = Studio::new();
         let paired = paired_routes(PAIRING);
         let merged = studio.state.machines(|machines| machines.merge(studio.id, &paired).map_err(CommandError::from));

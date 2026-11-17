@@ -283,7 +283,7 @@ mod matching_a_pairing_code {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn pairs_first_and_asks_the_mac_with_the_secret_it_got() {
+    async fn pairs_first_and_asks_the_machine_with_the_secret_it_got() {
         let studio = Studio::new();
         let (launcher, asked) = asking(contracted(PROBED));
         let (launcher, pairings) = pairing(launcher, Ok(SECRET));
@@ -313,7 +313,7 @@ mod matching_a_pairing_code {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_why_the_mac_did_not_pair_and_keeps_no_secret() {
+    async fn says_why_the_machine_did_not_pair_and_keeps_no_secret() {
         let studio = Studio::new();
         let refused = Err(PairError::Answered(Error::PairingRefused));
         let (launcher, _) = pairing(answering(contracted(PROBED), Err(asleep())), refused);

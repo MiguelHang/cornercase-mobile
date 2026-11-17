@@ -13,7 +13,9 @@ const SOURCES: [string, string[]][] = [
 const SINGLE_FILES = [
   'src-tauri/gen/apple/project.yml',
   'src-tauri/gen/apple/cornercase-mobile_iOS/Info.plist',
+  'src-tauri/gen/apple/LaunchScreen.storyboard',
   'src-tauri/gen/android/app/src/main/res/values/strings.xml',
+  'src-tauri/gen/android/app/src/main/java/dev/usecornercase/mobile/MainActivity.kt',
   'src-tauri/tauri.conf.json',
   'index.html',
   'README.md',

@@ -277,7 +277,7 @@ mod merging_a_pairing_code {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn says_why_the_mac_did_not_pair_and_changes_nothing() {
+    async fn says_why_the_machine_did_not_pair_and_changes_nothing() {
         let studio = Studio::new();
         let (launcher, _) = pairing(recording().0, Err(PairError::Answered(Error::PairingFailed)));
         let error = merge(&studio.state, Recorder::default(), &launcher, studio.id, PAIRING).await;

@@ -96,7 +96,7 @@ mod start {
     }
 
     #[test]
-    fn never_moves_the_window_of_the_mac() {
+    fn never_moves_the_window_of_the_machine() {
         assert!(!agent("opus", "fix/login").argv().iter().any(|word| word == "--focus"));
     }
 
@@ -158,7 +158,7 @@ mod start_issue {
     }
 
     #[test]
-    fn never_sends_a_prompt_nor_moves_the_window_of_the_mac() {
+    fn never_sends_a_prompt_nor_moves_the_window_of_the_machine() {
         let argv = issue("opus", "fix/coupon").argv();
         assert!(!argv.iter().any(|word| word.starts_with("--prompt") || word == "--focus"), "{argv:?}");
     }

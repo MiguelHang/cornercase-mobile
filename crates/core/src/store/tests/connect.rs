@@ -105,7 +105,7 @@ mod the_secret {
     #[case::absent_on_every_route(vec![tokenless(LAN), tokenless(TAILNET)])]
     #[case::of_a_machine_without_routes(Vec::new())]
     #[tokio::test(start_paused = true)]
-    async fn absent_stops_as_not_paired_without_asking_the_mac(#[case] routes: Vec<Route>) {
+    async fn absent_stops_as_not_paired_without_asking_the_machine(#[case] routes: Vec<Route>) {
         let hosts = vec![(LAN, refusing(Error::Timeout)), (TAILNET, refusing(Error::Timeout))];
         let (store, driver) = store_on(routes, hosts, &Asked::default());
         assert_eq!(settled(&store, driver).await, connections(Connection::NotPaired));

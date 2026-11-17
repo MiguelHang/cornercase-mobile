@@ -67,8 +67,7 @@ mod projects {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn names_each_project_and_its_workspaces_as_the_mac_does_in_the_order_of_the_session_with_the_server_s_boot()
-    {
+    async fn names_each_project_and_its_workspaces_as_the_machine_does_in_the_session_s_order_with_the_server_s_boot() {
         let studio = connected(serving(&[two_projects()])).await;
         let shop = ProjectChoice {
             id: 5,
@@ -103,7 +102,7 @@ mod agents {
     use super::*;
 
     #[tokio::test(start_paused = true)]
-    async fn lists_the_agents_installed_on_the_mac_of_cornercase_0_13_19() {
+    async fn lists_the_agents_installed_on_the_machine_of_cornercase_0_13_19() {
         let studio = connected(listing(ACCOUNTS)).await;
         let expected = StartAgents { agents: vec![choice("claude", "claude")], accounts: Vec::new() };
         assert_eq!(installed(&studio.state).await, Ok(expected));

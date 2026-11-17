@@ -328,7 +328,7 @@ mod outdated {
     #[rstest]
     #[case::server_without_the_command(failed(1, OLD_SERVER))]
     #[case::cli_without_the_subcommand(failed(2, OLD_CLI))]
-    fn says_cornercase_on_the_mac_is_too_old(#[case] error: Error) {
+    fn says_cornercase_on_the_machine_is_too_old(#[case] error: Error) {
         assert_eq!(outdated(error), Error::Outdated);
     }
 

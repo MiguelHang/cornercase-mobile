@@ -354,7 +354,7 @@ mod merge {
     }
 
     #[test]
-    fn replaces_the_secret_when_the_mac_is_paired_again() {
+    fn replaces_the_secret_when_the_machine_is_paired_again() {
         let phone = Phone::new();
         let id = phone.open().add("studio", &paired(&[LAN, TAILNET], SECRET)).expect("add the studio");
         let result = phone.open().merge(id, &paired(&[LAN, TAILNET], NEW_SECRET));
