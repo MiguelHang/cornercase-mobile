@@ -57,6 +57,12 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 - **The app**: "Cornercase remote", Apple ID 6835431973, SKU `cornercase-mobile`, primary language en-US, bundle ID `dev.usecornercase.mobile`, team `22FWTVV94S` (the paid Apple Developer Program). The name under the icon is "Cornercase" (decided by the user on 2026-11-16): `CFBundleDisplayName` in `project.yml` › `info.properties` on iOS, `app_name` and `main_activity_title` in `res/values/strings.xml` on Android. `productName` stays "cornercase", since it also names the binaries and the bundles.
 - **The privacy policy** is `PRIVACY.md`. External TestFlight testing and the App Store need it at a public URL, which the repository gives once it is public.
 
+## App Review
+
+- **The demo is the way in** (064, `demo.md`): the app does nothing without a Mac running cornercase, and App Review (guideline 2.1) has to see it work. The notes for the reviewer in App Store Connect › App Review Information say so, and `Sign-in required` stays off, since there is no account:
+  - "Cornercase remote controls the cornercase app running on the user's Mac, so a real session needs a Mac with cornercase 0.13.78 or later that the phone can reach. To try it without one, tap `Try a demo` on the first screen: it adds a simulated Demo Mac inside the app, marked `DEMO`, with sample agents to open, message, answer, start and close. It uses no network and saves nothing. Tap `Leave demo` on the connection bar to leave it."
+- **The screenshots** can come from the demo too: its sample is fictional and in English, made for them. None has been taken yet.
+
 ## The repository's URLs
 
 - **The repository lives at `MiguelHang/cornercase-mobile` for now and moves to the usecornercase organisation later**, so nothing names it: `README.md`, `CHANGELOG.md` and `PRIVACY.md` link relatively (`PRIVACY.md`, `../../releases/latest`, `../../issues`), and the workflow uses `github.repository` and `gh`'s defaults.
