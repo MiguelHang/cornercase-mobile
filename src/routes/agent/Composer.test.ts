@@ -284,18 +284,18 @@ describe('Composer, its attachments', () => {
     expect(shown[0].inside).toContain('aria-label="pasted.png, 900 B"')
   })
 
-  it('tells with a toast that a removed image already pasted stays on the Mac', async () => {
+  it('tells with a toast that a removed image already pasted stays on the machine', async () => {
     const chat = withChips('', CHIPS.map((chip, index) => ({ ...chip, pasted: index === 0 })))
-    expect(await chat.remove(1)).toEqual({ level: 'info', message: "The image stays in claude's input on the Mac" })
+    expect(await chat.remove(1)).toEqual({ level: 'info', message: "The image stays in claude's input on the machine" })
     expect(flat(composerSource)).toContain('const told = await chat.remove(id) if (told !== null) { ontoast(told) }')
   })
 
-  it('marks an image already pasted on the Mac, for the eye and for VoiceOver', () => {
+  it('marks an image already pasted on the machine, for the eye and for VoiceOver', () => {
     const chat = withChips('', CHIPS.map((chip, index) => ({ ...chip, pasted: index === 1 })))
     const shown = thumbnails(draw(chat))
     expect(shown.map((thumbnail) => thumbnail.pasted)).toEqual([false, true])
-    expect(shown[1].inside).toContain('aria-label="pasted.png, 900 B, on the Mac"')
-    expect(shown[1].inside).toMatch(/<span class="mark svelte-[\w-]+" aria-hidden="true">On Mac<\/span>/)
+    expect(shown[1].inside).toContain('aria-label="pasted.png, 900 B, on the machine"')
+    expect(shown[1].inside).toMatch(/<span class="mark svelte-[\w-]+" aria-hidden="true">Pasted<\/span>/)
     expect(shown[0].inside).not.toContain('class="mark')
   })
 

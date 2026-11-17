@@ -232,7 +232,7 @@ mod a_fit {
         }
     }
 
-    struct Mac {
+    struct Host {
         launched: mpsc::UnboundedReceiver<String>,
         outputs: mpsc::UnboundedReceiver<OutSink>,
         painted: mpsc::UnboundedReceiver<Painted>,
@@ -240,7 +240,7 @@ mod a_fit {
         following: JoinHandle<Fitted>,
     }
 
-    impl Mac {
+    impl Host {
         fn fitting() -> Self {
             let (outputs, handed) = mpsc::unbounded_channel();
             let fake = handing(handing(FakeTransport::default(), &ARGV, &outputs), &SURFACE, &outputs);
@@ -254,11 +254,11 @@ mod a_fit {
         }
 
         async fn granted() -> (Self, OutSink, OutSink) {
-            let mut mac = Self::fitting();
-            let mut view = mac.output().await;
+            let mut host = Self::fitting();
+            let mut view = host.output().await;
             say(&mut view, line(unchanged)).await;
-            let surface = mac.output().await;
-            (mac, view, surface)
+            let surface = host.output().await;
+            (host, view, surface)
         }
 
         async fn output(&mut self) -> OutSink {
@@ -295,44 +295,44 @@ mod a_fit {
 
     #[tokio::test(start_paused = true)]
     async fn launches_the_surface_of_the_view_only_after_its_first_line() {
-        let mut mac = Mac::fitting();
-        let mut view = mac.output().await;
-        assert_eq!(mac.launched(), [ARGV.join(" ")]);
+        let mut host = Host::fitting();
+        let mut view = host.output().await;
+        assert_eq!(host.launched(), [ARGV.join(" ")]);
         say(&mut view, line(unchanged)).await;
-        let mut surface = mac.output().await;
-        assert_eq!(mac.launched(), [SURFACE.join(" ")]);
+        let mut surface = host.output().await;
+        assert_eq!(host.launched(), [SURFACE.join(" ")]);
         say(&mut surface, frame(3, 3)).await;
-        assert_eq!(mac.painted().await, Some(Ok((3, Some(3)))));
+        assert_eq!(host.painted().await, Some(Ok((3, Some(3)))));
     }
 
     #[tokio::test(start_paused = true)]
     async fn paints_no_frame_behind_the_projection_the_view_last_told() {
-        let (mut mac, mut view, mut surface) = Mac::granted().await;
+        let (mut host, mut view, mut surface) = Host::granted().await;
         say(&mut surface, frame(3, 2)).await;
         say(&mut surface, frame(3, 3)).await;
-        assert_eq!(mac.painted().await, Some(Ok((3, Some(3)))));
+        assert_eq!(host.painted().await, Some(Ok((3, Some(3)))));
         say(&mut view, line(raised)).await;
         say(&mut surface, frame(3, 3)).await;
         say(&mut surface, frame(3, 4)).await;
-        assert_eq!(mac.painted().await, Some(Ok((3, Some(4)))));
+        assert_eq!(host.painted().await, Some(Ok((3, Some(4)))));
     }
 
     #[tokio::test(start_paused = true)]
     async fn paints_no_frame_of_another_tab() {
-        let (mut mac, _view, mut surface) = Mac::granted().await;
+        let (mut host, _view, mut surface) = Host::granted().await;
         say(&mut surface, frame(9, 3)).await;
         say(&mut surface, frame(3, 3)).await;
-        assert_eq!(mac.painted().await, Some(Ok((3, Some(3)))));
+        assert_eq!(host.painted().await, Some(Ok((3, Some(3)))));
     }
 
     #[tokio::test(start_paused = true)]
     async fn tells_of_a_line_that_is_no_surface_and_goes_on() {
-        let (mut mac, _view, mut surface) = Mac::granted().await;
+        let (mut host, _view, mut surface) = Host::granted().await;
         say(&mut surface, "{\"boot\":".to_owned()).await;
         say(&mut surface, frame(3, 3)).await;
         let warned = Err(Error::Json("the JSON ends too early at line 1 column 8".to_owned()));
-        assert_eq!(mac.painted().await, Some(warned));
-        assert_eq!(mac.painted().await, Some(Ok((3, Some(3)))));
+        assert_eq!(host.painted().await, Some(warned));
+        assert_eq!(host.painted().await, Some(Ok((3, Some(3)))));
     }
 
     #[rstest]
@@ -340,15 +340,15 @@ mod a_fit {
     #[case::moved_away(on_another_tab, Fitted::MovedAway)]
     #[tokio::test(start_paused = true)]
     async fn lets_go_of_both_processes_when_a_line_ends_it(#[case] edit: fn(&mut Value), #[case] fitted: Fitted) {
-        let (mut mac, mut view, mut surface) = Mac::granted().await;
+        let (mut host, mut view, mut surface) = Host::granted().await;
         say(&mut view, line(edit)).await;
-        assert_eq!(mac.fitted().await, fitted);
+        assert_eq!(host.fitted().await, fitted);
         assert!(released(&mut view).await && released(&mut surface).await);
     }
 
     #[tokio::test(start_paused = true)]
     async fn lets_go_of_both_processes_when_the_store_moved_on() {
-        let (Mac { moved_on, following, .. }, mut view, mut surface) = Mac::granted().await;
+        let (Host { moved_on, following, .. }, mut view, mut surface) = Host::granted().await;
         moved_on.send(()).expect("the fit is still followed");
         assert_eq!(within(following).await.expect("the fit ends"), Fitted::MovedOn);
         assert!(released(&mut view).await && released(&mut surface).await);

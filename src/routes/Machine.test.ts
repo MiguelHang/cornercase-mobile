@@ -17,7 +17,7 @@ const studio = (urls = ROUTES): MachineView_Serialize => ({
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: ROUTES[1] }
 
-const DEMO: MachineView_Serialize = { id: DEMO_MACHINE, name: 'Demo Mac', routes: [], last_route: null, demo: true }
+const DEMO: MachineView_Serialize = { id: DEMO_MACHINE, name: 'Demo machine', routes: [], last_route: null, demo: true }
 
 const CONNECTED_DEMO: ConnectionView_Serialize = { state: 'connected', route: '' }
 
@@ -187,7 +187,7 @@ describe('Machine', () => {
     const body = screen(machine, CONNECTED, edit)
     expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Studio\?<\/h2>/)
     expect(body).toContain(
-      'Its routes and their secrets are removed from this phone. The Mac still lets it in until you forget it in cornercase › Settings › Remote › Phone app.',
+      'Its routes and their secrets are removed from this phone. The machine still lets it in until you forget it in cornercase › Settings › Remote › Phone app.',
     )
     expect(body).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Cancel/)
     expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)
@@ -198,18 +198,18 @@ describe('Machine', () => {
 
   it('offers the demo only Delete machine, since it has no saved name or routes to change', () => {
     const body = screen(DEMO, CONNECTED_DEMO)
-    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Demo Mac<\/h1>/)
+    expect(body).toMatch(/<h1 class="title svelte-[\w-]+">Demo machine<\/h1>/)
     expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete machine/)
     expect(body).not.toContain('Rename')
     expect(body).not.toContain('Routes')
     expect(body).not.toContain('Edit routes')
   })
 
-  it('asks before ending the demo, without the routes, secrets and Mac it lacks', () => {
+  it('asks before ending the demo, without the routes, secrets and machine it lacks', () => {
     const edit = new EditMachine(CALLS, () => DEMO, nothing, nothing, quiet)
     edit.askToDelete()
     const body = screen(DEMO, CONNECTED_DEMO, edit)
-    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Demo Mac\?<\/h2>/)
+    expect(body).toMatch(/<h2 class="heading svelte-[\w-]+">Delete Demo machine\?<\/h2>/)
     expect(body).toContain('The demo ends, and nothing of it stays on this phone.')
     expect(body).not.toContain('secrets')
     expect(body).toMatch(/<button class="button danger svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Delete(?:<!--[^>]*-->)*<\/button>/)

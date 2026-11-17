@@ -190,7 +190,7 @@ describe('ChangesState, its list', () => {
     expect(tell.mock.calls).toEqual([[{ level: 'error', message }]])
   })
 
-  it('says the workspace was closed on the Mac, and takes nothing more', async () => {
+  it('says the workspace was closed on the machine, and takes nothing more', async () => {
     const { changes, calls, tell } = await following()
     await changes.open('src/a.rs')
     changes.see(told(null, { closed: true }))

@@ -283,7 +283,7 @@ mod a_patch_on_another_base {
 mod a_terminal {
     use super::*;
     use crate::cli::status::fixtures::VIEW;
-    use crate::follow::fake::{self, BOOT, Mac, Watched, connected, dropped, dropped_for_a_while, session};
+    use crate::follow::fake::{self, BOOT, Host, Watched, connected, dropped, dropped_for_a_while, session};
 
     const TAB: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
     const CLAIM: [&str; 7] = ["view", "--tab", "3", "--cols", "80", "--rows", "24"];
@@ -292,24 +292,24 @@ mod a_terminal {
         Said::Line(one_line(FRAME))
     }
 
-    fn watching(sessions: Vec<Vec<Said>>, surfaces: Vec<Vec<Said>>) -> Mac {
-        Mac::of(&TAB, sessions, surfaces)
+    fn watching(sessions: Vec<Vec<Said>>, surfaces: Vec<Vec<Said>>) -> Host {
+        Host::of(&TAB, sessions, surfaces)
     }
 
     struct OnScreen(Watched<Screen>);
 
     impl OnScreen {
-        async fn after_a_minute(mac: Mac) -> Self {
-            Self::for_a_minute(mac, false).await
+        async fn after_a_minute(host: Host) -> Self {
+            Self::for_a_minute(host, false).await
         }
 
-        async fn fitted_for_a_minute(mac: Mac) -> Self {
-            Self::for_a_minute(mac, true).await
+        async fn fitted_for_a_minute(host: Host) -> Self {
+            Self::for_a_minute(host, true).await
         }
 
-        async fn for_a_minute(mac: Mac, fit: bool) -> Self {
+        async fn for_a_minute(host: Host, fit: bool) -> Self {
             let terminal = Terminal { tab: 3, pane: None, size: SIZE, fit };
-            Self(Watched::after_a_minute(mac, move |store, sink| terminal.run(store, sink)).await)
+            Self(Watched::after_a_minute(host, move |store, sink| terminal.run(store, sink)).await)
         }
 
         fn seen(&mut self) -> Vec<(u64, &'static str)> {
@@ -404,7 +404,7 @@ mod a_terminal {
         let mut rebooted: Value = serde_json::from_str(FRAME).expect("the frame fixture");
         rebooted["boot"] = "another-boot".into();
         let surfaces = vec![vec![drawn(), Said::After(5), exits()], vec![Said::Line(rebooted.to_string())]];
-        let mut watched = OnScreen::after_a_minute(Mac::restarting(&TAB, surfaces)).await;
+        let mut watched = OnScreen::after_a_minute(Host::restarting(&TAB, surfaces)).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (15, "replaced")]);
     }
 
@@ -423,7 +423,7 @@ mod a_terminal {
         Said::Line(frame.to_string())
     }
 
-    fn fitting(views: Vec<Vec<Said>>, fitted: Vec<Vec<Said>>) -> Mac {
+    fn fitting(views: Vec<Vec<Said>>, fitted: Vec<Vec<Said>>) -> Host {
         watching(connected(), vec![vec![drawn()]]).also(&CLAIM, views).also(&VIEW_ARGV, fitted)
     }
 
@@ -446,7 +446,7 @@ mod a_terminal {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn shows_the_tab_as_it_is_once_the_mac_takes_it_back() {
+    async fn shows_the_tab_as_it_is_once_the_machine_takes_it_back() {
         let views = vec![vec![viewed(3, true), Said::After(5), viewed(3, false)]];
         let mut watched = OnScreen::fitted_for_a_minute(fitting(views, vec![vec![drawn_for_the_view(3)]])).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (5, "taken back"), (5, "replaced")]);
@@ -458,7 +458,7 @@ mod a_terminal {
         let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), session(BOOT, 8, false)]];
         let views = vec![vec![viewed(3, true), Said::After(5), viewed(9, true)]];
         let fitted = vec![vec![drawn_for_the_view(3), Said::After(5), drawn_for_the_view(9)]];
-        let mut watched = OnScreen::fitted_for_a_minute(Mac { sessions, ..fitting(views, fitted) }).await;
+        let mut watched = OnScreen::fitted_for_a_minute(Host { sessions, ..fitting(views, fitted) }).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (6, "closed")]);
         assert_eq!(watched.surfaces(), [CLAIM.join(" "), VIEW_ARGV.join(" ")]);
         assert!(watched.0.running.is_finished());
@@ -468,8 +468,8 @@ mod a_terminal {
     async fn claims_the_tab_again_at_the_same_size_once_connected_again() {
         let sessions =
             vec![vec![session(BOOT, 7, true), Said::After(5), exits()], vec![Said::After(20), session(BOOT, 7, true)]];
-        let mac = Mac { sessions, ..fitting(granted(), vec![vec![drawn_for_the_view(3)]]) };
-        let mut watched = OnScreen::fitted_for_a_minute(mac).await;
+        let host = Host { sessions, ..fitting(granted(), vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = OnScreen::fitted_for_a_minute(host).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
         let claimed = [CLAIM.join(" "), VIEW_ARGV.join(" ")];
         assert_eq!(watched.surfaces(), [claimed.clone(), claimed].concat());
@@ -482,8 +482,8 @@ mod a_terminal {
             vec![Said::After(20), session(BOOT, 7, true)],
         ];
         let views = vec![vec![viewed(3, true), Said::After(5), dropped()], granted().concat()];
-        let mac = Mac { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
-        let mut watched = OnScreen::fitted_for_a_minute(mac).await;
+        let host = Host { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = OnScreen::fitted_for_a_minute(host).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (26, "replaced")]);
         assert_eq!(watched.surfaces().len(), 4);
     }
@@ -493,7 +493,7 @@ mod a_terminal {
         let sessions = vec![vec![session(BOOT, 7, true), Said::After(7), session(BOOT, 8, false)]];
         let views = vec![vec![viewed(3, true), Said::After(5), viewed(9, true)], vec![refused()]];
         let fitted = vec![vec![drawn_for_the_view(3)]];
-        let mut watched = OnScreen::fitted_for_a_minute(Mac { sessions, ..fitting(views, fitted) }).await;
+        let mut watched = OnScreen::fitted_for_a_minute(Host { sessions, ..fitting(views, fitted) }).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (8, "closed")]);
         assert_eq!(watched.surfaces(), [CLAIM.join(" "), VIEW_ARGV.join(" ")]);
     }
@@ -510,8 +510,8 @@ mod a_terminal {
     async fn stays_quiet_about_a_view_refused_as_the_store_drops_its_transport() {
         let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), dropped()]];
         let views = vec![vec![Said::After(5), refused()], granted().concat()];
-        let mac = Mac { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
-        let mut watched = OnScreen::fitted_for_a_minute(mac).await;
+        let host = Host { sessions, ..fitting(views, vec![vec![drawn_for_the_view(3)]]) };
+        let mut watched = OnScreen::fitted_for_a_minute(host).await;
         assert!(!watched.seen().contains(&(5, "refused")));
     }
 
@@ -522,9 +522,9 @@ mod a_terminal {
     #[tokio::test(start_paused = true)]
     async fn stays_fitted_through_a_restart_told_by_the_view_before_the_store() {
         let views = vec![vec![viewed(3, true), Said::After(3), stale()], Vec::new(), granted().concat()];
-        let restarting = Mac::restarting(&TAB, vec![vec![drawn()]]);
-        let mac = restarting.also(&CLAIM, views).also(&VIEW_ARGV, vec![vec![drawn_for_the_view(3)]]);
-        let mut watched = OnScreen::fitted_for_a_minute(mac).await;
+        let restarting = Host::restarting(&TAB, vec![vec![drawn()]]);
+        let host = restarting.also(&CLAIM, views).also(&VIEW_ARGV, vec![vec![drawn_for_the_view(3)]]);
+        let mut watched = OnScreen::fitted_for_a_minute(host).await;
         assert_eq!(watched.seen(), [(0, "replaced"), (3, "failed"), (15, "replaced")]);
         let claims = watched.surfaces().into_iter().filter(|argv| *argv == CLAIM.join(" ")).count();
         assert_eq!(claims, 3);

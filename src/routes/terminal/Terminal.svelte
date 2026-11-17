@@ -123,7 +123,7 @@
     />
   </div>
   {#if shown.current.closed}
-    <p class="closed" role="status">This tab was closed on the Mac</p>
+    <p class="closed" role="status">This tab was closed on the machine</p>
   {/if}
   <KeyRow {ctrl} {send} {onfailed} disabled={shown.current.closed} />
 </section>

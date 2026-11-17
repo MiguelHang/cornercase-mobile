@@ -142,7 +142,7 @@
         {#if machine.demo}
           <p class="lost">The demo ends, and nothing of it stays on this phone.</p>
         {:else}
-          <p class="lost">Its routes and their secrets are removed from this phone. The Mac still lets it in until you forget it in cornercase › Settings › Remote › Phone app.</p>
+          <p class="lost">Its routes and their secrets are removed from this phone. The machine still lets it in until you forget it in cornercase › Settings › Remote › Phone app.</p>
         {/if}
         <div class="buttons">
           <Button tone="plain" resting={edit.busy} onclick={() => edit.keep()}>Cancel</Button>

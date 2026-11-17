@@ -23,7 +23,7 @@ const bar = (connection: ConnectionView_Serialize) =>
     .body
 
 const demoBar = (connection: ConnectionView_Serialize) =>
-  render(ConnectionBar, { props: { connection, machineName: 'Demo Mac', demo: true, onmachines: () => {}, onleave: () => {} } })
+  render(ConnectionBar, { props: { connection, machineName: 'Demo machine', demo: true, onmachines: () => {}, onleave: () => {} } })
     .body
 
 const flat = (text: string) => text.replace(/\s+/g, ' ')
@@ -33,8 +33,8 @@ describe('ConnectionBar', () => {
     ['connecting', { state: 'connecting' }, 'Connecting…', 'working'],
     ['connected', { state: 'connected', route: 'ws://192.168.1.20:7000/' }, 'MacBook · via 192.168.1.20:7000', 'done'],
     ['retrying', RETRYING, 'Retrying in 2 s', 'failed'],
-    ['missing', MISSING, 'Update cornercase on the Mac', 'failed'],
-    ['not_paired', { state: 'not_paired' }, 'This Mac no longer recognizes this phone', 'failed'],
+    ['missing', MISSING, 'Update cornercase on the machine', 'failed'],
+    ['not_paired', { state: 'not_paired' }, 'This machine no longer recognizes this phone', 'failed'],
   ])('shows %s with its text and the dot in its tone', (_, connection, text, tone) => {
     const body = bar(connection)
     expect(body).toMatch(new RegExp(`<span class="dot ${tone} svelte-[\\w-]+( pulsing)?"></span>`))
@@ -137,7 +137,7 @@ describe('ConnectionBar', () => {
         expect(body).not.toMatch(/No network|Retrying|via |:\d+/)
       }
       expect(demoBar({ state: 'connected', route: '' })).toMatch(
-        /<span class="line text svelte-[\w-]+">Demo Mac<\/span>/,
+        /<span class="line text svelte-[\w-]+">Demo machine<\/span>/,
       )
     })
 

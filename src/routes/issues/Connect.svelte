@@ -7,13 +7,13 @@
 
   const inRepository = (source: SourceInfo) =>
     source.source === 'gitlab'
-      ? 'On the Mac, open a folder inside the git repository whose remote is on your GitLab server as the project.'
-      : 'On the Mac, open a folder inside the git repository as the project.'
+      ? 'On the machine, open a folder inside the git repository whose remote is on your GitLab server as the project.'
+      : 'On the machine, open a folder inside the git repository as the project.'
 
   const signIn = (source: SourceInfo) =>
     source.source === 'github'
-      ? "On the Mac, sign in to gh in the project's folder."
-      : "On the Mac, connect it in cornercase's Settings › Issues."
+      ? "On the machine, sign in to gh in the project's folder."
+      : "On the machine, connect it in cornercase's Settings › Issues."
 
   const howTo = (source: SourceInfo) => {
     const repository = source.missing.includes('repository')
@@ -26,7 +26,7 @@
   <div class="connect">
     <h2 class="heading">No issue tracker is connected</h2>
     {#if sources.length === 0}
-      <p class="how">Connect one on the Mac, in cornercase's Settings › Issues.</p>
+      <p class="how">Connect one on the machine, in cornercase's Settings › Issues.</p>
     {:else}
       <ul class="trackers">
         {#each sources as source (source.source)}

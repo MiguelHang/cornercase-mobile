@@ -254,7 +254,7 @@ describe('Thread', () => {
     const conversation = [GAP, ASKED, yours(2, 'sent', { text: 'yes, run it' }), agentSaid(3, 'Migrated.')]
     const body = thread(threadChat(conversation))
     const marks = [
-      'Earlier messages are on the Mac',
+      'Earlier messages are on the machine',
       'Shall I run the migration?',
       'yes, run it',
       'Migrated.',
@@ -268,7 +268,7 @@ describe('Thread', () => {
 
   it('draws the gap as a muted line of its own', () => {
     const body = thread(threadChat([GAP, ASKED]))
-    expect(body).toMatch(/<p class="gap svelte-[\w-]+">Earlier messages are on the Mac<\/p>/)
+    expect(body).toMatch(/<p class="gap svelte-[\w-]+">Earlier messages are on the machine<\/p>/)
     expect(flat(threadSource)).toContain('.gap { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }')
   })
 

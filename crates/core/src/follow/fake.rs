@@ -83,7 +83,7 @@ fn in_turn(fake: FakeTransport, argv: &[&str], turns: Vec<Vec<Said>>) -> FakeTra
     })
 }
 
-pub(crate) struct Mac {
+pub(crate) struct Host {
     pub(crate) contracts: Vec<Vec<Said>>,
     pub(crate) sessions: Vec<Vec<Said>>,
     pub(crate) streams: Vec<Vec<Said>>,
@@ -91,7 +91,7 @@ pub(crate) struct Mac {
     pub(crate) also: Vec<(&'static [&'static str], Vec<Vec<Said>>)>,
 }
 
-impl Mac {
+impl Host {
     pub(crate) fn of(followed: &'static [&'static str], sessions: Vec<Vec<Said>>, streams: Vec<Vec<Said>>) -> Self {
         Self { contracts: vec![contract(BOOT)], sessions, streams, followed, also: Vec::new() }
     }
@@ -125,11 +125,11 @@ pub(crate) struct Watched<T> {
 }
 
 impl<T: Send + 'static> Watched<T> {
-    pub(crate) async fn after_a_minute<F>(mac: Mac, run: impl FnOnce(Store, Sink<T>) -> F) -> Self
+    pub(crate) async fn after_a_minute<F>(host: Host, run: impl FnOnce(Store, Sink<T>) -> F) -> Self
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        let (transport, launched) = mac.fake().launched();
+        let (transport, launched) = host.fake().launched();
         let address = Address { host: "studio.local".to_owned(), port: 8765 };
         let studio = Route::cli(address, Some(Token::new("4f2a91c0.9c1e2a7b5d0f".to_owned())));
         let machine = Machine { id: MachineId(1), name: "studio".to_owned(), routes: vec![studio], last_route: None };

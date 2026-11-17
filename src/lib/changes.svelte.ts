@@ -26,7 +26,7 @@ export type OpenDiff = { path: string; reading: Reading }
 
 type Mark = { viewed: boolean; id: number; settled: boolean }
 
-export const CLOSED = 'This workspace was closed on the Mac'
+export const CLOSED = 'This workspace was closed on the machine'
 
 export const goneMessage = (path: string) => `${path} no longer has changes`
 

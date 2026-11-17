@@ -12,7 +12,7 @@
   of={(choice) => ({ value: choice.agent, name: choice.agent })}
   error={form.agentError}
   reading="Reading the agents…"
-  empty="No agent is installed on this Mac."
+  empty="No agent is installed on this machine."
   disabled={form.sending}
   onretry={() => void form.loadAgents()}
 />

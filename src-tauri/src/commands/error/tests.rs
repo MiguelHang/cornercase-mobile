@@ -77,7 +77,7 @@ mod of_pairing {
     #[case::refused(PairError::Answered(Error::PairingRefused), "pairing_refused")]
     #[case::failed(PairError::Answered(Error::PairingFailed), "pairing_failed")]
     #[case::malformed(PairError::Answered(Error::MalformedSecret), "protocol")]
-    fn carries_the_code_of_what_the_mac_answered(#[case] error: PairError, #[case] code: &str) {
+    fn carries_the_code_of_what_the_machine_answered(#[case] error: PairError, #[case] code: &str) {
         let message = error.to_string();
         assert_eq!(json_of(&CommandError::from(error)), json!({ "code": code, "message": message }));
     }

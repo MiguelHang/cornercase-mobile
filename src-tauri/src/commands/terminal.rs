@@ -20,7 +20,7 @@ use crate::state::AppState;
 pub(crate) mod input;
 
 const FRAME: Duration = Duration::from_millis(16);
-const TAKEN_BACK: &str = "The Mac took this tab back";
+const TAKEN_BACK: &str = "The machine took this tab back";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
 pub(crate) struct Shape {

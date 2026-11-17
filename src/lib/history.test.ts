@@ -73,15 +73,15 @@ describe('restated', () => {
   const entries = [gap(0), you(1, 'fix the login', 'sending'), you(2, 'and the tests', 'sending')]
 
   it('changes the state of the message with that id, in place', () => {
-    expect(restated(entries, 1, 'failed', 'the Mac is not reachable')).toEqual([
+    expect(restated(entries, 1, 'failed', 'the machine is not reachable')).toEqual([
       gap(0),
-      { ...you(1, 'fix the login', 'failed'), reason: 'the Mac is not reachable' },
+      { ...you(1, 'fix the login', 'failed'), reason: 'the machine is not reachable' },
       you(2, 'and the tests', 'sending'),
     ])
   })
 
   it('clears the reason once a retry is sent', () => {
-    const failed = restated(entries, 1, 'failed', 'the Mac is not reachable')
+    const failed = restated(entries, 1, 'failed', 'the machine is not reachable')
     expect(restated(failed, 1, 'sent', null)[1]).toEqual(you(1, 'fix the login', 'sent'))
   })
 
@@ -128,7 +128,7 @@ describe('heard', () => {
   it.each([
     ['loading', { kind: 'loading' as const }],
     ['unreadable', { kind: 'unreadable' as const, reason: 'the transcript is gone' }],
-    ['lost', { kind: 'lost' as const, reason: 'the Mac is not reachable' }],
+    ['lost', { kind: 'lost' as const, reason: 'the machine is not reachable' }],
   ])('keeps nothing from a %s reading', (_, nothing) => {
     expect(heard(answered, nothing, SEEN, false)).toBe(answered)
     expect(heard([], nothing, SEEN, false)).toEqual([])

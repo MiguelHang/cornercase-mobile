@@ -44,11 +44,11 @@ describe('rowStatus of the active machine', () => {
 })
 
 describe('rowStatus of the demo', () => {
-  const DEMO: MachineView_Serialize = { id: 4294967295, name: 'Demo Mac', routes: [], last_route: null, demo: true }
+  const DEMO: MachineView_Serialize = { id: 4294967295, name: 'Demo machine', routes: [], last_route: null, demo: true }
 
   it('shows it connected by its name with no via', () => {
     expect(rowStatus(DEMO, { state: 'connected', route: '' }, CHECKING)).toEqual({
-      text: 'Demo Mac',
+      text: 'Demo machine',
       tone: 'done',
       pulsing: false,
       failures: [],
@@ -115,7 +115,7 @@ describe('rowStatus of another machine', () => {
 describe('rescannable', () => {
   it.each<[string, Probe, boolean]>([
     ['no secret', { state: 'no_token' }, true],
-    ['a Mac that forgot this phone', { state: 'not_paired' }, true],
+    ['a machine that forgot this phone', { state: 'not_paired' }, true],
     ['an answer', { state: 'answers', route: 'ws://studio.lan:9000/' }, false],
     ['no answer', { state: 'no_answer', failures: [] }, false],
     ['a probe still running', CHECKING, false],

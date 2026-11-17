@@ -55,7 +55,7 @@ describe('NoMachines', () => {
 
   it('keeps only Add machine in the card, and offers the demo as a line of text under it', () => {
     expect(body).toMatch(
-      /Add machine<!----><\/button><!----><\/div><!--\]--><!----><\/div><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+      /Add machine<!----><\/button><!----><\/div><!--\]--><!----><\/div><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No machine nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
     )
     expect(body.match(/<button/g)).toHaveLength(2)
   })
@@ -75,7 +75,7 @@ describe('NoMachines', () => {
   })
 
   it('sends to Phone app in cornercase for the code, never to the bridge', () => {
-    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your Mac, and the code it shows.')
+    expect(body).toContain('It needs Phone app turned on in cornercase › Settings › Remote on your computer (Linux or macOS), and the code it shows.')
     const sources = [noMachinesSource, formSource, urlFieldSource, overlaySource]
     expect(sources.filter((source) => /bridge/i.test(source))).toEqual([])
   })
@@ -181,7 +181,7 @@ describe('the same machine offer', () => {
   it('says why, then offers the route first as the primary, a new machine and Back', () => {
     const body = shown(offer('boot'))
     expect(body).toMatch(/<div class="offer svelte-[\w-]+" role="group" aria-label="Same machine">/)
-    expect(body).toContain('This code comes from the same Mac as Studio.')
+    expect(body).toContain('This code comes from the same machine as Studio.')
     expect(button(body, 'Add its addresses to Studio')?.[1]).toMatch(/^button primary svelte-[\w-]+$/)
     expect(button(body, 'Add as a new machine')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
     expect(button(body, 'Back')?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
@@ -193,9 +193,9 @@ describe('the same machine offer', () => {
     expect(shown(offer('address'))).toContain('Update the token of Studio')
   })
 
-  it('warns when the Mac could not be asked', () => {
+  it('warns when the machine could not be asked', () => {
     expect(shown(offer('name', false))).toMatch(
-      /<p class="note svelte-[\w-]+">cornercase on the Mac did not answer, so it could not be asked which machine it is.<\/p>/,
+      /<p class="note svelte-[\w-]+">cornercase did not answer, so it could not be asked which machine it is.<\/p>/,
     )
   })
 

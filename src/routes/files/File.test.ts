@@ -120,7 +120,7 @@ describe('File', () => {
     expect(noted(draw(showing({ kind: 'failed', reason: 'IPC is gone' })))).toBe('IPC is gone')
   })
 
-  it('leaves only the notice and Back once the workspace is closed on the Mac', () => {
+  it('leaves only the notice and Back once the workspace is closed on the machine', () => {
     const files = showing(reads({}))
     files.gone = true
     const body = draw(files)

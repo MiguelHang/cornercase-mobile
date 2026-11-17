@@ -18,7 +18,7 @@ mod the_launcher {
     use super::*;
 
     #[test]
-    fn names_the_app_its_version_and_the_platform_to_the_mac() {
+    fn names_the_app_its_version_and_the_platform_to_the_machine() {
         let agent = user_agent();
         let version = env!("CARGO_PKG_VERSION");
         assert!(agent.starts_with(&format!("cornercase-mobile/{version} (")), "{agent}");

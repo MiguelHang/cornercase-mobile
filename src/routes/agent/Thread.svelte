@@ -75,7 +75,7 @@
           {/if}
         </article>
       {:else}
-        <p class="gap">Earlier messages are on the Mac</p>
+        <p class="gap">Earlier messages are on the machine</p>
       {/if}
     {/each}
     {#if note !== null}

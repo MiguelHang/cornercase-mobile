@@ -192,7 +192,7 @@ mod parsed {
                 text: "now the tests".to_owned(),
                 chips: Vec::new(),
                 state: SendState::Failed,
-                reason: Some("the connection to the Mac dropped before the command finished".to_owned()),
+                reason: Some("the connection to the machine dropped before the command finished".to_owned()),
                 seen: 1_731_250_020_000,
             },
         ];

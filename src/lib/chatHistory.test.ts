@@ -16,7 +16,7 @@ const saying =
 const failingOnce = (): SendText => {
   let failed = false
   return () => {
-    const answer = failed ? ok(null) : refused('the Mac is not reachable')
+    const answer = failed ? ok(null) : refused('the machine is not reachable')
     failed = true
     return Promise.resolve(answer)
   }
@@ -85,7 +85,7 @@ describe('Chat, recording the conversation', () => {
     expect(kept.at(-1)).toEqual(chat.conversation)
   })
 
-  it('marks a send sent once the Mac has it', async () => {
+  it('marks a send sent once the machine has it', async () => {
     const { chat } = await loaded()
     await sendOn(chat, 'fix the login')
     expect(yours(chat.conversation)).toEqual([
@@ -161,7 +161,7 @@ describe('Chat, a send that failed', () => {
     const { chat } = await loaded(fakeHistory(stored), saying(), failingOnce())
     await sendOn(chat, 'fix the login')
     expect(yours(chat.conversation).map((entry) => [entry.state, entry.reason])).toEqual([
-      ['failed', 'the Mac is not reachable'],
+      ['failed', 'the machine is not reachable'],
     ])
   })
 
@@ -290,8 +290,8 @@ describe('Chat, vouching for the conversation', () => {
   it.each([
     ['following starts again, back from the background', (chat: ReturnType<typeof fresh>) => chat.follow()],
     ['the streams of the machine are lost', (chat: ReturnType<typeof fresh>) => chat.lose()],
-    ['the agent works on something sent from the Mac', (chat: ReturnType<typeof fresh>) => told(chat, 'working')],
-    ['the pane runs a command from the Mac', (chat: ReturnType<typeof fresh>) => told(chat, 'shell')],
+    ['the agent works on something sent from the machine', (chat: ReturnType<typeof fresh>) => told(chat, 'working')],
+    ['the pane runs a command from the machine', (chat: ReturnType<typeof fresh>) => told(chat, 'shell')],
     ['another agent runs in the pane', (chat: ReturnType<typeof fresh>) => told(chat, 'done', 'claude')],
   ])('puts a gap before the next message once %s', async (_, lost) => {
     const { chat } = await caughtUp()
@@ -320,7 +320,7 @@ describe('Chat, vouching for the conversation', () => {
     ])
   })
 
-  it('puts a gap before a message after a turn from the Mac that follows a send into a running turn', async () => {
+  it('puts a gap before a message after a turn from the machine that follows a send into a running turn', async () => {
     const { chat } = await loaded(fakeHistory(stored), saying('Done.', 'Fixed.', 'Tests pass.'))
     await chat.refresh()
     told(chat, 'working')

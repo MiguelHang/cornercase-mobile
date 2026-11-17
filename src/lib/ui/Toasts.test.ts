@@ -5,7 +5,7 @@ import Toasts from './Toasts.svelte'
 import toastsSource from './Toasts.svelte?raw'
 
 const INFO: Shown = { id: 1, level: 'info', message: 'Machine added', count: 1, at: 0 }
-const ERROR: Shown = { id: 2, level: 'error', message: 'Could not reach the Mac', count: 3, at: 0 }
+const ERROR: Shown = { id: 2, level: 'error', message: 'Could not reach the machine', count: 3, at: 0 }
 
 const toasts = (items: Shown[], below?: number) =>
   render(Toasts, { props: { items, ondismiss: () => {}, below } }).body
@@ -18,7 +18,7 @@ describe('Toasts', () => {
     expect(body).toMatch(
       /<div class="toast info svelte-[\w-]+"><div class="glass [^"]+"><span class="highlight [^"]+"><\/span> <button class="body svelte-[\w-]+" type="button"><span class="bar svelte-[\w-]+"><\/span> <span class="text svelte-[\w-]+">Machine added<\/span>/,
     )
-    expect(body).toMatch(/<div class="toast error svelte-[\w-]+">.*?<button class="body [^"]+" type="button">.*?>Could not reach the Mac<\/span>/)
+    expect(body).toMatch(/<div class="toast error svelte-[\w-]+">.*?<button class="body [^"]+" type="button">.*?>Could not reach the machine<\/span>/)
   })
 
   it('puts no block inside a button', () => {

@@ -29,7 +29,7 @@ mod observe {
     }
 
     #[test]
-    fn says_same_for_the_same_mac_reached_by_another_route() {
+    fn says_same_for_the_same_machine_reached_by_another_route() {
         let first: Descriptor = REAL.parse().expect("the real contract over one route");
         let second: Descriptor = REAL.parse().expect("the real contract over another route");
         let mut watch = BootWatch::default();

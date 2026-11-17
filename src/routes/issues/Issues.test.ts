@@ -263,15 +263,15 @@ describe('Issues', () => {
 describe('Connect', () => {
   const connect = (sources: SourceInfo[]) => render(Connect, { props: { sources, onretry: () => {} } }).body
 
-  it("says what each tracker misses, why it fails and where on the Mac it is connected, with no token field", () => {
+  it("says what each tracker misses, why it fails and where on the machine it is connected, with no token field", () => {
     const body = connect([{ ...GITHUB, state: 'missing', missing: ['repository'] }, LINEAR, JIRA])
     expect(textsOf(body, 'name svelte-')).toEqual(['GitHub', 'Linear', 'Jira'])
     expect(textsOf(body, 'why svelte-')).toEqual(['Missing: repository', LINEAR.reason, 'Missing: site, token'])
     expect(textsOf(body, 'why svelte-[\\w-]+ failing')).toEqual([LINEAR.reason])
     expect(textsOf(body, 'how svelte-')).toEqual([
-      'On the Mac, open a folder inside the git repository as the project.',
-      "On the Mac, connect it in cornercase's Settings › Issues.",
-      "On the Mac, connect it in cornercase's Settings › Issues.",
+      'On the machine, open a folder inside the git repository as the project.',
+      "On the machine, connect it in cornercase's Settings › Issues.",
+      "On the machine, connect it in cornercase's Settings › Issues.",
     ])
     expect(body).not.toContain('<input')
     expect(body).toContain('Check again')
@@ -281,28 +281,28 @@ describe('Connect', () => {
     [
       'gh failing in the folder',
       { state: 'failing', reason: 'gh is not logged in' },
-      ["On the Mac, sign in to gh in the project's folder."],
+      ["On the machine, sign in to gh in the project's folder."],
     ],
     [
       'a GitLab project whose remote is elsewhere',
       { source: 'gitlab', name: 'GitLab', state: 'missing', missing: ['repository'] },
-      ['On the Mac, open a folder inside the git repository whose remote is on your GitLab server as the project.'],
+      ['On the machine, open a folder inside the git repository whose remote is on your GitLab server as the project.'],
     ],
     [
       'a GitLab folder with no token outside a repository',
       { source: 'gitlab', name: 'GitLab', state: 'missing', missing: ['token', 'repository'] },
       [
-        'On the Mac, open a folder inside the git repository whose remote is on your GitLab server as the project.',
-        "On the Mac, connect it in cornercase's Settings › Issues.",
+        'On the machine, open a folder inside the git repository whose remote is on your GitLab server as the project.',
+        "On the machine, connect it in cornercase's Settings › Issues.",
       ],
     ],
   ])('tells how to fix %s', (_, change, how) => {
     expect(textsOf(connect([{ ...GITHUB, ...change }]), 'how svelte-')).toEqual(how)
   })
 
-  it('points at the Mac when no project has a tracker at all', () => {
+  it('points at the machine when no project has a tracker at all', () => {
     const how = textsOf(connect([]), 'how svelte-')
-    expect(how).toEqual(["Connect one on the Mac, in cornercase's Settings › Issues."])
+    expect(how).toEqual(["Connect one on the machine, in cornercase's Settings › Issues."])
     expect(one(connectSource)).toContain('<Button tone="plain" onclick={onretry}>Check again</Button>')
   })
 })

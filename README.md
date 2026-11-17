@@ -1,7 +1,7 @@
 # Cornercase remote
 
 The phone app for [cornercase](https://github.com/usecornercase/cornercase-terminal): follow, answer and start
-cornercase's coding agents from your iPhone or Android phone, while they keep running on your Mac.
+cornercase's coding agents from your iPhone or Android phone, while they keep running on your computer (Linux or macOS).
 
 - See every agent of your projects on one board, with its status, the ones that need you first.
 - Read an agent's conversation, answer it, tap its options, or open its live terminal.
@@ -12,8 +12,8 @@ What is new in each version is in the [changelog](CHANGELOG.md).
 
 ## What you need
 
-- **cornercase 0.13.78 or later** on your Mac.
-- A phone on the same network as the Mac, or both on your [Tailscale](https://tailscale.com) network.
+- **cornercase 0.13.78 or later** on the computer.
+- A phone on the same network as the computer, or both on your [Tailscale](https://tailscale.com) network.
 - iOS 15 or later on an iPhone, or Android 7.0 or later.
 
 ## Install
@@ -22,12 +22,12 @@ What is new in each version is in the [changelog](CHANGELOG.md).
 - **Android**: download the `.apk` of the [latest release](../../releases/latest) on your phone and open it. Android
   asks you to allow installing unknown apps from your browser or file manager the first time.
 
-## Pair it with your Mac
+## Pair it with your computer
 
-1. In cornercase on your Mac, open Settings › Remote › Phone app and turn it on. It shows a QR code, with the code as
-   text under it.
+1. In cornercase on the computer, open Settings › Remote › Phone app and turn it on. It shows a QR code, with the code
+   as text under it.
 2. In the app, open **Machines** › **Add machine**, then scan the QR code, or paste the code.
-3. Give the machine a name. Add one machine per Mac; the app opens the last one you used.
+3. Give the machine a name. Add one machine per computer; the app opens the last one you used.
 
 A code lasts ten minutes and pairs one phone. To cut a phone off, forget it in the same place in cornercase.
 
@@ -37,7 +37,7 @@ To ask a question or report a problem, see [support](SUPPORT.md): where to ask a
 
 ## Privacy
 
-The app collects nothing and talks only to the Macs you pair it with. The [privacy policy](PRIVACY.md) says what it
+The app collects nothing and talks only to the computers you pair it with. The [privacy policy](PRIVACY.md) says what it
 keeps on your phone and how to delete it.
 
 ## Development

@@ -18,14 +18,14 @@ export const NAME_EMPTY = 'the name is empty'
 export const NAME_TOO_LONG = `the name is longer than ${LONGEST_NAME} characters`
 export const NAME_TAKEN = 'another machine already has that name'
 
-export const UNCHECKED = 'cornercase on the Mac did not answer, so it could not be asked which machine it is.'
+export const UNCHECKED = 'cornercase did not answer, so it could not be asked which machine it is.'
 export const NEW_MACHINE = 'Add as a new machine'
 
 const NAME = 'Name'
 
 const REASONS: Record<SameWhy, (saved: string) => string> = {
   address: (saved) => `${saved} is already saved at this address.`,
-  boot: (saved) => `This code comes from the same Mac as ${saved}.`,
+  boot: (saved) => `This code comes from the same machine as ${saved}.`,
   name: (saved) => `A machine is already called ${saved}.`,
 }
 

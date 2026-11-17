@@ -287,9 +287,9 @@ describe('Button', () => {
 describe('DemoOffer', () => {
   const body = render(DemoOffer, { props: { ondemo: () => {} } }).body
 
-  it('says No Mac nearby? in grey, then Try a demo as a link', () => {
+  it('says No machine nearby? in grey, then Try a demo as a link', () => {
     expect(body).toMatch(
-      /^<!--\[--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!----><\/button>/,
+      /^<!--\[--><p class="offer svelte-[\w-]+">No machine nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!----><\/button>/,
     )
     expect(flat(demoOfferSource)).toContain(
       '.offer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin: 0; color: var(--muted); font-size: 15px; }',

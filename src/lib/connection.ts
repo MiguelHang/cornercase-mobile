@@ -104,7 +104,7 @@ const lacking = (missing: MissingView_Serialize[]): Told => {
   const since = newest(missing)
   const names = missing.map(({ name }) => name).join(', ')
   return {
-    text: `Update cornercase on the Mac${since === null ? '' : ` to ${since} or later`}`,
+    text: `Update cornercase on the machine${since === null ? '' : ` to ${since} or later`}`,
     detail: `It lacks ${names}`,
   }
 }
@@ -118,9 +118,9 @@ const failure = (connection: Failed): Told => {
     case 'missing':
       return lacking(connection.missing)
     case 'not_paired':
-      return { text: 'This Mac no longer recognizes this phone', detail: SCAN_AGAIN }
+      return { text: 'This machine no longer recognizes this phone', detail: SCAN_AGAIN }
     case 'incompatible':
-      return { text: 'Incompatible with cornercase on the Mac', detail: connection.error.message }
+      return { text: 'Incompatible with cornercase on the machine', detail: connection.error.message }
     case 'offline':
       return { text: 'No network' }
   }

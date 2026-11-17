@@ -159,7 +159,7 @@ mod a_batch {
     }
 
     #[rstest]
-    #[case::when_the_mac_takes_the_tab_back(Unfitted::TakenBack, Toast::info("The Mac took this tab back"))]
+    #[case::when_the_machine_takes_the_tab_back(Unfitted::TakenBack, Toast::info("The machine took this tab back"))]
     #[case::when_the_view_is_refused(
         Unfitted::Refused(Error::Failed { code: 2, stderr: "view 41 cannot size a tab now".to_owned() }),
         Toast::error("cornercase exited with code 2: view 41 cannot size a tab now")
