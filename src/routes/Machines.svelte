@@ -6,6 +6,7 @@
   import { retryClock } from '../lib/retryClock.svelte'
   import { ThisDevice } from '../lib/thisDevice.svelte'
   import Button from '../lib/ui/Button.svelte'
+  import DemoOffer from '../lib/ui/DemoOffer.svelte'
   import Glass from '../lib/ui/Glass.svelte'
   import MachineRow from '../lib/ui/MachineRow.svelte'
   import NavBar from '../lib/ui/NavBar.svelte'
@@ -114,7 +115,7 @@
     <div class="actions">
       <Button onclick={() => (adding = true)}>Add machine</Button>
       {#if !inDemo}
-        <Button tone="plain" onclick={ondemo}>Try a demo</Button>
+        <DemoOffer {ondemo} />
       {/if}
     </div>
   {/if}

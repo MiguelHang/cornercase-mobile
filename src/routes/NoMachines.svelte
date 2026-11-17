@@ -1,5 +1,6 @@
 <script lang="ts">
   import Button from '../lib/ui/Button.svelte'
+  import DemoOffer from '../lib/ui/DemoOffer.svelte'
   import Emblem from '../lib/ui/Emblem.svelte'
   import Glass from '../lib/ui/Glass.svelte'
   import Mark from '../lib/ui/Mark.svelte'
@@ -30,10 +31,12 @@
       {:else}
         <div class="actions">
           <Button onclick={() => (open = true)}>Add machine</Button>
-          <Button tone="plain" onclick={ondemo}>Try a demo</Button>
         </div>
       {/if}
     </Glass>
+    {#if !open}
+      <DemoOffer {ondemo} />
+    {/if}
   </div>
 </section>
 
@@ -59,15 +62,16 @@
   }
 
   .card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--inset);
     width: 100%;
     max-width: 520px;
   }
 
   .actions {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--gap);
+    justify-content: center;
     padding: 0 var(--inset-card) var(--inset-card);
   }
 </style>

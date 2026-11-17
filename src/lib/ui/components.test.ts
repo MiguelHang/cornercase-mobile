@@ -6,6 +6,7 @@ import { NOTHING_DELETED } from '../closeAgent.svelte'
 import Button from './Button.svelte'
 import CloseConfirm from './CloseConfirm.svelte'
 import CodeBox from './CodeBox.svelte'
+import DemoOffer from './DemoOffer.svelte'
 import Emblem from './Emblem.svelte'
 import Field from './Field.svelte'
 import Glass from './Glass.svelte'
@@ -19,6 +20,7 @@ import ToolButton from './ToolButton.svelte'
 import buttonSource from './Button.svelte?raw'
 import closeConfirmSource from './CloseConfirm.svelte?raw'
 import codeBoxSource from './CodeBox.svelte?raw'
+import demoOfferSource from './DemoOffer.svelte?raw'
 import emblemSource from './Emblem.svelte?raw'
 import fieldSource from './Field.svelte?raw'
 import glassSource from './Glass.svelte?raw'
@@ -181,7 +183,7 @@ describe('CodeBox', () => {
 })
 
 describe('Button', () => {
-  type Props = { tone?: 'primary' | 'plain' | 'danger'; type?: 'button' | 'submit'; quiet?: boolean; resting?: boolean; busy?: boolean }
+  type Props = { tone?: 'primary' | 'plain' | 'danger' | 'link'; type?: 'button' | 'submit'; quiet?: boolean; resting?: boolean; busy?: boolean }
   const button = (props: Props, label = 'Add machine') =>
     render(Button, { props: { ...props, children: html(label) } }).body
 
@@ -204,6 +206,14 @@ describe('Button', () => {
 
   it('takes the danger tone', () => {
     expect(button({ tone: 'danger' }, 'Remove')).toMatch(/<button class="button danger svelte-[\w-]+" type="button">/)
+  })
+
+  it('takes the link tone: accent text with no fill or edge, in the size of the text around it', () => {
+    expect(button({ tone: 'link' }, 'Try a demo')).toMatch(/<button class="button link svelte-[\w-]+" type="button">/)
+    expect(flat(buttonSource)).toContain(
+      '.link { padding: 0 6px; border: 1px solid transparent; background: none; color: var(--accent); font-size: inherit; }',
+    )
+    expect(flat(buttonSource)).toContain('.link:not(.resting):active { opacity: 0.7; }')
   })
 
   it('goes quiet as text in its tone, with no fill or edge, its label still on the line of the text beside it', () => {
@@ -271,6 +281,31 @@ describe('Button', () => {
   it('passes its click on and listens to touches so that WebKit on iOS shows the press', () => {
     expect(buttonSource).toContain('{onclick}')
     expect(buttonSource).toContain('ontouchstart={() => {}}')
+  })
+})
+
+describe('DemoOffer', () => {
+  const body = render(DemoOffer, { props: { ondemo: () => {} } }).body
+
+  it('says No Mac nearby? in grey, then Try a demo as a link', () => {
+    expect(body).toMatch(
+      /^<!--\[--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!----><\/button>/,
+    )
+    expect(flat(demoOfferSource)).toContain(
+      '.offer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin: 0; color: var(--muted); font-size: 15px; }',
+    )
+  })
+
+  it('asks for the demo on Try a demo', () => {
+    expect(flat(demoOfferSource)).toContain('<Button tone="link" onclick={ondemo}>Try a demo</Button>')
+  })
+
+  it('keeps the link 44 px tall and its keyboard focus ring', () => {
+    expect(buttonSource).toContain('min-height: 44px;')
+    expect(flat(baseSource)).toContain(
+      ":where(button, a, summary, input[type='checkbox']):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }",
+    )
+    expect(`${buttonSource}${demoOfferSource}`).not.toMatch(/outline/)
   })
 })
 
