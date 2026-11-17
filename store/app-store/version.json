@@ -10,9 +10,8 @@
     "en-US": {
       "attributes": {
         "description": { "$file": "en-US/description.txt" },
-        "keywords": "coding agent,ai agent,developer,terminal,diff,code review,worktree,prompt,llm,programming",
+        "keywords": "developer,terminal,code review,diff,worktree,prompt,llm,programming,git,assistant,automation",
         "promotionalText": "See which agents need you, answer their questions and start new work from your iPhone, while they keep running on your computer.",
-        "whatsNew": { "$file": "en-US/whats-new.txt" },
         "supportUrl": null,
         "marketingUrl": null
       }

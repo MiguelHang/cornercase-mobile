@@ -26,8 +26,9 @@ Code: `store/app-store/` (the listing, its texts, the screenshots, the recording
 - **The copyright is "2026 The cornercase-mobile authors"**, as `LICENSE-MIT` says it, with no person's name.
 - **Free, in every territory and in new ones**: the price point of 0 with the USA as base territory, and `availableInNewTerritories`.
 - **The computer is not a Mac** (the user's decision, 2026-11-17): cornercase runs on Linux and macOS. The listing, the review notes and the README speak of a "machine", the app's own word (`Add machine`, Machines), and of "your computer (Linux or macOS)" for someone new. The notes name the demo's link and what it adds ("the Try a demo link", "a simulated demo machine, marked DEMO") without quoting the app's texts, which still say "No Mac nearby?" and "Demo Mac" until 070 changes them, with `PRIVACY.md` and `README.md`.
+- **Keywords the name and subtitle do not already give**: the store indexes both, so a keyword that repeats a word of "Cornercase remote" or "Follow your coding agents" (coding, agent) wastes its bytes. Each is longer than 2 characters, which rules out "ai".
 - **Guideline 2.3.10**: the listing names no other platform, so no Android, and neither TestFlight nor "beta". The keywords name no other app (Claude, Codex, Tailscale) and no word of the app's name, which the store already searches. The description may name Tailscale as the network the phone reaches the computer through.
-- **`whatsNew` is not set on the first version**, which App Store Connect does not take there. `en-US/whats-new.txt` is the base for the next one, written from that version's section of `CHANGELOG.md` without what is not about the iPhone, such as Android.
+- **`whatsNew` is left out of the first version**, which App Store Connect does not take there: it is not in `version.json` at all, so that the file still goes as it is, and the test checks its absence. `en-US/whats-new.txt` is the base for the next one, written from that version's section of `CHANGELOG.md` without what is not about the iPhone, such as Android; that version adds it to the localization and drops the check.
 
 ## The screenshots
 
@@ -38,26 +39,28 @@ Code: `store/app-store/` (the listing, its texts, the screenshots, the recording
 - **The Dynamic Island drawn black**: after a boot, the board's screenshot came out with the island painted in, also with `--mask=ignored`, and only on the board. Scrolling the board a little before taking it clears it.
 - **No alpha**: App Store Connect refuses screenshots with an alpha channel, and simctl's PNGs are RGBA with every pixel opaque. Each one is rewritten as 8-bit RGB with only `IHDR`, `sRGB`, `IDAT` and `IEND`, which loses nothing. Rejected: `sips`, which drops the alpha only through JPEG, with loss.
 - **Moving through the app with a throwaway XCUITest** outside the repository, which taps by accessibility label: the same screens each time, without Simulator.app. Rejected: a UI test target in `src-tauri/gen/apple`, kept up for screenshots taken once per version.
-- **Taken again after 070**: they and the recording still show "Demo Mac" and "No Mac nearby?", while the listing speaks of a machine. `store/app-store/README.md` lists them as missing before submitting.
+- **Taken again after 070**: they and the recording still show the app's own words that say Mac ("Demo Mac", "No Mac nearby?", "Earlier messages are on the Mac", "on your Mac"), while the listing speaks of a machine. `store/app-store/README.md` lists them as missing before submitting.
+- **The terminal splits words** in `03-terminal` and the recording ("but t / he receipt"): the demo's sample (`crates/core/src/demo/data/questions.json`) has lines longer than the phone's columns, and the demo wraps them at the last column, as a terminal does; `Fit to this phone` does not change it. Noted rather than hidden: it is the demo's content, out of this task, and replacing the screenshot would leave the listing without the terminal. Shorter lines in the sample fix it before the screenshots are taken again.
 
 ## The recording for App Review
 
 - **A review attachment, not an app preview** (`appStoreReviewAttachments`): it shows App Review how to get in without a computer running cornercase (`Try a demo`, the board, answering a waiting agent, its terminal, `Leave demo`), and nobody else sees it. An app preview is marketing on the product page, with rules and a set per size of its own.
-- **`recordVideo` in H.264, then `avconvert` with `Preset1920x1080`**: 884×1920, 32.4 seconds, 2.8 MB, no audio, and none of the source's metadata, which `avconvert` filters. `--start` cuts the seconds before the first tap. `PresetHighestQuality` kept 1320×2868 at 5.7 MB; the smaller one reads as well at half the weight.
+- **`recordVideo` in H.264, then `avconvert` with `Preset1920x1080`**: 884×1920, 30 seconds, 3.5 MB, no audio, and none of the source's metadata, which `avconvert` filters. `--start` and `--duration` cut the seconds before the first tap and after the end. `PresetHighestQuality` kept 1320×2868 at twice the weight on a first take; the smaller one reads as well.
+- **The probe waits for each screen before the next tap** (`waitForExistence` on the question card, `codex is working…` then `Idle`, and the terminal's last line), then holds it long enough to read: the card about 5 seconds, the terminal 5. A first recording with fixed pauses alone never showed the question or the terminal. The idle seconds are kept short in the script rather than cut out, since `avconvert` only trims the ends.
 - **In the repository**, since it is under 10 MB: at `store/app-store/review/demo.mp4`, next to the notes that mention it.
 
 ## The test
 
-- **`scripts/store.test.ts` checks what App Store Connect would refuse, before an upload does**: the subtitle within 30 characters; the keywords within 100 bytes, each longer than 2 characters and none a word of the app's name; the promotional text within 170 characters; the description and `whatsNew` within 4,000; the review notes within 4,000 bytes; `versionString` equal to `package.json`'s version; every `$file` present; no Android in the listing; no "Mac" as a word in the listing or the notes (`macOS` passes); 4 to 6 screenshots, each 1320×2868, RGB, with no `tRNS`.
+- **`scripts/store.test.ts` checks what App Store Connect would refuse, before an upload does**: the subtitle within 30 characters; the keywords within 100 bytes, each longer than 2 characters and none a word of the app's name or subtitle; the promotional text within 170 characters; the description and `whatsNew` within 4,000, and `whatsNew` absent from the first version; the review notes within 4,000 bytes; `versionString` equal to `package.json`'s version; every `$file` present; no Android in the listing; no "Mac" as a word in the listing or the notes (`macOS` passes); 4 to 6 screenshots, each 1320×2868, RGB, with no `tRNS`.
 - **The PNGs are read by their header and chunk names**, without decoding them: the size, the colour type and `tRNS` are all it needs, so it adds no image library.
 - **Bytes where the limit may be bytes** (the keywords and the notes), characters elsewhere: the texts are ASCII, so both agree today, and the stricter count holds if that changes.
-- A `$file` that is missing among the description, `whatsNew` and the notes fails the test file as it loads, before any test runs, rather than a named test.
+- A missing description, `whatsNew` or notes file fails the test file as it loads, before any test runs, rather than a named test.
 
 ## Checked and not checked
 
 - On 2026-11-17, with Xcode 27.2, the iOS 27.2 simulator and Tauri CLI 2.12.4:
   - the attributes and endpoints against the OpenAPI 4.6 file; every JSON file parses;
   - the screenshots' size, colour type and chunks, and each one by eye;
-  - the recording's length, its one video track, its size and its lack of metadata, through AVFoundation, and its frames by eye;
+  - the recording's length, its one video track, its size and its lack of metadata, through AVFoundation, and a frame every half second of the raw take and every second of the final one, by eye;
   - `scripts/store.test.ts` failing with a longer subtitle, Android in the description, the word Mac in the notes and a `$file` naming a missing file.
 - Not checked: anything in App Store Connect. No request was sent, so neither the API taking these attributes as they are, the price point's lookup, the upload of the screenshots and the recording, the size App Store Connect asks for, nor what App Review makes of the notes.

@@ -32,12 +32,12 @@ function words(text: string) {
   return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
 }
 
-function keywordProblems(keywords: string, name: string) {
-  const nameWords = words(name)
+function keywordProblems(keywords: string, indexed: string) {
+  const indexedWords = words(indexed)
   const problems = bytes(keywords) > 100 ? [`${bytes(keywords)} bytes`] : []
   for (const keyword of keywords.split(',')) {
     if (characters(keyword.trim()) <= 2) problems.push(`too short: "${keyword}"`)
-    if (words(keyword).some((word) => nameWords.includes(word))) problems.push(`repeats the name: "${keyword}"`)
+    if (words(keyword).some((word) => indexedWords.includes(word))) problems.push(`already indexed: "${keyword}"`)
   }
   return problems
 }
@@ -113,10 +113,10 @@ describe('characters and bytes', () => {
 })
 
 describe('keywordProblems', () => {
-  const name = 'Cornercase remote'
+  const name = 'Cornercase remote Follow your coding agents'
 
-  it('accepts keywords within 100 bytes, longer than 2 characters and away from the name', () => {
-    expect(keywordProblems('coding agent,terminal,diff', name)).toEqual([])
+  it('accepts keywords within 100 bytes, longer than 2 characters and away from the name and subtitle', () => {
+    expect(keywordProblems('developer,terminal,diff', name)).toEqual([])
   })
 
   it('counts bytes, not characters', () => {
@@ -127,10 +127,11 @@ describe('keywordProblems', () => {
     expect(keywordProblems('terminal, ai', name)).toEqual(['too short: " ai"'])
   })
 
-  it('rejects a word of the name, in any case', () => {
-    expect(keywordProblems('Remote control,cornercase', name)).toEqual([
-      'repeats the name: "Remote control"',
-      'repeats the name: "cornercase"',
+  it('rejects a word of the name or the subtitle, in any case', () => {
+    expect(keywordProblems('Remote control,cornercase,Coding tools', name)).toEqual([
+      'already indexed: "Remote control"',
+      'already indexed: "cornercase"',
+      'already indexed: "Coding tools"',
     ])
   })
 
@@ -186,7 +187,7 @@ describe('the App Store listing', () => {
     keywords: localization.keywords as string,
     promotionalText: localization.promotionalText as string,
     description: text(localization.description),
-    whatsNew: text(localization.whatsNew),
+    whatsNew: readFileSync(join(store, 'en-US/whats-new.txt'), 'utf8'),
   }
 
   it('fits the subtitle in 30 characters', () => {
@@ -194,7 +195,7 @@ describe('the App Store listing', () => {
   })
 
   it('has valid keywords', () => {
-    expect(keywordProblems(listing.keywords, info.name)).toEqual([])
+    expect(keywordProblems(listing.keywords, `${info.name} ${info.subtitle}`)).toEqual([])
   })
 
   it('fits the promotional text in 170 characters', () => {
@@ -257,6 +258,10 @@ describe('the listing metadata', () => {
   it('names the app and leaves the pending URLs null', () => {
     expect(info.appInfoLocalizations['en-US'].attributes.name).toBe('Cornercase remote')
     expect([info.appInfoLocalizations['en-US'].attributes.privacyPolicyUrl, localization.supportUrl, localization.marketingUrl]).toEqual([null, null, null])
+  })
+
+  it('leaves whatsNew out of the first version', () => {
+    expect(localization).not.toHaveProperty('whatsNew')
   })
 
   it('has a copyright without a personal name and a manual release', () => {
