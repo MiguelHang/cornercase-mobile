@@ -1,0 +1,21 @@
+{
+  "appStoreVersions": {
+    "attributes": {
+      "versionString": "0.1.0",
+      "copyright": "2026 The cornercase-mobile authors",
+      "releaseType": "MANUAL"
+    }
+  },
+  "appStoreVersionLocalizations": {
+    "en-US": {
+      "attributes": {
+        "description": { "$file": "en-US/description.txt" },
+        "keywords": "coding agent,ai agent,developer,terminal,diff,code review,worktree,prompt,llm,programming",
+        "promotionalText": "See which agents need you, answer their questions and start new work from your iPhone, while they keep running on your Mac.",
+        "whatsNew": { "$file": "en-US/whats-new.txt" },
+        "supportUrl": null,
+        "marketingUrl": null
+      }
+    }
+  }
+}
