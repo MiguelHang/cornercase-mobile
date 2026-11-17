@@ -127,7 +127,7 @@ describe('Diff', () => {
     expect(viewedButton(body)).toBeNull()
   })
 
-  it('leaves only the notice and the way back once the workspace is closed on the Mac', () => {
+  it('leaves only the notice and the way back once the workspace is closed on the machine', () => {
     const state = stateWith(null)
     state.gone = true
     const body = draw(state)

@@ -5,7 +5,7 @@
 </script>
 
 <p class="offer">
-  No Mac nearby?
+  No machine nearby?
   <Button tone="link" onclick={ondemo}>Try a demo</Button>
 </p>
 

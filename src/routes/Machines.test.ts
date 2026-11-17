@@ -169,14 +169,14 @@ describe('Machines', () => {
     expect((await withRescannable()).map((row) => row.includes('Check again'))).toEqual([false, false, false, true])
   })
 
-  it('offers Scan again on the active one the Mac forgot, with the text of the bar', async () => {
+  it('offers Scan again on the active one the machine forgot, with the text of the bar', async () => {
     const [active] = rows(await screen(loaded(FINGERPRINT), { state: 'not_paired' }))
     expect(active).toMatch(scanAgain)
-    expect(active).toContain('This Mac no longer recognizes this phone')
+    expect(active).toContain('This machine no longer recognizes this phone')
     expect(active).toContain('Scan its code again in Machines')
   })
 
-  it('offers Scan again, in the place of Check again, on another one the Mac forgot, saying it is not paired', async () => {
+  it('offers Scan again, in the place of Check again, on another one the machine forgot, saying it is not paired', async () => {
     const probes = new Probes({ machineProbe: () => Promise.resolve({ status: 'ok', data: { state: 'not_paired' } }) })
     await probes.check([2])
     const [, forgotten] = rows(await screen(loaded(FINGERPRINT), CONNECTED, Promise.resolve(probes)))
@@ -186,13 +186,13 @@ describe('Machines', () => {
   })
 
   it('tags the demo Demo beside its name, and shows it by its name alone, with Edit to leave it', async () => {
-    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const demo = { ...machine(4294967295, 'Demo machine'), routes: [], demo: true }
     const listed = [demo, ...MACHINES]
     const [shown, studio] = rows(await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), listed))
     expect(shown).toMatch(
-      /<span class="title svelte-[\w-]+"><span class="name svelte-[\w-]+">Demo Mac<\/span> <!--\[0?--><span class="tag svelte-[\w-]+">Demo<\/span>/,
+      /<span class="title svelte-[\w-]+"><span class="name svelte-[\w-]+">Demo machine<\/span> <!--\[0?--><span class="tag svelte-[\w-]+">Demo<\/span>/,
     )
-    expect(shown).toMatch(/<span class="text svelte-[\w-]+">Demo Mac<\/span>/)
+    expect(shown).toMatch(/<span class="text svelte-[\w-]+">Demo machine<\/span>/)
     expect(shown).toContain('aria-current="true"')
     expect(shown).toMatch(/<button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Edit/)
     expect(studio).not.toContain('class="tag')
@@ -206,15 +206,15 @@ describe('Machines', () => {
 
   it('offers trying a demo as a line of text under Add machine', async () => {
     expect(await screen()).toMatch(
-      /Add machine<!----><\/button><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+      /Add machine<!----><\/button><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No machine nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
     )
   })
 
   it('offers no demo while the demo is listed', async () => {
-    const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
+    const demo = { ...machine(4294967295, 'Demo machine'), routes: [], demo: true }
     const body = await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), [demo, ...MACHINES])
     expect(body).toMatch(/Add machine<!---->/)
-    expect(body).not.toMatch(/Try a demo|No Mac nearby/)
+    expect(body).not.toMatch(/Try a demo|No machine nearby/)
   })
 })
 
@@ -225,7 +225,7 @@ describe('Machines wiring', () => {
     expect(script).toContain('void probes.open( machines.map(({ id }) => id), active, ) void device.load()')
   })
 
-  it('reloads the machines on opening, since the Mac may have told new routes', () => {
+  it('reloads the machines on opening, since the machine may have told new routes', () => {
     expect(script).toContain('onMount(() => { onrouted() void probes.open(')
     expect(script).toContain('$effect(() => { const now = active untrack(() => void probes.follow(now)) })')
   })
@@ -251,7 +251,7 @@ describe('Machines wiring', () => {
     expect(flat(rowSource)).toContain('{/if} <Button tone="plain" onclick={onedit}>Edit</Button>')
   })
 
-  it('opens Add route on Scan again of a machine whose token is rejected or missing, or that the Mac forgot', () => {
+  it('opens Add route on Scan again of a machine whose token is rejected or missing, or that the machine forgot', () => {
     expect(script).toContain('const connectionOf = (machine: MachineView_Serialize) => (machine.id === active ? connection : null)')
     expect(script).toContain('rejected={rescannable(connectionOf(machine), probes.of(machine.id))}')
     expect(script).toContain('onrescan={() => onrescan(machine.id)}')

@@ -306,7 +306,7 @@ describe('FilesState, failing', () => {
     ['gone', `there is no workspace ${WORKSPACE}; \`cornercase status\` lists them`],
     ['closing', `workspace ${WORKSPACE} is closing`],
     ['being removed', `workspace ${WORKSPACE} is being removed`],
-  ])('says the workspace was closed on the Mac when it is %s, and asks nothing more', async (_, message) => {
+  ])('says the workspace was closed on the machine when it is %s, and asks nothing more', async (_, message) => {
     const { files, calls, tell } = await browsing(() => refusal(message))
     await files.toggle('src')
     await files.refresh()
@@ -431,7 +431,7 @@ describe('FilesState, searching names', () => {
     ])
   })
 
-  it('says the workspace was closed on the Mac when a search finds it gone', async () => {
+  it('says the workspace was closed on the machine when a search finds it gone', async () => {
     const { files, tell } = await browsing(fromTree(TREE), {
       search: () => refusal(`workspace ${WORKSPACE} is closing`),
     })
@@ -453,7 +453,7 @@ describe('FilesState, searching names', () => {
     expect([calls.search.mock.calls, files.results]).toEqual([[], null])
   })
 
-  it('stops the search of its workspace on the Mac once left', async () => {
+  it('stops the search of its workspace on the machine once left', async () => {
     const { files, calls } = await browsing()
     files.find('main')
     await vi.advanceTimersByTimeAsync(SEARCH_DELAY)

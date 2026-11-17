@@ -67,7 +67,7 @@ describe('the terminal screen', () => {
   it('says nothing about a closed tab before it closes', () => {
     expect(body).not.toContain('class="closed')
     expect(source).toContain(
-      '{#if shown.current.closed} <p class="closed" role="status">This tab was closed on the Mac</p> {/if}',
+      '{#if shown.current.closed} <p class="closed" role="status">This tab was closed on the machine</p> {/if}',
     )
   })
 
@@ -227,7 +227,7 @@ describe('fitting the pane to the phone', () => {
     expect(open.mock.calls).toEqual([[SIZE, true]])
   })
 
-  it('turns the toggle off when the Mac takes the tab back', () => {
+  it('turns the toggle off when the machine takes the tab back', () => {
     const { fit } = fitting()
     fit.unfitted()
     expect(fit.on).toBe(false)

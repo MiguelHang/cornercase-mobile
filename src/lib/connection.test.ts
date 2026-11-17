@@ -87,21 +87,21 @@ describe('status', () => {
     ['connecting', { state: 'connecting' }, { text: 'Connecting…', tone: 'working', pulsing: true }],
     ['connected', CONNECTED, { text: 'MacBook · via 127.0.0.1:7000', tone: 'done', pulsing: false }],
     ['retrying', RETRYING, failing('Retrying in 2 s', 'timed out')],
-    ['missing', MISSING, failing('Update cornercase on the Mac', 'It lacks watch, input')],
+    ['missing', MISSING, failing('Update cornercase on the machine', 'It lacks watch, input')],
     [
       'missing the /cli',
       LACKS_THE_CLI,
-      failing('Update cornercase on the Mac to 0.13.78 or later', 'It lacks app-routes, cli-endpoint'),
+      failing('Update cornercase on the machine to 0.13.78 or later', 'It lacks app-routes, cli-endpoint'),
     ],
     [
       'not_paired',
       { state: 'not_paired' },
-      failing('This Mac no longer recognizes this phone', 'Scan its code again in Machines'),
+      failing('This machine no longer recognizes this phone', 'Scan its code again in Machines'),
     ],
     [
       'incompatible',
       { state: 'incompatible', error: error('too new') },
-      failing('Incompatible with cornercase on the Mac', 'too new'),
+      failing('Incompatible with cornercase on the machine', 'too new'),
     ],
     ['offline', { state: 'offline' }, failing('No network')],
   ])('shows %s', (_, view, shown) => {
@@ -115,7 +115,7 @@ describe('status', () => {
     ['no release when none is known', [null, null], ''],
   ])('names %s that brings what is missing', (_, releases, told) => {
     const missing = releases.map((since, at) => lacks(`op-${at}`, 'operation', since))
-    expect(connection.status({ state: 'missing', missing }, 'MacBook').text).toMatch(new RegExp(`Mac${told}$`))
+    expect(connection.status({ state: 'missing', missing }, 'MacBook').text).toMatch(new RegExp(`machine${told}$`))
   })
 
   it('shows the route alone while the machine has no name', () => {
@@ -126,7 +126,7 @@ describe('status', () => {
     expect(connection.status({ ...RETRYING, in_ms: 5000 }, 'MacBook', 2500).text).toBe('Retrying in 3 s')
   })
 
-  it('sends the user to scan the code again only when the Mac no longer takes this phone', () => {
+  it('sends the user to scan the code again only when the machine no longer takes this phone', () => {
     const views: ConnectionView_Serialize[] = [CONNECTED, RETRYING, MISSING, { state: 'none' }, { state: 'offline' }]
     const told = (view: ConnectionView_Serialize) => {
       const shown = connection.status(view, 'MacBook')
@@ -137,8 +137,8 @@ describe('status', () => {
   })
 
   it('shows a machine connected with no address by its name alone', () => {
-    expect(connection.status({ state: 'connected', route: '' }, 'Demo Mac')).toEqual({
-      text: 'Demo Mac',
+    expect(connection.status({ state: 'connected', route: '' }, 'Demo machine')).toEqual({
+      text: 'Demo machine',
       tone: 'done',
       pulsing: false,
     })
@@ -146,7 +146,7 @@ describe('status', () => {
 
   it('never shows an address for the demo while it connects or once connected', () => {
     const views: ConnectionView_Serialize[] = [{ state: 'connecting' }, { state: 'connected', route: '' }]
-    const told = views.map((view) => connection.status(view, 'Demo Mac').text)
+    const told = views.map((view) => connection.status(view, 'Demo machine').text)
     expect(told.filter((text) => /via|:\d/.test(text))).toEqual([])
   })
 })
@@ -159,10 +159,10 @@ describe('onTheBar', () => {
     last_route: null,
     demo,
   })
-  const MACHINES = [listed(1, 'MacBook', false), listed(4294967295, 'Demo Mac', true)]
+  const MACHINES = [listed(1, 'MacBook', false), listed(4294967295, 'Demo machine', true)]
 
   it.each<[string, number | null, { name: string; demo: boolean }]>([
-    ['the demo with its label', 4294967295, { name: 'Demo Mac', demo: true }],
+    ['the demo with its label', 4294967295, { name: 'Demo machine', demo: true }],
     ['a machine with no label', 1, { name: 'MacBook', demo: false }],
     ['nothing while no machine is active', null, { name: '', demo: false }],
     ['nothing for a machine no longer listed', 7, { name: '', demo: false }],

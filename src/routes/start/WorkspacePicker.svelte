@@ -12,7 +12,7 @@
   of={(choice) => ({ value: choice.id, name: choice.label })}
   error={form.workspaceError}
   reading="Reading the workspaces…"
-  empty="No workspace is open on this Mac."
+  empty="No workspace is open on this machine."
   disabled={form.sending}
   onretry={() => void form.loadProjects()}
 />

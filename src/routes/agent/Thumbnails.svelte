@@ -4,7 +4,7 @@
 
   let { chips, onremove }: { chips: Chip[]; onremove: (id: number) => void } = $props()
 
-  const named = (chip: Chip) => `${chip.name}, ${chip.size}${chip.pasted ? ', on the Mac' : ''}`
+  const named = (chip: Chip) => `${chip.name}, ${chip.size}${chip.pasted ? ', on the machine' : ''}`
 </script>
 
 <ul class="thumbnails" aria-label="Attached images">
@@ -16,7 +16,7 @@
         <img class="picture" src={chip.thumbnail} alt={named(chip)} />
       {/if}
       {#if chip.pasted}
-        <span class="mark" aria-hidden="true">On Mac</span>
+        <span class="mark" aria-hidden="true">Pasted</span>
       {/if}
       <button
         class="remove"

@@ -123,7 +123,7 @@ describe('IssuesState trackers', () => {
     expect(state.loading).toBe(false)
   })
 
-  it('asks to connect a tracker on the Mac and lists nothing when none is connected', async () => {
+  it('asks to connect a tracker on the machine and lists nothing when none is connected', async () => {
     const missing = tracker('github', { state: 'missing', missing: ['repository'] })
     const failing = tracker('shortcut', { state: 'failing', reason: 'Shortcut rejected the token' })
     const { state, calls } = await opened(fakes(sources(missing, failing)))
@@ -132,7 +132,7 @@ describe('IssuesState trackers', () => {
     expect(state.trackers).toEqual({ kind: 'ready', sources: [missing, failing] })
   })
 
-  it('asks to connect a tracker when the Mac has no project open', async () => {
+  it('asks to connect a tracker when the machine has no project open', async () => {
     const { state, calls } = await opened(fakes(sources(tracker('github')), live(lists([])), []))
     expect([state.connect, state.trackers]).toEqual([true, { kind: 'ready', sources: [] }])
     expect(calls.issueSources).not.toHaveBeenCalled()
@@ -148,7 +148,7 @@ describe('IssuesState trackers', () => {
   it.each<[string, () => Promise<Answer<Sources>>, string]>([
     ['the reason cornercase gives', () => refusal('not a project'), 'not a project'],
     ['that cornercase did not answer', () => refusal('lost', 'unanswered'), CHOICES_UNANSWERED],
-    ['what the call threw', () => Promise.reject(new Error('Mac down')), 'Mac down'],
+    ['what the call threw', () => Promise.reject(new Error('machine down')), 'machine down'],
   ])('says %s when the trackers cannot be read', async (_, answer, reason) => {
     const calls = fakes()
     calls.issueSources.mockImplementation(answer)
@@ -594,7 +594,7 @@ describe('IssueState reading', () => {
   it.each<[string, () => Promise<Answer<ReadIssue>>, string]>([
     ['the reason cornercase gives', () => refusal('there is no issue #41'), 'there is no issue #41'],
     ['that cornercase did not answer', () => refusal('lost', 'unanswered'), CHOICES_UNANSWERED],
-    ['what the call threw', () => Promise.reject(new Error('Mac down')), 'Mac down'],
+    ['what the call threw', () => Promise.reject(new Error('machine down')), 'machine down'],
   ])('says %s when the issue cannot be read', async (_, answer, reason) => {
     const { state } = await shown(reader(answer))
     expect(state.reading).toEqual({ kind: 'failed', reason })

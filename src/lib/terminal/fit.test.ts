@@ -94,7 +94,7 @@ describe('Fit', () => {
     expect([shown(fit), asked(fit)]).toEqual([{ on: true, visible: true }, [['open', SIZE, true]]])
   })
 
-  it('turns off when the Mac takes the tab back', () => {
+  it('turns off when the machine takes the tab back', () => {
     const { fit } = watched()
     fit.unfitted()
     expect([shown(fit), asked(fit)]).toEqual([{ on: false, visible: true }, [['open', SIZE, false]]])

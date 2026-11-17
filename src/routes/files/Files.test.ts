@@ -117,7 +117,7 @@ describe('Files', () => {
     expect(hits(body)).toEqual(['mai', 'é'])
   })
 
-  it('leaves only the notice and Back once the workspace is closed on the Mac', async () => {
+  it('leaves only the notice and Back once the workspace is closed on the machine', async () => {
     const files = await browsing()
     files.gone = true
     const body = draw(files)

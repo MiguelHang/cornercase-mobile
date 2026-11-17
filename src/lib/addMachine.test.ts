@@ -267,7 +267,7 @@ describe('AddMachine offering the same machine', () => {
     expect(commands.machineAdd).not.toHaveBeenCalled()
   })
 
-  it('keeps whether the Mac answered the check', async () => {
+  it('keeps whether the machine answered the check', async () => {
     const { draft } = form({ machineMatch: () => same('name', false) })
     await draft.submit()
     expect(draft.offer?.checked).toBe(false)

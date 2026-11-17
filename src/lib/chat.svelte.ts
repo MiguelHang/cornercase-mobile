@@ -31,7 +31,7 @@ export const FOLLOW_MS = 10_000
 
 export const TAB_HOLD_MS = 1500
 
-export const staysOnTheMac = (agent: string) => `The image stays in ${agent}'s input on the Mac`
+export const staysOnTheMachine = (agent: string) => `The image stays in ${agent}'s input on the machine`
 
 export const timers: Clock = {
   after: (ms, then) => {
@@ -149,7 +149,7 @@ export class Chat {
   #again = false
   #starting = false
   #heard: string | null | undefined = undefined
-  #leftOnTheMac = false
+  #leftOnTheMachine = false
   #keysByWaiting = false
 
   constructor(
@@ -475,7 +475,7 @@ export class Chat {
       return
     }
     if (failed === null) {
-      this.#leftOnTheMac = false
+      this.#leftOnTheMachine = false
       this.#vouched ||= broken === this.#broken
       this.lastNews = this.#clock.now()
       this.outgoing = { ...bubble, state: 'sent' }
@@ -495,7 +495,7 @@ export class Chat {
         return failed
       }
     }
-    const forced = chips.length > 0 || this.#leftOnTheMac
+    const forced = chips.length > 0 || this.#leftOnTheMachine
     return deliver(() => this.#sendText(this.pane, text, forced))
   }
 
@@ -516,8 +516,8 @@ export class Chat {
     if (failed !== null) {
       return { level: 'error', message: failed }
     }
-    this.#leftOnTheMac ||= pasted
-    return pasted ? { level: 'info', message: staysOnTheMac(this.row?.agent ?? 'the agent') } : null
+    this.#leftOnTheMachine ||= pasted
+    return pasted ? { level: 'info', message: staysOnTheMachine(this.row?.agent ?? 'the agent') } : null
   }
 
   #rowIn(agents: AgentRow[] | null) {

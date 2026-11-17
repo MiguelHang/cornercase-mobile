@@ -66,7 +66,7 @@
     <Segmented label="What to start" options={ACTIONS} bind:value={action} disabled={form.sending} />
   {/if}
   {#if !sendable}
-    <p class="offline">Not connected to the Mac. What you type stays here until it connects.</p>
+    <p class="offline">Not connected to the machine. What you type stays here until it connects.</p>
   {/if}
   <Glass>
     {#if form.issue !== null}

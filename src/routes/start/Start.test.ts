@@ -147,7 +147,7 @@ describe('Start', () => {
   it('holds Start and says why while not connected', async () => {
     const form = await formOf()
     const body = screen(form, { state: 'connecting' })
-    expect(body).toContain('Not connected to the Mac. What you type stays here until it connects.')
+    expect(body).toContain('Not connected to the machine. What you type stays here until it connects.')
     expect(submit(body)?.[1]).toContain('disabled=""')
     expect(screen(form)).not.toContain('Not connected')
     expect(submit(screen(form))?.[1]).not.toContain('disabled')
@@ -189,7 +189,7 @@ describe('Start, its agent form', () => {
 
   it('says when no agent is installed and holds Start', async () => {
     const body = agentForm(await formOf({ installedAgents: () => answer(installed()) }))
-    expect(body).toContain('No agent is installed on this Mac.')
+    expect(body).toContain('No agent is installed on this machine.')
     expect(submit(body)?.[1]).toContain('disabled=""')
   })
 
@@ -273,7 +273,7 @@ describe('Start, where its agent works', () => {
   it('says no workspace is open and holds Start without any', async () => {
     const projects = [{ id: 1, name: 'web', workspaces: [] }]
     const body = agentForm(await formOf({ startProjects: () => answer({ boot: null, projects }) }))
-    expect(body).toContain('No workspace is open on this Mac.')
+    expect(body).toContain('No workspace is open on this machine.')
     expect(submit(body)?.[1]).toContain('disabled=""')
   })
 })
@@ -300,7 +300,7 @@ describe('Start, the account its agent starts with', () => {
     return form
   }
 
-  const SIGNED_OUT = 'This account is signed out: the agent will ask to log in on the Mac.'
+  const SIGNED_OUT = 'This account is signed out: the agent will ask to log in on the machine.'
 
   it('offers the own login and each account of the agent under it, its default chosen', async () => {
     const body = agentForm(await onCodex())
@@ -433,7 +433,7 @@ describe('Start, on an issue', () => {
 
   it('holds Start while not connected', async () => {
     const body = onIssue(await formOf(), { state: 'connecting' })
-    expect(body).toContain('Not connected to the Mac.')
+    expect(body).toContain('Not connected to the machine.')
     expect(submit(body)?.[1]).toContain('disabled=""')
   })
 

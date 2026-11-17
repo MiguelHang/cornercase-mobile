@@ -36,7 +36,7 @@ describe('checkUrl', () => {
     expect(form.checkUrl(raw)).toEqual({ ok: true, url: URL_TEXT })
   })
 
-  it('accepts a machine code with more addresses and the name of the Mac, trimmed', () => {
+  it('accepts a machine code with more addresses and the name of the machine, trimmed', () => {
     expect(form.checkUrl(` ${named('Studio')}\n`)).toEqual({ ok: true, url: named('Studio') })
   })
 
@@ -172,7 +172,7 @@ describe('checkName', () => {
 describe('offerText', () => {
   it.each<[SameWhy, string, string]>([
     ['address', 'Studio is already saved at this address.', 'Update the token of Studio'],
-    ['boot', 'This code comes from the same Mac as Studio.', 'Add its addresses to Studio'],
+    ['boot', 'This code comes from the same machine as Studio.', 'Add its addresses to Studio'],
     ['name', 'A machine is already called Studio.', 'Add its addresses to Studio'],
   ])('explains a match by %s and names the choice it keeps', (why, reason, keep) => {
     expect(form.offerText({ saved: 'Studio', why })).toEqual({ reason, keep })

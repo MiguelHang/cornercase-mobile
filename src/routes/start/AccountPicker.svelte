@@ -24,7 +24,7 @@
       {disabled}
     />
     {#if accounts.signedOut(agent)}
-      <p class="note">This account is signed out: the agent will ask to log in on the Mac.</p>
+      <p class="note">This account is signed out: the agent will ask to log in on the machine.</p>
     {/if}
   </div>
 {/if}

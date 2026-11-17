@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AttachImage, PasteAttached } from './attach.svelte'
-import { staysOnTheMac, type Chat, type ReadLast, type SendText } from './chat.svelte'
+import { staysOnTheMachine, type Chat, type ReadLast, type SendText } from './chat.svelte'
 import {
   MACHINE,
   PANE,
@@ -192,7 +192,7 @@ const halfWay = async (calls: Calls = {}) => {
 const pastedMarks = (chat: Chat) => chat.attachments.chips.map((chip) => [chip.id, chip.pasted])
 
 describe('Chat, a send that fails half-way through its images', () => {
-  it('sends no text, and keeps the image pasted marked as on the Mac and the other one waiting', async () => {
+  it('sends no text, and keeps the image pasted marked as on the machine and the other one waiting', async () => {
     const { chat, sendText } = await halfWay()
     expect(sendText).not.toHaveBeenCalled()
     expect([chat.outgoing?.state, chat.outgoing?.reason]).toEqual(['failed', 'pane 12 is busy'])
@@ -242,8 +242,8 @@ describe('Chat, removing an image', () => {
   it("tells one already pasted stays in the agent's input, and forces the next send past it", async () => {
     const discard = vi.fn(discardedOk)
     const { chat, sendText } = await halfWay({ discard })
-    expect(await chat.remove(1)).toEqual({ level: 'info', message: staysOnTheMac('codex') })
-    expect(staysOnTheMac('codex')).toBe("The image stays in codex's input on the Mac")
+    expect(await chat.remove(1)).toEqual({ level: 'info', message: staysOnTheMachine('codex') })
+    expect(staysOnTheMachine('codex')).toBe("The image stays in codex's input on the machine")
     expect(discard).not.toHaveBeenCalled()
     await chat.remove(2)
     await chat.retry()
