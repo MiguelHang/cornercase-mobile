@@ -79,7 +79,7 @@ describe('App wiring', () => {
     expect(source).toContain(
       'const added = (machine: number) => { show(connecting(machine)) Promise.all([commands.machinesList().then(remember), join(machine)]).catch(toasts.failed) }',
     )
-    expect(source).toContain("machines.find((machine) => machine.id === current.machine)?.name ?? ''")
+    expect(source).toContain('const barMachine = $derived(onTheBar(machines, current.machine))')
   })
 
   it('reads the machines before the first screen, so saved machines never show the empty screen', () => {
@@ -168,7 +168,7 @@ describe('App wiring', () => {
       "const barred = $derived(route.name === 'home' || route.name === 'agent' || route.name === 'terminal')",
     )
     expect(source).toContain(
-      "{:else} {#if barred} <ConnectionBar connection={current.connection} {machineName} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {/if}",
+      "{:else} {#if barred} <ConnectionBar connection={current.connection} machineName={barMachine.name} bind:height={barHeight} onmachines={() => router.go({ name: 'machines' })} /> {/if}",
     )
     expect(source).toContain(
       'style:transform={translated(shift)}> {#if route.name === \'home\'} <Board',

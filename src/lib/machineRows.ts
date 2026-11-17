@@ -1,5 +1,5 @@
 import type { ConnectionView_Serialize, MachineView_Serialize, ProbeView } from './bindings'
-import { routeAddress, status, type Status, type Tone } from './connection'
+import { routeAddress, spaced, status, via, type Status, type Tone } from './connection'
 
 export type Probe = { state: 'checking' } | { state: 'failed'; message: string } | ProbeView
 
@@ -21,7 +21,7 @@ const probed = (probe: Probe): RowStatus => {
     case 'checking':
       return { ...row('Checking…', 'working'), pulsing: true }
     case 'answers':
-      return row(`Answers via ${routeAddress(probe.route)}`, 'done')
+      return row(spaced(' ', 'Answers', via(probe.route)), 'done')
     case 'not_paired':
       return row('Not paired', 'failed')
     case 'no_token':

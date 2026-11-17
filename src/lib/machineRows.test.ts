@@ -43,6 +43,19 @@ describe('rowStatus of the active machine', () => {
   })
 })
 
+describe('rowStatus of the demo', () => {
+  const DEMO: MachineView_Serialize = { id: 4294967295, name: 'Demo Mac', routes: [], last_route: null, demo: true }
+
+  it('shows it connected by its name with no via', () => {
+    expect(rowStatus(DEMO, { state: 'connected', route: '' }, CHECKING)).toEqual({
+      text: 'Demo Mac',
+      tone: 'done',
+      pulsing: false,
+      failures: [],
+    })
+  })
+})
+
 describe('rowStatus of another machine', () => {
   it.each<[string, Probe, ReturnType<typeof shown>]>([
     ['checking', CHECKING, { text: 'Checking…', tone: 'working', pulsing: true }],
@@ -88,6 +101,10 @@ describe('rowStatus of another machine', () => {
       pulsing: false,
       failures: [],
     })
+  })
+
+  it('answers with no address for a machine without one', () => {
+    expect(shown({ state: 'answers', route: '' })).toEqual({ text: 'Answers', tone: 'done', pulsing: false })
   })
 
   it('carries no route errors while it answers', () => {

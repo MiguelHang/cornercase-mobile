@@ -15,7 +15,7 @@
   import { ChangesState } from './lib/changes.svelte'
   import { CloseAgent } from './lib/closeAgent.svelte'
   import { Chat, timers, touches, whileShown } from './lib/chat.svelte'
-  import { apply, connecting, firstToConnect, screen, type Screen } from './lib/connection'
+  import { apply, connecting, firstToConnect, onTheBar, screen, type Screen } from './lib/connection'
   import { FilesState } from './lib/files.svelte'
   import { LocalHistory } from './lib/history'
   import { IssuesState, IssueState } from './lib/issues.svelte'
@@ -98,7 +98,7 @@
   const editing = $derived(route.name === 'machine' ? machines.find((machine) => machine.id === route.id) : undefined)
   const rescanning = $derived(route.name === 'machine' && route.adding === true)
   const taken = $derived(machines.filter((machine) => machine.id !== editing?.id).map((machine) => machine.name))
-  const machineName = $derived(machines.find((machine) => machine.id === current.machine)?.name ?? '')
+  const barMachine = $derived(onTheBar(machines, current.machine))
   const starting = $derived(route.name === 'agent' && route.starting === true ? launched : null)
   const reviewed = $derived(router.reviewed)
   const reviewedMachine = $derived(reviewed?.machine ?? null)
@@ -450,7 +450,7 @@
       {#if barred}
         <ConnectionBar
           connection={current.connection}
-          {machineName}
+          machineName={barMachine.name}
           bind:height={barHeight}
           onmachines={() => router.go({ name: 'machines' })}
         />

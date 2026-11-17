@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentRow_Serialize, ConnectionView_Serialize, Kind, MissingView_Serialize } from './bindings'
+import type {
+  AgentRow_Serialize,
+  ConnectionView_Serialize,
+  Kind,
+  MachineView_Serialize,
+  MissingView_Serialize,
+} from './bindings'
 import * as connection from './connection'
 
 const error = (message: string) => ({ code: 'timeout' as const, message })
@@ -128,6 +134,40 @@ describe('status', () => {
     }
     expect(views.map(told).filter((text) => /scan/i.test(text))).toEqual([])
     expect(connection.status({ state: 'not_paired' }, 'MacBook').detail).toBe('Scan its code again in Machines')
+  })
+
+  it('shows a machine connected with no address by its name alone', () => {
+    expect(connection.status({ state: 'connected', route: '' }, 'Demo Mac')).toEqual({
+      text: 'Demo Mac',
+      tone: 'done',
+      pulsing: false,
+    })
+  })
+
+  it('never shows an address for the demo while it connects or once connected', () => {
+    const views: ConnectionView_Serialize[] = [{ state: 'connecting' }, { state: 'connected', route: '' }]
+    const told = views.map((view) => connection.status(view, 'Demo Mac').text)
+    expect(told.filter((text) => /via|:\d/.test(text))).toEqual([])
+  })
+})
+
+describe('onTheBar', () => {
+  const listed = (id: number, name: string, demo: boolean): MachineView_Serialize => ({
+    id,
+    name,
+    routes: [],
+    last_route: null,
+    demo,
+  })
+  const MACHINES = [listed(1, 'MacBook', false), listed(4294967295, 'Demo Mac', true)]
+
+  it.each<[string, number | null, { name: string; demo: boolean }]>([
+    ['the demo with its label', 4294967295, { name: 'Demo Mac', demo: true }],
+    ['a machine with no label', 1, { name: 'MacBook', demo: false }],
+    ['nothing while no machine is active', null, { name: '', demo: false }],
+    ['nothing for a machine no longer listed', 7, { name: '', demo: false }],
+  ])('shows %s', (_, id, shown) => {
+    expect(connection.onTheBar(MACHINES, id)).toEqual(shown)
   })
 })
 

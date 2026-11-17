@@ -5,6 +5,7 @@ import type {
   ConnectionState_Serialize,
   ConnectionView_Serialize,
   MachineList_Serialize,
+  MachineView_Serialize,
   MissingView_Serialize,
 } from './bindings'
 
@@ -65,8 +66,18 @@ export const routeAddress = (route: string) => parsed(route)?.host || route.repl
 
 export const retryLeft = (in_ms: number, elapsed: number) => Math.max(1, seconds(in_ms - elapsed))
 
-const connectedTo = (machineName: string, route: string) =>
-  machineName ? `${machineName} · via ${routeAddress(route)}` : `via ${routeAddress(route)}`
+export const via = (route: string) => (route === '' ? '' : `via ${routeAddress(route)}`)
+
+export const spaced = (separator: string, ...parts: string[]) => parts.filter((part) => part !== '').join(separator)
+
+const connectedTo = (machineName: string, route: string) => spaced(' · ', machineName, via(route))
+
+type Shown = { name: string; demo: boolean }
+
+export const onTheBar = (machines: MachineView_Serialize[], id: number | null): Shown => {
+  const machine = machines.find((listed) => listed.id === id)
+  return { name: machine?.name ?? '', demo: machine?.demo ?? false }
+}
 
 const failed = (text: string, detail?: string): Status =>
   detail === undefined ? { text, tone: 'failed', pulsing: false } : { text, detail, tone: 'failed', pulsing: false }
