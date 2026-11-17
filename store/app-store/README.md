@@ -14,8 +14,8 @@ applied yet. The decisions behind it are in [design/releases/app-store.md](../..
 - **`{ "$file": "<path>" }`** stands for the whole content of that file, relative to this folder, as the attribute's
   string. The long texts live in plain `.txt` files so that what is pasted or sent is exactly the file: no markdown, no
   typographic quotes.
-- **`null`** is a value still to fill in at upload time (an id, a URL, the reviewer's contact) or an attribute left
-  empty on purpose. Ids of the app, its `appInfos`, its `appStoreVersions` and their localizations are looked up at
+- **`null`** is a value still to fill in at upload time (an id, the reviewer's contact) or an attribute left empty on
+  purpose. Ids of the app, its `appInfos`, its `appStoreVersions` and their localizations are looked up at
   upload time and never kept here.
 - **`${free}`** in `pricing.json` is the local id that the API's inline creates use, linking the price schedule to the
   price it creates in `included`. `appPricePoints` is not a request's body but what to look for: its `id` goes into
@@ -50,14 +50,8 @@ applied yet. The decisions behind it are in [design/releases/app-store.md](../..
 
 ## Still missing before submitting
 
-- **The privacy policy's URL** (`privacyPolicyUrl`): `PRIVACY.md` at a public URL, once the repository is public.
-- **The support URL** (`supportUrl`): for example the repository's issues, at an absolute URL.
 - **The reviewer's contact** (`contactFirstName`, `contactLastName`, `contactPhone`, `contactEmail`): given at upload
   time only, never written into this repository.
-- **The screenshots and the recording, taken again**: they still show the app's own words that say Mac ("Demo Mac", "No
-  Mac nearby?", "Earlier messages are on the Mac", "on your Mac"), while the listing and the notes speak of a machine,
-  since cornercase runs on Linux and macOS. Once task 070 renames them in the app, take them again with the steps
-  below, before submitting.
 - **The terminal splits words** in `03-terminal` and the recording ("but t / he receipt"): the demo's sample has lines
   longer than the phone's columns, and the demo wraps them at the last column, as a terminal does; `Fit to this phone`
   does not change it. Shorter lines in `crates/core/src/demo/data/questions.json` would fix it, out of this listing's
@@ -111,7 +105,7 @@ With other simulators booted, give `simctl` the UDID, never `booted`.
    - `05-start`: Start with the workspace `acme-store › main` and a prompt typed in, the keyboard closed.
    - `06-files`: Files of that agent, with `src/checkout` open.
 
-   If the board comes out with the Dynamic Island drawn black, take it again after scrolling the board a little.
+   If the board comes out with the Dynamic Island drawn black, take it again after scrolling the board up a little.
 7. **No alpha**: simctl's PNGs are RGBA, every pixel opaque. Each one is rewritten as 8-bit RGB (`colorType` 2) with
    only `IHDR`, `sRGB`, `IDAT` and `IEND`: no `tRNS`, no EXIF. Dropping the alpha loses nothing, which `sips` cannot do
    without going through JPEG. A few lines with Python's `zlib` and `struct` do it.
@@ -126,6 +120,6 @@ With other simulators booted, give `simctl` the UDID, never `booted`.
    - Look at a frame every half second before keeping it: each step has to be on screen, with nothing still for long.
    - Stop the recording with SIGINT.
    - `avconvert --source raw.mp4 --preset Preset1920x1080 --output demo.mp4 --start <s> --duration <s>`: `--start`
-     cuts the seconds before the first tap. The output is 884×1920 H.264, with no audio and none of the source's
-     metadata, which `avconvert` filters. It must stay under 60 seconds; the one here is 30 seconds and 3.5 MB, from
-     second 10.5 of the raw recording.
+     cuts the seconds before the first tap, and `--duration` the still seconds after `Leave demo`. The output is 884×1920 H.264, with no audio and none of the source's
+     metadata, which `avconvert` filters. It must stay under 60 seconds; the one here is 30.5 seconds and 3.5 MB, from
+     second 7.5 of the raw recording.

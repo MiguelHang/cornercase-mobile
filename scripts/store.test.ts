@@ -113,22 +113,22 @@ describe('characters and bytes', () => {
 })
 
 describe('keywordProblems', () => {
-  const name = 'Cornercase remote Follow your coding agents'
+  const indexed = 'Cornercase remote Follow your coding agents'
 
   it('accepts keywords within 100 bytes, longer than 2 characters and away from the name and subtitle', () => {
-    expect(keywordProblems('developer,terminal,diff', name)).toEqual([])
+    expect(keywordProblems('developer,terminal,diff', indexed)).toEqual([])
   })
 
   it('counts bytes, not characters', () => {
-    expect(keywordProblems(`${'é'.repeat(50)},abc`, name)).toEqual(['104 bytes'])
+    expect(keywordProblems(`${'é'.repeat(50)},abc`, indexed)).toEqual(['104 bytes'])
   })
 
   it('rejects a keyword of 2 characters', () => {
-    expect(keywordProblems('terminal, ai', name)).toEqual(['too short: " ai"'])
+    expect(keywordProblems('terminal, ai', indexed)).toEqual(['too short: " ai"'])
   })
 
   it('rejects a word of the name or the subtitle, in any case', () => {
-    expect(keywordProblems('Remote control,cornercase,Coding tools', name)).toEqual([
+    expect(keywordProblems('Remote control,cornercase,Coding tools', indexed)).toEqual([
       'already indexed: "Remote control"',
       'already indexed: "cornercase"',
       'already indexed: "Coding tools"',
@@ -136,7 +136,7 @@ describe('keywordProblems', () => {
   })
 
   it('accepts a word that only contains one of the name', () => {
-    expect(keywordProblems('remotely', name)).toEqual([])
+    expect(keywordProblems('remotely', indexed)).toEqual([])
   })
 })
 
@@ -255,9 +255,14 @@ describe('the listing metadata', () => {
     expect(info.appInfos.relationships.secondaryCategory.data).toBeNull()
   })
 
-  it('names the app and leaves the pending URLs null', () => {
+  it('names the app and links the pages of the site that design/releases.md names', () => {
+    const releases = readFileSync(join(root, 'design/releases.md'), 'utf8')
+    const privacy = info.appInfoLocalizations['en-US'].attributes.privacyPolicyUrl
     expect(info.appInfoLocalizations['en-US'].attributes.name).toBe('Cornercase remote')
-    expect([info.appInfoLocalizations['en-US'].attributes.privacyPolicyUrl, localization.supportUrl, localization.marketingUrl]).toEqual([null, null, null])
+    expect(privacy).toMatch(/^https:\/\/[^/]+\/.*privacy\/$/)
+    expect(localization.supportUrl).toBe(privacy.replace(/privacy\/$/, 'support/'))
+    expect(localization.marketingUrl).toBe(privacy.replace(/privacy\/$/, ''))
+    expect([privacy, localization.supportUrl].filter((url) => !releases.includes(`\`${url}\``))).toEqual([])
   })
 
   it('leaves whatsNew out of the first version', () => {
