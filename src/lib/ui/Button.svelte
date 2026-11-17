@@ -15,7 +15,7 @@
     onclick,
     children,
   }: {
-    tone?: 'primary' | 'plain' | 'danger'
+    tone?: 'primary' | 'plain' | 'danger' | 'link'
     type?: 'button' | 'submit'
     quiet?: boolean
     resting?: boolean
@@ -91,6 +91,14 @@
     color: var(--failed);
   }
 
+  .link {
+    padding: 0 6px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--accent);
+    font-size: inherit;
+  }
+
   .primary:not(.resting):active {
     background: var(--brand-hover);
   }
@@ -109,6 +117,10 @@
   .danger:not(.resting):active {
     border-color: color-mix(in srgb, var(--failed) 70%, transparent);
     background: color-mix(in srgb, var(--failed) 18%, transparent);
+  }
+
+  .link:not(.resting):active {
+    opacity: 0.7;
   }
 
   .quiet {

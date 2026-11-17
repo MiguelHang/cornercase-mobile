@@ -53,19 +53,20 @@ describe('NoMachines', () => {
     expect(add?.[0]).not.toMatch(/disabled|aria-/)
   })
 
-  it('offers trying a demo, plain, under Add machine', () => {
-    const demo = button(body, 'Try a demo')
-    expect(demo?.[1]).toMatch(/^button plain svelte-[\w-]+$/)
-    expect(demo?.[2]).toBe('button')
-    expect(body.indexOf('Try a demo')).toBeGreaterThan(body.indexOf('Add machine'))
+  it('keeps only Add machine in the card, and offers the demo as a line of text under it', () => {
+    expect(body).toMatch(
+      /Add machine<!----><\/button><!----><\/div><!--\]--><!----><\/div><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+    )
+    expect(body.match(/<button/g)).toHaveLength(2)
   })
 
-  it('asks for the demo on Try a demo, and hides it with the form', () => {
+  it('asks for the demo on Try a demo, and hides the line with the form', () => {
     const markup = flat(noMachinesSource)
     expect(markup).toContain(
-      '<Button onclick={() => (open = true)}>Add machine</Button> <Button tone="plain" onclick={ondemo}>Try a demo</Button> </div> {/if}',
+      '<Button onclick={() => (open = true)}>Add machine</Button> </div> {/if} </Glass> {#if !open} <DemoOffer {ondemo} /> {/if} </div>',
     )
-    expect(markup).toContain('.actions { display: flex; flex-direction: column; align-items: center; gap: var(--gap);')
+    expect(markup).toContain('.card { display: flex; flex-direction: column; gap: var(--inset);')
+    expect(markup).toContain('.actions { display: flex; justify-content: center; padding: 0 var(--inset-card) var(--inset-card); }')
   })
 
   it('shows no form yet', () => {

@@ -204,9 +204,9 @@ describe('Machines', () => {
     expect(body).not.toContain('<form')
   })
 
-  it('offers trying a demo, plain, under Add machine', async () => {
+  it('offers trying a demo as a line of text under Add machine', async () => {
     expect(await screen()).toMatch(
-      /Add machine<!----><\/button><!----> <!--\[0?--><button class="button plain svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
+      /Add machine<!----><\/button><!----> <!--\[0?--><p class="offer svelte-[\w-]+">No Mac nearby\? <button class="button link svelte-[\w-]+" type="button">(?:<!--[^>]*-->| )*Try a demo<!---->/,
     )
   })
 
@@ -214,7 +214,7 @@ describe('Machines', () => {
     const demo = { ...machine(4294967295, 'Demo Mac'), routes: [], demo: true }
     const body = await screen(loaded(FINGERPRINT), { state: 'connected', route: '' }, probed(), [demo, ...MACHINES])
     expect(body).toMatch(/Add machine<!---->/)
-    expect(body).not.toContain('Try a demo')
+    expect(body).not.toMatch(/Try a demo|No Mac nearby/)
   })
 })
 
@@ -284,7 +284,7 @@ describe('Machines wiring', () => {
   it('hides Try a demo with the form, and while the demo is among the machines, and asks for the demo on it', () => {
     expect(script).toContain('const inDemo = $derived(machines.some((machine) => machine.demo))')
     expect(script).toContain(
-      '<Button onclick={() => (adding = true)}>Add machine</Button> {#if !inDemo} <Button tone="plain" onclick={ondemo}>Try a demo</Button> {/if} </div> {/if}',
+      '<Button onclick={() => (adding = true)}>Add machine</Button> {#if !inDemo} <DemoOffer {ondemo} /> {/if} </div> {/if}',
     )
     expect(script).toContain('.actions { display: flex; flex-direction: column; align-items: center; gap: var(--gap); }')
   })
