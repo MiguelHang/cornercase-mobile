@@ -12,6 +12,7 @@ const machine = (id: number, name: string): MachineView_Serialize => ({
   name,
   routes: [{ kind: 'cli', url: `ws://${name.toLowerCase()}.lan:9000/`, has_token: true }],
   last_route: null,
+  demo: false,
 })
 
 const MACHINES = [machine(1, 'Studio'), machine(2, 'Desk'), machine(3, 'Laptop'), machine(4, 'Attic')]

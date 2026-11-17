@@ -15,6 +15,7 @@ const studio = (routes = ROUTES): MachineView_Serialize => ({
   name: 'Studio',
   routes: routes.map((url) => ({ kind: 'cli', url, has_token: true })),
   last_route: null,
+  demo: false,
 })
 
 const MERGED: MergeView = { added: ['ws://100.64.0.3:9000/'], token_updated: false, skipped: [] }

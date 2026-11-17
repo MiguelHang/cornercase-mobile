@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
+use cornercase_core::error::Error;
 use cornercase_core::machines::MachineId;
 use cornercase_core::network::{Kind, Network};
 use cornercase_core::secrets::Secrets;
@@ -9,9 +10,11 @@ use cornercase_core::secrets::file::FileSecrets;
 use cornercase_core::test_util::TempDir;
 
 use super::*;
-use crate::commands::connection::{current, latest_agents};
+use crate::commands::connection::{current, latest_agents, switch_to};
 use crate::commands::error::CommandError;
+use crate::commands::machines::{list, remove_or_leave};
 use crate::test_util::{BOOT, Recorder, Studio, changed, launcher, route, serving, settle, snapshot, spawned};
+use crate::view::MachineView;
 
 const NONE: Network = Network { kind: Kind::None, expensive: false };
 
@@ -128,6 +131,118 @@ mod leaving {
         leave(&studio.state, recorder.clone(), &studio_serving()).expect("nothing to leave");
         assert_eq!(active_machine(&studio.state), Some(studio.id));
         assert_eq!(recorder.all(), []);
+    }
+}
+
+mod in_the_machines {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn the_demo_is_listed_last_as_the_active_one_with_no_route() {
+        let studio = connected_studio();
+        enter(&studio.state, Recorder::default(), spawned);
+
+        let listed = list(&studio.state).expect("the machines load");
+
+        let demo =
+            MachineView { id: DEMO.0, name: "Demo Mac".to_owned(), routes: vec![], last_route: None, demo: true };
+        assert_eq!(listed.active, Some(DEMO.0));
+        assert_eq!(listed.machines.iter().map(|machine| machine.demo).collect::<Vec<_>>(), [false, true]);
+        assert_eq!(listed.machines.last(), Some(&demo));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn no_demo_is_listed_outside_it() {
+        let studio = connected_studio();
+        let listed = list(&studio.state).expect("the machines load");
+        assert_eq!(listed.machines.iter().map(|machine| machine.id).collect::<Vec<_>>(), [studio.id.0]);
+        assert_ne!(listed.active, Some(DEMO.0));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn removing_the_demo_leaves_it_and_keeps_the_machines_as_they_were() {
+        let studio = connected_studio();
+        let before = list(&studio.state).expect("the machines load");
+        enter(&studio.state, Recorder::default(), spawned);
+
+        remove_or_leave(&studio.state, Recorder::default(), &studio_serving(), DEMO).expect("the demo is left");
+
+        assert_eq!(list(&studio.state).expect("the machines load"), before);
+        assert_eq!(active_machine(&studio.state), Some(studio.id));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn removing_another_machine_still_removes_it() {
+        let studio = connected_studio();
+        remove_or_leave(&studio.state, Recorder::default(), &studio_serving(), studio.id).expect("removed");
+        assert_eq!(list(&studio.state).expect("the machines load").machines, []);
+        assert_eq!(active_machine(&studio.state), None);
+    }
+}
+
+mod connecting {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn to_another_machine_leaves_the_demo() {
+        let studio = Studio::new();
+        enter(&studio.state, Recorder::default(), spawned);
+
+        switch_to(&studio.state, Recorder::default(), &studio_serving(), studio.id).expect("the studio connects");
+
+        assert_eq!(active_machine(&studio.state), Some(studio.id));
+        assert!(!studio.state.in_demo());
+        let recorder = Recorder::default();
+        leave(&studio.state, recorder.clone(), &studio_serving()).expect("nothing to leave");
+        assert_eq!(recorder.all(), []);
+        assert_eq!(active_machine(&studio.state), Some(studio.id));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn to_the_demo_while_in_it_stays_there() {
+        let studio = connected_studio();
+        enter(&studio.state, Recorder::default(), spawned);
+        let recorder = Recorder::default();
+
+        switch_to(&studio.state, recorder.clone(), &studio_serving(), DEMO).expect("still in the demo");
+
+        assert_eq!(active_machine(&studio.state), Some(DEMO));
+        assert_eq!(recorder.all(), []);
+        leave(&studio.state, Recorder::default(), &studio_serving()).expect("the demo is left");
+        assert_eq!(active_machine(&studio.state), Some(studio.id));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn to_the_demo_outside_it_finds_no_such_machine() {
+        let studio = connected_studio();
+        let error = switch_to(&studio.state, Recorder::default(), &studio_serving(), DEMO).expect_err("no demo");
+        assert_eq!(error, CommandError::from(Error::UnknownMachine));
+        assert_eq!(active_machine(&studio.state), Some(studio.id));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn to_an_unknown_machine_stays_in_the_demo() {
+        let studio = Studio::new();
+        enter(&studio.state, Recorder::default(), spawned);
+        switch_to(&studio.state, Recorder::default(), &studio_serving(), MachineId(99)).expect_err("unknown");
+        assert!(studio.state.in_demo());
+    }
+}
+
+mod the_bar {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn shows_the_demo_connected_with_no_address() {
+        let studio = Studio::new();
+        let recorder = Recorder::default();
+
+        enter(&studio.state, recorder.clone(), spawned);
+        settle().await;
+
+        let connected = ConnectionView::Connected { route: String::new() };
+        assert_eq!(current(&studio.state).connection, connected);
+        assert_eq!(recorder.connections().last(), Some(&changed(DEMO, connected)));
     }
 }
 

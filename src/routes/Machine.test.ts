@@ -12,6 +12,7 @@ const studio = (urls = ROUTES): MachineView_Serialize => ({
   name: 'Studio',
   routes: urls.map((url, index) => ({ kind: 'cli', url, has_token: index !== 2 })),
   last_route: null,
+  demo: false,
 })
 
 const CONNECTED: ConnectionView_Serialize = { state: 'connected', route: ROUTES[1] }

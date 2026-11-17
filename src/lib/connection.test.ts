@@ -47,7 +47,7 @@ const RUNNING: AgentRow_Serialize[] = [
 const ON_FIRST = connection.screen({ machine: 1, connection: CONNECTED }, RUNNING)
 
 describe('firstToConnect', () => {
-  const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null })
+  const machine = (id: number) => ({ id, name: `mac ${id}`, routes: [], last_route: null, demo: false })
   const IDLE = { machine: null, connection: { state: 'none' as const } }
   const listed = (active: number | null) => ({ machines: [machine(4), machine(2)], active })
 

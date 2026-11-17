@@ -101,7 +101,11 @@ pub(crate) fn switch_to(
     launcher: &Launcher,
     id: MachineId,
 ) -> Result<(), CommandError> {
+    if id == DEMO && state.in_demo() {
+        return Ok(());
+    }
     state.machines(|machines| machines.activate(id).map_err(CommandError::from))?;
+    state.left_demo();
     start(state, emit, launcher, id)
 }
 

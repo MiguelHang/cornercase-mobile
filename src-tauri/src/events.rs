@@ -252,7 +252,10 @@ fn pane_status_changed(machine: MachineId, event: &CliEvent) -> Option<Emitted> 
 }
 
 fn connection_changed(machine: MachineId, machines: &SharedMachines, connection: &Connection) -> Vec<Emitted> {
-    let changed = Emitted::Connection(ConnectionChanged { machine: machine.0, connection: connection.into() });
+    let changed = Emitted::Connection(ConnectionChanged {
+        machine: machine.0,
+        connection: ConnectionView::of(machine, connection),
+    });
     let (Connection::Connected { route }, false) = (connection, machine == DEMO) else {
         return vec![changed];
     };

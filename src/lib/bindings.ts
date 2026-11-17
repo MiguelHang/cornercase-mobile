@@ -785,6 +785,7 @@ export type MachineView_Deserialize = {
 	name: string,
 	routes: RouteView[],
 	last_route?: string | null,
+	demo: boolean,
 };
 
 export type MachineView_Serialize = {
@@ -792,6 +793,7 @@ export type MachineView_Serialize = {
 	name: string,
 	routes: RouteView[],
 	last_route: string | null,
+	demo: boolean,
 };
 
 export type MatchFound = { kind: "none" } | { kind: "same"; machine: number; name: string; why: SameWhy } | { kind: "merge"; machine: number; name: string };

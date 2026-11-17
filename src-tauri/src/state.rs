@@ -170,6 +170,10 @@ impl AppState {
         *self.demo_slot() = Some(Demo { previous });
     }
 
+    pub(crate) fn in_demo(&self) -> bool {
+        self.demo_slot().is_some()
+    }
+
     pub(crate) fn left_demo(&self) -> Option<Demo> {
         self.demo_slot().take()
     }

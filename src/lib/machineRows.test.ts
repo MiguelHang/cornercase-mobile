@@ -8,6 +8,7 @@ const MACHINE: MachineView_Serialize = {
   name: 'Studio',
   routes: [{ kind: 'cli', url: 'ws://studio.lan:9000/', has_token: true }],
   last_route: null,
+  demo: false,
 }
 
 const shown = (probe: Probe) => {
