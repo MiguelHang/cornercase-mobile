@@ -6,7 +6,7 @@ import { fromMarkdown } from 'mdast-util-from-markdown'
 import { gfmFromMarkdown } from 'mdast-util-gfm'
 import { gfm } from 'micromark-extension-gfm'
 
-export const PAGES = { 'site/index.md': '', 'PRIVACY.md': 'privacy', 'SUPPORT.md': 'support' }
+const PAGES = { 'site/index.md': '', 'PRIVACY.md': 'privacy', 'SUPPORT.md': 'support' }
 const ASSETS = { 'src/lib/theme/tokens.css': 'tokens.css', 'site/site.css': 'site.css' }
 const TEMPLATE = 'site/page.html'
 const SITE = 'Cornercase remote'
@@ -29,8 +29,12 @@ function pageLink(from, to) {
   return path === '' ? './' : `${path}/`
 }
 
-function repositoryBase(repository) {
+function checkRepository(repository) {
   if (!REPOSITORY.test(repository ?? '')) throw new Error(`not a GitHub repository as owner/name: ${repository}`)
+}
+
+function repositoryBase(repository) {
+  checkRepository(repository)
   return `https://github.com/${repository}/blob/main/`
 }
 
@@ -42,10 +46,13 @@ function secure(url, source) {
 export function resolveLink(url, { source, repository }) {
   const from = pageOf(source)
   if (URL.canParse(url)) return secure(url, source)
+  if (/^\/(?!\/)/.test(url)) throw new Error(`${source}: a link from the root, which GitHub reads otherwise: ${url}`)
   const base = repositoryBase(repository)
   const target = new URL(url, base + source)
   const file = Object.keys(PAGES).find((path) => target.origin + target.pathname === base + path)
-  return file === undefined ? target.href : pageLink(from, PAGES[file]) + target.hash
+  if (file === undefined) return target.href
+  if (target.hash !== '') throw new Error(`${source}: the site has no anchors: ${url}`)
+  return pageLink(from, PAGES[file])
 }
 
 function unsupported(node, context, what) {
@@ -76,6 +83,11 @@ function list(node, context) {
   return element(node.ordered ? 'ol' : 'ul', `\n${items}\n`, start)
 }
 
+function link(node, context) {
+  if (node.title) throw unsupported(node, context, 'link title')
+  return element('a', inner(node, context), ` href="${escape(resolveLink(node.url, context))}"`)
+}
+
 const HANDLERS = {
   root: (node, context) => inner(node, context, '\n'),
   heading: (node, context) => element(`h${node.depth}`, inner(node, context)),
@@ -88,7 +100,7 @@ const HANDLERS = {
   break: () => '<br>',
   thematicBreak: () => '<hr>',
   list,
-  link: (node, context) => element('a', inner(node, context), ` href="${escape(resolveLink(node.url, context))}"`),
+  link,
 }
 
 function html(node, context) {
@@ -128,7 +140,7 @@ function page(template, markdown, context) {
 }
 
 export function build({ root, out, repository }) {
-  repositoryBase(repository)
+  checkRepository(repository)
   const template = readFileSync(join(root, TEMPLATE), 'utf8')
   const pages = Object.entries(PAGES).map(([source, folder]) => {
     const markdown = readFileSync(join(root, source), 'utf8')
@@ -143,10 +155,10 @@ export function build({ root, out, repository }) {
 }
 
 function main() {
-  const { values } = parseArgs({ options: { repository: { type: 'string' } } })
-  const repository = values.repository || process.env.GITHUB_REPOSITORY
   const root = fileURLToPath(new URL('..', import.meta.url))
   try {
+    const { values } = parseArgs({ options: { repository: { type: 'string' } } })
+    const repository = values.repository || process.env.GITHUB_REPOSITORY
     if (!repository) throw new Error(NO_REPOSITORY)
     build({ root, out: join(root, '_site'), repository })
   } catch (error) {

@@ -56,7 +56,6 @@ describe('resolveLink', () => {
   it.each([
     ['PRIVACY.md', 'SUPPORT.md', '../privacy/'],
     ['SUPPORT.md', 'PRIVACY.md', '../support/'],
-    ['PRIVACY.md#contact', 'SUPPORT.md', '../privacy/#contact'],
     ['./PRIVACY.md', 'SUPPORT.md', '../privacy/'],
     ['SUPPORT.md', 'SUPPORT.md', './'],
     ['../PRIVACY.md', 'site/index.md', 'privacy/'],
@@ -76,6 +75,25 @@ describe('resolveLink', () => {
       expect(() => resolveLink(url, { source: 'SUPPORT.md', repository })).toThrow(/SUPPORT\.md: .*not https/)
     },
   )
+
+  it.each([
+    ['PRIVACY.md#contact', 'SUPPORT.md'],
+    ['#contact', 'PRIVACY.md'],
+  ])('refuses %s from %s, since the pages have no anchors', (url, source) => {
+    expect(() => resolveLink(url, { source, repository })).toThrow(`${source}: the site has no anchors: ${url}`)
+  })
+
+  it('keeps the anchor of a link to GitHub', () => {
+    expect(resolveLink('CHANGELOG.md#v1', { source: 'SUPPORT.md', repository })).toBe(
+      'https://github.com/owner/name/blob/main/CHANGELOG.md#v1',
+    )
+  })
+
+  it('refuses a link from the root, which GitHub reads from the repository', () => {
+    expect(() => resolveLink('/PRIVACY.md', { source: 'SUPPORT.md', repository })).toThrow(
+      'SUPPORT.md: a link from the root, which GitHub reads otherwise: /PRIVACY.md',
+    )
+  })
 
   it('refuses a source that is not a page of the site', () => {
     expect(() => resolveLink('PRIVACY.md', { source: 'README.md', repository })).toThrow(/README\.md: not a page/)
@@ -152,6 +170,12 @@ describe('render', () => {
     ['[a][b]\n\n[b]: https://example.com', 'linkReference'],
   ])('fails on %j, a node it has no HTML for', (markdown, type) => {
     expect(() => html(markdown)).toThrow(`SUPPORT.md:1: the site has no HTML for the markdown node "${type}"`)
+  })
+
+  it('fails on a link with a title, instead of losing it', () => {
+    expect(() => html('[a](PRIVACY.md "the policy")')).toThrow(
+      'SUPPORT.md:1: the site has no HTML for the markdown link title',
+    )
   })
 
   it('fails on a task list item, instead of losing its box', () => {
@@ -309,7 +333,8 @@ describe('the workflow that publishes the site', () => {
 
   it('builds the site again when any of its sources changes', () => {
     const markdown = PAGES.map(([source]) => source).filter((source) => !source.startsWith('site/'))
-    const sources = [...markdown, 'site/**', 'scripts/site.mjs', 'src/lib/theme/tokens.css', 'pnpm-lock.yaml']
+    const sources = [...markdown, 'site/**', 'scripts/site.mjs', 'src/lib/theme/tokens.css']
+    sources.push('package.json', 'pnpm-lock.yaml', '.github/workflows/pages.yml')
     for (const source of sources) expect(pages, source).toContain(`- ${source}\n`)
   })
 })
