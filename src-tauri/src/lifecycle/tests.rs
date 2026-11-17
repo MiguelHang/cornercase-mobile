@@ -127,3 +127,24 @@ mod a_page_loading {
         assert!(app.try_state::<AppState>().is_none());
     }
 }
+
+mod the_demo {
+    use super::*;
+    use crate::commands::demo::enter;
+    use crate::test_util::{settle, spawned};
+
+    #[tokio::test(start_paused = true)]
+    async fn stays_connected_back_in_the_foreground() {
+        let studio = Studio::new();
+        let recorder = Recorder::default();
+        enter(&studio.state, recorder.clone(), spawned);
+        settle().await;
+        let before = recorder.connections();
+
+        on_foreground(&studio.state);
+        settle().await;
+
+        assert_eq!(recorder.connections(), before);
+        assert_eq!(current(&studio.state).connection, ConnectionView::Connected { route: String::new() });
+    }
+}

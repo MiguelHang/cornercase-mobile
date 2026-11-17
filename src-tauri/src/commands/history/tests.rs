@@ -153,3 +153,50 @@ mod forgetting {
         );
     }
 }
+
+mod the_demo {
+    use super::*;
+    use crate::state::DEMO;
+
+    fn files_in(dir: &TempDir) -> usize {
+        fs::read_dir(dir.path()).map(Iterator::count).unwrap_or_default()
+    }
+
+    #[test]
+    fn keeps_each_pane_in_memory_and_writes_no_file() {
+        let dir = TempDir::new();
+        let state = kept_in(&dir);
+        state.entered_demo(None);
+
+        save(&state, DEMO, BOOT, 7, &said("fix the login")).expect("the history is kept");
+
+        assert_eq!(load(&state, DEMO, BOOT, 7), Ok(said("fix the login")));
+        assert_eq!(load(&state, DEMO, BOOT, 8), Ok(vec![]));
+        assert_eq!(files_in(&dir), 0);
+    }
+
+    #[test]
+    fn is_gone_once_the_demo_is_left() {
+        let dir = TempDir::new();
+        let state = kept_in(&dir);
+        state.entered_demo(None);
+        save(&state, DEMO, BOOT, 7, &said("fix the login")).expect("the history is kept");
+
+        state.left_demo();
+        save(&state, DEMO, BOOT, 8, &said("fix the login")).expect("nothing to keep");
+
+        assert_eq!(load(&state, DEMO, BOOT, 7), Ok(vec![]));
+        assert_eq!(load(&state, DEMO, BOOT, 8), Ok(vec![]));
+        assert_eq!(files_in(&dir), 0);
+    }
+
+    #[test]
+    fn leaves_the_other_machines_on_disk() {
+        let dir = TempDir::new();
+        let state = kept_in(&dir);
+        state.entered_demo(None);
+        save(&state, STUDIO, BOOT, 7, &said("fix the login")).expect("the history is saved");
+        assert!(dir.path().join("history").join("3").join("7.json").is_file());
+        assert_eq!(load(&state, DEMO, BOOT, 7), Ok(vec![]));
+    }
+}

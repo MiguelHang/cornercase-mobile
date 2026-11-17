@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use cornercase_core::error::Error;
+use cornercase_core::history::HistoryEntry;
 use cornercase_core::history::store::JsonFolderStore;
 use cornercase_core::identity::Identity;
 use cornercase_core::machines::MachineId;
@@ -42,6 +43,7 @@ pub(crate) struct AppState {
 
 pub(crate) struct Demo {
     pub(crate) previous: Option<MachineId>,
+    history: HashMap<(String, u64), Vec<HistoryEntry>>,
 }
 
 struct Redeemed {
@@ -167,11 +169,22 @@ impl AppState {
     }
 
     pub(crate) fn entered_demo(&self, previous: Option<MachineId>) {
-        *self.demo_slot() = Some(Demo { previous });
+        *self.demo_slot() = Some(Demo { previous, history: HashMap::new() });
     }
 
     pub(crate) fn in_demo(&self) -> bool {
         self.demo_slot().is_some()
+    }
+
+    pub(crate) fn demo_history(&self, boot: &str, pane: u64) -> Vec<HistoryEntry> {
+        let demo = self.demo_slot();
+        demo.as_ref().and_then(|demo| demo.history.get(&(boot.to_owned(), pane)).cloned()).unwrap_or_default()
+    }
+
+    pub(crate) fn kept_in_demo(&self, boot: &str, pane: u64, entries: &[HistoryEntry]) {
+        if let Some(demo) = self.demo_slot().as_mut() {
+            demo.history.insert((boot.to_owned(), pane), entries.to_vec());
+        }
     }
 
     pub(crate) fn left_demo(&self) -> Option<Demo> {

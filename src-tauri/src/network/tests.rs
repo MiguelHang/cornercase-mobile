@@ -175,3 +175,34 @@ mod the_log_line {
         assert_eq!(line(network), expected);
     }
 }
+
+mod the_demo {
+    use super::*;
+    use crate::commands::connection::current;
+    use crate::commands::demo::enter;
+    use crate::state::DEMO;
+    use crate::test_util::spawned;
+
+    #[rstest]
+    #[case::going_offline(&[Decision::Offline], true)]
+    #[case::coming_back(&[Decision::Offline, Decision::Changed(WIFI)], false)]
+    #[case::changing(&[Decision::Changed(WIFI), Decision::Changed(CELLULAR)], false)]
+    #[tokio::test(start_paused = true)]
+    async fn stays_connected_whatever_the_network_does(#[case] decisions: &[Decision], #[case] down: bool) {
+        let studio = Studio::new();
+        let recorder = Recorder::default();
+        enter(&studio.state, recorder.clone(), spawned);
+        settle().await;
+        let before = recorder.connections();
+
+        for decision in decisions {
+            apply(&studio.state, *decision);
+            settle().await;
+        }
+
+        assert_eq!(recorder.connections(), before);
+        assert_eq!(before.last(), Some(&changed(DEMO, ConnectionView::Connected { route: String::new() })));
+        assert_eq!(current(&studio.state).connection, ConnectionView::Connected { route: String::new() });
+        assert_eq!(studio.state.network_is_down(), down);
+    }
+}

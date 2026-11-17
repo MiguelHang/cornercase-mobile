@@ -52,7 +52,7 @@ fn apply(state: &AppState, decision: Decision) {
     let network = applied(decision);
     let was_down = state.replace_network(network).is_some_and(Network::is_down);
     eprintln!("cornercase-mobile: {}", line(network));
-    if let Some(active) = state.active().as_ref() {
+    if let Some(active) = state.active().as_ref().filter(|active| !active.is_demo()) {
         let store = active.store();
         match decision {
             Decision::Baseline(_) => {}
