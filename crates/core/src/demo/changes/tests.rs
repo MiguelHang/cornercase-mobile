@@ -150,6 +150,7 @@ mod a_diff {
         let text = text(workspace, path).await;
         let added: Vec<&str> = patch.hunks.iter().flat_map(|hunk| &hunk.lines).map(|line| line.text.as_str()).collect();
         assert_ne!(added, Vec::<&str>::new());
+        assert!(patch.hunks.iter().flat_map(|hunk| &hunk.lines).all(|line| line.kind == LineKind::Added));
         assert_eq!(added, text.iter().map(String::as_str).collect::<Vec<_>>());
         assert_eq!(patch.file.added, u64::try_from(text.len()).expect("a small file"));
     }
