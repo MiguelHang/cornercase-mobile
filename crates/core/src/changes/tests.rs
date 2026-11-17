@@ -2,7 +2,7 @@ use serde_json::Value;
 
 use super::*;
 use crate::cli::changes::fixtures::SUMMARY;
-use crate::follow::fake::{self, BOOT, Mac, Said, Watched, connected, dropped, dropped_for_a_while, exits, session};
+use crate::follow::fake::{self, BOOT, Host, Said, Watched, connected, dropped, dropped_for_a_while, exits, session};
 
 const FOLLOWED: [&str; 7] = ["changes", "list", "--follow", "--workspace", "2", "--mode", "commits"];
 
@@ -30,13 +30,13 @@ fn refused() -> Said {
 struct Followed(Watched<Seen>);
 
 impl Followed {
-    async fn after_a_minute(mac: Mac) -> Self {
+    async fn after_a_minute(host: Host) -> Self {
         let changes = Changes { workspace: 2, mode: Mode::Commits };
-        Self(Watched::after_a_minute(mac, move |store, sink| changes.run(store, sink)).await)
+        Self(Watched::after_a_minute(host, move |store, sink| changes.run(store, sink)).await)
     }
 
     async fn of(streams: Vec<Vec<Said>>) -> Self {
-        Self::after_a_minute(Mac::of(&FOLLOWED, connected(), streams)).await
+        Self::after_a_minute(Host::of(&FOLLOWED, connected(), streams)).await
     }
 
     fn seen(&mut self) -> Vec<(u64, String)> {
@@ -120,7 +120,7 @@ mod reopening {
     async fn says_the_workspace_closed_and_stops_once_the_session_lacks_it() {
         let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), session(BOOT, 8, false)]];
         let streams = vec![vec![ready(2), Said::After(5), exits()], vec![ready(3)]];
-        let mut followed = Followed::after_a_minute(Mac::of(&FOLLOWED, sessions, streams)).await;
+        let mut followed = Followed::after_a_minute(Host::of(&FOLLOWED, sessions, streams)).await;
         assert_eq!(followed.seen(), at(&[(0, "ready 2"), (6, "closed")]));
         assert_eq!((followed.follows(), followed.0.running.is_finished()), (1, true));
     }
@@ -128,21 +128,21 @@ mod reopening {
     #[tokio::test(start_paused = true)]
     async fn says_the_workspace_closed_without_following_it_when_the_session_lacks_it() {
         let sessions = vec![vec![session(BOOT, 7, false)]];
-        let mut followed = Followed::after_a_minute(Mac::of(&FOLLOWED, sessions, vec![vec![ready(2)]])).await;
+        let mut followed = Followed::after_a_minute(Host::of(&FOLLOWED, sessions, vec![vec![ready(2)]])).await;
         assert_eq!((followed.seen(), followed.follows()), (at(&[(0, "closed")]), 0));
     }
 
     #[tokio::test(start_paused = true)]
     async fn follows_again_once_connected_after_the_store_lost_its_transport() {
         let streams = vec![vec![ready(2), Said::After(5), dropped()], vec![ready(3)]];
-        let mut followed = Followed::after_a_minute(Mac::of(&FOLLOWED, dropped_for_a_while(), streams)).await;
+        let mut followed = Followed::after_a_minute(Host::of(&FOLLOWED, dropped_for_a_while(), streams)).await;
         assert_eq!(followed.seen(), at(&[(0, "ready 2"), (26, "ready 3")]));
     }
 
     #[tokio::test(start_paused = true)]
     async fn waits_for_a_session_of_the_restarted_server_before_following_again() {
         let streams = vec![vec![ready(2), Said::After(5), exits()], vec![ready(1)]];
-        let mut followed = Followed::after_a_minute(Mac::restarting(&FOLLOWED, streams)).await;
+        let mut followed = Followed::after_a_minute(Host::restarting(&FOLLOWED, streams)).await;
         assert_eq!(followed.seen(), at(&[(0, "ready 2"), (15, "ready 1")]));
     }
 }

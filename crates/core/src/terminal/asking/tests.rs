@@ -3,7 +3,7 @@ use serde_json::{Map, Value, json};
 
 use super::*;
 use crate::cli::surface::fixtures::ASK_ONE;
-use crate::follow::fake::{BOOT, Mac, Said, Watched, connected, exits, refused, session};
+use crate::follow::fake::{BOOT, Host, Said, Watched, connected, exits, refused, session};
 
 const TAB: [&str; 8] = ["surface", "--tab", "3", "--cols", "80", "--rows", "24", "--patches"];
 const SIZE: Size = Size { cols: 80, rows: 24 };
@@ -49,13 +49,13 @@ fn described(question: &Question) -> String {
 struct Read(Watched<Asked>);
 
 impl Read {
-    async fn after_a_minute(mac: Mac) -> Self {
-        Self::of_pane(941, mac).await
+    async fn after_a_minute(host: Host) -> Self {
+        Self::of_pane(941, host).await
     }
 
-    async fn of_pane(pane: u64, mac: Mac) -> Self {
+    async fn of_pane(pane: u64, host: Host) -> Self {
         let asking = Asking { tab: 3, pane, size: SIZE };
-        Self(Watched::after_a_minute(mac, move |store, sink| asking.run(store, sink)).await)
+        Self(Watched::after_a_minute(host, move |store, sink| asking.run(store, sink)).await)
     }
 
     fn seen(&mut self) -> Vec<(u64, String)> {
@@ -80,8 +80,8 @@ impl Read {
     }
 }
 
-fn reading(surfaces: Vec<Vec<Said>>) -> Mac {
-    Mac::of(&TAB, connected(), surfaces)
+fn reading(surfaces: Vec<Vec<Said>>) -> Host {
+    Host::of(&TAB, connected(), surfaces)
 }
 
 mod the_surface {
@@ -105,7 +105,7 @@ mod the_surface {
     async fn says_the_tab_closed_and_stops_once_the_session_drops_it() {
         let sessions = vec![vec![session(BOOT, 7, true), Said::After(5), session(BOOT, 8, false)]];
         let surfaces = vec![vec![asked(), Said::After(5), exits()], vec![asked()]];
-        let mut read = Read::after_a_minute(Mac::of(&TAB, sessions, surfaces)).await;
+        let mut read = Read::after_a_minute(Host::of(&TAB, sessions, surfaces)).await;
         assert_eq!(read.seen(), [(0, RED.to_owned()), (6, "closed".to_owned())]);
         assert!(read.0.running.is_finished());
     }
