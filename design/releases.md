@@ -1,8 +1,8 @@
 # Releases
 
-Code: `.github/workflows/release.yml`, `scripts/ios-release.sh`, `scripts/versions.test.ts`, `CHANGELOG.md`, and `src-tauri/gen/apple/project.yml` for the device family and the encryption key.
+Code: `.github/workflows/release.yml`, `scripts/ios-release.sh`, `scripts/versions.test.ts`, `CHANGELOG.md`, and `src-tauri/gen/apple/project.yml` for the device family and the encryption key; for the site, `site/`, `scripts/site.mjs`, `scripts/site.test.ts`, `SUPPORT.md` and `.github/workflows/pages.yml`.
 
-How a version becomes an Android APK on a GitHub Release and an iPhone build in TestFlight (0.1.0, 060). Android is built and signed by a workflow; iOS by a script on a Mac. Publishing stays a person's job: the workflow makes only a draft, and the script is run by hand.
+How a version becomes an Android APK on a GitHub Release and an iPhone build in TestFlight (0.1.0, 060). Android is built and signed by a workflow; iOS by a script on a Mac. Publishing stays a person's job: the workflow makes only a draft, and the script is run by hand. The privacy and support pages that the stores ask for are a small site on GitHub Pages, built from the repository's markdown on every change to `main` (069).
 
 ## The version
 
@@ -55,7 +55,9 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 ## App Store Connect
 
 - **The app**: "Cornercase remote", Apple ID 6835431973, SKU `cornercase-mobile`, primary language en-US, bundle ID `dev.usecornercase.mobile`, team `22FWTVV94S` (the paid Apple Developer Program). The name under the icon is "Cornercase" (decided by the user on 2026-11-16): `CFBundleDisplayName` in `project.yml` › `info.properties` on iOS, `app_name` and `main_activity_title` in `res/values/strings.xml` on Android. `productName` stays "cornercase", since it also names the binaries and the bundles.
-- **The privacy policy** is `PRIVACY.md`. External TestFlight testing and the App Store need it at a public URL, which the repository gives once it is public.
+- **The privacy policy** is `PRIVACY.md`. External TestFlight testing and the App Store need it at a public URL: `https://miguelhang.github.io/cornercase-mobile/privacy/`, the site's (The site).
+- **The support page** is `SUPPORT.md`, at `https://miguelhang.github.io/cornercase-mobile/support/`, the Support URL that the App Store asks for with every version.
+- **The user puts both URLs into App Store Connect by hand**: no script or workflow writes to it. They change with the move to usecornercase (The repository's URLs).
 
 ## App Review
 
@@ -63,10 +65,55 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
   - "Cornercase remote controls the cornercase app running on the user's Mac, so a real session needs a Mac with cornercase 0.13.78 or later that the phone can reach. To try it without one, tap `Try a demo` on the first screen: it adds a simulated Demo Mac inside the app, marked `DEMO`, with sample agents to open, message, answer, start and close. It uses no network and saves nothing. Tap `Leave demo` on the connection bar to leave it."
 - **The screenshots** can come from the demo too: its sample is fictional and in English, made for them. None has been taken yet.
 
+## The site
+
+- **Three pages on GitHub Pages**: a short home at `/`, the privacy policy at `/privacy/` and support at `/support/`, which App Store Connect asks for (069). Their text is `site/index.md`, `PRIVACY.md` and `SUPPORT.md`; `site/page.html` is the template the three share and `site/site.css` their style sheet. `scripts/site.mjs` writes them to `_site/`, which git and ESLint ignore, and `.github/workflows/pages.yml` publishes that folder. Locally: `node scripts/site.mjs --repository owner/name`.
+- **Built from the markdown by a script of our own** (D1), so `PRIVACY.md` stays the one text that GitHub shows in the repository and the site serves. `scripts/site.mjs` parses with `mdast-util-from-markdown` and its GFM extension, which the app already depends on, and writes the HTML through a map of handlers by node type, as `src/lib/markdown.ts` does; it does not import that file, which is TypeScript for the WebView. No new dependency. Rejected:
+  - Jekyll, Pages' own build: from a folder it takes no files from outside it, so `PRIVACY.md` at the root would need a copy, and from the root it would publish every markdown file of the repository; it also brings a theme of its own and Ruby.
+  - GitHub's markdown API: the network at build time, for HTML that still needs a page around it.
+  - `remark` and `rehype`: new dependencies for three pages.
+  - HTML committed next to the markdown, with a test that they match: two copies of every change.
+- **What markdown it takes**: headings, paragraphs, emphasis, strong, inline code, code blocks, line breaks, rules, lists and links, which is what the three pages use. Anything else, such as a table, an image, strikethrough, a task list or raw HTML, stops the build with the file and the line, so a page never shows markdown as literal text and no raw HTML reaches the site. GFM is parsed so that what GitHub renders as a table fails rather than turning into a paragraph of pipes. All text is escaped.
+- **Links stay as GitHub reads them**: the markdown links relatively, and the script resolves every link against the file's place in the repository, `https://github.com/<owner>/<name>/blob/main/<file>`. A link to one of the three pages becomes a relative link to its folder, keeping its `#fragment` (`PRIVACY.md` from `/support/` is `../privacy/`); any other becomes an absolute link to GitHub (`../../issues/new` is the repository's new issue). An absolute link that is not `https` stops the build.
+- **The repository comes from `GITHUB_REPOSITORY`**, which GitHub sets in every job and does not let a workflow override, or from `--repository owner/name`; with neither, the script stops and says so. So no source names the owner, and the move to usecornercase changes none of them.
+- **URLs with a folder** (D2): `/privacy/` and `/support/`, each an `index.html`, rather than `privacy.html`: shorter to type into App Store Connect, and the address says nothing about what the page is made of.
+- **`SUPPORT.md` at the root** (D3): GitHub links a repository's `SUPPORT.md` to whoever opens an issue, so one text serves both. It calls the computer that runs cornercase a machine, the app's word, and "your computer (Linux or macOS)" to someone new, never a Mac (decided by the user on 2026-11-17). `PRIVACY.md`, `README.md` and the app's texts, the reviewer's notes in App Review included, still say Mac until 070.
+- **The page**: `site/page.html` fills `{{root}}`, `{{title}}` and `{{content}}`, and a key without a value stops the build. It has `lang="en"`, a Content Security Policy of `default-src 'none'; style-src 'self'` (the site has no scripts, fonts or images), `no-referrer`, and a header that links the three pages. A page's title is its `#` heading and "Cornercase remote"; the home's heading is the name, which it does not repeat.
+- **The look** (D4): `src/lib/theme/tokens.css` is copied as it is, so the dark site has the app's colours, radii, spacing and fonts, and `site/site.css` uses only its variables. The wash of `--brand` at 12 % and the visible focus follow `src/lib/theme/base.css`, which the site does not import: it turns off text selection and carries rules of the app's own.
+- **A light palette of the site's own**: the app is dark only, while the site follows the phone's setting (`color-scheme` and `prefers-color-scheme`). In light it overrides six colours and nothing else, inverting the background and the text and keeping cobalt; its accent is the app's `--brand-hover`:
+
+  | Token | Dark (the app's) | Light |
+  |---|---|---|
+  | `--glass` | `#0b0c0e` | `#f7f8fa` |
+  | `--panel` | `#ffffff0a` | `#0000000a` |
+  | `--border` | `#ffffff17` | `#0000001f` |
+  | `--text` | `#eceef1` | `#16181c` |
+  | `--soft` | `#b6bcc4` | `#474d56` |
+  | `--accent` | `#74a3ff` | `#0050d8` |
+
+- **Contrast**, WCAG's ratio, measured on 2026-11-17 on the background, under the wash where it is strongest and on the panel behind code; the lowest is 5.30:1, above the 4.5:1 that AA asks of body text:
+
+  | Theme | Text | Background | Wash | Code |
+  |---|---|---|---|---|
+  | Dark | `--text` | 16.83 | 15.55 | 15.64 |
+  | Dark | `--soft` | 10.23 | 9.45 | 9.51 |
+  | Dark | `--accent` | 7.85 | 7.25 | 7.30 |
+  | Light | `--text` | 16.73 | 14.07 | 15.35 |
+  | Light | `--soft` | 8.02 | 6.75 | 7.36 |
+  | Light | `--accent` | 6.30 | 5.30 | 5.78 |
+
+- **The workflow**, `.github/workflows/pages.yml`, runs on a push to `main` that touches the site's sources (the three markdown files, `site/`, `scripts/site.mjs`, `tokens.css`, `package.json`, `pnpm-lock.yaml` and itself) and by hand with `workflow_dispatch`. `build` sets up the tools as `ci.yml` does, with the same versions, installs, runs `node scripts/site.mjs`, then `configure-pages` and `upload-pages-artifact`; `deploy` runs `deploy-pages`. `scripts/site.test.ts` checks the versions against `ci.yml` and that the paths name every source.
+  - Permissions: `contents: read`, `pages: write` and `id-token: write`, which `deploy-pages` needs to prove where it runs.
+  - Concurrency `pages` without cancelling: a deploy that has started finishes, and the next one waits.
+  - No `.nojekyll`: Jekyll does not run when Actions deploys. `upload-pages-artifact` leaves out hidden files, and the site has none.
+  - The Pages actions are at their latest major versions on 2026-11-17 (`configure-pages` 6, `upload-pages-artifact` 5, `deploy-pages` 5); Dependabot updates them with the rest.
+- **Only `main` deploys**: the `github-pages` environment that GitHub creates with Pages allows the default branch only, so a pull request cannot publish, and the first deploy is the merge's. Pages was turned on before that merge, on 2026-11-17, through the API (`POST /repos/{owner}/{repo}/pages` with `build_type: workflow`, the Actions source, authorised by the user), since the deploy fails while Pages is off. The site is `https://miguelhang.github.io/cornercase-mobile/`.
+
 ## The repository's URLs
 
-- **The repository lives at `MiguelHang/cornercase-mobile` for now and moves to the usecornercase organisation later**, so nothing names it: `README.md`, `CHANGELOG.md` and `PRIVACY.md` link relatively (`PRIVACY.md`, `../../releases/latest`, `../../issues`), and the workflow uses `github.repository` and `gh`'s defaults.
-- **Absolute URLs to the repository: none** (`grep -rn "MiguelHang/cornercase-mobile" --exclude-dir=node_modules --exclude-dir=docs .` on 2026-11-16). Outside it, the privacy policy's URL in App Store Connect names it; change it with the move.
+- **The repository lives at `MiguelHang/cornercase-mobile` for now and moves to the usecornercase organisation later**, so nothing names it: `README.md`, `CHANGELOG.md` and `PRIVACY.md` link relatively (`PRIVACY.md`, `../../releases/latest`, `../../issues`), as do `SUPPORT.md` and `site/index.md`; `release.yml` uses `github.repository` and `gh`'s defaults, and the site's script `GITHUB_REPOSITORY`.
+- **Absolute URLs to the repository: none** (`grep -rn "MiguelHang/cornercase-mobile" --exclude-dir=node_modules --exclude-dir=docs .` on 2026-11-17, which finds only this file).
+- **The site's URLs name the owner, here only**: `https://miguelhang.github.io/cornercase-mobile/privacy/` and `/support/`, written into App Store Connect by hand. The move changes their host to `usecornercase.github.io` and keeps their paths: change both in App Store Connect then, and check that they answer.
 
 ## Checked live
 
@@ -83,4 +130,9 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
   - The signed APK on a phone or in the emulator.
   - `tauri ios build` writing `CFBundleShortVersionString` into `Info.plist` from a version other than `0.1.0`: every build so far had `0.1.0` in both. The CLI 2.12.4 binary holds the code for it (its warning about stripping a prerelease tag from `CFBundleShortVersionString`), and `CFBundleVersion` was seen rewritten.
   - Signing with the API key, the `app-store-connect` export, the upload, and App Store Connect taking a 12-digit build number.
+- On 2026-11-17, for the site, with Node 22 and actionlint 1.7.12:
+  - `actionlint` passes `pages.yml`, and the Pages actions' latest releases were read with `gh api repos/actions/<action>/releases/latest`.
+  - `node scripts/site.mjs --repository owner/name` writes the three pages and the two style sheets to `_site/`, which `git status` does not list, and resolves `SUPPORT.md`'s links to `../privacy/` and to the repository's new issue on GitHub.
+  - The three pages at 320 px wide, in light and in dark, in headless Chrome: nothing overflows the width, and both themes read as The site describes. The contrasts were computed from the colours, with WCAG's formula.
+- Not checked for the site, until the merge deploys it: the workflow on GitHub and the two URLs answering 200, which a `curl` of each confirms after the merge.
 - `apksigner` also writes a v4 signature, `cornercase-<version>.apk.idsig`, next to the APK; the workflow does not upload it.
