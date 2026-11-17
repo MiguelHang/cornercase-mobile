@@ -1,0 +1,14 @@
+{
+  "appStoreReviewDetails": {
+    "attributes": {
+      "contactFirstName": null,
+      "contactLastName": null,
+      "contactPhone": null,
+      "contactEmail": null,
+      "demoAccountName": null,
+      "demoAccountPassword": null,
+      "demoAccountRequired": false,
+      "notes": { "$file": "review/notes.txt" }
+    }
+  }
+}

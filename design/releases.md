@@ -1,8 +1,12 @@
 # Releases
 
-Code: `.github/workflows/release.yml`, `scripts/ios-release.sh`, `scripts/versions.test.ts`, `CHANGELOG.md`, and `src-tauri/gen/apple/project.yml` for the device family and the encryption key; for the site, `site/`, `scripts/site.mjs`, `scripts/site.test.ts`, `SUPPORT.md` and `.github/workflows/pages.yml`.
+Code: `.github/workflows/release.yml`, `scripts/ios-release.sh`, `scripts/versions.test.ts`, `CHANGELOG.md`, and `src-tauri/gen/apple/project.yml` for the device family and the encryption key; for the site, `site/`, `scripts/site.mjs`, `scripts/site.test.ts`, `SUPPORT.md` and `.github/workflows/pages.yml`; for the App Store listing, `store/app-store/` and `scripts/store.test.ts`.
 
 How a version becomes an Android APK on a GitHub Release and an iPhone build in TestFlight (0.1.0, 060). Android is built and signed by a workflow; iOS by a script on a Mac. Publishing stays a person's job: the workflow makes only a draft, and the script is run by hand. The privacy and support pages that the stores ask for are a small site on GitHub Pages, built from the repository's markdown on every change to `main` (069).
+
+Topics, in `design/releases/`:
+
+- [The App Store listing](releases/app-store.md) (`store/app-store/`, `scripts/store.test.ts`): one JSON file per group of App Store Connect API resources and the texts in `.txt`, why not fastlane `deliver`, the OpenAPI version, what is left `null`, 4+ and why, the copyright, free everywhere, a machine and not a Mac, guideline 2.3.10, `whatsNew`, the screenshots from the demo on a simulator of their own (English, the Dynamic Island, no alpha, no frames), the recording as a review attachment, the test, and that nothing was applied in App Store Connect.
 
 ## The version
 
@@ -58,12 +62,12 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 - **The privacy policy** is `PRIVACY.md`. External TestFlight testing and the App Store need it at a public URL: `https://miguelhang.github.io/cornercase-mobile/privacy/`, the site's (The site).
 - **The support page** is `SUPPORT.md`, at `https://miguelhang.github.io/cornercase-mobile/support/`, the Support URL that the App Store asks for with every version.
 - **The user puts both URLs into App Store Connect by hand**: no script or workflow writes to it. They change with the move to usecornercase (The repository's URLs).
+- **The listing** lives in `store/app-store/`, in a form the API applies as it is, with its `README.md` saying how and what is still missing (The App Store listing).
 
 ## App Review
 
-- **The demo is the way in** (064, `demo.md`): the app does nothing without a computer running cornercase, and App Review (guideline 2.1) has to see it work. The notes for the reviewer in App Store Connect › App Review Information say so, and `Sign-in required` stays off, since there is no account:
-  - "Cornercase remote controls the cornercase app running on the user's computer (Linux or macOS), so a real session needs a computer with cornercase 0.13.78 or later that the phone can reach. To try it without one, tap `Try a demo` on the first screen: it adds a simulated Demo machine inside the app, marked `DEMO`, with sample agents to open, message, answer, start and close. It uses no network and saves nothing. Tap `Leave demo` on the connection bar to leave it."
-- **The screenshots** can come from the demo too: its sample is fictional and in English, made for them. None has been taken yet.
+- **The demo is the way in** (064, `demo.md`): the app does nothing without a computer running cornercase, and App Review (guideline 2.1) has to see it work. The notes for the reviewer in App Store Connect › App Review Information say so, and `Sign-in required` stays off, since there is no account. Their text is `store/app-store/review/notes.txt`, with a recording of the way in attached (The App Store listing).
+- **The screenshots** come from the demo too: its sample is fictional and in English, made for them. They are in `store/app-store/screenshots/iphone-6.9/` and the recording in `store/app-store/review/demo.mp4` (The App Store listing).
 
 ## The site
 
@@ -113,7 +117,7 @@ How a version becomes an Android APK on a GitHub Release and an iPhone build in 
 
 - **The repository lives at `MiguelHang/cornercase-mobile` for now and moves to the usecornercase organisation later**, so nothing names it: `README.md`, `CHANGELOG.md` and `PRIVACY.md` link relatively (`PRIVACY.md`, `../../releases/latest`, `../../issues`), as do `SUPPORT.md` and `site/index.md`; `release.yml` uses `github.repository` and `gh`'s defaults, and the site's script `GITHUB_REPOSITORY`.
 - **Absolute URLs to the repository: none** (`grep -rn "MiguelHang/cornercase-mobile" --exclude-dir=node_modules --exclude-dir=docs .` on 2026-11-17, which finds only this file).
-- **The site's URLs name the owner, here only**: `https://miguelhang.github.io/cornercase-mobile/privacy/` and `/support/`, written into App Store Connect by hand. The move changes their host to `usecornercase.github.io` and keeps their paths: change both in App Store Connect then, and check that they answer.
+- **The site's URLs name the owner, here and in the App Store listing**: `https://miguelhang.github.io/cornercase-mobile/privacy/` and `/support/`, written into App Store Connect by hand, and into `store/app-store/app-info.json` and `version.json`, which `scripts/store.test.ts` ties to these two. The move changes their host to `usecornercase.github.io` and keeps their paths: change them here, in the listing and in App Store Connect then, and check that they answer.
 
 ## Checked live
 

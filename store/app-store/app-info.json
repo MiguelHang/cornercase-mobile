@@ -1,0 +1,22 @@
+{
+  "apps": {
+    "attributes": {
+      "contentRightsDeclaration": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+    }
+  },
+  "appInfos": {
+    "relationships": {
+      "primaryCategory": { "data": { "type": "appCategories", "id": "DEVELOPER_TOOLS" } },
+      "secondaryCategory": { "data": null }
+    }
+  },
+  "appInfoLocalizations": {
+    "en-US": {
+      "attributes": {
+        "name": "Cornercase remote",
+        "subtitle": "Follow your coding agents",
+        "privacyPolicyUrl": "https://miguelhang.github.io/cornercase-mobile/privacy/"
+      }
+    }
+  }
+}

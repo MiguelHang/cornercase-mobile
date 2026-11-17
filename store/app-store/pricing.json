@@ -1,0 +1,30 @@
+{
+  "appPricePoints": {
+    "attributes": { "customerPrice": "0.0" },
+    "relationships": {
+      "territory": { "data": { "type": "territories", "id": "USA" } }
+    }
+  },
+  "appPriceSchedules": {
+    "relationships": {
+      "baseTerritory": { "data": { "type": "territories", "id": "USA" } },
+      "manualPrices": { "data": [{ "type": "appPrices", "id": "${free}" }] }
+    },
+    "included": [
+      {
+        "type": "appPrices",
+        "id": "${free}",
+        "attributes": { "startDate": null, "endDate": null },
+        "relationships": {
+          "appPricePoint": { "data": { "type": "appPricePoints", "id": null } }
+        }
+      }
+    ]
+  },
+  "appAvailabilities": {
+    "attributes": { "availableInNewTerritories": true }
+  },
+  "territoryAvailabilities": {
+    "attributes": { "available": true, "releaseDate": null, "preOrderEnabled": false }
+  }
+}
